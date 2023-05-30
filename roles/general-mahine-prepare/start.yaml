@@ -1,0 +1,3 @@
+---
+  - import_playbook: ./tasks/update.yaml
+  - import_playbook: ./tasks/install_packages.yaml

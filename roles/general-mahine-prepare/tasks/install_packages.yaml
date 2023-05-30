@@ -1,0 +1,30 @@
+---
+- hosts: local
+  become: true
+  vars_files:
+    - '{{ inventory_dir }}/vars/vars.yaml'
+  tasks:
+  - name: Install packages
+    apt:
+      state: latest
+      update_cache: yes
+      pkg:
+      - tree
+      - neofetch
+      - bat
+      - exa
+      - fd-find
+      - fzf
+      - httpie
+      # - xh # not found, apparently
+      - cron
+      - hstr
+      - duf
+      - jq
+      - zoxide
+  - name: Install Snap packages
+    community.general.snap:
+      name:
+        # - tldr # not found, too
+        - procs
+  
