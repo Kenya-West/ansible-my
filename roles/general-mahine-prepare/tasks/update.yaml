@@ -1,5 +1,6 @@
 ---
-- hosts: local
+- name: Update standard packages
+  hosts: local
   become: true
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'

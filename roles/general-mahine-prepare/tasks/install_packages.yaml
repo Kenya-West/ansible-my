@@ -1,5 +1,6 @@
 ---
-- hosts: local
+- name: Install packages
+  hosts: local
   become: true
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'

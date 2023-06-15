@@ -1,5 +1,6 @@
 ---
-- hosts: local
+- name: Install PowerShell
+  hosts: local
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
   tasks:
