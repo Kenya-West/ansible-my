@@ -5,7 +5,8 @@
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
   tasks:
-  - name: Install packages
+  - name: Install Apt packages
+    ignore_errors: yes
     apt:
       state: latest
       update_cache: yes
