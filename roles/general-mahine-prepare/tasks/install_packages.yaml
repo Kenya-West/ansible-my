@@ -17,12 +17,13 @@
       - fd-find
       - fzf
       - httpie
-      # - xh # not found, apparently
+      - xh
       - cron
       - hstr
       - duf
       - jq
       - zoxide
+      - whois
   - name: Install Snap packages
     community.general.snap:
       name:
