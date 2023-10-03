@@ -4,3 +4,4 @@
   - import_playbook: ./tasks/install_powershell.yaml
   - import_playbook: ./tasks/install_docker.yaml
   - import_playbook: ./tasks/install_oh-my-posh.yaml
+  - import_playbook: ./tasks/install_oh-my-posh_powershell.yaml
