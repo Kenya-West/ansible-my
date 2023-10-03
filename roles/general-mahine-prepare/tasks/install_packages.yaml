@@ -11,6 +11,7 @@
       state: latest
       update_cache: yes
       pkg:
+      - unzip
       - ncdu
       - tree
       - neofetch
