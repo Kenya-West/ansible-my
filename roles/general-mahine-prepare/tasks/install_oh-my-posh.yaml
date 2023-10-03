@@ -4,7 +4,7 @@
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
   become: true
-  become_user: "{{ standard_user }}"
+  become_user: root
   vars:
     script_dir: oh-my-posh
     themes_dir: .poshthemes
@@ -14,9 +14,11 @@
   - file:
       state: directory
       path: "/home/{{ standard_user }}/{{ script_dir }}"
+      mode: 0775
   - file:
       state: directory
       path: "/home/{{ standard_user }}/{{ themes_dir }}"
+      mode: 0775
   
   - name: Change script and themes permissions
     command: "{{ item }}"
@@ -71,8 +73,6 @@
 
   - name: Install oh-my-posh
     command: "/home/{{ standard_user }}/{{ script_dir }}/install.sh"
-    become: yes
-    become_user: root
 
   - name: Install Nerd fonts
     command: "oh-my-posh font install CascadiaCode"
