@@ -1,9 +1,10 @@
 ---
 - name: Install OhMyPosh
   hosts: local
-  become: true
   vars_files:
-    - '{{ inventory_dir }}/vars/vars.yaml'
+    - "{{ inventory_dir }}/vars/vars.yaml"
+  become: true
+  become_user: "{{ standard_user }}"
   vars:
     script_dir: oh-my-posh
     themes_dir: .poshthemes
@@ -16,6 +17,12 @@
   - file:
       state: directory
       path: "/home/{{ standard_user }}/{{ themes_dir }}"
+  
+  - name: Change script and themes permissions
+    command: "{{ item }}"
+    with_items: 
+    - "chmod -R 775 /home/{{ standard_user }}/{{ script_dir }}"
+    - "chmod -R 775 /home/{{ standard_user }}/{{ themes_dir }}"
 
   - name: Download oh-my-posh
     get_url:
@@ -23,40 +30,68 @@
       validate_certs: false
       dest: "/home/{{ standard_user }}/{{ script_dir }}/install.sh"
 
-  - name: Download and unzip oh-my-posh themes
-    ansible.builtin.unarchive:
-      src: https://github.com/JanDeDobbeleer/oh-my-posh/releases/latest/download/themes.zip
-      validate_certs: false
+  - name: Download oh-my-posh themes
+    get_url:
+      url: https://github.com/JanDeDobbeleer/oh-my-posh/releases/latest/download/themes.zip
       dest: "/home/{{ standard_user }}/{{ themes_dir }}"
-      remote_src: yes
+      force: true
 
-  - name: Change script and themes permissions
+  - name: Rename themes file
+    shell: "mv /home/{{ standard_user }}/{{ themes_dir }}/themes.zip /home/{{ standard_user }}/{{ themes_dir }}/themes.zip.gz"  
+  
+  - name: Change themes permissions
+    command: "{{ item }}"
+    with_items: 
+    - "chmod -R 775 /home/{{ standard_user }}/{{ themes_dir }}"
+
+  - name: Unzip themes by two ways
+    block:
+      - name: Unzip oh-my-posh themes by built-in unarchive module
+        unarchive:
+          src: "/home/{{ standard_user }}/{{ themes_dir }}/themes.zip.gz"
+          dest: "/home/{{ standard_user }}/{{ themes_dir }}"
+    rescue:
+      - name: Unzip oh-my-posh themes by shell module with unzip tool
+        shell: "unzip -o /home/{{ standard_user }}/{{ themes_dir }}/themes.zip.gz -d /home/{{ standard_user }}/{{ themes_dir }}"
+
+  - name: Change themes permissions
+    command: "{{ item }}"
+    with_items: 
+    - "chmod -R 775 /home/{{ standard_user }}/{{ themes_dir }}"
+
+  - name: Remove themes archive
+    file:
+      state: absent
+      path: "/home/{{ standard_user }}/{{ themes_dir }}/themes.zip.gz"
+
+  - name: Change script permissions
     command: "{{ item }}"
     with_items: 
     - "chmod -R 775 /home/{{ standard_user }}/{{ script_dir }}"
-    - "chmod -R 775 /home/{{ standard_user }}/{{ themes_dir }}"
 
   - name: Install oh-my-posh
     command: "/home/{{ standard_user }}/{{ script_dir }}/install.sh"
+    become: yes
+    become_user: root
 
   - name: Install Nerd fonts
     command: "oh-my-posh font install CascadiaCode"
 
   - name: Ensure that profile exists
-    ansible.builtin.copy:
+    copy:
       dest: "/home/{{ standard_user }}/.profile"
       content: ""
       force: no
 
   - name: Remove oh-my-posh obsolete line from profile
-    ansible.builtin.lineinfile:
+    lineinfile:
       path: "/home/{{ standard_user }}/.profile"
       regexp: eval\s\"\$\(oh-my-posh.+
       state: absent
       backup: yes
 
   - name: Add oh-my-posh to profile
-    ansible.builtin.lineinfile:
+    lineinfile:
       path: "/home/{{ standard_user }}/.profile"
       line: "eval \"$(oh-my-posh init bash --config /home/{{ standard_user }}/{{ themes_dir }}/{{ theme }}.omp.json)\""
 
