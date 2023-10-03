@@ -2,7 +2,7 @@
 - name: Install PowerShell
   hosts: local
   vars_files:
-    - '{{ inventory_dir }}/vars/vars.yaml'
+    - "{{ inventory_dir }}/vars/vars.yaml"
   tasks:
     - name: Set custom fact based on ansible_distribution_major_version
       set_fact:
