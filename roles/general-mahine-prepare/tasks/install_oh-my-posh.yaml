@@ -1,6 +1,6 @@
 ---
 - name: Install OhMyPosh
-  hosts: local
+  hosts: all
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
   become: true

@@ -1,6 +1,6 @@
 ---
 - name: Install Docker
-  hosts: local
+  hosts: all
   become: true
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
