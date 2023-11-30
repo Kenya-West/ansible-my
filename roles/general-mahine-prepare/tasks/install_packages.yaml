@@ -27,6 +27,7 @@
       - jq
       - zoxide
       - whois
+      - ripgrep
   - name: Install Snap packages
     community.general.snap:
       name:
