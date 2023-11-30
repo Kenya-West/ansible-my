@@ -1,0 +1,64 @@
+---
+- name: Install FRP
+  hosts: all
+  become: true
+  become_user: "{{ standard_user }}"
+  vars_files:
+    - '{{ inventory_dir }}/vars/vars.yaml'
+  vars:
+    frp_dir: frp
+
+  tasks:
+  - name: check latest FRP
+    uri:
+      url: https://api.github.com/repos/fatedier/frp/releases/latest
+      return_content: true
+    register: github_latest_release
+  
+  - name: Set version
+    set_fact:
+      latest_version: "{{ github_latest_release.json.tag_name | replace('v', '') }}"
+  - name: Set file name
+    set_fact:
+      file_name: "frp_{{ latest_version }}_linux_amd64.tar.gz"
+      download_dir_name: "frp_{{ latest_version }}_linux_amd64"
+  - name: Show file name
+    debug:
+      msg: "{{ file_name }}"
+
+  - name: Create directories for the /{{frp_dir}}/ path
+    file:
+      path: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      state: directory
+      mode: 0755
+
+  - name: "installing FRP {{ github_latest_release.json.tag_name }}"
+    loop: "{{ github_latest_release.json.assets }}"
+    when: "file_name in item.name"
+    unarchive:
+      remote_src: yes
+      src: "{{ item.browser_download_url }}"
+      dest: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      keep_newer: yes
+  
+  - name: Copy the frpc file to the new location
+    copy:
+      src: /home/{{ standard_user }}/{{ frp_dir }}/{{download_dir_name}}/frpc
+      dest: /home/{{ standard_user }}/{{ frp_dir }}/
+      remote_src: true
+      
+  - name: Copy the frps file to the new location
+    copy:
+      src: /home/{{ standard_user }}/{{ frp_dir }}/{{download_dir_name}}/frps
+      dest: /home/{{ standard_user }}/{{ frp_dir }}/
+      remote_src: true
+
+  - name: Change script and themes permissions
+    command: "{{ item }}"
+    with_items: 
+    - "chmod -R 775 /home/{{ standard_user }}/{{ frp_dir }}"
+
+  - name: Delete downloaded directory
+    file:
+      path: /home/{{ standard_user }}/{{ frp_dir }}/{{download_dir_name}}/
+      state: absent
