@@ -1,0 +1,48 @@
+---
+- name: Install Caddy with Docker
+  hosts: all
+  become: true
+  vars_files:
+    - '{{ inventory_dir }}/vars/vars.yaml'
+  vars:
+    caddy_dir: caddy
+
+  tasks:
+  - name: Ensure ~/caddy directory exists
+    file:
+      path: "/home/{{ standard_user }}/{{ caddy_dir }}/"
+      state: directory
+      mode: '0775'
+  - name: Ensure ~/caddy/caddy_data directory exists
+    file:
+      path: "/home/{{ standard_user }}/{{ caddy_dir }}/caddy_data"
+      state: directory
+      mode: '0775'
+  - name: Copy all files from local assets/caddy to remote ~/caddy
+    copy:
+      src: "{{ item }}"
+      dest: "/home/{{ standard_user }}/{{ caddy_dir }}/{{ item | basename }}"
+    with_fileglob:
+      - "{{ inventory_dir }}/assets/caddy/*"
+    register: copy_files
+  - name: Ensure Docker network 'caddy' exists with specific settings
+    docker_network:
+      name: caddy
+      driver: bridge
+      state: present
+  - name: Run docker compose up for Caddy
+    command: docker compose up caddy -d
+    args:
+      chdir: "/home/{{ standard_user }}/{{ caddy_dir }}/"
+    register: docker_compose_up
+  - name: Wait for 3 seconds after starting docker compose
+    pause:
+      seconds: 3
+    when: docker_compose_up.changed
+  - name: Check if Caddy service is running correctly
+    command: docker compose ps caddy
+    args:
+      chdir: "/home/{{ standard_user }}/{{ caddy_dir }}/"
+    register: docker_ps
+    failed_when: "'Up' not in docker_ps.stdout"
+    when: docker_compose_up.changed

@@ -6,12 +6,14 @@
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
     packages:
+      # Base packages
       - bash
       - curl
       - wget
       - unzip
       - ncdu
       - tree
+      # Extra packages
       - neofetch
       - bat # Ensure this is available or add a task to include its repository
       # - rust-eza might need to be installed differently
@@ -26,6 +28,8 @@
       - zoxide
       - whois
       - ripgrep
+      # Service packages
+      - python3-docker # Needed for Ansible Docker modules
 
   tasks:
   - name: Install Apt packages
