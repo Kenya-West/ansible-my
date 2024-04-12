@@ -1,0 +1,12 @@
+---
+- name: Install Bash as a default shell
+  hosts: all
+  become: true
+  vars_files:
+    - "{{ inventory_dir }}/vars/vars.yaml"
+  tasks:
+    - name: Change user shell to Bash
+      become: yes
+      user:
+        name: "{{ standard_user }}"
+        shell: /bin/bash
