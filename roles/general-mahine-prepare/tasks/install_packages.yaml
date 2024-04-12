@@ -4,20 +4,18 @@
   become: true
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
-  tasks:
-  - name: Install Apt packages
-    ignore_errors: yes
-    apt:
-      state: latest
-      update_cache: yes
-      pkg:
+  vars:
+    packages:
+      - bash
+      - curl
+      - wget
       - unzip
       - ncdu
       - tree
       - neofetch
-      - bat
-      - exa
-      - fd-find
+      - bat # Ensure this is available or add a task to include its repository
+      # - rust-eza might need to be installed differently
+      - fd-find # Use 'fd' for Ubuntu/Debian, might need a PPA
       - fzf
       - httpie
       - xh
@@ -28,9 +26,18 @@
       - zoxide
       - whois
       - ripgrep
+
+  tasks:
+  - name: Install Apt packages
+    ignore_errors: yes
+    ansible.builtin.apt:
+      update_cache: yes
+      name: "{{ item }}"
+      state: present
+    loop: "{{ packages }}"
+
   - name: Install Snap packages
+    ignore_errors: yes
     community.general.snap:
       name:
-        # - tldr # not found, too
         - procs
-  
