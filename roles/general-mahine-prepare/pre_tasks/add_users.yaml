@@ -2,6 +2,8 @@
 - name: Add users based on local file contents
   hosts: all
   become: true
+  vars_files:
+    - "{{ inventory_dir }}/vars/vars.yaml"
 
   tasks:
     - name: Load user data from a local file
