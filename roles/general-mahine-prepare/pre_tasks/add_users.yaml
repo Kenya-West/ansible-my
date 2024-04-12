@@ -8,7 +8,7 @@
   tasks:
     - name: Load user data from a local file
       set_fact:
-        user_lines: "{{ lookup('file', '{{ inventory_dir }}/users.txt').split(' ') }}"
+        user_lines: "{{ lookup('file', '{{ inventory_dir }}//assets/users/users.txt').split(' ') }}"
 
     - name: Parse user data
       set_fact:
