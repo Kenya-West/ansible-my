@@ -1,0 +1,47 @@
+---
+- name: Set authorized SSH keys
+  hosts: all
+  become: true
+  vars_files:
+    - "{{ inventory_dir }}/vars/vars.yaml"
+  vars:
+    combined_user_keys: []
+  tasks:
+    - name: Load user data from a local file
+      set_fact:
+        user_lines: "{{ lookup('file', inventory_dir + '/assets/users/users.txt').splitlines() }}"
+      ignore_errors: yes
+
+    - name: Parse user data
+      set_fact:
+        users: "{{ user_lines |
+                   map('split', ':') |
+                   map('list') |
+                   json_query('[*].{name: [0], state: [1], role: [2]}') }}"
+      ignore_errors: yes
+
+    - name: Load public keys from a local file
+      set_fact:
+        ssh_keys_content: "{{ lookup('file', inventory_dir + '/assets/ssh_keys/authorized_keys').split('\n') }}"
+      ignore_errors: true
+
+    - name: Create combined user-key pairs
+      set_fact:
+        combined_user_keys: "{{ combined_user_keys + [{'user': item[0].name, 'key': item[1]}] }}"
+      loop: "{{ users | product(ssh_keys_content) | list }}"
+      when: item[1] is match('ssh-rsa|ecdsa-sha2|ssh-ed25519')
+      loop_control:
+        loop_var: item
+
+    - name: Set SSH authorized keys for each user with valid keys
+      authorized_key:
+        user: "{{ item.user }}"
+        state: present
+        key: "{{ item.key | trim }}"
+      loop: "{{ combined_user_keys }}"
+      ignore_errors: true
+
+    - name: Handle errors if occurred
+      debug:
+        msg: "An error occurred processing a user or key."
+      when: ansible_failed_task is defined
