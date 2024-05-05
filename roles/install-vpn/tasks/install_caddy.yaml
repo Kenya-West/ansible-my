@@ -18,13 +18,50 @@
       path: "/home/{{ standard_user }}/{{ caddy_dir }}/caddy_data"
       state: directory
       mode: '0775'
-  - name: Copy all files from local assets/caddy to remote ~/caddy
+  - name: Ensure ~/caddy/config directory exists
+    file:
+      path: "/home/{{ standard_user }}/{{ caddy_dir }}/config"
+      state: directory
+      mode: '0775'
+  - name: Ensure ~/caddy/logs directory exists
+    file:
+      path: "/home/{{ standard_user }}/{{ caddy_dir }}/logs"
+      state: directory
+      mode: '0775'
+  - name: Ensure ~/caddy/static directory exists
+    file:
+      path: "/home/{{ standard_user }}/{{ caddy_dir }}/static"
+      state: directory
+      mode: '0777'
+  - name: Ensure ~/caddy/certs directory exists
+    file:
+      path: "/home/{{ standard_user }}/{{ caddy_dir }}/certs"
+      state: directory
+      mode: '0775'
+
+  - name: Copy all files from local root assets/caddy to remote ~/caddy
     copy:
       src: "{{ item }}"
       dest: "/home/{{ standard_user }}/{{ caddy_dir }}/{{ item | basename }}"
     with_fileglob:
-      - "{{ inventory_dir }}/assets/caddy/*"
-    register: copy_files
+      - "{{ inventory_dir }}/assets/caddy/docker-compose.yml"
+      - "{{ inventory_dir }}/assets/caddy/.env"
+    register: copy_files_root
+  - name: Copy all files from local root assets/caddy to remote ~/caddy/config
+    copy:
+      src: "{{ item }}"
+      dest: "/home/{{ standard_user }}/{{ caddy_dir }}/config/{{ item | basename }}"
+    with_fileglob:
+      - "{{ inventory_dir }}/assets/caddy/config/Caddyfile"
+    register: copy_files_config
+  - name: Copy all files from local root assets/caddy/static to remote ~/caddy/static
+    copy:
+      src: "{{ item }}"
+      dest: "/home/{{ standard_user }}/{{ caddy_dir }}/static/{{ item | basename }}"
+    with_fileglob:
+      - "{{ inventory_dir }}/assets/caddy/static/index.html"
+    register: copy_files_config
+
   - name: Ensure Docker network 'caddy' exists with specific settings
     docker_network:
       name: caddy
