@@ -1,3 +1,5 @@
 logs/
 vars/
 .vault_password.txt
+.env*
+!.env.example
