@@ -3,3 +3,11 @@ vars/
 .vault_password.txt
 .env*
 !.env.example
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
