@@ -1,0 +1,16 @@
+{$DOMAIN} {
+    log {
+        output file /var/log/caddy/{$DOMAIN}/{$DOMAIN}-access.log
+    }
+
+    root * /var/www/public
+    file_server
+    rewrite / /index.html
+
+    reverse_proxy /{$FRP_CADDY_PATH}/frps-dashboard* http://{$EXTERNAL_IP}:{$FRPS_DASHBOARD_PORT} {
+
+    }
+    reverse_proxy /{$FRP_CADDY_PATH}/frpc-dashboard* http://{$EXTERNAL_IP}:{$FRPC_DASHBOARD_PORT} {
+
+    }
+}

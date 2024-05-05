@@ -2,17 +2,25 @@ version: "3.8"
 services:
   caddy:
     image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    container_name: caddy
     ports:
       - 80:80
       - 443:443
       - "443:443/udp"
     environment:
       - CADDY_INGRESS_NETWORKS=caddy
+      - CADDY_DOCKER_CADDYFILE_PATH=/config/Caddyfile
+    env_file:
+      - .env
     networks:
       - caddy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - caddy_data:/data
+      - ./caddy_data:/data
+      - ./config:/config
+      - ./logs:/var/log/caddy
+      - ./static:/var/www/public
+      - ./certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
     restart: unless-stopped
 
 networks:
