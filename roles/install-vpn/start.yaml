@@ -1,0 +1,3 @@
+---
+  - import_playbook: ./tasks/install_caddy.yaml
+  - import_playbook: ./tasks/install_frp.yaml

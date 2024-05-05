@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  frps:
+    image: snowdreamtech/frps
+    container_name: frps
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./config-frps:/etc/frp
+    network_mode: host
+
+  frpc:
+    image: snowdreamtech/frpc
+    container_name: frpc
+    restart: unless-stopped
+    volumes:
+      - ./config-frpc:/etc/frp
+    network_mode: host
+
+networks:
+  caddy:
+    external: true
