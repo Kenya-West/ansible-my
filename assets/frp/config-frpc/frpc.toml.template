@@ -1,0 +1,13 @@
+webServer.addr = "0.0.0.0"
+webServer.port = ${FRPC_DASHBOARD_PORT}
+webServer.user = "${FRPC_DASHBOARD_USER}"
+webServer.password = "${FRPC_DASHBOARD_PASSWORD}"
+auth.method = "${FRPS_AUTH_METHOD}"
+auth.token = "${FRPS_AUTH_TOKEN}"
+
+[[proxies]]
+name = "ssh"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 22
+remotePort = 22001

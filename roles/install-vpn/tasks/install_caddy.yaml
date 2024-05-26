@@ -8,6 +8,7 @@
     caddy_dir: caddy
 
   tasks:
+  # Validate fiels and folders exist
   - name: Ensure ~/caddy directory exists
     file:
       path: "/home/{{ standard_user }}/{{ caddy_dir }}/"
@@ -33,19 +34,35 @@
       path: "/home/{{ standard_user }}/{{ caddy_dir }}/static"
       state: directory
       mode: '0777'
-  - name: Ensure ~/caddy/certs directory exists
-    file:
-      path: "/home/{{ standard_user }}/{{ caddy_dir }}/certs"
-      state: directory
-      mode: '0775'
-
+  # Stop and down if it was up
+  - name: Check status of Docker Compose services
+    command: docker compose ps
+    args:
+      chdir: "/home/{{ standard_user }}/{{ caddy_dir }}/"
+    register: docker_compose_status
+    ignore_errors: yes
+  - name: Stop Caddy service because it is running
+    command: docker compose down caddy
+    args:
+      chdir: "/home/{{ standard_user }}/{{ caddy_dir }}/"
+    when: "'caddy' in docker_compose_status.stdout"
+    ignore_errors: yes
+  - name: Pull new Caddy release service if it was running
+    command: docker compose pull caddy
+    args:
+      chdir: "/home/{{ standard_user }}/{{ caddy_dir }}/"
+    when: "'caddy' in docker_compose_status.stdout"
+    ignore_errors: yes
+  # Copy files
   - name: Copy all files from local root assets/caddy to remote ~/caddy
     copy:
-      src: "{{ item }}"
-      dest: "/home/{{ standard_user }}/{{ caddy_dir }}/{{ item | basename }}"
-    with_fileglob:
-      - "{{ inventory_dir }}/assets/caddy/docker-compose.yml"
-      - "{{ inventory_dir }}/assets/caddy/.env"
+      src: "{{ inventory_dir }}/assets/caddy/{{ item.sourcename }}"
+      dest: "/home/{{ standard_user }}/{{ caddy_dir }}/{{ item.destname }}"
+    loop:
+      - sourcename: "docker-compose.yml"
+        destname: "docker-compose.yml"
+      - sourcename: ".env-{{ inventory_hostname }}"
+        destname: ".env"
     register: copy_files_root
   - name: Copy all files from local root assets/caddy to remote ~/caddy/config
     copy:
@@ -61,12 +78,13 @@
     with_fileglob:
       - "{{ inventory_dir }}/assets/caddy/static/index.html"
     register: copy_files_config
-
+  # Network existing check
   - name: Ensure Docker network 'caddy' exists with specific settings
     docker_network:
       name: caddy
       driver: bridge
       state: present
+  # Up the service
   - name: Run docker compose up for Caddy
     command: docker compose up caddy -d
     args:

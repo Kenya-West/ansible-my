@@ -1,0 +1,33 @@
+---
+version: "3.8"
+
+services:
+  xui:
+    image: alireza7/x-ui
+    container_name: x-ui
+    hostname: ${XUI_HOSTNAME}
+    volumes:
+      - type: bind
+        source: ./bin/config.json
+        target: /app/bin/config.json
+    environment:
+      XRAY_VMESS_AEAD_FORCED: "false"
+    tty: true
+    restart: unless-stopped
+    networks:
+      - caddy
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}"
+      caddy.0_reverse_proxy: "{{upstreams ${XUI_DASHBOARD_PORT}}}"
+      # caddy.0_handle_path: "/${XUI_DASHBOARD_PATH}*"
+      # caddy.0_handle_path.reverse_proxy: "{{upstreams ${XUI_DASHBOARD_PORT}}}"
+      # caddy.1_handle_path: "/sub*"
+      # caddy.1_handle_path.rewrite: "* /sub{uri}"
+      # caddy.1_handle_path.reverse_proxy: "{{upstreams 2096}}"
+      # caddy.2_handle_path: "/${XUI_VLESS_WS_PATH}*"
+      # caddy.2_handle_path.reverse_proxy: "{{upstreams ${XUI_VLESS_WS_PORT}}}"
+
+networks:
+  caddy:
+    external: true

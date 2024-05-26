@@ -8,6 +8,7 @@
     frp_dir: frp
 
   tasks:
+  # Validate fiels and folders exist
   - name: Ensure ~/frp directory exists
     file:
       path: "/home/{{ standard_user }}/{{ frp_dir }}/"
@@ -23,13 +24,47 @@
       path: "/home/{{ standard_user }}/{{ frp_dir }}/config-frps"
       state: directory
       mode: '0775'
+  # Stop and down if it was up
+  - name: Check status of Docker Compose services
+    command: docker compose ps
+    args:
+      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+    register: docker_compose_status
+    ignore_errors: yes
+  - name: Stop FRP service service because it is running
+    command: docker compose down frps
+    args:
+      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+    when: "'frps' in docker_compose_status.stdout"
+    ignore_errors: yes
+  - name: Stop FRP client service because it is running
+    command: docker compose down frpc
+    args:
+      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+    when: "'frpc' in docker_compose_status.stdout"
+    ignore_errors: yes
+  - name: Pull new FRPS release service if it was running
+    command: docker compose pull frps
+    args:
+      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+    when: "'frps' in docker_compose_status.stdout"
+    ignore_errors: yes
+  - name: Pull new FRPC release service if it was running
+    command: docker compose pull frpc
+    args:
+      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+    when: "'frpc' in docker_compose_status.stdout"
+    ignore_errors: yes
+  # Copy files
   - name: Copy all files from local root assets/frp to remote ~/frp
     copy:
-      src: "{{ item }}"
-      dest: "/home/{{ standard_user }}/{{ frp_dir }}/{{ item | basename }}"
-    with_fileglob:
-      - "{{ inventory_dir }}/assets/frp/docker-compose.yml"
-      - "{{ inventory_dir }}/assets/frp/.env"
+      src: "{{ inventory_dir }}/assets/frp/{{ item.sourcename }}"
+      dest: "/home/{{ standard_user }}/{{ frp_dir }}/{{ item.destname }}"
+    loop:
+      - sourcename: "docker-compose.yml"
+        destname: "docker-compose.yml"
+      - sourcename: ".env-{{ inventory_hostname }}"
+        destname: ".env"
   - name: Copy FRPC config from local assets/frp/config-frpc to remote ~/frp/config-frpc
     copy:
       src: "{{ item }}"
@@ -44,6 +79,7 @@
     with_fileglob:
       - "{{ inventory_dir }}/assets/frp/config-frps/*"
     register: copy_files_frpc_config
+  # Run the service
   - name: Run docker compose up for frps
     command: docker compose up frps -d
     args:

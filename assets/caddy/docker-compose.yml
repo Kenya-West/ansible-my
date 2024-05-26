@@ -16,11 +16,11 @@ services:
       - caddy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./caddy_data:/data
-      - ./config:/config
+      - ./config/Caddyfile:/config/Caddyfile
       - ./logs:/var/log/caddy
       - ./static:/var/www/public
-      - ./certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
+      - caddy-data:/data
+      - caddy-certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
     restart: unless-stopped
 
 networks:
@@ -28,4 +28,5 @@ networks:
     external: true
 
 volumes:
-  caddy_data: {}
+  caddy-data: {}
+  caddy-certs: {}
