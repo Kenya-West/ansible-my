@@ -13,10 +13,10 @@
       - unzip
       - ncdu
       - tree
+      - gpg
       # Extra packages
       - neofetch
       - bat # Ensure this is available or add a task to include its repository
-      # - rust-eza might need to be installed differently
       - fd-find # Use 'fd' for Ubuntu/Debian, might need a PPA
       - fzf
       - httpie
