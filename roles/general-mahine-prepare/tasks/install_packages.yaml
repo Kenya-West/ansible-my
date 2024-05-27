@@ -28,6 +28,7 @@
       - zoxide
       - whois
       - ripgrep
+      - micro
       # Service packages
       - python3-docker # Needed for Ansible Docker modules
 
