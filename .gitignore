@@ -3,6 +3,7 @@ vars/
 .vault_password.txt
 .env*
 !.env.example
+.*rc
 
 # Visual Studio Code
 .vscode/*
