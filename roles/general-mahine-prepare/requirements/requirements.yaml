@@ -4,3 +4,5 @@
 - src: cloudalchemy.node_exporter
 # Docker
 - src: geerlingguy.docker
+- src: darkwizard242.lazydocker
+- src: darkwizard242.lazygit
