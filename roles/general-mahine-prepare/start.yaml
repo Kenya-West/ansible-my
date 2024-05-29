@@ -1,6 +1,8 @@
 ---
   - import_playbook: ./tasks/update.yaml
   - import_playbook: ./tasks/install_packages.yaml
+  - import_playbook: ./tasks/install_eget.yaml
+  - import_playbook: ./tasks/install_packages_binary.yaml
   - import_playbook: ./tasks/install_eza.yaml
   - import_playbook: ./tasks/install_bash_default.yaml
   - import_playbook: ./tasks/install_bash_profile.yaml
