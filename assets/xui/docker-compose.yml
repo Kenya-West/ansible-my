@@ -10,6 +10,8 @@ services:
       - type: bind
         source: ./bin/config.json
         target: /app/bin/config.json
+    env_file:
+      - .env
     environment:
       XRAY_VMESS_AEAD_FORCED: "false"
     tty: true

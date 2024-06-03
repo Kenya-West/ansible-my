@@ -6,6 +6,8 @@ services:
     container_name: xray
     volumes:
       - ./config:/etc/xray
+    env_file:
+      - .env
     ports:
       - ${XRAY_PORT}:23
     restart: unless-stopped
