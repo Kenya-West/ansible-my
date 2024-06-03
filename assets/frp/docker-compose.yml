@@ -12,10 +12,6 @@ services:
         target: /etc/frp/frps.toml.template
       - certs:/etc/frp/certs
     network_mode: host
-    labels:
-      caddy: "${DOMAIN}"
-      caddy.import: "logging ${DOMAIN}"
-      caddy.0_reverse_proxy: "https://${DOMAIN}:${FRPS_DASHBOARD_PORT}"
 
   frpc:
     image: kenyawest/frpc-dockerized:latest
