@@ -13,3 +13,4 @@
   - import_playbook: ./tasks/install_lazygit.yaml
   - import_playbook: ./tasks/install_oh-my-posh.yaml
   - import_playbook: ./tasks/install_oh-my-posh_powershell.yaml
+  - import_playbook: ./tasks/add_keys.yaml
