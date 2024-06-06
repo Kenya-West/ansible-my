@@ -79,6 +79,28 @@
     with_fileglob:
       - "{{ inventory_dir }}/assets/frp/config-frps/*"
     register: copy_files_frpc_config
+  # Create backups for .env file
+  - name: Copy FRPS config file to backup
+    ansible.builtin.copy:
+      src: /home/{{ standard_user }}/{{ frp_dir }}/.env
+      dest: /home/{{ standard_user }}/{{ frp_dir }}/.env.bak
+      remote_src: true
+  # Remove comments, empty line and trailing spaces from .env file
+  - name: Remove comments, empty line and trailing spaces from .env file
+    command: sed -i -e 's/[[:space:]]*#.*//' -e 's/[[:space:]]*$//' -e '/^$/d' .env
+    args:
+      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+  # Substitute variables from .env file in FRP config files
+  - name: Substitute variables in FRPS config file
+    command: docker container run --rm -it --env-file .env -v .:/wd bhgedigital/envsubst sh -c "envsubst < /wd/config-frps/frps.toml.template > /wd/config-frps/frps.toml" && cat config-frps/frps.toml
+    args:
+      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+    register: envsubst_frps
+  - name: Substitute variables in FRPC config file
+    command: docker container run --rm -it --env-file .env -v .:/wd bhgedigital/envsubst sh -c "envsubst < /wd/config-frpc/frpc.toml.template > /wd/config-frpc/frpc.toml" && cat config-frpc/frpc.toml
+    args:
+      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+    register: envsubst_frpc
   # Run the service
   - name: Run docker compose up for frps
     command: docker compose up frps -d

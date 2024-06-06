@@ -6,7 +6,5 @@ webServer.addr = "0.0.0.0"
 webServer.port = ${FRPS_DASHBOARD_PORT}
 webServer.user = "${FRPS_DASHBOARD_USER}"
 webServer.password = "${FRPS_DASHBOARD_PASSWORD}"
-webServer.tls.certFile = "/etc/frp/certs/${DOMAIN}/${DOMAIN}.crt"
-webServer.tls.keyFile = "/etc/frp/certs/${DOMAIN}/${DOMAIN}.key"
 auth.method = "${FRPS_AUTH_METHOD}"
 auth.token = "${FRPS_AUTH_TOKEN}"

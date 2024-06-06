@@ -1,26 +1,30 @@
 version: '3.8'
 services:
   frps:
-    image: kenyawest/frps-dockerized:latest
+    image: snowdreamtech/frps
     container_name: frps
     restart: unless-stopped
+    ports:
+      - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}
+      - "${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}:${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}/tcp"
     env_file:
       - .env
     volumes:
-      - type: bind
-        source: ./config-frps/frps.toml.template
-        target: /etc/frp/frps.toml.template
+      - ./config-frps:/etc/frp
       - certs:/etc/frp/certs
-    network_mode: host
+    networks:
+      - caddy
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}"
+      caddy.0_reverse_proxy: "{{upstreams ${FRPS_DASHBOARD_PORT}}}"
 
   frpc:
-    image: kenyawest/frpc-dockerized:latest
+    image: snowdreamtech/frpc
     container_name: frpc
     restart: unless-stopped
     volumes:
-      - type: bind
-        source: ./config-frpc/frpc.toml.template
-        target: /etc/frp/frpc.toml.template
+      - ./config-frpc:/etc/frp
       - certs:/etc/frp/certs
     network_mode: host
 
