@@ -14,9 +14,9 @@
       path: "/home/{{ standard_user }}/{{ xui_dir }}/"
       state: directory
       mode: '0775'
-  - name: Ensure ~/xui/bin directory exists
+  - name: Ensure ~/xui/db directory exists
     file:
-      path: "/home/{{ standard_user }}/{{ xui_dir }}/bin"
+      path: "/home/{{ standard_user }}/{{ xui_dir }}/db"
       state: directory
       mode: '0775'
   # Stop and down if it was up
@@ -49,12 +49,12 @@
       - sourcename: ".env-{{ inventory_hostname }}"
         destname: ".env"
     register: copy_files_root
-  - name: Copy all files from local root assets/xui/bin/ to remote ~/xui/bin/
+  - name: Copy all database files from local root assets/xui/db/ to remote ~/xui/db/
     copy:
       src: "{{ item }}"
-      dest: "/home/{{ standard_user }}/{{ xui_dir }}/bin/{{ item | basename }}"
+      dest: "/home/{{ standard_user }}/{{ xui_dir }}/db/{{ item | basename }}"
     with_fileglob:
-      - "{{ inventory_dir }}/assets/xui/bin/config.json"
+      - "{{ inventory_dir }}/assets/xui/db/x-ui.db"
     register: copy_files_config
   # Network existing check
   - name: Ensure Docker network 'caddy' exists with specific settings
