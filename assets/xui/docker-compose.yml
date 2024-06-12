@@ -4,12 +4,12 @@ version: "3.8"
 services:
   xui:
     image: alireza7/x-ui
-    container_name: x-ui
+    container_name: xui
     hostname: ${XUI_HOSTNAME}
     volumes:
       - type: bind
-        source: ./bin/config.json
-        target: /app/bin/config.json
+        source: ./db/x-ui.db
+        target: /etc/x-ui/x-ui.db
     env_file:
       - .env
     environment:
@@ -18,11 +18,20 @@ services:
     restart: unless-stopped
     networks:
       - caddy
+    ports:
+      - "${XUI_SUB_PORT}:${XUI_SUB_PORT}"
+      - "${XUI_VLESS_PORT}:${XUI_VLESS_PORT}"
     labels:
       caddy: "${DOMAIN}"
       caddy.0_import: "logging ${DOMAIN}"
       caddy.1_import: "cors"
+      caddy.3_reverse_proxy: "{{upstreams ${XUI_DASHBOARD_PORT}}}"
 
 networks:
   caddy:
     external: true
+
+volumes:
+  certs:
+    external: true
+    name: caddy_caddy-certs
