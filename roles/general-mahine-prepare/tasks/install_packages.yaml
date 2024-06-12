@@ -14,7 +14,9 @@
       - ncdu
       - tree
       - gpg
+      - gettext-base
       # Extra packages
+      - moreutils
       - neofetch
       - bat # Ensure this is available or add a task to include its repository
       - fd-find # Use 'fd' for Ubuntu/Debian, might need a PPA
