@@ -20,15 +20,8 @@ services:
       - caddy
     labels:
       caddy: "${DOMAIN}"
-      caddy.import: "logging ${DOMAIN}"
-      caddy.0_reverse_proxy: "{{upstreams ${XUI_DASHBOARD_PORT}}}"
-      # caddy.0_handle_path: "/${XUI_DASHBOARD_PATH}*"
-      # caddy.0_handle_path.reverse_proxy: "{{upstreams ${XUI_DASHBOARD_PORT}}}"
-      # caddy.1_handle_path: "/sub*"
-      # caddy.1_handle_path.rewrite: "* /sub{uri}"
-      # caddy.1_handle_path.reverse_proxy: "{{upstreams 2096}}"
-      # caddy.2_handle_path: "/${XUI_VLESS_WS_PATH}*"
-      # caddy.2_handle_path.reverse_proxy: "{{upstreams ${XUI_VLESS_WS_PORT}}}"
+      caddy.0_import: "logging ${DOMAIN}"
+      caddy.1_import: "cors"
 
 networks:
   caddy:
