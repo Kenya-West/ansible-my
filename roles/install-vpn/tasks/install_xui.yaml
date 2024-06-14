@@ -38,6 +38,10 @@
       chdir: "/home/{{ standard_user }}/{{ xui_dir }}/"
     when: "'xui' in docker_compose_status.stdout"
     ignore_errors: yes
+  # Check files existing
+  - name: Check if ~/xui/db/ exists
+    stat: path="/home/{{ standard_user }}/{{ xui_dir }}/db/x-ui.db"
+    register: db_file
   # Copy files
   - name: Copy all files from local root assets/xui to remote ~/xui
     copy:
@@ -55,7 +59,8 @@
       dest: "/home/{{ standard_user }}/{{ xui_dir }}/db/{{ item | basename }}"
     with_fileglob:
       - "{{ inventory_dir }}/assets/xui/db/x-ui.db"
-    register: copy_files_config
+    when: not db_file.stat.exists
+    register: copy_files_db
   # Network existing check
   - name: Ensure Docker network 'caddy' exists with specific settings
     docker_network:

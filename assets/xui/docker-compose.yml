@@ -19,8 +19,10 @@ services:
     networks:
       - caddy
     ports:
-      - "${XUI_SUB_PORT}:${XUI_SUB_PORT}"
+      - "${XUI_WG_PORT}:${XUI_WG_PORT}/udp"
       - "${XUI_VLESS_PORT}:${XUI_VLESS_PORT}"
+      - "${XUI_SS2022_PORT}:${XUI_SS2022_PORT}"
+      - "${XUI_SUB_PORT}:${XUI_SUB_PORT}"
     labels:
       caddy: "${DOMAIN}"
       caddy.0_import: "logging ${DOMAIN}"
