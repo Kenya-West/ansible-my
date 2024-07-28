@@ -1,0 +1,12 @@
+---
+  - import_playbook: ./tasks/update.yaml
+  - import_playbook: ./tasks/install_packages.yaml
+  - import_playbook: ./tasks/install_eget.yaml
+  - import_playbook: ./tasks/install_packages_binary.yaml
+  - import_playbook: ./tasks/install_eza.yaml
+  - import_playbook: ./tasks/install_bash_default.yaml
+  - import_playbook: ./tasks/install_bash_profile.yaml
+  - import_playbook: ./tasks/install_powershell.yaml
+  - import_playbook: ./tasks/install_lazygit.yaml
+  - import_playbook: ./tasks/install_oh-my-posh.yaml
+  - import_playbook: ./tasks/install_oh-my-posh_powershell.yaml
