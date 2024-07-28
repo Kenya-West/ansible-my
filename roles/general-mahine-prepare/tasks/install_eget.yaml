@@ -27,7 +27,7 @@
       when: eget_installed.rc == 0
 
     - name: Move eget binary to /usr/local/bin
-      command: mv /home/{{ standard_user }}/eget /usr/local/bin/
+      command: mv ./eget /usr/local/bin/
       args:
         creates: /usr/local/bin/eget
 
