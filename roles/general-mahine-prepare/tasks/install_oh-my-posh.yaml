@@ -72,7 +72,9 @@
     - "chmod -R 775 /home/{{ standard_user }}/{{ script_dir }}"
 
   - name: Install oh-my-posh
-    command: "/home/{{ standard_user }}/{{ script_dir }}/install.sh"
+    command: "/home/{{ standard_user }}/{{ script_dir }}/install.sh -d /usr/local/bin"
+    args:
+      creates: "/root/usr/bin/oh-my-posh"
 
   - name: Install Nerd fonts
     command: "oh-my-posh font install CascadiaCode"
