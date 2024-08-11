@@ -122,11 +122,12 @@
 
   - name: Check if additional docker-compose.yml was found
     set_fact:
-      additional_caddyfile_exists: "{{ additional_dc_content is not none and additional_dc_content != '' }}"
+      additional_dc_exists: "{{ additional_dc_stat.stat.exists and additional_dc_content != '' and additional_dc_content.split('\n') | length > 3 }}"
 
   - name: Debug line count
     debug:
       msg: "The additional docker-compose.yml file has {{ additional_dc_content.split('\n') | length }} lines."
+    when: additional_dc_exists
 
   - name: Copy additional docker-compose.yml file from local root assets/caddy to remote ~/caddy
     copy:
@@ -135,7 +136,7 @@
     loop:
       - sourcename: "docker-compose-{{ inventory_hostname }}.yml"
         destname: "docker-compose-{{ inventory_hostname }}.yml"
-    when: additional_caddyfile_exists and additional_dc_content.split('\n') | length > 3
+    when: additional_dc_exists
 
   - name: Run yq command to merge all docker-compose.yml files into one
     shell: "yq eval-all '. as $item ireduce ({}; . *+ $item)' docker-compose-{{ inventory_hostname }}.yml docker-compose.yml"
@@ -143,7 +144,7 @@
       chdir: "/home/{{ standard_user }}/{{ caddy_dir }}/"
       removes: "/home/{{ standard_user }}/{{ caddy_dir }}/docker-compose.yml"
     register: yq_output
-    when: additional_caddyfile_exists and additional_dc_content.split('\n') | length > 3
+    when: additional_dc_exists
   
   - name: Print output to console
     debug:
