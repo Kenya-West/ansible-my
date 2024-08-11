@@ -5,7 +5,7 @@
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
-    wg_dir: wireguard
+    wg_dir: wg
 
   tasks:
   # Validate fiels and folders exist
@@ -34,9 +34,9 @@
     when: "'wg' in docker_compose_status.stdout"
     ignore_errors: yes
   # Copy files
-  - name: Copy all files from local root assets/wireguard to remote ~/wg
+  - name: Copy all files from local root assets/wg to remote ~/wg
     copy:
-      src: "{{ inventory_dir }}/assets/wireguard/{{ item.sourcename }}"
+      src: "{{ inventory_dir }}/assets/wg/{{ item.sourcename }}"
       dest: "/home/{{ standard_user }}/{{ wg_dir }}/{{ item.destname }}"
     loop:
       - sourcename: "docker-compose.yml"
