@@ -2,6 +2,7 @@
 - name: Install Caddy with Docker
   hosts: all
   become: true
+  become_user: "{{ standard_user }}"
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
@@ -80,12 +81,18 @@
     register: copy_files_config
   # Modify files with additional content
   - name: Check if the additional Caddyfile exists
+    stat:
+      path: "{{ inventory_dir }}/assets/caddy/config/Caddyfile-{{ inventory_hostname }}"
+    register: additional_caddyfile_stat
+
+  - name: Set the additional_caddyfile_content fact if the file exists
     set_fact:
       additional_caddyfile_content: "{{ lookup('file', inventory_dir + '/assets/caddy/config/Caddyfile-' + inventory_hostname) }}"
+    when: additional_caddyfile_stat.stat.exists
 
   - name: Check if additional Caddyfile was found
     set_fact:
-      additional_caddyfile_exists: "{{ additional_caddyfile_content is not none and additional_caddyfile_content != '' }}"
+      additional_caddyfile_exists: "{{ additional_caddyfile_stat.stat.exists and additional_caddyfile_content != '' }}"
 
   - name: Read the content of the first file
     set_fact:
@@ -117,8 +124,14 @@
 
   # Merging additional docker-compose.yml
   - name: Check if the additional docker-compose.yml exists
+    stat:
+      path: "{{ inventory_dir }}/assets/caddy/docker-compose-{{ inventory_hostname }}.yml"
+    register: additional_dc_stat
+
+  - name: Set the additional_dc_content fact if the file exists
     set_fact:
       additional_dc_content: "{{ lookup('file', inventory_dir + '/assets/caddy/docker-compose-' + inventory_hostname + '.yml') }}"
+    when: additional_dc_stat.stat.exists
 
   - name: Check if additional docker-compose.yml was found
     set_fact:
@@ -149,13 +162,13 @@
   - name: Print output to console
     debug:
       msg: "{{yq_output.stdout}}"
-    when: additional_caddyfile_exists and additional_dc_content.split('\n') | length > 3
+    when: additional_dc_exists
   
   - name: Save output of yq to docker-compose.yml
     ansible.builtin.copy:
       content: "{{yq_output.stdout}}"
       dest: "/home/{{ standard_user }}/{{ caddy_dir }}/docker-compose.yml"
-    when: (additional_caddyfile_exists) and (yq_output.stdout_lines | length > 1) and (additional_dc_content.split('\n') | length > 3)
+    when: (additional_dc_exists) and (yq_output.stdout_lines | length > 1)
 
   # Up the service
   - name: Run docker compose up for Caddy
