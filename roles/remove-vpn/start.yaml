@@ -1,0 +1,2 @@
+---
+  - import_playbook: ./tasks/remove_vpns.yaml
