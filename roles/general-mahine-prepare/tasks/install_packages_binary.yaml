@@ -12,7 +12,7 @@
       ignore_errors: true
 
     - name: Download tstack/lnav
-      command: 'eget tstack/lnav --file lnav --to /usr/local/bin'
+      command: 'eget tstack/lnav --asset lnav --to /usr/local/bin'
       when: eget_installed.rc == 0
       ignore_errors: true
 
@@ -22,6 +22,6 @@
       ignore_errors: true
 
     - name: Download mikefarah/yq
-      command: 'eget mikefarah/yq --file yq_linux_amd64 --to /usr/local/bin'
+      command: 'eget mikefarah/yq --asset yq_linux_amd64 --to /usr/local/bin'
       when: eget_installed.rc == 0
       ignore_errors: true
