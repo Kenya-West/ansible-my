@@ -2,6 +2,7 @@
 - name: Install XRay with Docker
   hosts: all
   become: true
+  become_user: "{{ standard_user }}"
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
