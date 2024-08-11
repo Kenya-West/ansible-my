@@ -3,8 +3,6 @@
   hosts: all
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
-  become: true
-  become_user: root
   vars:
     script_dir: oh-my-posh
     themes_dir: .poshthemes
