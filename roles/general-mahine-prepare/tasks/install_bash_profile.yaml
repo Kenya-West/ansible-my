@@ -2,12 +2,13 @@
 - name: Configure Bash Profile
   hosts: all
   become: true
+  become_user: "{{ standard_user }}"
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
   tasks:
     - name: Read aliases from local .bashrc file
       set_fact:
-        aliases_content: "{{ lookup('file', inventory_dir + '/assets/bash/.bashrc', errors='ignore').split('\n') }}"
+        aliases_content: "{{ lookup('file', inventory_dir + '/assets/bash/.bashrc', errors='ignore').splitlines() }}"
       failed_when: aliases_content == ['']
       ignore_errors: yes
 
