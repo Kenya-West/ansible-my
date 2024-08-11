@@ -1,0 +1,70 @@
+---
+- name: Remove VPNs
+  hosts: all
+  become: true
+  vars_files:
+    - '{{ inventory_dir }}/vars/vars.yaml'
+  vars:
+    vpn_directories_file: "{{ inventory_dir }}/assets/vpn/vpn-directories-list.txt"
+
+  tasks:
+    - name: Set directory list fact
+      set_fact:
+        vpn_directories_list: "{{ lookup('file', '{{ vpn_directories_file }}').splitlines() }}"
+
+    - name: Check if the directory exists
+      stat:
+        path: "/home/{{ standard_user }}/{{ item }}"
+      register: dir_stat
+      loop: "{{ vpn_directories_list }}"
+      loop_control:
+        loop_var: item
+
+    - name: Check if docker-compose.yml file exists
+      stat:
+        path: "/home/{{ standard_user }}/{{ item }}/docker-compose.yml"
+      register: file_stat
+      when: dir_stat.results[item_index].stat.exists
+      loop: "{{ vpn_directories_list }}"
+      loop_control:
+        loop_var: item
+        index_var: item_index
+
+    - name: Output directory existence status
+      debug:
+        msg: "Directory {{ item }} existence: {{ dir_stat.results[item_index].stat.exists }}"
+      loop: "{{ vpn_directories_list }}"
+      loop_control:
+        loop_var: item
+        index_var: item_index
+
+    - name: Output docker-compose.yml existence status
+      debug:
+        msg: "docker-compose.yml in {{ item }} existence: {{ file_stat.results[item_index].stat.exists }}"
+      when: dir_stat.results[item_index].stat.exists
+      loop: "{{ vpn_directories_list }}"
+      loop_control:
+        loop_var: item
+        index_var: item_index
+
+    - name: Down all apps if docker-compose.yml exists
+      command: docker compose down
+      args:
+        chdir: "/home/{{ standard_user }}/{{ item }}"
+      when: file_stat.results[item_index].stat.exists
+      loop: "{{ vpn_directories_list }}"
+      loop_control:
+        loop_var: item
+        index_var: item_index
+      ignore_errors: yes
+
+    - name: Remove the directory if it exists
+      file:
+        path: "/home/{{ standard_user }}/{{ item }}"
+        state: absent
+      when: dir_stat.results[item_index].stat.exists
+      loop: "{{ vpn_directories_list }}"
+      loop_control:
+        loop_var: item
+        index_var: item_index
+      ignore_errors: yes
