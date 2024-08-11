@@ -78,12 +78,84 @@
     with_fileglob:
       - "{{ inventory_dir }}/assets/caddy/static/index.html"
     register: copy_files_config
+  # Modify files with additional content
+  - name: Check if the additional Caddyfile exists
+    set_fact:
+      additional_caddyfile_content: "{{ lookup('file', inventory_dir + '/assets/caddy/config/Caddyfile-' + inventory_hostname) }}"
+
+  - name: Check if additional Caddyfile was found
+    set_fact:
+      additional_caddyfile_exists: "{{ additional_caddyfile_content is not none and additional_caddyfile_content != '' }}"
+
+  - name: Read the content of the first file
+    set_fact:
+      file1_content: "{{ lookup('file', inventory_dir + '/assets/caddy/config/Caddyfile') }}"
+    when: additional_caddyfile_exists
+    
+  - name: Read the content of the second file
+    set_fact:
+      file2_content: "{{ lookup('file', inventory_dir + '/assets/caddy/config/Caddyfile-' + inventory_hostname) }}"
+    when: additional_caddyfile_exists
+  
+  - name: Merge the contents of the two files
+    set_fact:
+      merged_content: "{{ file1_content + '\n\n' + file2_content }}"
+    when: additional_caddyfile_exists
+  
+  - name: Set the merged content on the destination machine
+    copy:
+      content: "{{ merged_content }}"
+      dest: /home/{{ standard_user }}/{{ caddy_dir }}/config/Caddyfile
+    when: additional_caddyfile_exists
+
   # Network existing check
   - name: Ensure Docker network 'caddy' exists with specific settings
     docker_network:
       name: caddy
       driver: bridge
       state: present
+
+  # Merging additional docker-compose.yml
+  - name: Check if the additional docker-compose.yml exists
+    set_fact:
+      additional_dc_content: "{{ lookup('file', inventory_dir + '/assets/caddy/docker-compose-' + inventory_hostname + '.yml') }}"
+
+  - name: Check if additional docker-compose.yml was found
+    set_fact:
+      additional_caddyfile_exists: "{{ additional_dc_content is not none and additional_dc_content != '' }}"
+
+  - name: Debug line count
+    debug:
+      msg: "The additional docker-compose.yml file has {{ additional_dc_content.split('\n') | length }} lines."
+
+  - name: Copy additional docker-compose.yml file from local root assets/caddy to remote ~/caddy
+    copy:
+      src: "{{ inventory_dir }}/assets/caddy/{{ item.sourcename }}"
+      dest: "/home/{{ standard_user }}/{{ caddy_dir }}/{{ item.destname }}"
+    loop:
+      - sourcename: "docker-compose-{{ inventory_hostname }}.yml"
+        destname: "docker-compose-{{ inventory_hostname }}.yml"
+    when: additional_caddyfile_exists and additional_dc_content.split('\n') | length > 3
+
+  - name: Run yq command to merge all docker-compose.yml files into one
+    shell: "yq eval-all '. as $item ireduce ({}; . *+ $item)' docker-compose-{{ inventory_hostname }}.yml docker-compose.yml"
+    args:
+      chdir: "/home/{{ standard_user }}/{{ caddy_dir }}/"
+      removes: "/home/{{ standard_user }}/{{ caddy_dir }}/docker-compose.yml"
+    register: yq_output
+    when: additional_caddyfile_exists and additional_dc_content.split('\n') | length > 3
+  
+  - name: Print output to console
+    debug:
+      msg: "{{yq_output.stdout}}"
+    when: additional_caddyfile_exists and additional_dc_content.split('\n') | length > 3
+  
+  - name: Save output of yq to docker-compose.yml
+    ansible.builtin.copy:
+      content: "{{yq_output.stdout}}"
+      dest: "/home/{{ standard_user }}/{{ caddy_dir }}/docker-compose.yml"
+    when: (additional_caddyfile_exists) and (yq_output.stdout_lines | length > 1) and (additional_dc_content.split('\n') | length > 3)
+
   # Up the service
   - name: Run docker compose up for Caddy
     command: docker compose up caddy -d
