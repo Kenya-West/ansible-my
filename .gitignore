@@ -12,3 +12,6 @@ vars/
 !.vscode/launch.json
 !.vscode/extensions.json
 .history/*
+
+# Project-specific
+*[0-9]*.[0-9]*.[0-9]*.[0-9]*
