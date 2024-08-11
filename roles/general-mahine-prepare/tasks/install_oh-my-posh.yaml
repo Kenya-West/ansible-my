@@ -3,6 +3,8 @@
   hosts: all
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
+  become: true
+  become_user: "{{ standard_user }}"
   vars:
     script_dir: oh-my-posh
     themes_dir: .poshthemes
@@ -70,6 +72,8 @@
     - "chmod -R 775 /home/{{ standard_user }}/{{ script_dir }}"
 
   - name: Install oh-my-posh
+    become: true
+    become_user: root
     command: "/home/{{ standard_user }}/{{ script_dir }}/install.sh -d /usr/local/bin"
     args:
       creates: "/root/usr/bin/oh-my-posh"
