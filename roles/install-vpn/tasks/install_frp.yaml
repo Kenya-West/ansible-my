@@ -6,107 +6,110 @@
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
-    frp_dir: frp
+    vpn_dir: vpn
+    project_dir: frp
+    source_asset_fullpath: "{{ inventory_dir }}/assets/frp"
+    dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir }}"
 
   tasks:
   # Validate fiels and folders exist
-  - name: Ensure ~/frp directory exists
+  - name: Ensure ~/project directory exists
     file:
-      path: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      path: "{{ dest_project_fullpath }}/"
       state: directory
       mode: '0775'
-  - name: Ensure ~/frp/config-frpc directory exists
+  - name: Ensure ~/project/config-frpc directory exists
     file:
-      path: "/home/{{ standard_user }}/{{ frp_dir }}/config-frpc"
+      path: "{{ dest_project_fullpath }}/config-frpc"
       state: directory
       mode: '0775'
-  - name: Ensure ~/frp/config-frps directory exists
+  - name: Ensure ~/project/config-frps directory exists
     file:
-      path: "/home/{{ standard_user }}/{{ frp_dir }}/config-frps"
+      path: "{{ dest_project_fullpath }}/config-frps"
       state: directory
       mode: '0775'
   # Stop and down if it was up
   - name: Check status of Docker Compose services
     command: docker compose ps
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     register: docker_compose_status
     ignore_errors: yes
   - name: Stop FRP service service because it is running
     command: docker compose down frps
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     when: "'frps' in docker_compose_status.stdout"
     ignore_errors: yes
   - name: Stop FRP client service because it is running
     command: docker compose down frpc
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     when: "'frpc' in docker_compose_status.stdout"
     ignore_errors: yes
   - name: Pull new FRPS release service if it was running
     command: docker compose pull frps
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     when: "'frps' in docker_compose_status.stdout"
     ignore_errors: yes
   - name: Pull new FRPC release service if it was running
     command: docker compose pull frpc
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     when: "'frpc' in docker_compose_status.stdout"
     ignore_errors: yes
   # Copy files
-  - name: Copy all files from local root assets/frp to remote ~/frp
+  - name: Copy all files from local root assets/frp to remote ~/project
     copy:
-      src: "{{ inventory_dir }}/assets/frp/{{ item.sourcename }}"
-      dest: "/home/{{ standard_user }}/{{ frp_dir }}/{{ item.destname }}"
+      src: "{{ source_asset_fullpath }}/{{ item.sourcename }}"
+      dest: "{{ dest_project_fullpath }}/{{ item.destname }}"
     loop:
       - sourcename: "docker-compose.yml"
         destname: "docker-compose.yml"
       - sourcename: ".env-{{ inventory_hostname }}"
         destname: ".env"
-  - name: Copy FRPC config from local assets/frp/config-frpc to remote ~/frp/config-frpc
+  - name: Copy FRPC config from local assets/frp/config-frpc to remote ~/project/config-frpc
     copy:
       src: "{{ item }}"
-      dest: "/home/{{ standard_user }}/{{ frp_dir }}/config-frpc/{{ item | basename }}"
+      dest: "{{ dest_project_fullpath }}/config-frpc/{{ item | basename }}"
     with_fileglob:
-      - "{{ inventory_dir }}/assets/frp/config-frpc/*"
+      - "{{ source_asset_fullpath }}/config-frpc/*"
     register: copy_files_frpc_config
-  - name: Copy FRPS config from local assets/frp/config-frps to remote ~/frp/config-frps
+  - name: Copy FRPS config from local assets/frp/config-frps to remote ~/project/config-frps
     copy:
       src: "{{ item }}"
-      dest: "/home/{{ standard_user }}/{{ frp_dir }}/config-frps/{{ item | basename }}"
+      dest: "{{ dest_project_fullpath }}/config-frps/{{ item | basename }}"
     with_fileglob:
-      - "{{ inventory_dir }}/assets/frp/config-frps/*"
+      - "{{ source_asset_fullpath }}/config-frps/*"
     register: copy_files_frpc_config
   # Create backups for .env file
   - name: Copy FRPS config file to backup
     ansible.builtin.copy:
-      src: /home/{{ standard_user }}/{{ frp_dir }}/.env
-      dest: /home/{{ standard_user }}/{{ frp_dir }}/.env.bak
+      src: "{{ dest_project_fullpath }}/.env"
+      dest: "{{ dest_project_fullpath }}/.env.bak"
       remote_src: true
   # Remove comments, empty line and trailing spaces from .env file
   - name: Remove comments, empty line and trailing spaces from .env file
     command: sed -i -e 's/[[:space:]]*#.*//' -e 's/[[:space:]]*$//' -e '/^$/d' .env
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
   # Substitute variables from .env file in FRP config files
   - name: Substitute variables in FRPS config file
     command: docker container run --rm -it --env-file .env -v .:/wd bhgedigital/envsubst sh -c "envsubst < /wd/config-frps/frps.toml.template > /wd/config-frps/frps.toml" && cat config-frps/frps.toml
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     register: envsubst_frps
   - name: Substitute variables in FRPC config file
     command: docker container run --rm -it --env-file .env -v .:/wd bhgedigital/envsubst sh -c "envsubst < /wd/config-frpc/frpc.toml.template > /wd/config-frpc/frpc.toml" && cat config-frpc/frpc.toml
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     register: envsubst_frpc
   # Run the service
   - name: Run docker compose up for frps
     command: docker compose up frps -d
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     register: docker_compose_up
   - name: Wait for 3 seconds after starting docker compose
     pause:
@@ -115,7 +118,7 @@
   - name: Check if frps service is running correctly
     command: docker compose ps frps
     args:
-      chdir: "/home/{{ standard_user }}/{{ frp_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     register: docker_ps
     failed_when: "'Up' not in docker_ps.stdout"
     when: docker_compose_up.changed

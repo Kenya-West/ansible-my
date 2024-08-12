@@ -6,39 +6,42 @@
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
-    wg_dir: wg
+    vpn_dir: vpn
+    project_dir: wg
+    source_asset_fullpath: "{{ inventory_dir }}/assets/wg"
+    dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir }}"
 
   tasks:
   # Validate fiels and folders exist
-  - name: Ensure ~/wg directory exists
+  - name: Ensure ~/project directory exists
     file:
-      path: "/home/{{ standard_user }}/{{ wg_dir }}/"
+      path: "{{ dest_project_fullpath }}/"
       state: directory
       mode: '0775'
   # Stop and down if it was up
   - name: Check status of Docker Compose services
     command: docker compose ps
     args:
-      chdir: "/home/{{ standard_user }}/{{ wg_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     register: docker_compose_status
     ignore_errors: yes
   - name: Stop WireGuard (Easy) service service because it is running
     command: docker compose down wg
     args:
-      chdir: "/home/{{ standard_user }}/{{ wg_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     when: "'wg' in docker_compose_status.stdout"
     ignore_errors: yes
   - name: Pull new WireGuard (Easy) release service if it was running
     command: docker compose pull wg
     args:
-      chdir: "/home/{{ standard_user }}/{{ wg_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     when: "'wg' in docker_compose_status.stdout"
     ignore_errors: yes
   # Copy files
-  - name: Copy all files from local root assets/wg to remote ~/wg
+  - name: Copy all files from local root assets/wg to remote ~/project
     copy:
-      src: "{{ inventory_dir }}/assets/wg/{{ item.sourcename }}"
-      dest: "/home/{{ standard_user }}/{{ wg_dir }}/{{ item.destname }}"
+      src: "{{ source_asset_fullpath }}/{{ item.sourcename }}"
+      dest: "{{ dest_project_fullpath }}/{{ item.destname }}"
     loop:
       - sourcename: "docker-compose.yml"
         destname: "docker-compose.yml"
@@ -48,7 +51,7 @@
   - name: Run docker compose up for wg
     command: docker compose up wg -d
     args:
-      chdir: "/home/{{ standard_user }}/{{ wg_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     register: docker_compose_up
   - name: Wait for 3 seconds after starting docker compose
     pause:
@@ -57,7 +60,7 @@
   - name: Check if wg service is running correctly
     command: docker compose ps wg
     args:
-      chdir: "/home/{{ standard_user }}/{{ wg_dir }}/"
+      chdir: "{{ dest_project_fullpath }}/"
     register: docker_ps
     failed_when: "'Up' not in docker_ps.stdout"
     when: docker_compose_up.changed

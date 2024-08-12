@@ -5,6 +5,7 @@
   vars_files:
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
+    root_dir: "/home/{{ standard_user }}"
     vpn_directories_file: "{{ inventory_dir }}/assets/vpn/vpn-directories-list.txt"
 
   tasks:
@@ -14,7 +15,7 @@
 
     - name: Check if the directory exists
       stat:
-        path: "/home/{{ standard_user }}/{{ item }}"
+        path: "{{ root_dir }}/{{ item }}"
       register: dir_stat
       loop: "{{ vpn_directories_list }}"
       loop_control:
@@ -22,7 +23,7 @@
 
     - name: Check if docker-compose.yml file exists
       stat:
-        path: "/home/{{ standard_user }}/{{ item }}/docker-compose.yml"
+        path: "{{ root_dir }}/{{ item }}/docker-compose.yml"
       register: file_stat
       when: dir_stat.results[item_index].stat.exists
       loop: "{{ vpn_directories_list }}"
@@ -50,7 +51,7 @@
     - name: Down all apps if docker-compose.yml exists
       command: docker compose down
       args:
-        chdir: "/home/{{ standard_user }}/{{ item }}"
+        chdir: "{{ root_dir }}/{{ item }}"
       when: file_stat.results[item_index].stat.exists
       loop: "{{ vpn_directories_list }}"
       loop_control:
@@ -60,7 +61,7 @@
 
     - name: Remove the directory if it exists
       file:
-        path: "/home/{{ standard_user }}/{{ item }}"
+        path: "{{ root_dir }}/{{ item }}"
         state: absent
       when: dir_stat.results[item_index].stat.exists
       loop: "{{ vpn_directories_list }}"
