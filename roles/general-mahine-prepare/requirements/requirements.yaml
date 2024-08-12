@@ -6,3 +6,5 @@
 - src: geerlingguy.docker
 - src: darkwizard242.lazydocker
 - src: darkwizard242.lazygit
+# Certbot
+- src: geerlingguy.certbot
