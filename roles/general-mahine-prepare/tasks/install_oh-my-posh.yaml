@@ -82,10 +82,9 @@
     command: "oh-my-posh font install CascadiaCode"
 
   - name: Ensure that profile exists
-    copy:
-      dest: "/home/{{ standard_user }}/.profile"
-      content: ""
-      force: no
+    file:
+      path: "/home/{{ standard_user }}/.profile"
+      state: touch
 
   - name: Remove oh-my-posh obsolete line from profile
     lineinfile:
