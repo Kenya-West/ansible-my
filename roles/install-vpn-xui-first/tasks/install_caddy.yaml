@@ -1,0 +1,192 @@
+---
+- name: Install Caddy with Docker
+  hosts: all
+  become: true
+  become_user: "{{ standard_user }}"
+  vars_files:
+    - '{{ inventory_dir }}/vars/vars.yaml'
+  vars:
+    vpn_dir: vpn-xui-first
+    project_dir: caddy
+    source_asset_fullpath: "{{ inventory_dir }}/assets/caddy-fallback"
+    dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir }}"
+
+  tasks:
+  # Validate fiels and folders exist
+  - name: Ensure project directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/"
+      state: directory
+      mode: '0775'
+  - name: Ensure project/caddy_data directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/caddy_data"
+      state: directory
+      mode: '0775'
+  - name: Ensure project/config directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/config"
+      state: directory
+      mode: '0775'
+  - name: Ensure project/logs directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/logs"
+      state: directory
+      mode: '0775'
+  - name: Ensure project/static directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/static"
+      state: directory
+      mode: '0777'
+  # Stop and down if it was up
+  - name: Check status of Docker Compose services
+    command: docker compose ps
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_compose_status
+    ignore_errors: yes
+  - name: Stop Caddy service because it is running
+    command: docker compose down caddy
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    when: "'caddy' in docker_compose_status.stdout"
+    ignore_errors: yes
+  - name: Pull new Caddy release service if it was running
+    command: docker compose pull caddy
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    when: "'caddy' in docker_compose_status.stdout"
+    ignore_errors: yes
+  # Copy files
+  - name: Copy all files from local root assets/project to remote ~/project
+    copy:
+      src: "{{ source_asset_fullpath }}/{{ item.sourcename }}"
+      dest: "{{ dest_project_fullpath }}/{{ item.destname }}"
+    loop:
+      - sourcename: "docker-compose.yml"
+        destname: "docker-compose.yml"
+      - sourcename: ".env-{{ inventory_hostname }}"
+        destname: ".env"
+    register: copy_files_root
+  - name: Copy all files from local root assets/project to remote ~/project/config
+    copy:
+      src: "{{ item }}"
+      dest: "{{ dest_project_fullpath }}/config/{{ item | basename }}"
+    with_fileglob:
+      - "{{ source_asset_fullpath }}/config/Caddyfile"
+    register: copy_files_config
+  - name: Copy all files from local root assets/project/static to remote ~/project/static
+    copy:
+      src: "{{ item }}"
+      dest: "{{ dest_project_fullpath }}/static/{{ item | basename }}"
+    with_fileglob:
+      - "{{ source_asset_fullpath }}/static/index.html"
+    register: copy_files_config
+  # Modify files with additional content
+  - name: Check if the additional Caddyfile exists
+    stat:
+      path: "{{ source_asset_fullpath }}/config/Caddyfile-{{ inventory_hostname }}"
+    register: additional_caddyfile_stat
+
+  - name: Set the additional_caddyfile_content fact if the file exists
+    set_fact:
+      additional_caddyfile_content: "{{ lookup('file', source_asset_fullpath + '/config/Caddyfile-' + inventory_hostname) }}"
+    when: additional_caddyfile_stat.stat.exists
+
+  - name: Check if additional Caddyfile was found
+    set_fact:
+      additional_caddyfile_exists: "{{ additional_caddyfile_stat.stat.exists and additional_caddyfile_content != '' }}"
+
+  - name: Read the content of the first file
+    set_fact:
+      file1_content: "{{ lookup('file', source_asset_fullpath + '/config/Caddyfile') }}"
+    when: additional_caddyfile_exists
+    
+  - name: Read the content of the second file
+    set_fact:
+      file2_content: "{{ lookup('file', source_asset_fullpath + '/config/Caddyfile-' + inventory_hostname) }}"
+    when: additional_caddyfile_exists
+  
+  - name: Merge the contents of the two files
+    set_fact:
+      merged_content: "{{ file1_content + '\n\n' + file2_content }}"
+    when: additional_caddyfile_exists
+  
+  - name: Set the merged content on the destination machine
+    copy:
+      content: "{{ merged_content }}"
+      dest: "{{ dest_project_fullpath }}/config/Caddyfile"
+    when: additional_caddyfile_exists
+
+  # Network existing check
+  - name: Ensure Docker network 'caddy-fallback' exists with specific settings
+    docker_network:
+      name: caddy-fallback
+      driver: bridge
+      state: present
+
+  # Merging additional docker-compose.yml
+  - name: Check if the additional docker-compose.yml exists
+    stat:
+      path: "{{ source_asset_fullpath }}/docker-compose-{{ inventory_hostname }}.yml"
+    register: additional_dc_stat
+
+  - name: Set the additional_dc_content fact if the file exists
+    set_fact:
+      additional_dc_content: "{{ lookup('file', source_asset_fullpath + '/docker-compose-' + inventory_hostname + '.yml') }}"
+    when: additional_dc_stat.stat.exists
+
+  - name: Check if additional docker-compose.yml was found
+    set_fact:
+      additional_dc_exists: "{{ additional_dc_stat.stat.exists and additional_dc_content != '' and additional_dc_content.split('\n') | length > 3 }}"
+
+  - name: Debug line count
+    debug:
+      msg: "The additional docker-compose.yml file has {{ additional_dc_content.split('\n') | length }} lines."
+    when: additional_dc_exists
+
+  - name: Copy additional docker-compose.yml file from local root assets/project to remote ~/project
+    copy:
+      src: "{{ source_asset_fullpath }}/{{ item.sourcename }}"
+      dest: "{{ dest_project_fullpath }}/{{ item.destname }}"
+    loop:
+      - sourcename: "docker-compose-{{ inventory_hostname }}.yml"
+        destname: "docker-compose-{{ inventory_hostname }}.yml"
+    when: additional_dc_exists
+
+  - name: Run yq command to merge all docker-compose.yml files into one
+    shell: "yq eval-all '. as $item ireduce ({}; . *+ $item)' docker-compose-{{ inventory_hostname }}.yml docker-compose.yml"
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+      removes: "{{ dest_project_fullpath }}/docker-compose.yml"
+    register: yq_output
+    when: additional_dc_exists
+  
+  - name: Print output to console
+    debug:
+      msg: "{{yq_output.stdout}}"
+    when: additional_dc_exists
+  
+  - name: Save output of yq to docker-compose.yml
+    ansible.builtin.copy:
+      content: "{{yq_output.stdout}}"
+      dest: "{{ dest_project_fullpath }}/docker-compose.yml"
+    when: (additional_dc_exists) and (yq_output.stdout_lines | length > 1)
+
+  # Up the service
+  - name: Run docker compose up for Caddy
+    command: docker compose up caddy -d
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_compose_up
+  - name: Wait for 3 seconds after starting docker compose
+    pause:
+      seconds: 3
+    when: docker_compose_up.changed
+  - name: Check if Caddy service is running correctly
+    command: docker compose ps caddy
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_ps
+    failed_when: "'Up' not in docker_ps.stdout"
+    when: docker_compose_up.changed

@@ -1,0 +1,34 @@
+(logging) {
+    log {
+        output file /var/log/caddy/{args[0]}.access.log {
+            roll_size 10mb
+            roll_keep 20
+            roll_keep_for 3d
+        }
+    }
+}
+
+# Apply logging to all incoming requests
+{
+    log {
+        output file /var/log/caddy/common.access.log {
+            roll_size 10mb
+            roll_keep 20
+            roll_keep_for 3d
+        }
+    }
+}
+
+* {
+    import logging wildcard
+}
+
+:{$FALLBACK_PORT_1} {
+    import logging :{$FALLBACK_PORT_1};
+    respond "Handled by Caddy 1" 200
+}
+
+:{$FALLBACK_PORT_2} {
+    import logging :{$FALLBACK_PORT_2};
+    respond "Handled by Caddy 2" 200
+}

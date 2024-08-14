@@ -1,0 +1,106 @@
+---
+- name: Configure X-UI database
+  hosts: all
+  become: true
+  become_user: "{{ standard_user }}"
+  vars_files:
+    - '{{ inventory_dir }}/vars/vars.yaml'
+  vars:
+    vpn_dir: vpn-xui-first
+    project_dir: xui
+    source_asset_fullpath: "{{ inventory_dir }}/assets/xui-first"
+    dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir }}"
+  
+  tasks:
+    # Validate fiels and folders exist
+    - name: Ensure ~/project/db directory exists
+      file:
+        path: "{{ dest_project_fullpath }}/db"
+        state: directory
+        mode: '0775'
+    # Map .env file
+    - name: Get env file content
+      set_fact:
+        env_lines: "{{ lookup('file', '{{ source_asset_fullpath }}/.env-{{ inventory_hostname }}').splitlines() }}"
+    
+    - name: Debug env_lines to verify content
+      debug:
+        var: env_lines
+
+    - name: Parse environment variables into a dictionary
+      set_fact:
+        env_vars: "{{ dict(env_lines | select('match', '^[^#].*=.*$') | map('split', '=', 2) | map('map', 'trim')) }}"
+    
+    - name: Debug env_vars to verify parsed variables
+      debug:
+        var: env_vars
+
+    - name: Set each env var as an individual fact
+      set_fact:
+        "{{ item.key }}": "{{ item.value }}"
+      loop: "{{ env_vars | dict2items }}"
+
+    - name: Debug to verify individual variables
+      debug:
+        msg: "Key={{ item.key }}, Value={{ item.value }}"
+      loop: "{{ env_vars | dict2items }}"
+
+    # Template configuredb file and execute it
+    - name: Template the configuredb.sql.j2 file on the destination machine
+      template:
+        src: "{{ source_asset_fullpath }}/db/configuredb.sql.j2"
+        dest: "{{ dest_project_fullpath }}/db/configuredb.sql"
+
+    - name: Debug to verify the presence of SQL file
+      stat:
+        path: "{{ dest_project_fullpath }}/db/configuredb.sql"
+      register: sql_file
+
+    - name: Verify that the SQL file exists
+      debug:
+        msg: "SQL file exists and is ready for execution"
+      when: sql_file.stat.exists
+
+    # Stop and down if it was up
+    - name: Check status of Docker Compose services
+      command: docker compose ps
+      args:
+        chdir: "{{ dest_project_fullpath }}/"
+      register: docker_compose_status
+      when: sql_file.stat.exists
+      ignore_errors: yes
+    - name: Stop Project service because it is running
+      command: docker compose down xui
+      args:
+        chdir: "{{ dest_project_fullpath }}/"
+      when: 
+        - "'xui' in docker_compose_status.stdout"
+        - sql_file.stat.exists
+      ignore_errors: yes
+    
+    - name: Execute SQL file on SQLite database
+      shell:
+        cmd: "sqlite3 {{ dest_project_fullpath }}/db/x-ui.db < {{ dest_project_fullpath }}/db/configuredb.sql"
+      when: sql_file.stat.exists
+
+    # Up the service
+    - name: Run docker compose up for Project
+      command: docker compose up xui -d
+      args:
+        chdir: "{{ dest_project_fullpath }}/"
+      register: docker_compose_up
+    - name: Wait for 3 seconds after starting docker compose
+      pause:
+        seconds: 3
+      when:
+        - docker_compose_up.changed
+        - sql_file.stat.exists
+    - name: Check if Project service is running correctly
+      command: docker compose ps xui
+      args:
+        chdir: "{{ dest_project_fullpath }}/"
+      register: docker_ps
+      failed_when: "'Up' not in docker_ps.stdout"
+      when: 
+        - docker_compose_up.changed
+        - sql_file.stat.exists

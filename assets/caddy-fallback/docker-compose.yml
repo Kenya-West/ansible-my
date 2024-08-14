@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    cpus: "0.5"
+    mem_limit: 200m
+    environment:
+      - CADDY_INGRESS_NETWORKS=caddy-fallback
+      - CADDY_DOCKER_CADDYFILE_PATH=/config/Caddyfile
+    env_file:
+      - .env
+    ports:
+      - ${FALLBACK_PORT_1}
+      - ${FALLBACK_PORT_2}
+    networks:
+      - caddy-fallback
+    volumes:
+      - ./config/Caddyfile:/config/Caddyfile
+      - ./logs:/var/log/caddy
+      - ./static:/var/www/public
+      - caddy-data:/data
+    restart: unless-stopped
+
+networks:
+  caddy-fallback:
+    external: true
+
+volumes:
+  caddy-data: {}
