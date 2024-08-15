@@ -8,8 +8,9 @@
   vars:
     vpn_dir: vpn-xui-first
     project_dir: certbot
-    source_asset_fullpath: "{{ inventory_dir }}/assets/xui-first"
+    source_asset_fullpath: "{{ inventory_dir }}/assets/{{ vpn_dir }}/xui"
     dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir }}"
+
     certbot_create_extra_args: ""
     certbot_create_if_missing: true
     certbot_auto_renew: true
