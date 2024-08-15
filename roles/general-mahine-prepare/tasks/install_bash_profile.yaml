@@ -5,16 +5,20 @@
   become_user: "{{ standard_user }}"
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
+  vars:
+    project_dir: bash
+    source_asset_fullpath: "{{ inventory_dir }}/assets/general-machine-prepare/{{ project_dir }}"
+    dest_project_fullpath: "/home/{{ standard_user }}/"
   tasks:
     - name: Read aliases from local .bashrc file
       set_fact:
-        aliases_content: "{{ lookup('file', inventory_dir + '/assets/bash/.bashrc', errors='ignore').splitlines() }}"
+        aliases_content: "{{ lookup('file', source_asset_fullpath + '/.bashrc', errors='ignore').splitlines() }}"
       failed_when: aliases_content == ['']
       ignore_errors: yes
 
     - name: Ensure .bashrc exists on target machine
       file:
-        path: "/home/{{ standard_user }}/.bashrc"
+        path: "{{ dest_project_fullpath }}/.bashrc"
         state: touch
         mode: '0644'
       when:
@@ -24,7 +28,7 @@
 
     - name: Add aliases to .bashrc if not present
       lineinfile:
-        path: "/home/{{ standard_user }}/.bashrc"
+        path: "{{ dest_project_fullpath }}/.bashrc"
         line: "{{ item }}"
         state: present
         create: yes

@@ -5,11 +5,16 @@
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
   vars:
+    project_dir_users: users
+    project_dir_ssh: ssh_keys
+    source_asset_fullpath: "{{ inventory_dir }}/assets/general-machine-prepare/"
+    dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir_users }}"
+
     combined_user_keys: []
   tasks:
     - name: Load user data from a local file
       set_fact:
-        user_lines: "{{ lookup('file', inventory_dir + '/assets/users/users.txt').splitlines() }}"
+        user_lines: "{{ lookup('file', '{{ source_asset_fullpath }}/{{ project_dir_users }}/users.txt').splitlines() }}"
       ignore_errors: yes
 
     - name: Parse user data
@@ -22,7 +27,7 @@
 
     - name: Load public keys from a local file
       set_fact:
-        ssh_keys_content: "{{ lookup('file', inventory_dir + '/assets/ssh_keys/authorized_keys').split('\n') }}"
+        ssh_keys_content: "{{ lookup('file', '{{ source_asset_fullpath }}/{{ project_dir_ssh }}/authorized_keys').split('\n') }}"
       ignore_errors: true
 
     - name: Create combined user-key pairs

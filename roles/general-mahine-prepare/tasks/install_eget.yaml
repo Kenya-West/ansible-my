@@ -4,6 +4,9 @@
   become: true
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
+  vars:
+    project_dir: eget
+    dest_project_fullpath: "/home/{{ standard_user }}/{{ project_dir }}"
 
   tasks:
     - name: Check if eget is already installed
@@ -38,5 +41,5 @@
     
     - name: Remove eget binary file in user directory
       file:
-        path: /home/{{ standard_user }}/eget
+        path: "{{ dest_project_fullpath }}"
         state: absent

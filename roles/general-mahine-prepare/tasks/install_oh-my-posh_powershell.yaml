@@ -6,8 +6,9 @@
   become: true
   become_user: "{{ standard_user }}"
   vars:
-    script_dir: oh-my-posh
-    themes_dir: .poshthemes
+    dest_project_fullpath: "/home/{{ standard_user }}"
+
+    themes_dir: "{{ dest_project_fullpath }}/.poshthemes"
     theme: jandedobbeleer
 
   tasks:
@@ -49,6 +50,6 @@
     - name: Add oh-my-posh to $PROFILE
       lineinfile:
         path: "{{ pwsh_profile.stdout }}"
-        line: "oh-my-posh init pwsh --config /home/{{ standard_user }}/{{ themes_dir }}/{{ theme }}.omp.json | Invoke-Expression"
+        line: "oh-my-posh init pwsh --config {{ themes_dir }}/{{ theme }}.omp.json | Invoke-Expression"
 
     
