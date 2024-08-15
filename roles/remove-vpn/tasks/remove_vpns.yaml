@@ -6,7 +6,7 @@
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
     root_dir: "/home/{{ standard_user }}"
-    vpn_directories_file: "{{ inventory_dir }}/assets/vpn/vpn-directories-list.txt"
+    vpn_directories_file: "{{ inventory_dir }}/assets/general-machine-prepare/remove_vpn/vpn-directories-list.txt"
 
   tasks:
     - name: Set directory list fact
@@ -48,15 +48,28 @@
         loop_var: item
         index_var: item_index
 
-    - name: Down all apps if docker-compose.yml exists
-      command: docker compose down
-      args:
-        chdir: "{{ root_dir }}/{{ item }}"
-      when: file_stat.results[item_index].stat.exists
+    # - name: Down all apps if docker-compose.yml exists
+    #   command: docker compose down
+    #   args:
+    #     chdir: "{{ root_dir }}/{{ item }}"
+    #   when: file_stat.results[item_index].stat.exists
+    #   loop: "{{ vpn_directories_list }}"
+    #   loop_control:
+    #     loop_var: item
+    #     index_var: item_index
+    #   ignore_errors: yes
+    
+    - name: destroy docker-compose project
+      community.docker.docker_compose_v2:
+        project_src: "{{ root_dir }}/{{ item }}"
+        files:
+          - docker-compose.yml
+        state: absent
+        remove_orphans: true
+        remove_volumes: true
       loop: "{{ vpn_directories_list }}"
       loop_control:
         loop_var: item
-        index_var: item_index
       ignore_errors: yes
 
     - name: Remove the directory if it exists
