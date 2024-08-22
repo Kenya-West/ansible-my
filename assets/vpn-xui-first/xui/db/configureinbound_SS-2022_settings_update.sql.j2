@@ -1,1 +1,3 @@
+UPDATE "main"."inbounds" SET "port" = '{{ XUI_SS2022_PORT | defaut("49991") }}' WHERE "remark" = 'SS-2022';
+UPDATE "main"."inbounds" SET "tag" = 'inbound-{{ XUI_SS2022_PORT | defaut("49991") }}' WHERE "remark" = 'SS-2022';
 UPDATE "main"."inbounds" SET "settings" = '{{ JQ_RESULT.stdout }}' WHERE "remark" = 'SS-2022';

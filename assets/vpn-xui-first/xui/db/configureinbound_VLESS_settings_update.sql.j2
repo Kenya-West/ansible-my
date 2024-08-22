@@ -1,1 +1,3 @@
+UPDATE "main"."inbounds" SET "port" = '{{ XUI_VLESS_PORT | defaut("443") }}' WHERE "remark" = 'VLESS';
+UPDATE "main"."inbounds" SET "tag" = 'inbound-{{ XUI_VLESS_PORT | defaut("443") }}' WHERE "remark" = 'VLESS';
 UPDATE "main"."inbounds" SET "settings" = '{{ JQ_RESULT.stdout }}' WHERE "remark" = 'VLESS';
