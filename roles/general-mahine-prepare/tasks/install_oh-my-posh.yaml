@@ -13,6 +13,22 @@
     theme: illusi0n
 
   tasks:
+  - name: Remove scripts directory
+    file:
+      state: absent
+      path: "{{ script_dir }}"
+    become: true
+    become_user: root
+    ignore_errors: yes
+
+  - name: Remove themes directory
+    file:
+      state: absent
+      path: "{{ themes_dir }}"
+    become: true
+    become_user: root
+    ignore_errors: yes
+
   - file:
       state: directory
       path: "{{ script_dir }}"
