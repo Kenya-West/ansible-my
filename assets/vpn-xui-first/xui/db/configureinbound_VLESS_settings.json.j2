@@ -4,14 +4,14 @@
   "fallbacks": [
     {
       "alpn": "",
-      "dest": "8001",
+      "dest": "{{ XUI_VLESS_FALLBACK_PORT_1 | default("8081") }}",
       "name": "",
       "path": "",
       "xver": 1
     },
     {
       "alpn": "h2",
-      "dest": "8002",
+      "dest": "{{ XUI_VLESS_FALLBACK_PORT_2 | default("8082") }}",
       "name": "",
       "path": "",
       "xver": 2
