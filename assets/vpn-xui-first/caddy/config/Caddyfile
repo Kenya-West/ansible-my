@@ -24,11 +24,11 @@
 }
 
 :{$FALLBACK_PORT_1} {
-    import logging :{$FALLBACK_PORT_1};
+    import logging {$FALLBACK_PORT_1}
     respond "Handled by Caddy 1" 200
 }
 
 :{$FALLBACK_PORT_2} {
-    import logging :{$FALLBACK_PORT_2};
+    import logging {$FALLBACK_PORT_2}
     respond "Handled by Caddy 2" 200
 }
