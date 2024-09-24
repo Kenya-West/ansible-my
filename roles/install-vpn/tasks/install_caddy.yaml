@@ -126,19 +126,14 @@
       state: present
 
   # Merging additional docker-compose.yml
-  - name: Check if the additional docker-compose.yml exists
-    stat:
-      path: "{{ source_asset_fullpath }}/docker-compose-{{ inventory_hostname }}.yml"
-    register: additional_dc_stat
-
   - name: Set the additional_dc_content fact if the file exists
     set_fact:
       additional_dc_content: "{{ lookup('file', source_asset_fullpath + '/docker-compose-' + inventory_hostname + '.yml') }}"
-    when: additional_dc_stat.stat.exists
+    ignore_errors: yes
 
   - name: Check if additional docker-compose.yml was found
     set_fact:
-      additional_dc_exists: "{{ additional_dc_stat.stat.exists and additional_dc_content != '' and additional_dc_content.split('\n') | length > 3 }}"
+      additional_dc_exists: "{{ additional_dc_content != '' and additional_dc_content.split('\n') | length > 3 }}"
 
   - name: Debug line count
     debug:
