@@ -1,0 +1,21 @@
+---
+version: "3.8"
+
+services:
+  xui:
+    image: kenyawest/xui-sqlite-server
+    container_name: xui-sqlite-server
+    volumes:
+      - ../xui/db:/assets
+    networks:
+      - caddy-fallback
+    tty: true
+    restart: unless-stopped
+    labels:
+      - caddy=xui-sqlite-server:3000
+      - caddy.route=/{$URL_SEGMENT}*
+      - caddy.reverse_proxy={{upstreams}}
+
+networks:
+  caddy-fallback:
+    external: true

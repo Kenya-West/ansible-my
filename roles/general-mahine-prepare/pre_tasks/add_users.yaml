@@ -2,13 +2,15 @@
 - name: Add users based on local file contents
   hosts: all
   become: true
+  vars:
+    ansible_user: root
   vars_files:
     - "{{ inventory_dir }}/vars/vars.yaml"
 
   tasks:
     - name: Load user data from a local file
       set_fact:
-        user_lines: "{{ lookup('file', '{{ inventory_dir }}//assets/users/users.txt').split(' ') }}"
+        user_lines: "{{ lookup('file', '{{ inventory_dir }}/assets/general-machine-prepare/users/users.txt').split(' ') }}"
 
     - name: Parse user data
       set_fact:

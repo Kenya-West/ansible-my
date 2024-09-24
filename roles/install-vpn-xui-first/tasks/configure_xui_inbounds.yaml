@@ -25,6 +25,9 @@
         path: "{{ dest_project_fullpath }}/db"
         state: directory
         mode: '0775'
+    - name: Check if x-ui.db file exists
+      register: sql_file
+      stat: path="{{ dest_project_fullpath }}/db/x-ui.db"
     
     # Map .env file
     - name: Get env file content
