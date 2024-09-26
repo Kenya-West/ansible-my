@@ -12,12 +12,11 @@ services:
       - caddy-fallback
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
-      # - ./config/vhost.d:/etc/nginx/vhost.d:ro
-      # - type: bind
-      #   source: ./config/root/my_proxy.conf
-      #   target: /etc/nginx/conf.d/my_proxy.conf
-      #   read_only: true
-      # - ./static:/var/www/html
+      - ./config/vhost.d:/etc/nginx/vhost.d:ro
+      - type: bind
+        source: ./config/root/my_proxy.conf
+        target: /etc/nginx/conf.d/my_proxy.conf
+        read_only: true
 
 networks:
   caddy-fallback:
