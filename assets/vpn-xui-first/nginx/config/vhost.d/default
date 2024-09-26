@@ -1,0 +1,9 @@
+# listen 80 proxy_protocol;
+# server_name dummy;
+# location /kek2 {
+#     proxy_pass http://dummy;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $proxy_protocol_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+# }

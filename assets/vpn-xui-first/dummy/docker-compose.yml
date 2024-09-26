@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  dummy:
+    image: nginx:latest
+    container_name: dummy
+    cpus: "0.5"
+    mem_limit: 200m
+    environment:
+      - VIRTUAL_HOST=DEFAULT_HOST
+      - VIRTUAL_PATH=/
+    networks:
+      - caddy-fallback
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/usr/share/nginx/html:ro
+
+networks:
+  caddy-fallback:
+    external: true

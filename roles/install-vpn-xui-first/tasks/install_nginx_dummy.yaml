@@ -1,0 +1,97 @@
+---
+- name: Install Dummy with Docker
+  hosts: all
+  become: true
+  become_user: "{{ standard_user }}"
+  vars_files:
+    - '{{ inventory_dir }}/vars/vars.yaml'
+  vars:
+    vpn_dir: vpn-xui-first
+    project_dir: dummy
+    source_asset_fullpath: "{{ inventory_dir }}/assets/{{ vpn_dir }}/{{ project_dir }}"
+    dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir }}"
+
+  tasks:
+  # Validate fiels and folders exist
+  - name: Ensure project directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/"
+      state: directory
+      mode: '0775'
+  - name: Ensure project/config directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/config"
+      state: directory
+      mode: '0775'
+  - name: Ensure project/static directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/static"
+      state: directory
+      mode: '0777'
+  # Stop and down if it was up
+  - name: Check status of Docker Compose services
+    command: docker compose ps
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_compose_status
+    ignore_errors: yes
+  - name: Stop Dummy service because it is running
+    command: docker compose down dummy
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    when: "'dummy' in docker_compose_status.stdout"
+    ignore_errors: yes
+  - name: Pull new Dummy release service if it was running
+    command: docker compose pull dummy
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    when: "'dummy' in docker_compose_status.stdout"
+    ignore_errors: yes
+  # Copy files
+  - name: Copy all files from local root assets/project to remote ~/project
+    copy:
+      src: "{{ source_asset_fullpath }}/{{ item.sourcename }}"
+      dest: "{{ dest_project_fullpath }}/{{ item.destname }}"
+    loop:
+      - sourcename: "docker-compose.yml"
+        destname: "docker-compose.yml"
+    register: copy_files_root
+  - name: Copy all files from local root assets/project to remote ~/project/config
+    copy:
+      src: "{{ item }}"
+      dest: "{{ dest_project_fullpath }}/config/{{ item | basename }}"
+    with_fileglob:
+      - "{{ source_asset_fullpath }}/config/nginx.conf"
+    register: copy_files_config
+  - name: Copy all files from local root assets/project/static to remote ~/project/static
+    copy:
+      src: "{{ item }}"
+      dest: "{{ dest_project_fullpath }}/static/{{ item | basename }}"
+    with_fileglob:
+      - "{{ source_asset_fullpath }}/static/index.html"
+    register: copy_files_config
+
+  # Network existing check
+  - name: Ensure Docker network 'caddy-fallback' exists with specific settings
+    docker_network:
+      name: caddy-fallback
+      driver: bridge
+      state: present
+
+  # Up the service
+  - name: Run docker compose up for Dummy
+    command: docker compose up dummy -d
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_compose_up
+  - name: Wait for 3 seconds after starting docker compose
+    pause:
+      seconds: 3
+    when: docker_compose_up.changed
+  - name: Check if Dummy service is running correctly
+    command: docker compose ps dummy
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_ps
+    failed_when: "'Up' not in docker_ps.stdout"
+    when: docker_compose_up.changed
