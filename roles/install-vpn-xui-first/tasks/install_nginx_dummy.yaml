@@ -72,9 +72,9 @@
     register: copy_files_config
 
   # Network existing check
-  - name: Ensure Docker network 'caddy-fallback' exists with specific settings
+  - name: Ensure Docker network 'xui_network' exists with specific settings
     docker_network:
-      name: caddy-fallback
+      name: xui_network
       driver: bridge
       state: present
 

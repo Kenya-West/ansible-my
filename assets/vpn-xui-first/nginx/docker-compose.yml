@@ -9,7 +9,7 @@ services:
     env_file:
       - .env
     networks:
-      - caddy-fallback
+      - xui_network
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
       - ./config/vhost.d:/etc/nginx/vhost.d:ro
@@ -19,5 +19,5 @@ services:
         read_only: true
 
 networks:
-  caddy-fallback:
+  xui_network:
     external: true
