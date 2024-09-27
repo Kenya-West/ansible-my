@@ -4,3 +4,4 @@
   - import_playbook: ./tasks/configure_xui.yaml
   - import_playbook: ./tasks/configure_xui_inbounds.yaml
   - import_playbook: ./tasks/install_nginx.yaml
+  - import_playbook: ./tasks/install_nginx_dummy.yaml
