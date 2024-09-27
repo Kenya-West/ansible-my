@@ -14,7 +14,7 @@ services:
     env_file:
       - .env
     networks:
-      - caddy-fallback
+      - xui_network
     environment:
       XRAY_VMESS_AEAD_FORCED: "false"
     tty: true
@@ -29,5 +29,5 @@ services:
       - "${XUI_SUB_PORT}:${XUI_SUB_PORT}"
 
 networks:
-  caddy-fallback:
+  xui_network:
     external: true
