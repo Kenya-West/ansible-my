@@ -24,7 +24,7 @@ services:
       - 443:443
       - "${XUI_DASHBOARD_PORT}:${XUI_DASHBOARD_PORT}"
       - "${XUI_WG_PORT}:${XUI_WG_PORT}/udp"
-      - "${XUI_VLESS_PORT}:${XUI_VLESS_PORT}"
+      # - "${XUI_VLESS_PORT}:${XUI_VLESS_PORT}" # It is not needed since VLESS utilizes port 443
       - "${XUI_SS2022_PORT}:${XUI_SS2022_PORT}"
       - "${XUI_SUB_PORT}:${XUI_SUB_PORT}"
 
