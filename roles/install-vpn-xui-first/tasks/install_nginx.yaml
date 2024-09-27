@@ -70,7 +70,7 @@
     loop:
       - sourcename: "docker-compose.yml"
         destname: "docker-compose.yml"
-      - sourcename: ".env-{{ inventory_hostname }}"
+      - sourcename: ".env"
         destname: ".env"
     register: copy_files_root
   - name: Copy all files from local root assets/project to remote ~/project/config/root
