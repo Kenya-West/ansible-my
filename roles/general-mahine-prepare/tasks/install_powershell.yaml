@@ -50,6 +50,15 @@
     - name: Update package list
       apt:
        update_cache: yes    
-    - name: Install latest version of PowerShell
+    - name: Install latest version of PowerShell via apt
       apt:
        name: powershell
+      ignore_errors: yes
+      register: powershell_install_apt
+    - name: Install latest version of PowerShell via Snap Classic
+      snap:
+       name: powershell
+       classic: yes
+      ignore_errors: yes
+      register: powershell_install_snap
+      when: powershell_install_apt is failed
