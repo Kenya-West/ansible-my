@@ -17,6 +17,7 @@ services:
         source: ./config/root/my_proxy.conf
         target: /etc/nginx/conf.d/my_proxy.conf
         read_only: true
+    restart: unless-stopped
 
 networks:
   xui_network:
