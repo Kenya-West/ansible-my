@@ -51,16 +51,16 @@
     register: docker_compose_status
     ignore_errors: yes
   - name: Stop Nginx service because it is running
-    command: docker compose down nginx-proxy
+    command: docker compose down nginx
     args:
       chdir: "{{ dest_project_fullpath }}/"
-    when: "'nginx-proxy' in docker_compose_status.stdout"
+    when: "'nginx' in docker_compose_status.stdout"
     ignore_errors: yes
   - name: Pull new Nginx release service if it was running
-    command: docker compose pull nginx-proxy
+    command: docker compose pull nginx
     args:
       chdir: "{{ dest_project_fullpath }}/"
-    when: "'nginx-proxy' in docker_compose_status.stdout"
+    when: "'nginx' in docker_compose_status.stdout"
     ignore_errors: yes
   # Copy files
   - name: Copy all files from local root assets/project to remote ~/project
@@ -187,7 +187,7 @@
 
   # Up the service
   - name: Run docker compose up for Nginx
-    command: docker compose up nginx-proxy -d
+    command: docker compose up nginx -d
     args:
       chdir: "{{ dest_project_fullpath }}/"
     register: docker_compose_up
@@ -196,7 +196,7 @@
       seconds: 3
     when: docker_compose_up.changed
   - name: Check if Nginx service is running correctly
-    command: docker compose ps nginx-proxy
+    command: docker compose ps nginx
     args:
       chdir: "{{ dest_project_fullpath }}/"
     register: docker_ps
