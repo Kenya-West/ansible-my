@@ -7,7 +7,7 @@ services:
     cpus: "0.5"
     mem_limit: 200m
     environment:
-      - VIRTUAL_HOST=DEFAULT_HOST
+      - VIRTUAL_HOST=dummy
       - VIRTUAL_PATH=/
     networks:
       - xui_network
