@@ -1,0 +1,19 @@
+---
+version: "3.8"
+
+services:
+  xui-api-server:
+    image: kenyawest/xui-api-server:latest
+    container_name: xui-api-server
+    cpus: "0.5"
+    mem_limit: 200m
+    environment:
+      - VIRTUAL_HOST=xui-api-server
+      - VIRTUAL_PATH=/api/xui-api-server/
+    networks:
+      - xui_network
+    restart: unless-stopped
+
+networks:
+  xui_network:
+    external: true

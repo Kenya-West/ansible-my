@@ -16,3 +16,4 @@ vpn-xui-first/xray
 vpn-xui-first/wg
 vpn-xui-first/wireguard
 vpn-xui-first/caddy
+vpn-xui-first/nginx

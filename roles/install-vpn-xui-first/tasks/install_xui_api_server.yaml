@@ -1,5 +1,5 @@
 ---
-- name: Install X-UI as first-party with Docker
+- name: Install X-UI API Server
   hosts: all
   become: true
   become_user: "{{ standard_user }}"
@@ -7,7 +7,7 @@
     - '{{ inventory_dir }}/vars/vars.yaml'
   vars:
     vpn_dir: vpn-xui-first
-    project_dir: xui
+    project_dir: xui-api-server
     source_asset_fullpath: "{{ inventory_dir }}/assets/{{ vpn_dir }}/{{ project_dir }}"
     dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir }}"
 
@@ -18,11 +18,6 @@
       path: "{{ dest_project_fullpath }}/"
       state: directory
       mode: '0775'
-  - name: Ensure ~/project/db directory exists
-    file:
-      path: "{{ dest_project_fullpath }}/db"
-      state: directory
-      mode: '0775'
   # Stop and down if it was up
   - name: Check status of Docker Compose services
     command: docker compose ps
@@ -31,39 +26,26 @@
     register: docker_compose_status
     ignore_errors: yes
   - name: Stop X-UI service if it is running
-    command: docker compose down xui
+    command: docker compose down xui-api-server
     args:
       chdir: "{{ dest_project_fullpath }}/"
-    when: "'xui' in docker_compose_status.stdout"
+    when: "'xui-api-server' in docker_compose_status.stdout"
     ignore_errors: yes
   - name: Pull new X-UI release service if it was running
-    command: docker compose pull xui
+    command: docker compose pull xui-api-server
     args:
       chdir: "{{ dest_project_fullpath }}/"
-    when: "'xui' in docker_compose_status.stdout"
+    when: "'xui-api-server' in docker_compose_status.stdout"
     ignore_errors: yes
-  # Check files existing
-  - name: Check if ~/project/db/ exists
-    stat: path="{{ dest_project_fullpath }}/db/x-ui.db"
-    register: db_file
   # Copy files
-  - name: Copy all files from local root assets/xui to remote ~/project
+  - name: Copy all files from "{{ source_asset_fullpath }}" to remote "{{ dest_project_fullpath }}"
     copy:
       src: "{{ source_asset_fullpath }}/{{ item.sourcename }}"
       dest: "{{ dest_project_fullpath }}/{{ item.destname }}"
     loop:
       - sourcename: "docker-compose.yml"
         destname: "docker-compose.yml"
-      - sourcename: ".env-{{ inventory_hostname }}"
-        destname: ".env"
     register: copy_files_root
-  - name: Copy all database files from local root assets/xui/db/ to remote ~/project/db/
-    copy:
-      src: "{{ item }}"
-      dest: "{{ dest_project_fullpath }}/db/{{ item | basename }}"
-    with_fileglob:
-      - "{{ source_asset_fullpath }}/db/x-ui.db"
-    register: copy_files_db
   # Network existing check
   - name: Ensure Docker network 'xui_network' exists with specific settings
     docker_network:
@@ -71,8 +53,8 @@
       driver: bridge
       state: present
   # Up the service
-  - name: Run docker compose up for X-UI
-    command: docker compose up xui -d
+  - name: Run docker compose up for X-UI API Server
+    command: docker compose up xui-api-server -d
     args:
       chdir: "{{ dest_project_fullpath }}/"
     register: docker_compose_up
@@ -80,8 +62,8 @@
     pause:
       seconds: 3
     when: docker_compose_up.changed
-  - name: Check if X-UI service is running correctly
-    command: docker compose ps xui
+  - name: Check if X-UI API Server service is running correctly
+    command: docker compose ps xui-api-server
     args:
       chdir: "{{ dest_project_fullpath }}/"
     register: docker_ps
