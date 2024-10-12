@@ -6,12 +6,12 @@ services:
     cpus: "0.5"
     mem_limit: 200m
     environment:
-      - CADDY_INGRESS_NETWORKS=caddy-fallback
+      - CADDY_INGRESS_NETWORKS=xui_network
       - CADDY_DOCKER_CADDYFILE_PATH=/config/Caddyfile
     env_file:
       - .env
     networks:
-      - caddy-fallback
+      - xui_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/Caddyfile:/config/Caddyfile
@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
 networks:
-  caddy-fallback:
+  xui_network:
     external: true
 
 volumes:
