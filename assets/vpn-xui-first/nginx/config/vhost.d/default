@@ -1,3 +1,0 @@
-# This is a default config for any hosts behind nginx-proxy.
-# Omit section server {} and place its contents there
-# Details: https://github.com/nginx-proxy/nginx-proxy/tree/main/docs#per-virtual_host-default-configuration
