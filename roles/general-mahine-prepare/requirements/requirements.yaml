@@ -8,3 +8,5 @@
 - src: darkwizard242.lazygit
 # Certbot
 - src: geerlingguy.certbot
+# Logs
+- src: linux-system-roles.journald
