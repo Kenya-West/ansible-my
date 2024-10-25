@@ -14,3 +14,4 @@
   - import_playbook: ./tasks/install_oh-my-posh.yaml
   - import_playbook: ./tasks/install_oh-my-posh_powershell.yaml
   - import_playbook: ./tasks/add_keys.yaml
+  - import_playbook: ./tasks/clear_cache.yaml
