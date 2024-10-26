@@ -1,0 +1,76 @@
+---
+- name: Install Prometheus
+  hosts: all
+  become: true
+  vars_files:
+    - "{{ inventory_dir }}/vars/vars.yaml"
+  vars:
+    vpn_dir: analytics
+    project_dir: prometheus
+    source_asset_fullpath: "{{ inventory_dir }}/assets/{{ vpn_dir }}/prometheus"
+    dest_project_fullpath: "/home/{{ standard_user }}/{{ vpn_dir }}/{{ project_dir }}"
+  
+  tasks:
+  # Validate fiels and folders exist
+  - name: Ensure ~/project directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/"
+      state: directory
+      mode: '0775'
+  - name: Ensure ~/project/config directory exists
+    file:
+      path: "{{ dest_project_fullpath }}/config"
+      state: directory
+      mode: '0775'
+  # Stop and down if it was up
+  - name: Check status of Docker Compose services
+    command: docker compose ps
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_compose_status
+    ignore_errors: yes
+  - name: Stop Prometheus service if it is running
+    command: docker compose down prometheus
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    when: "'prometheus' in docker_compose_status.stdout"
+    ignore_errors: yes
+  - name: Pull new Prometheus release service if it was running
+    command: docker compose pull prometheus
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    when: "'prometheus' in docker_compose_status.stdout"
+    ignore_errors: yes
+  # Copy files
+  - name: Copy all files from local root assets/prometheus to remote ~/project
+    copy:
+      src: "{{ source_asset_fullpath }}/{{ item.sourcename }}"
+      dest: "{{ dest_project_fullpath }}/{{ item.destname }}"
+    loop:
+      - sourcename: "docker-compose.yml"
+        destname: "docker-compose.yml"
+    register: copy_files_root
+  - name: Copy all database files from local root assets/prometheus/config/ to remote ~/project/config/
+    copy:
+      src: "{{ item }}"
+      dest: "{{ dest_project_fullpath }}/config/{{ item | basename }}"
+    with_fileglob:
+      - "{{ source_asset_fullpath }}/config/config.yaml"
+    register: copy_files_config
+  # Up the service
+  - name: Run docker compose up for Prometheus
+    command: docker compose up prometheus -d
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_compose_up
+  - name: Wait for 3 seconds after starting docker compose
+    pause:
+      seconds: 3
+    when: docker_compose_up.changed
+  - name: Check if Prometheus service is running correctly
+    command: docker compose ps prometheus
+    args:
+      chdir: "{{ dest_project_fullpath }}/"
+    register: docker_ps
+    failed_when: "'Up' not in docker_ps.stdout"
+    when: docker_compose_up.changed
