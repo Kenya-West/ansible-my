@@ -1,0 +1,8 @@
+---
+- name: Reboot if necessary
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/reboot

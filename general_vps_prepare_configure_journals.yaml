@@ -1,0 +1,8 @@
+---
+- name: Configure journals
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/configure_journals

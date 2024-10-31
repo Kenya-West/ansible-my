@@ -1,0 +1,8 @@
+---
+- name: Add users
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/add_users

@@ -1,0 +1,8 @@
+---
+- name: Install packages
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/install_packages

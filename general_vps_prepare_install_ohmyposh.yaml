@@ -1,0 +1,7 @@
+---
+- name: Install Oh-My-Posh
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/install_ohmyposh

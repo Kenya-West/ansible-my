@@ -1,0 +1,8 @@
+---
+- name: Clear cache
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/clear_cache

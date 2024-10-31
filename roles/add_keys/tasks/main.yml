@@ -1,0 +1,9 @@
+---
+# tasks file for roles/add_keys
+  - name: Set SSH authorized keys for user {{ standard_user }} with valid keys
+    authorized_key:
+      user: "{{ standard_user }}"
+      state: present
+      key: "{{ item | trim }}"
+    loop: "{{ authorized_keys }}"
+    ignore_errors: true

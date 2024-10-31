@@ -1,0 +1,36 @@
+---
+# tasks file for roles/install_eget
+  - name: Check if eget is already installed
+    command: which eget
+    register: eget_installed
+    ignore_errors: true
+
+  - name: Download eget installation script to /tmp/
+    get_url:
+      url: https://zyedidia.github.io/eget.sh
+      dest: /tmp/eget.sh
+      mode: '0755'
+    when: eget_installed.rc != 0
+
+  - name: Run eget.sh to install eget
+    shell: "bash /tmp/eget.sh"
+    when: eget_installed.rc != 0
+
+  - name: Run eget to update itself
+    command: eget zyedidia/eget
+    when: eget_installed.rc == 0
+
+  - name: Move eget binary to {{ eget_location_bin }}
+    command: "mv ./eget {{ eget_location_bin }}/"
+    args:
+      creates: "{{ eget_location_bin }}/eget"
+
+  - name: Remove eget.sh from /tmp/
+    file:
+      path: /tmp/eget.sh
+      state: absent
+  
+  - name: Remove eget binary file in user directory
+    file:
+      path: "{{ eget_location_user_dir }}"
+      state: absent

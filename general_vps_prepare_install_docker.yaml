@@ -1,0 +1,11 @@
+---
+- name: Install Docker
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/install_docker
+      vars:
+        docker_users:
+          - "{{ standard_user }}"
+        docker_package_state: present

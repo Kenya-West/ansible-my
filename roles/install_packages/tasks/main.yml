@@ -1,0 +1,15 @@
+---
+# tasks file for roles/install_packages
+  - name: Install Apt packages
+    ignore_errors: yes
+    ansible.builtin.apt:
+      update_cache: yes
+      name: "{{ item }}"
+      state: present
+    loop: "{{ packages_list }}"
+
+  - name: Install Snap packages
+    ignore_errors: yes
+    community.general.snap:
+      name:
+        - procs

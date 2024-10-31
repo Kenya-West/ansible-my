@@ -1,0 +1,12 @@
+---
+  - name: Check if eget is already installed
+    command: which eget
+    register: eget_installed
+    ignore_errors: true
+
+  - name: Download packages using eget
+    command: "eget {{ item.repo }} --asset {{ item.asset | default('') }} --to {{ item.dest_loc | default('/usr/local/bin')}}"
+    when: eget_installed.rc == 0
+    ignore_errors: true
+    loop: "{{ packages_binaary_list }}"
+

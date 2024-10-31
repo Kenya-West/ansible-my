@@ -1,0 +1,8 @@
+---
+- name: Install PowerShell
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/install_powershell

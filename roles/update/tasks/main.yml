@@ -1,0 +1,11 @@
+---
+# tasks file for roles/update
+  - name: ensure apt list dir exists
+    file:
+      path: /var/lib/apt/lists/
+      state: directory
+      mode: 0755
+  - name: Update & refresh packages
+    apt: update_cache=yes cache_valid_time=3600
+  - name: Upgrade all apt packages
+    apt: upgrade=dist

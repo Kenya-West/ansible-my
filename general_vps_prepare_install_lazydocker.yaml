@@ -1,0 +1,7 @@
+---
+- name: Install LazyDocker
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/install_lazydocker

@@ -1,0 +1,8 @@
+---
+- name: Install EZA (modern ls replacement)
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/install_eza

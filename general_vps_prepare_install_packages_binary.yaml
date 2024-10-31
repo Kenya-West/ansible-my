@@ -1,0 +1,7 @@
+---
+- name: Install packages by eget
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/install_packages_binary

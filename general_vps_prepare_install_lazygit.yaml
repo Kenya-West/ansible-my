@@ -1,0 +1,7 @@
+---
+- name: Install LazyGit
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/install_lazygit

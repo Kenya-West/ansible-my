@@ -1,0 +1,31 @@
+---
+# tasks file for roles/install_bash_profile
+  - name: Read aliases from local .bashrc file
+    set_fact:
+      aliases_content: "{{ lookup('file', bash_asset_fullpath + '/.bashrc', errors='ignore').splitlines() }}"
+    failed_when: aliases_content == ['']
+    ignore_errors: yes
+
+  - name: Ensure .bashrc exists on target machine
+    file:
+      path: "/home/{{ standard_user }}/.bashrc"
+      state: touch
+      mode: '0644'
+    when:
+      - aliases_content is defined
+      - aliases_content != ['']
+    ignore_errors: yes
+
+  - name: Add aliases to .bashrc if not present
+    lineinfile:
+      path: "/home/{{ standard_user }}/.bashrc"
+      line: "{{ item }}"
+      state: present
+      create: yes
+      insertafter: EOF
+    with_items: "{{ aliases_content }}"
+    when:
+      - item != ''
+      - aliases_content is defined
+      - aliases_content != ['']
+    ignore_errors: yes
