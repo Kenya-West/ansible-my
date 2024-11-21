@@ -31,3 +31,6 @@ assets/hosts-list/*
 !assets/hosts-list/common/**/*
 !assets/hosts-list/example/
 !assets/hosts-list/example/**/*
+
+# Do not include SSH keys
+group_vars/general_vps_prepare/ssh_keys.yaml
