@@ -1,0 +1,80 @@
+---
+  standard_user: someuser
+  root_password: pass
+
+  domains_keys:
+    main: subdomain.example.tld
+    frps: subdomain-frps.example.tld
+    wg: subdomain-wg.example.tld
+    xray: subdomain-xray.example.tld
+    xui: subdomain-xui.example.tld
+  domains: "{{ domains_keys.values() | list }}"
+  
+  emails:
+    main: Kenya-West@outlook.com
+    domain: Kenya-West@outlook.com
+
+  host_ip_address: 111.222.333.444
+
+  node_exporter_system_group: node-exp
+  node_exporter_system_user: node-exp
+  node_exporter_binary_install_dir: /usr/local/bin
+  node_exporter_basic_auth_users:
+    someuser: pass
+    prometheus: pass
+  node_exporter_tls_server_config:
+    cert_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/fullchain.pem"
+    key_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/privkey.pem"
+  node_exporter_http_server_config:
+    http2: true
+  node_exporter_web_telemetry_path: /node_exporter_metrics
+  node_exporter_web_listen_address_host: 0.0.0.0
+  node_exporter_web_listen_address_port: 49876
+  node_exporter_web_listen_address: "{{ node_exporter_web_listen_address_host }}:{{ node_exporter_web_listen_address_port }}"
+
+  copy_certs_auto_renew_hour: 0
+  copy_certs_auto_renew_minute: 0
+  cert_access_group: certaccess
+
+  docker_service_vars:
+    wg:
+      domain: "{{ domains_keys.wg }}"
+      wg_host: "{{ domains_keys.wg }}"
+      port: 51821
+      wg_port: 51920
+      lang: ru
+      password: pass
+      ui_traffic_stats: "true" # Should be as string because it will be templated
+      ui_chart_type: 1
+    xray:
+      domain: "{{ domains_keys.xray }}"
+      port: 23
+      ws_path: xray_ws_path
+      ws_port: 8188
+    frp:
+      domain: "{{ domains_keys.frps }}"
+      caddy_path: frp
+      server_port: 7000
+      auth_method: token
+      auth_token: sometoken
+      dashboard_port: 7500
+      dashboard_user: someuser
+      dashboard_password: pass
+      range_ports_1_start: 22001
+      range_ports_1_end: 22089
+      client_dashboard_port: 7400
+      client_dashboard_user: someuser
+      client_dashboard_password: pass
+    caddy:
+      vpn_caddy_domain: "{{ domains_keys.main }}"
+      external_ip: "{{ host_ip_address }}"
+    xui:
+      domain: "{{ domains_keys.xui }}"
+      email: "{{ emails.domain }}"
+      dashboard_path: xui-dashboard
+      hostname: "{{ domains_keys.xui }}"
+      dashboard_port: 49999
+      wg_port: 49989
+      vless_port: 49990
+      ss2022_port: 49991
+      sub_port: 49998

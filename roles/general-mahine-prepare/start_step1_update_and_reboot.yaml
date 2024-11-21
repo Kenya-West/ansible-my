@@ -1,3 +1,0 @@
----
-  - import_playbook: ./tasks/update.yaml
-  - import_playbook: ./tasks/reboot.yaml

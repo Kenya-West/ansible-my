@@ -1,0 +1,31 @@
+#!/bin/bash
+
+TARGET_DIR="{{ dest_project_fullpath }}/.certs"
+
+# Ensure the base target directory exists
+mkdir -p "$TARGET_DIR"
+chmod -R 0755 "$TARGET_DIR"
+
+# Get the relative path under /etc/letsencrypt/live
+RELATIVE_PATH=$(realpath --relative-to="/etc/letsencrypt/live" "$RENEWED_LINEAGE")
+
+# Create the corresponding directory in the target location
+TARGET_CERT_DIR="$TARGET_DIR/$RELATIVE_PATH"
+mkdir -p "$TARGET_CERT_DIR"
+
+# Remove any existing symlinks or files to avoid dangling symlinks
+rm -f "$TARGET_CERT_DIR/fullchain.pem"
+rm -f "$TARGET_CERT_DIR/privkey.pem"
+
+# Copy the certificate and private key to the target directory, preserving structure
+cp --preserve=timestamps "$RENEWED_LINEAGE/fullchain.pem" "$TARGET_CERT_DIR/fullchain.pem"
+cp --preserve=timestamps "$RENEWED_LINEAGE/privkey.pem" "$TARGET_CERT_DIR/privkey.pem"
+
+# Set permissions
+chmod 0755 "$TARGET_CERT_DIR/fullchain.pem"
+chmod 0755 "$TARGET_CERT_DIR/privkey.pem"
+
+# Change $TARGET_DIR directory group to {{ cert_access_group }}
+chgrp -R {{ cert_access_group }} "$TARGET_DIR"
+
+echo "Certificates for $RELATIVE_PATH copied to $TARGET_CERT_DIR"

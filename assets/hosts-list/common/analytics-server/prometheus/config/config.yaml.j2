@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: []
+    scheme: http
+    timeout: 10s
+    api_version: v1
+scrape_configs:
+  - job_name: "My servers pool"
+    static_configs:
+      - targets: [ "<yourLinuxServerDomain>:9100" ]
+    basic_auth:
+      username: "prometheus"
+      password: "<password>"
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    # Relabeling "instance" to remove the ":9100" part
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(:[0-9]+)?'
+        replacement: '${1}'

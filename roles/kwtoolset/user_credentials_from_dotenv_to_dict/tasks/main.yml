@@ -1,0 +1,26 @@
+- name: Read file content from the destination machine
+  slurp:
+    src: "{{ dotenv_file_path }}"
+  register: file_content
+
+- name: Decode file content
+  set_fact:
+    decoded_content: "{{ file_content.content | b64decode }}"
+
+- name: Split decoded content into lines and parse into a dictionary
+  set_fact:
+    all_vars: "{{ all_vars | default({}) | combine({item.split('=')[0].strip(): item.split('=')[1].strip()}) }}"
+  loop: "{{ decoded_content.splitlines() }}"
+  when: "'=' in item"
+
+- name: Set user_credentials with the parsed users and passwords
+  set_fact:
+    users_credentials: "{{ dict(all_vars | dict2items | selectattr('key', 'search', '_password$') | map(attribute='key') | map('regex_replace', '_password$', '') | zip(all_vars | dict2items | selectattr('key', 'search', '_password$') | map(attribute='value'))) }}"
+
+- name: Show parsed users and passwords
+  debug:
+    var: users_credentials
+
+- name: Set users_credentials as a fact
+  set_fact:
+    users_credentials: "{{ users_credentials }}"

@@ -1,0 +1,44 @@
+---
+
+services:
+  frps:
+    image: snowdreamtech/frps
+    container_name: frps
+    cpus: "0.5"
+    mem_limit: 200m
+    ports:
+      - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}
+      - "${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}:${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}/tcp"
+    env_file:
+      - .env
+    volumes:
+      - ./config-frps:/etc/frp
+      - certs:/etc/frp/certs
+    networks:
+      - caddy
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${FRPS_DASHBOARD_PORT} }}"{% endraw %}
+
+    restart: unless-stopped
+
+  frpc:
+    image: snowdreamtech/frpc
+    cpus: "0.5"
+    mem_limit: 200m
+    container_name: frpc
+    volumes:
+      - ./config-frpc:/etc/frp
+      - certs:/etc/frp/certs
+    network_mode: host
+    restart: unless-stopped
+
+networks:
+  caddy:
+    external: true
+
+volumes:
+  certs:
+    external: true
+    name: caddy_caddy-certs

@@ -1,0 +1,22 @@
+UPDATE "main"."users" set "username" = '{{ docker_service_vars.xui.dashboard_login }}';
+UPDATE "main"."users" set "password" = '{{ docker_service_vars.xui.dashboard_password }}';
+
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/live/{{ docker_service_vars.xui.domain }}/fullchain.pem' WHERE "key" = 'webCertFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/live/{{ docker_service_vars.xui.domain }}/privkey.pem' WHERE "key" = 'webKeyFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/live/{{ docker_service_vars.xui.domain }}/fullchain.pem' WHERE "key" = 'subCertFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/live/{{ docker_service_vars.xui.domain }}/privkey.pem' WHERE "key" = 'subKeyFile';
+
+UPDATE "main"."settings" SET "value" = '{{ docker_service_vars.xui.domain }}' WHERE "key" = 'webDomain';
+
+UPDATE "main"."settings" SET "value" = 'true' WHERE "key" = 'subEnable';
+UPDATE "main"."settings" SET "value" = 'true' WHERE "key" = 'subEncrypt';
+UPDATE "main"."settings" SET "value" = 'true' WHERE "key" = 'subShowInfo';
+UPDATE "main"."settings" SET "value" = '/{{ docker_service_vars.xui.sub_path }}/' WHERE "key" = 'subPath';
+UPDATE "main"."settings" SET "value" = '/{{ docker_service_vars.xui.sub_json_path }}/' WHERE "key" = 'subJsonPath';
+
+UPDATE "main"."settings" SET "value" = '{{ docker_service_vars.xui.dashboard_port }}' WHERE "key" = 'webPort';
+UPDATE "main"."settings" SET "value" = '{{ docker_service_vars.xui.sub_port }}' WHERE "key" = 'subPort';
+
+UPDATE "main"."inbounds" SET "port" = '{{ docker_service_vars.xui.ss2022_port }}' WHERE "remark" = 'SS-2022';
+UPDATE "main"."inbounds" SET "port" = '{{ docker_service_vars.xui.vless_port }}' WHERE "remark" = 'VLESS';
+UPDATE "main"."inbounds" SET "port" = '{{ docker_service_vars.xui.wg_port }}' WHERE "remark" = 'WG';

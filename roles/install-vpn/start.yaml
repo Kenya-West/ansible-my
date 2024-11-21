@@ -1,6 +1,0 @@
----
-  - import_playbook: ./tasks/install_caddy.yaml
-  - import_playbook: ./tasks/install_frp.yaml
-  - import_playbook: ./tasks/install_xui.yaml
-  - import_playbook: ./tasks/install_xray.yaml
-  - import_playbook: ./tasks/install_wg.yaml

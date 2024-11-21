@@ -1,0 +1,33 @@
+{
+  "network": "tcp",
+  "security": "tls",
+  "externalProxy": [],
+  "tcpSettings": {
+    "acceptProxyProtocol": false,
+    "header": {
+      "type": "none"
+    }
+  },
+  "tlsSettings": {
+    "serverName": "",
+    "minVersion": "1.2",
+    "maxVersion": "1.3",
+    "cipherSuites": "",
+    "rejectUnknownSni": true,
+    "certificates": [
+      {
+        "certificateFile": "/etc/letsencrypt/live/{{ docker_service_vars.xui.domain }}/fullchain.pem",
+        "keyFile": "/etc/letsencrypt/live/{{ docker_service_vars.xui.domain }}/privkey.pem",
+        "ocspStapling": 3600
+      }
+    ],
+    "alpn": [
+      "h2",
+      "http/1.1"
+    ],
+    "settings": {
+      "allowInsecure": false,
+      "fingerprint": "chrome"
+    }
+  }
+}

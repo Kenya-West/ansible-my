@@ -1,0 +1,24 @@
+---
+- name: Remove Web features directories and project (WARNING - This will remove data files, too!)
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/remove_project_dirs
+      vars:
+        remove_project_dirs: "{{ remove_project_dirs_remapped }}"
+  
+  pre_tasks:
+    - name: Remap remove_project_dirs variable to contain complete paths - add /home/{{ standard_user }} prefix
+      set_fact:
+        remove_project_dirs_remapped: "{{ webfeatures_project_structure_end_dirs_list | map('regex_replace', '^(.*)$', '/home/{{ standard_user }}/\\1') | list }}"
+    - name: Add root directory to remove_project_dirs variable
+      set_fact:
+        remove_project_dirs_remapped: "{{ remove_project_dirs_remapped + ['/home/{{ standard_user }}/{{ webfeatures_project_structure_root }}'] }}"
+  
+  post_tasks:
+    - name: Remove certbot cron job
+      ansible.builtin.cron:
+        # Be sure to set same name like in install_web_features.yaml
+        name: "Copy certs"
+        state: absent

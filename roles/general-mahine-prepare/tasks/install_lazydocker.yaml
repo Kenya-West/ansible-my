@@ -1,8 +1,0 @@
----
-- name: Install LazyDocker
-  hosts: all
-  become: true
-  vars_files:
-    - "{{ inventory_dir }}/vars/vars.yaml"
-  roles:
-    - darkwizard242.lazydocker

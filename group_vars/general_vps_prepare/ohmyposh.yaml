@@ -1,0 +1,10 @@
+---
+  ohmyposh_project_fullpath: "/home/{{ standard_user }}"
+  ohmyposh_script_dir: "{{ ohmyposh_project_fullpath }}/oh-my-posh"
+  ohmyposh_themes_dir: "{{ ohmyposh_project_fullpath }}/.poshthemes"
+  ohmyposh_theme: illusi0n
+
+  ohmyposh_powershell_project_fullpath: "/home/{{ standard_user }}"
+  ohmyposh_powershell_script_dir: "{{ ohmyposh_powershell_project_fullpath }}/oh-my-posh"
+  ohmyposh_powershell_themes_dir: "{{ ohmyposh_powershell_project_fullpath }}/.poshthemes"
+  ohmyposh_powershell_theme: jandedobbeleer

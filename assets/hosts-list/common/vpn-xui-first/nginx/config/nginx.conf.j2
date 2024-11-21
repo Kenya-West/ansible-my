@@ -1,0 +1,70 @@
+events {}
+
+error_log /var/log/nginx/error.log debug;
+
+http {
+
+    map $http_x_proxy_port $xproxyport {
+        default {{ docker_service_vars.xui.vless_fallback_port_1 }};  # Default port if X-PROXY-PORT header is not set
+        ~^[0-9]+$ $http_x_proxy_port;  # Use the value of X-PROXY-PORT if it is a number
+    }
+
+    log_format custom_debug 'Request method: $request_method, Host: $host, Container: $container, Port: $xproxyport, Path: $uri, X-PROXY-PORT: $http_x_proxy_port, complete proxying URL will be: http://$container:$xproxyport$rest_of_path';
+
+    # Add CORS headers globally
+    add_header 'Access-Control-Allow-Origin' $http_origin always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'authority,method,path,scheme,Accept,Accept-Encoding,Accept-Language,Access-Control-Request-Headers,Access-Control-Request-Method,Authorization,If-Modified-Since,Cache-Control,Content-Type,Origin,Priority,Postman-Token,Referer,sec-ch-ua,sec-ch-ua-mobile,sec-ch-ua-platform,sec-fetch-dest,sec-fetch-mode,sec-fetch-site,DNT,User-Agent,X-Requested-With,Range,x-proxy-port,x-xui-base-url' always;
+    add_header 'Access-Control-Allow-Credentials' 'true' always;
+    add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+
+    server {
+        listen {{ docker_service_vars.xui.vless_fallback_port_1 }};
+        http2 on;
+        server_name proxy;
+
+        resolver 127.0.0.11;
+
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $proxy_protocol_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            if ($request_method ~* ^(GET|POST|PUT|DELETE)$) {
+                access_log /var/log/nginx/access.log custom_debug;
+            }
+        }
+
+        location ~ ^/proxy/([^/]+)(/.*)?$ {
+            # Extract container name from the URL
+            set $container $1;
+            set $rest_of_path $2;
+
+            proxy_no_cache 1;
+            proxy_cache_bypass 1;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            if ($request_method ~* ^(GET|POST|PUT|DELETE)$) {
+                access_log /var/log/nginx/access.log custom_debug;
+            }
+
+            # Proxy the request to the respective container and port
+            proxy_pass http://$container:$xproxyport$rest_of_path;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}

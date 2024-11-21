@@ -1,0 +1,47 @@
+---
+- name: Install UFW and configure it
+  hosts: all
+  become: false
+
+  roles:
+    - name: ./roles/install_ufw
+      become: true
+      vars:
+        ufw_rules:
+          - rule: limit
+            port: ssh
+            proto: tcp
+          - rule: allow
+            port: 80
+            proto: tcp
+          - rule: allow
+            port: 443
+            proto: tcp
+          - rule: allow
+            port: 443
+            proto: udp
+        input_mode: complex
+    # VPN project
+    - name: ./roles/kwtoolset/collect_ports
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern: "PORT"
+        files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+        skip_if_not_found: true
+    - name: ./roles/install_ufw
+      become: true
+      vars:
+        ufw_ports: "{{ collected_ports }}"
+        ufw_protos: ['tcp', 'udp']
+    # Analytics-node project
+    - name: ./roles/kwtoolset/collect_ports
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern: "PORT"
+        files_path: "/home/{{ standard_user }}/{{ analytics_project_structure_root }}"
+    - name: ./roles/install_ufw
+      become: true
+      vars:
+        ufw_ports: "{{ collected_ports }}"
+        ufw_protos: ['tcp', 'udp']
+        skip_if_not_found: true

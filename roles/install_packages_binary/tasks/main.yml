@@ -5,8 +5,11 @@
     ignore_errors: true
 
   - name: Download packages using eget
-    command: "eget {{ item.repo }} --asset {{ item.asset | default('') }} --to {{ item.dest_loc | default('/usr/local/bin')}}"
+    command: >
+      eget {{ item.repo }}
+      {% if item.asset is defined and item.asset | length > 0 %} --asset {{ item.asset }}{% endif %}
+      --to {{ item.dest_loc | default('/usr/local/bin') }}
     when: eget_installed.rc == 0
     ignore_errors: true
-    loop: "{{ packages_binaary_list }}"
+    loop: "{{ packages_binary_list }}"
 

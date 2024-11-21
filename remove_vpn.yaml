@@ -1,0 +1,32 @@
+---
+- name: Remove VPN directories and project (WARNING - This will remove data files, too!)
+  hosts:
+    - vpn
+    - vpn_xui_first
+  become: true
+
+  roles:
+    - name: ./roles/kwtoolset/collect_ports
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern: "PORT"
+        files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+        skip_if_not_found: true
+    - name: ./roles/remove_project_dirs
+      vars:
+        remove_project_dirs: "{{ remove_project_dirs_remapped }}"
+    - name: ./roles/remove_ufw_rules
+      become: true
+      become_user: root
+      vars:
+        ufw_ports: "{{ collected_ports }}"
+        ufw_protos: ['tcp', 'udp']
+  
+  pre_tasks:
+    - name: Remap remove_project_dirs variable to contain complete paths - add /home/{{ standard_user }} prefix
+      set_fact:
+        remove_project_dirs_remapped: "{{ vpn_project_structure_end_dirs_list | map('regex_replace', '^(.*)$', '/home/{{ standard_user }}/\\1') | list }}"
+    - name: Add root directory to remove_project_dirs variable
+      set_fact:
+        remove_project_dirs_remapped: "{{ remove_project_dirs_remapped + ['/home/{{ standard_user }}/{{ vpn_project_structure_root }}'] }}"
+

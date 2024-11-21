@@ -1,0 +1,10 @@
+---
+# tasks file for roles/kwtoolset/copy_files
+
+  - name: Copy files recuresively and template them
+    template_tree:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      file_mode: "{{ item.default_mode | default('0775') }}"
+      directory_mode: "{{ item.default_mode | default('0775') }}"
+    with_items: "{{ dir_list }}"

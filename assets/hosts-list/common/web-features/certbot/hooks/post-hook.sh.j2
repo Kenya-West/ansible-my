@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Start the main_webserver Docker container using Docker Compose
+docker compose -f /home/{{ standard_user }}/{{ main_webserver.dir_path }}/docker-compose.yml up -d {{ main_webserver.container_name }}

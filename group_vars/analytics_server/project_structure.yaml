@@ -1,0 +1,5 @@
+---
+  analytics_project_structure_root: analytics-server
+  analytics_project_structure_end_dirs:
+    prometheus: "{{ analytics_project_structure_root }}/prometheus"
+  analytics_project_structure_end_dirs_list: "{{ analytics_project_structure_end_dirs.values() | list }}"

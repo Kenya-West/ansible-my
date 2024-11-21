@@ -1,0 +1,11 @@
+---
+  docker_config_file: "/etc/docker/daemon.json"
+  docker_features:
+    containerd-snapshotter: true
+  docker_mirrors_ru:
+    - "https://dockerhub.timeweb.cloud"
+    - "https://mirror.gcr.io"
+    - "https://daocloud.io"
+    - "https://c.163.com"
+    - "https://registry.docker-cn.com"
+  docker_mirror_country_code: "RU"

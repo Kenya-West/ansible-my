@@ -1,0 +1,3 @@
+---
+  eget_location_bin: /usr/local/bin
+  eget_location_user_dir: /home/{{ standard_user }}/eget

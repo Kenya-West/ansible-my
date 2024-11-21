@@ -1,0 +1,20 @@
+---
+
+  vpn_project_structure_root: vpn
+  vpn_project_structure_end_dirs:
+    frp: "{{ vpn_project_structure_root }}/frp"
+    xui: "{{ vpn_project_structure_root }}/xui"
+    xray: "{{ vpn_project_structure_root }}/xray"
+    wg: "{{ vpn_project_structure_root }}/wg"
+    caddy: "{{ vpn_project_structure_root }}/caddy"
+  vpn_project_structure_end_dirs_list: "{{ vpn_project_structure_end_dirs.values() | list }}"
+
+  main_webserver:
+    path: "{{ vpn_project_structure_end_dirs.caddy }}"
+    name: caddy
+  
+  webfeatures_project_structure_root: web-features-caddy
+  webfeatures_project_structure_end_dirs:
+    main: "{{ webfeatures_project_structure_root }}/certcopy"
+    certcopy: "{{ webfeatures_project_structure_root }}/certcopy"
+  webfeatures_project_structure_end_dirs_list: "{{ webfeatures_project_structure_end_dirs.values() | list }}"

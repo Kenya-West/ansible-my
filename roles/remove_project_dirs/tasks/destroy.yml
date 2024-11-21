@@ -1,0 +1,15 @@
+- name: Check if docker-compose.yml file exists
+  stat:
+    path: "{{ item }}/docker-compose.yml"
+  register: compose_file_stat
+
+- name: Destroy docker-compose project
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    files:
+      - docker-compose.yml
+    state: absent
+    remove_orphans: true
+    remove_volumes: true
+  when: compose_file_stat.stat.exists
+  ignore_errors: yes

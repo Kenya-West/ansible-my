@@ -1,0 +1,25 @@
+---
+
+  vpn_project_structure_root: vpn-xui-first
+  vpn_project_structure_end_dirs:
+    frp: "{{ vpn_project_structure_root }}/frp"
+    xui: "{{ vpn_project_structure_root }}/xui"
+    xray: "{{ vpn_project_structure_root }}/xray"
+    wg: "{{ vpn_project_structure_root }}/wg"
+    wireguard: "{{ vpn_project_structure_root }}/wireguard"
+    caddy: "{{ vpn_project_structure_root }}/caddy"
+    nginx: "{{ vpn_project_structure_root }}/nginx"
+    dummy: "{{ vpn_project_structure_root }}/dummy"
+    xui-api-server: "{{ vpn_project_structure_root }}/xui-api-server"
+    proxy: "{{ vpn_project_structure_root }}/proxy"
+  vpn_project_structure_end_dirs_list: "{{ vpn_project_structure_end_dirs.values() | list }}"
+
+  main_webserver:
+    dir_path: "{{ vpn_project_structure_end_dirs.xui }}"
+    container_name: xui
+
+  webfeatures_project_structure_root: web-features
+  webfeatures_project_structure_end_dirs:
+    main: "{{ webfeatures_project_structure_root }}/certbot"
+    certbot: "{{ webfeatures_project_structure_root }}/certbot"
+  webfeatures_project_structure_end_dirs_list: "{{ webfeatures_project_structure_end_dirs.values() | list }}"

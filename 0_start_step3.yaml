@@ -1,0 +1,17 @@
+---
+  - import_playbook: ./general_vps_prepare_install_packages.yaml
+  - import_playbook: ./general_vps_prepare_install_eget.yaml
+  - import_playbook: ./general_vps_prepare_install_packages_binary.yaml
+  - import_playbook: ./general_vps_prepare_install_eza.yaml
+  - import_playbook: ./general_vps_prepare_install_bash_default.yaml
+  - import_playbook: ./general_vps_prepare_install_bash_profile.yaml
+  - import_playbook: ./general_vps_prepare_install_powershell.yaml
+  - import_playbook: ./general_vps_prepare_install_docker.yaml
+  - import_playbook: ./general_vps_prepare_install_docker_mirrors.yaml
+  - import_playbook: ./general_vps_prepare_install_lazydocker.yaml
+  - import_playbook: ./general_vps_prepare_install_lazygit.yaml
+  - import_playbook: ./general_vps_prepare_install_ohmyposh.yaml
+  - import_playbook: ./general_vps_prepare_install_ohmyposh_powershell.yaml
+  - import_playbook: ./general_vps_prepare_add_keys.yaml
+  - import_playbook: ./general_vps_prepare_clear_cache.yaml
+  - import_playbook: ./general_vps_prepare_configure_journals.yaml

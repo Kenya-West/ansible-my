@@ -1,0 +1,7 @@
+---
+  - import_playbook: ./install_web_features.yaml
+  - import_playbook: ./install_vpnxuifirst_xui.yaml
+  - import_playbook: ./install_vpnxuifirst_xui_configure.yaml
+  - import_playbook: ./install_vpnxuifirst_xuiapiserver.yaml
+  - import_playbook: ./install_vpnxuifirst_nginx.yaml
+  - import_playbook: ./install_ufw.yaml

@@ -1,0 +1,9 @@
+---
+  packages_binary_list:
+    - repo: "tstack/lnav"
+      asset: "lnav"
+    - repo: "koenbollen/jl"
+    - repo: "mikefarah/yq"
+      asset: "yq_linux_amd64"
+    - repo: "jkfran/killport"
+    - repo: "Lifailon/lazyjournal"

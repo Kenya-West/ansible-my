@@ -1,0 +1,11 @@
+#!/bin/bash
+
+echo "Starting copy.sh script"
+docker cp caddy:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/ {{ dest_project_fullpath }}/.certs/
+if [ -d {{ dest_project_fullpath }}/.certs/acme* ]; then
+    rsync -a --remove-source-files {{ dest_project_fullpath }}/.certs/acme*/* {{ dest_project_fullpath }}/.certs/
+    rm -rf {{ dest_project_fullpath }}/.certs/acme*/
+fi
+find {{ dest_project_fullpath }}/.certs -type d -exec chmod 0755 {} +
+find {{ dest_project_fullpath }}/.certs -type f -exec chmod 0755 {} +
+echo "Completed copy.sh script"

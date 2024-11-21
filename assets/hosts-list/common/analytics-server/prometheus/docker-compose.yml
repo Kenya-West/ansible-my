@@ -1,0 +1,29 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    # user: root
+    command:
+      - '--config.file=/etc/prometheus/config.yaml'
+      - '--web.config.file=/etc/prometheus/web.config.yaml'
+    networks:
+      - caddy
+    volumes:
+      - ./config:/etc/prometheus
+      - prom_data:/prometheus
+      # - certs:/etc/ssl
+    labels:
+      caddy: "${DOMAIN}:${PORT}"
+      caddy.import: "logging ${DOMAIN}"
+      caddy.0_reverse_proxy: "{{ upstreams ${PORT}}}"
+    restart: unless-stopped
+
+volumes:
+  prom_data:
+  # certs:
+  #   external: true
+  #   name: caddy_caddy-certs
+
+networks:
+  caddy:
+    external: true

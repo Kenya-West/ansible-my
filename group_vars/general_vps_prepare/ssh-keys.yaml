@@ -1,0 +1,4 @@
+---
+  authorized_keys:
+    # There you set public SSH key like so:
+    - "ssh-rsa AAAAB3dfkljlkfdjlkfdj some-description"
