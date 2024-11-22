@@ -7,8 +7,8 @@ domains_keys:
 domains: "{{ domains_keys.values() | list }}"
 
 emails:
-  main: Kenya-West@outlook.com
-  domain: Kenya-West@outlook.com
+  main: YourEmail@domain.tld
+  domain: YourEmail@domain.tld
 
 host_ip_address: 111.222.333.444
 
