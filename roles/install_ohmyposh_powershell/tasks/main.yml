@@ -1,41 +1,41 @@
 ---
 # tasks file for roles/install_ohmyposh_powershell
-  - name: Get Powershell $PROFILE path
-    command: 
-      cmd: pwsh -Command "$PROFILE"
-    register: pwsh_profile
-  
-  - name: Install posh-git module using pwsh
-    command:
-      cmd: pwsh -Command "Install-Module posh-git -Force -Scope CurrentUser"
-    register: install_result_poshgit
-    failed_when: install_result_poshgit.rc != 0
-    ignore_errors: true
+- name: Get Powershell $PROFILE path
+  ansible.builtin.command:
+    cmd: pwsh -Command "$PROFILE"
+  register: pwsh_profile
 
-  - name: Extract directory structure from $profile path
-    set_fact:
-      profile_dir: "{{ pwsh_profile.stdout | regex_replace('[^/]*$', '') }}"
-      profile_filename: "{{ pwsh_profile.stdout | regex_search('[^/]*$') }}"
+- name: Install posh-git module using pwsh
+  ansible.builtin.command:
+    cmd: pwsh -Command "Install-Module posh-git -Force -Scope CurrentUser"
+  register: install_result_poshgit
+  failed_when: install_result_poshgit.rc != 0
+  ignore_errors: true
 
-  - name: Create directories for the $PROFILE path
-    file:
-      path: "{{ profile_dir }}"
-      state: directory
-      mode: 0755
+- name: Extract directory structure from $profile path
+  ansible.builtin.set_fact:
+    profile_dir: "{{ pwsh_profile.stdout | regex_replace('[^/]*$', '') }}"
+    profile_filename: "{{ pwsh_profile.stdout | regex_search('[^/]*$') }}"
 
-  - name: Ensure $PROFILE file exists
-    file:
-      path: "{{ pwsh_profile.stdout }}"
-      state: touch
-      mode: 0755
-    ignore_errors: false
+- name: Create directories for the $PROFILE path
+  ansible.builtin.file:
+    path: "{{ profile_dir }}"
+    state: directory
+    mode: "0755"
 
-  - name: Add posh-git to $PROFILE
-    lineinfile:
-      path: "{{ pwsh_profile.stdout }}"
-      line: "Import-Module posh-git"
+- name: Ensure $PROFILE file exists
+  ansible.builtin.file:
+    path: "{{ pwsh_profile.stdout }}"
+    state: touch
+    mode: "0755"
+  ignore_errors: false
 
-  - name: Add oh-my-posh to $PROFILE
-    lineinfile:
-      path: "{{ pwsh_profile.stdout }}"
-      line: "oh-my-posh init pwsh --config {{ ohmyposh_powershell_themes_dir }}/{{ ohmyposh_powershell_theme }}.omp.json | Invoke-Expression"
+- name: Add posh-git to $PROFILE
+  ansible.builtin.lineinfile:
+    path: "{{ pwsh_profile.stdout }}"
+    line: "Import-Module posh-git"
+
+- name: Add oh-my-posh to $PROFILE
+  ansible.builtin.lineinfile:
+    path: "{{ pwsh_profile.stdout }}"
+    line: "oh-my-posh init pwsh --config {{ ohmyposh_powershell_themes_dir }}/{{ ohmyposh_powershell_theme }}.omp.json | Invoke-Expression"

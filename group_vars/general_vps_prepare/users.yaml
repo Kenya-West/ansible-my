@@ -1,5 +1,5 @@
 ---
-  users_to_set:
-    - name: kenyawest
-      state: present
-      role: super
+users_to_set:
+  - name: kenyawest
+    state: present
+    role: super

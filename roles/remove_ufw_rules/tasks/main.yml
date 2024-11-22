@@ -15,7 +15,7 @@
   when: ufw_installed.stdout != ""
 
 - name: Set fact that UFW is (not) enabled
-  set_fact:
+  ansible.builtin.set_fact:
     ufw_enabled: "{{ 'inactive' not in ufw_status.stdout }}"
   when: ufw_installed.stdout != ""
 

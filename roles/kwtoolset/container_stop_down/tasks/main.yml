@@ -1,12 +1,12 @@
 ---
 # tasks file for roles/kwtoolset/container_stop_down
-  - name: Stop and down Docker Compose project
-    community.docker.docker_compose_v2:
-      project_src: "{{ item }}"
-      files:
-        - docker-compose.yml
-      state: absent
-    loop: "{{ container_stop_down_list }}"
-    loop_control:
-      loop_var: item
-    ignore_errors: true
+- name: Stop and down Docker Compose project
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    files:
+      - docker-compose.yml
+    state: absent
+  loop: "{{ container_stop_down_list }}"
+  loop_control:
+    loop_var: item
+  ignore_errors: true

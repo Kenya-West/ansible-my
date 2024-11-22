@@ -1,8 +1,8 @@
 ---
-  - import_playbook: ./install_vpn_caddy.yaml
-  - import_playbook: ./install_vpn_frp.yaml
-  - import_playbook: ./install_vpn_wg.yaml
-  - import_playbook: ./install_vpn_xray.yaml
-  - import_playbook: ./install_vpn_xui.yaml
-  - import_playbook: ./install_web_features_caddy.yaml
-  - import_playbook: ./install_ufw.yaml
+- import_playbook: ./install_vpn_caddy.yaml
+- import_playbook: ./install_vpn_frp.yaml
+- import_playbook: ./install_vpn_wg.yaml
+- import_playbook: ./install_vpn_xray.yaml
+- import_playbook: ./install_vpn_xui.yaml
+- import_playbook: ./install_web_features_caddy.yaml
+- import_playbook: ./install_ufw.yaml

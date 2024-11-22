@@ -20,10 +20,10 @@
         dir_list:
           - src: "{{ source_asset_fullpath_common }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
           - src: "{{ source_asset_fullpath_project }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
     - name: prometheus.prometheus.node_exporter
       become: true
       become_user: root
@@ -35,7 +35,7 @@
       ansible.builtin.user:
         name: "{{ node_exporter_system_user }}"
         groups: "{{ cert_access_group }}"
-        append: yes
+        append: true
         state: present
     - name: Add {{ node_exporter_system_user }} user to {{ standard_user }} group
       become: true
@@ -43,40 +43,40 @@
       ansible.builtin.user:
         name: "{{ node_exporter_system_user }}"
         groups: "{{ standard_user }}"
-        append: yes
+        append: true
         state: present
 
     - name: Get FragmentPath for node_exporter.service
       become: true
       become_user: root
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "systemctl show -P FragmentPath node_exporter.service"
       register: node_exporter_service_fragment_path
-    
+
     - name: Ensure ProtectHome is set to 'no'
       become: true
       become_user: root
       ansible.builtin.lineinfile:
         path: "{{ node_exporter_service_fragment_path.stdout }}"
-        regexp: '^ProtectHome=.*'
-        line: 'ProtectHome=no'
-        insertafter: '[Service]'  # Ensures the line is added under [Service] if not found
-        backup: yes
+        regexp: "^ProtectHome=.*"
+        line: "ProtectHome=no"
+        insertafter: "[Service]" # Ensures the line is added under [Service] if not found
+        backup: true
 
     - name: Ensure NoNewPrivileges is set to 'no'
       become: true
       become_user: root
       ansible.builtin.lineinfile:
         path: "{{ node_exporter_service_fragment_path.stdout }}"
-        regexp: '^NoNewPrivileges=.*'
-        line: 'NoNewPrivileges=no'
-        insertafter: '[Service]'  # Ensures the line is added under [Service] if not found
-        backup: yes
+        regexp: "^NoNewPrivileges=.*"
+        line: "NoNewPrivileges=no"
+        insertafter: "[Service]" # Ensures the line is added under [Service] if not found
+        backup: true
 
     - name: Validate systemd configuration by reloading
       become: true
       become_user: root
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "systemctl daemon-reexec"
 
     - name: Reload systemd daemon

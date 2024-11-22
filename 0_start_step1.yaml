@@ -1,3 +1,3 @@
 ---
-  - import_playbook: ./general_vps_prepare_add_users.yaml
-  - import_playbook: ./general_vps_prepare_add_keys.yaml
+- import_playbook: ./general_vps_prepare_add_users.yaml
+- import_playbook: ./general_vps_prepare_add_keys.yaml

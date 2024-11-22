@@ -5,7 +5,7 @@
     name: node_exporter
     state: stopped
   register: node_exporter_service_status
-  ignore_errors: yes
+  ignore_errors: true
   failed_when: false
 
 - name: Stop Node Exporter service if it exists
@@ -17,7 +17,7 @@
 - name: Disable Node Exporter service if it exists
   ansible.builtin.systemd:
     name: node_exporter
-    enabled: no
+    enabled: false
   when: node_exporter_service_status.failed is not defined
 
 - name: Remove Node Exporter systemd service file
@@ -27,7 +27,7 @@
 
 - name: Reload systemd daemon to remove Node Exporter service
   ansible.builtin.systemd:
-    daemon_reload: yes
+    daemon_reload: true
 
 - name: Remove Node Exporter binary
   ansible.builtin.file:
@@ -38,7 +38,7 @@
   ansible.builtin.user:
     name: "{{ node_exporter_system_user }}"
     state: absent
-    remove: yes
+    remove: true
 
 - name: Clean up Node Exporter cache (if exists)
   ansible.builtin.file:

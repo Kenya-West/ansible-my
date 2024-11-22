@@ -1,5 +1,6 @@
+---
 - name: Check if docker-compose.yml file exists
-  stat:
+  ansible.builtin.stat:
     path: "{{ item }}/docker-compose.yml"
   register: compose_file_stat
 
@@ -12,4 +13,4 @@
     remove_orphans: true
     remove_volumes: true
   when: compose_file_stat.stat.exists
-  ignore_errors: yes
+  ignore_errors: true

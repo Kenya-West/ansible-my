@@ -24,10 +24,10 @@
         dir_list:
           - src: "{{ source_asset_fullpath_common }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
           - src: "{{ source_asset_fullpath_project }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
     - name: ./roles/kwtoolset/container_pull
       vars:
         container_pull_list:

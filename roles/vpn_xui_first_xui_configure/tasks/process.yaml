@@ -1,24 +1,25 @@
+---
 - name: Template the base file without _update - SQL for {{ item }}
-  template:
+  ansible.builtin.template:
     src: "{{ source_asset_fullpath_common }}/db/{{ item }}.sql.j2"
     dest: "{{ dest_project_fullpath }}/db/{{ item }}.sql"
 
 - name: Template the base file without _update - JSON for {{ item }}
-  template:
+  ansible.builtin.template:
     src: "{{ source_asset_fullpath_common }}/db/{{ item }}.json.j2"
     dest: "{{ dest_project_fullpath }}/db/{{ item }}.json"
 
 - name: Execute the base SQL file on SQLite database for {{ item }}
-  shell: "sqlite3 {{ dest_project_fullpath }}/db/x-ui.db < {{ dest_project_fullpath }}/db/{{ item }}.sql"
+  ansible.builtin.shell: "sqlite3 {{ dest_project_fullpath }}/db/x-ui.db < {{ dest_project_fullpath }}/db/{{ item }}.sql"
   register: sql_output
 
 - name: Save SQL execution output to JSON file for {{ item }}
-  copy:
+  ansible.builtin.copy:
     content: "{{ sql_output.stdout }}"
     dest: "{{ dest_project_fullpath }}/db/{{ item }}_output.json"
 
 - name: Merge JSON outputs into one for {{ item }}
-  shell: >
+  ansible.builtin.shell: >
     jq -s '
     def merge_values(a; b):
       if (a | type) == "array" and (b | type) == "array" then
@@ -32,11 +33,11 @@
         b
       end;
 
-    reduce .[] as $item ({}; 
+    reduce .[] as $item ({};
       reduce ($item | keys_unsorted[]) as $key (
         .;
-        .[$key] = if .[$key] == null then $item[$key] 
-                  else merge_values(.[ $key ]; $item[$key]) 
+        .[$key] = if .[$key] == null then $item[$key]
+                  else merge_values(.[ $key ]; $item[$key])
                   end
       )
     )' "{{ item }}_output.json" "{{ item }}.json"
@@ -45,9 +46,9 @@
   register: JQ_RESULT
 
 - name: Template the update file with _update in the name for {{ item }}
-  template:
+  ansible.builtin.template:
     src: "{{ source_asset_fullpath_common }}/db/{{ item }}_update.sql.j2"
     dest: "{{ dest_project_fullpath }}/db/{{ item }}_update.sql"
 
 - name: Execute the update SQL file on SQLite database for {{ item }}
-  shell: "sqlite3 {{ dest_project_fullpath }}/db/x-ui.db < {{ dest_project_fullpath }}/db/{{ item }}_update.sql"
+  ansible.builtin.shell: "sqlite3 {{ dest_project_fullpath }}/db/x-ui.db < {{ dest_project_fullpath }}/db/{{ item }}_update.sql"

@@ -15,13 +15,13 @@
     source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir_xui }}"
-  
+
   roles:
     - name: ./roles/kwtoolset/container_stop_down
       vars:
         container_stop_down_list:
           - "{{ dest_project_fullpath }}"
-    - name : ./roles/vpn_xui_first_xui_configure
+    - name: ./roles/vpn_xui_first_xui_configure
       vars:
         configuredb_file_name: configuredb
         base_file_names:

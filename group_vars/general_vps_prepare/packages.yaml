@@ -1,31 +1,31 @@
 ---
-  packages_list:
-    # Base packages
-    - bash
-    - curl
-    - wget
-    - unzip
-    - ncdu
-    - tree
-    - gpg
-    - gettext-base
-    # Extra packages
-    - moreutils
-    - neofetch
-    - bat # Ensure this is available or add a task to include its repository
-    - fd-find # Use 'fd' for Ubuntu/Debian, might need a PPA
-    - fzf
-    - httpie
-    - xh
-    - cron
-    - hstr
-    - duf
-    - jq
-    - zoxide
-    - whois
-    - ripgrep
-    - micro
-    - btop
-    - sqlite3
-    # Service packages
-    - python3-docker # Needed for Ansible Docker modules
+packages_list:
+  # Base packages
+  - bash
+  - curl
+  - wget
+  - unzip
+  - ncdu
+  - tree
+  - gpg
+  - gettext-base
+  # Extra packages
+  - moreutils
+  - neofetch
+  - bat # Ensure this is available or add a task to include its repository
+  - fd-find # Use 'fd' for Ubuntu/Debian, might need a PPA
+  - fzf
+  - httpie
+  - xh
+  - cron
+  - hstr
+  - duf
+  - jq
+  - zoxide
+  - whois
+  - ripgrep
+  - micro
+  - btop
+  - sqlite3
+  # Service packages
+  - python3-docker # Needed for Ansible Docker modules

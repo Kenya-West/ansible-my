@@ -1,13 +1,13 @@
 ---
 # tasks file for roles/kwtoolset/container_up
-  - name: Docker Compose project - container up
-    community.docker.docker_compose_v2:
-      project_src: "{{ item.path }}"
-      project_name: "{{ item.name }}"
-      files:
-        - docker-compose.yml
-      state: present
-    loop: "{{ container_up_list }}"
-    loop_control:
-      loop_var: item
-    ignore_errors: "{{ item.ignore_errors | default(false) }}"
+- name: Docker Compose project - container up
+  community.docker.docker_compose_v2:
+    project_src: "{{ item.path }}"
+    project_name: "{{ item.name }}"
+    files:
+      - docker-compose.yml
+    state: present
+  loop: "{{ container_up_list }}"
+  loop_control:
+    loop_var: item
+  ignore_errors: "{{ item.ignore_errors | default(false) }}"

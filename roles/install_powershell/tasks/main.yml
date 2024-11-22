@@ -1,60 +1,60 @@
 ---
 # tasks file for roles/install_powershell
-  - name: Set custom fact based on ansible_distribution_major_version
-    set_fact:
-      ubuntu_nearest_lts_ver: >-
-        {% if ansible_distribution_major_version in ['14', '15'] %}
-        14.04
-        {% elif ansible_distribution_major_version in ['16', '17'] %}
-        16.04
-        {% elif ansible_distribution_major_version in ['18', '19'] %}
-        18.04
-        {% elif ansible_distribution_major_version in ['20', '21'] %}
-        20.04
-        {% elif ansible_distribution_major_version in ['22', '23'] %}
-        22.04
-        {% elif ansible_distribution_major_version in ['24', '25'] %}
-        24.04
-        {% elif ansible_distribution_major_version in ['26', '27'] %}
-        26.04
-        {% elif ansible_distribution_major_version in ['28', '29'] %}
-        28.04
-        {% elif ansible_distribution_major_version in ['30', '31'] %}
-        30.04
-        {% else %}
-        unsupported
-        {% endif %}
-  - name: Update package list
-    apt:
-      update_cache: yes
-  - name: Install packages
-    apt:
-      state: latest
-      update_cache: yes
-      pkg:
-      - wget 
+- name: Set custom fact based on ansible_distribution_major_version
+  ansible.builtin.set_fact:
+    ubuntu_nearest_lts_ver: >-
+      {% if ansible_distribution_major_version in ['14', '15'] %}
+      14.04
+      {% elif ansible_distribution_major_version in ['16', '17'] %}
+      16.04
+      {% elif ansible_distribution_major_version in ['18', '19'] %}
+      18.04
+      {% elif ansible_distribution_major_version in ['20', '21'] %}
+      20.04
+      {% elif ansible_distribution_major_version in ['22', '23'] %}
+      22.04
+      {% elif ansible_distribution_major_version in ['24', '25'] %}
+      24.04
+      {% elif ansible_distribution_major_version in ['26', '27'] %}
+      26.04
+      {% elif ansible_distribution_major_version in ['28', '29'] %}
+      28.04
+      {% elif ansible_distribution_major_version in ['30', '31'] %}
+      30.04
+      {% else %}
+      unsupported
+      {% endif %}
+- name: Update package list
+  ansible.builtin.apt:
+    update_cache: true
+- name: Install packages
+  ansible.builtin.apt:
+    state: latest
+    update_cache: true
+    pkg:
+      - wget
       - apt-transport-https
       - software-properties-common
-  - name: Download PGP security keys
-    get_url:
-     url: 'https://packages.microsoft.com/config/ubuntu/{{ ubuntu_nearest_lts_ver | trim }}/packages-microsoft-prod.deb'
-     dest: /tmp/packages-microsoft-prod.deb
-     force_basic_auth: yes
-  - name: Register PGP security keys
-    command: 
-     cmd: dpkg -i /tmp/packages-microsoft-prod.deb
-  - name: Update package list
-    apt:
-     update_cache: yes    
-  - name: Install latest version of PowerShell via apt
-    apt:
-     name: powershell
-    ignore_errors: yes
-    register: powershell_install_apt
-  - name: Install latest version of PowerShell via Snap Classic
-    snap:
-     name: powershell
-     classic: yes
-    ignore_errors: yes
-    register: powershell_install_snap
-    when: powershell_install_apt is failed
+- name: Download PGP security keys
+  ansible.builtin.get_url:
+    url: "https://packages.microsoft.com/config/ubuntu/{{ ubuntu_nearest_lts_ver | trim }}/packages-microsoft-prod.deb"
+    dest: /tmp/packages-microsoft-prod.deb
+    force_basic_auth: true
+- name: Register PGP security keys
+  ansible.builtin.command:
+    cmd: dpkg -i /tmp/packages-microsoft-prod.deb
+- name: Update package list
+  ansible.builtin.apt:
+    update_cache: true
+- name: Install latest version of PowerShell via apt
+  ansible.builtin.apt:
+    name: powershell
+  ignore_errors: true
+  register: powershell_install_apt
+- name: Install latest version of PowerShell via Snap Classic
+  community.general.snap:
+    name: powershell
+    classic: true
+  ignore_errors: true
+  register: powershell_install_snap
+  when: powershell_install_apt is failed

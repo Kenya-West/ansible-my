@@ -32,7 +32,7 @@
       become: true
       vars:
         ufw_ports: "{{ collected_ports }}"
-        ufw_protos: ['tcp', 'udp']
+        ufw_protos: ["tcp", "udp"]
     # Analytics-node project
     - name: ./roles/kwtoolset/collect_ports
       vars:
@@ -43,5 +43,5 @@
       become: true
       vars:
         ufw_ports: "{{ collected_ports }}"
-        ufw_protos: ['tcp', 'udp']
+        ufw_protos: ["tcp", "udp"]
         skip_if_not_found: true

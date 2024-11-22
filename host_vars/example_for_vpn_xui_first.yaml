@@ -1,66 +1,65 @@
 ---
-  standard_user: someuser
-  root_password: pass
+standard_user: someuser
+root_password: pass
 
-  domains_keys:
-    xui: subdomain-xui.example.tld
-  domains: "{{ domains_keys.values() | list }}"
-  
-  emails:
-    main: Kenya-West@outlook.com
-    domain: Kenya-West@outlook.com
+domains_keys:
+  xui: subdomain-xui.example.tld
+domains: "{{ domains_keys.values() | list }}"
 
-  host_ip_address: 111.222.333.444
+emails:
+  main: Kenya-West@outlook.com
+  domain: Kenya-West@outlook.com
 
-  node_exporter_system_group: node-exp
-  node_exporter_system_user: node-exp
-  node_exporter_binary_install_dir: /usr/local/bin
-  node_exporter_basic_auth_users:
-    someuser: pass
-    prometheus: pass
-  node_exporter_tls_server_config:
-    cert_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/fullchain.pem"
-    key_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/privkey.pem"
-  node_exporter_http_server_config:
-    http2: true
-  node_exporter_web_telemetry_path: node_exporter_metrics
-  node_exporter_web_listen_address_host: 0.0.0.0
-  node_exporter_web_listen_address_port: 49876
-  node_exporter_web_listen_address: "{{ node_exporter_web_listen_address_host }}:{{ node_exporter_web_listen_address_port }}"
+host_ip_address: 111.222.333.444
 
-  certbot_install_method: snap
-  certbot_create_extra_args: "--expand --redirect"
-  certbot_create_if_missing: true
-  certbot_create_method: standalone
-  certbot_admin_email: "{{ emails.domain }}"
-  certbot_auto_renew: false
-  certbot_auto_renew_user: "{{ standard_user }}"
-  certbot_auto_renew_weekday: 3
-  certbot_auto_renew_hour: 0
-  certbot_auto_renew_minute: 0
-  certbot_auto_renew_options: "--quiet"
-  certbot_certs:
-    - domains: "{{ domains }}"
-  cert_access_group: "certaccess"
+node_exporter_system_group: node-exp
+node_exporter_system_user: node-exp
+node_exporter_binary_install_dir: /usr/local/bin
+node_exporter_basic_auth_users:
+  someuser: pass
+  prometheus: pass
+node_exporter_tls_server_config:
+  cert_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/fullchain.pem"
+  key_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/privkey.pem"
+node_exporter_http_server_config:
+  http2: true
+node_exporter_web_telemetry_path: node_exporter_metrics
+node_exporter_web_listen_address_host: 0.0.0.0
+node_exporter_web_listen_address_port: 49876
+node_exporter_web_listen_address: "{{ node_exporter_web_listen_address_host }}:{{ node_exporter_web_listen_address_port }}"
 
-  docker_service_vars:
-    nginx:
-    xui:
-      domain: "{{ domains_keys.xui }}"
-      email: "{{ emails.domain }}"
-      dashboard_path: xui-dashboard
-      dashboard_login: someuser
-      dashboard_password: 0000PB_xui
-      dashboard_port: 49999
-      hostname: "{{ domains_keys.xui }}"
-      wg_port: 49989
-      vless_port: 443
-      vless_fallback_port_1: 8081
-      ss2022_port: 49991
-      sub_port: 49998
-      sub_path: xui-subscription
-      sub_json_path: xui-subscription-json
-    xui_api_server:
-      port: 3000
-      enable_logging: true
+certbot_install_method: snap
+certbot_create_extra_args: "--expand --redirect"
+certbot_create_if_missing: true
+certbot_create_method: standalone
+certbot_admin_email: "{{ emails.domain }}"
+certbot_auto_renew: false
+certbot_auto_renew_user: "{{ standard_user }}"
+certbot_auto_renew_weekday: 3
+certbot_auto_renew_hour: 0
+certbot_auto_renew_minute: 0
+certbot_auto_renew_options: "--quiet"
+certbot_certs:
+  - domains: "{{ domains }}"
+cert_access_group: "certaccess"
 
+docker_service_vars:
+  nginx:
+  xui:
+    domain: "{{ domains_keys.xui }}"
+    email: "{{ emails.domain }}"
+    dashboard_path: xui-dashboard
+    dashboard_login: someuser
+    dashboard_password: 0000PB_xui
+    dashboard_port: 49999
+    hostname: "{{ domains_keys.xui }}"
+    wg_port: 49989
+    vless_port: 443
+    vless_fallback_port_1: 8081
+    ss2022_port: 49991
+    sub_port: 49998
+    sub_path: xui-subscription
+    sub_json_path: xui-subscription-json
+  xui_api_server:
+    port: 3000
+    enable_logging: true

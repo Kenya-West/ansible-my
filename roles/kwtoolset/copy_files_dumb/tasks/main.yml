@@ -1,8 +1,8 @@
 ---
 # tasks file for roles/kwtoolset/copy_files_dumb
-  - name: Copy directories with contents
-    ansible.builtin.copy:
-      src: "{{ item.src }}"
-      dest: "{{ item.dest }}"
-      mode: "{{ item.default_mode | default('0775') }}"
-    with_items: "{{ dir_list }}"
+- name: Copy directories with contents
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.default_mode | default('0775') }}"
+  with_items: "{{ dir_list }}"

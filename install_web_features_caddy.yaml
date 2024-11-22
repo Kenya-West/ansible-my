@@ -20,10 +20,10 @@
         dir_list:
           - src: "{{ source_asset_fullpath_common }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
           - src: "{{ source_asset_fullpath_project }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
 
   post_tasks:
     - name: Verify if copy.sh exists
@@ -50,4 +50,3 @@
       ansible.builtin.group:
         name: "{{ cert_access_group }}"
         state: present
-

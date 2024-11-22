@@ -13,17 +13,17 @@
     source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
-  
+
   roles:
     - name: ./roles/kwtoolset/create_dirs
       vars:
         dir_list:
           - path: "{{ dest_project_fullpath }}"
-            mode: '0775'
+            mode: "0775"
             owner: "{{ standard_user }}"
             group: "{{ standard_user }}"
           - path: "{{ dest_project_fullpath }}/config"
-            mode: '0775'
+            mode: "0775"
             owner: "{{ standard_user }}"
             group: "{{ standard_user }}"
     - name: ./roles/kwtoolset/container_stop_down
@@ -35,10 +35,10 @@
         dir_list:
           - src: "{{ source_asset_fullpath_common }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
           - src: "{{ source_asset_fullpath_project }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
     - name: ./roles/kwtoolset/container_pull
       vars:
         container_pull_list:

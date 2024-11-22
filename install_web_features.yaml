@@ -23,10 +23,10 @@
         dir_list:
           - src: "{{ source_asset_fullpath_common }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
           - src: "{{ source_asset_fullpath_project }}"
             dest: "{{ dest_project_rootpath }}"
-            default_mode: '0775'
+            default_mode: "0775"
     - name: geerlingguy.certbot
       tags: certbot
       become: true
@@ -38,13 +38,13 @@
     - name: Remove certbot apt package if installed
       become: true
       become_user: root
-      apt:
+      ansible.builtin.apt:
         name: "{{ item }}"
         state: absent
       with_items:
         - python-certbot-nginx
         - certbot
-  
+
   post_tasks:
     - name: Verify if update.sh exists
       ansible.builtin.stat:
@@ -85,12 +85,12 @@
       register: first_launch_result
 
     - name: Debug first-launch result
-      debug:
+      ansible.builtin.debug:
         var: first_launch_result.stdout
       when: first_launch_result.stdout is defined
 
     - name: Debug first-launch error result
-      debug:
+      ansible.builtin.debug:
         var: first_launch_result.stderr
       when: first_launch_result.stderr is defined
 
