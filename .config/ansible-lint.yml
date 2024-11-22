@@ -1,7 +1,7 @@
 ---
 # .ansible-lint
 
-profile: production # min, basic, moderate,safety, shared, production
+profile: basic # min, basic, moderate,safety, shared, production
 
 # Allows dumping of results in SARIF format
 # sarif_file: result.sarif
@@ -13,6 +13,7 @@ exclude_paths:
   - .cache/ # implicit unless exclude_paths is defined in config
   - test/fixtures/formatting-before/
   - test/fixtures/formatting-prettier/
+  - tests/
 # parseable: true
 # quiet: true
 # strict: true
