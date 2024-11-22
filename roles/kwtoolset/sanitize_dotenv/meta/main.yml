@@ -1,6 +1,7 @@
 ---
 galaxy_info:
   author: Kenya-West
+  description: This role sanitizes dotenv files by removing comments and empty lines.
 
   # If the issue tracker for your role is not on github, uncomment the
   # next line and provide a value
