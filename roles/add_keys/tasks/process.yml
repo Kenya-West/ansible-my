@@ -1,0 +1,9 @@
+- name: Set SSH authorized keys for user {{ user_name }} with valid keys
+  become: true
+  become_user: root
+  ansible.posix.authorized_key:
+    user: "{{ user_name }}"
+    state: present
+    key: "{{ item | trim }}"
+  loop: "{{ authorized_keys }}"
+  ignore_errors: true
