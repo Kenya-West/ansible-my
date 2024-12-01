@@ -29,3 +29,7 @@
     - aliases_content is defined
     - aliases_content != ['']
   ignore_errors: true
+
+- name: Set micro as alternative system-wide
+  ansible.builtin.include_tasks:
+    file: set_micro_editor.yml
