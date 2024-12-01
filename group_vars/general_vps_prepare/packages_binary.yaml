@@ -8,3 +8,6 @@ packages_binary_list:
   - repo: "jkfran/killport"
   - repo: "Lifailon/lazyjournal"
   - repo: "bensadeh/tailspin"
+  - repo: "tomnomnom/gron"
+  - repo: "PaulJuliusMartinez/jless"
+  - repo: "https://dystroy.org/broot/download/x86_64-linux/broot"
