@@ -14,3 +14,8 @@ alias lj=lazyjournal
 
 alias bat=batcat
 alias cat='bat --paging=never'
+
+alias norg='gron --ungron'
+alias ungron='gron --ungron'
+
+alias br='broot'
