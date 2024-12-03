@@ -42,6 +42,13 @@
             ignore_errors: false
 
   pre_tasks:
+    - name: Ensure user is in the 'docker' group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ standard_user }}"
+        groups: docker
+        append: true
     - name: Ensure Docker network 'caddy' exists with specific settings
       community.docker.docker_network:
         name: caddy
