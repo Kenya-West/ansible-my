@@ -1,0 +1,39 @@
+---
+# tasks file for roles/stop_docker_containers
+- name: List contents of the user's home directory
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    cmd: ls -la /home/{{ username_to_remove.user_input }}/
+  register: user_home_directory_contents
+
+- name: Debug user home directory contents
+  ansible.builtin.debug:
+    var: user_home_directory_contents
+
+- name: Find docker-compose files
+  ansible.builtin.find:
+    paths: /home/{{ username_to_remove.user_input }}/
+    patterns: ["docker-compose.yml", "docker-compose.yaml"]
+    file_type: file
+    recurse: true
+  register: user_container_directories
+
+- name: Debug user container directories
+  ansible.builtin.debug:
+    var: user_container_directories
+
+- name: Transform paths into dirpath and filename
+  set_fact:
+    files_mapped: "{{ user_container_directories.files | map(attribute='path') | map('regex_replace', '(.*/)([^/]*)$', '{\"path\":\"\\1\", \"filename\":\"\\2\"}')
+      | map('from_json') | list }}"
+
+- name: Display the transformed list
+  debug:
+    var: files_mapped
+
+- name: Destroy docker-compose project
+  ansible.builtin.include_tasks: destroy.yml
+  loop: "{{ files_mapped }}"
+  loop_control:
+    loop_var: item
