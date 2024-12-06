@@ -36,4 +36,4 @@ assets/hosts-list/*
 group_vars/general_vps_prepare/ssh_keys.yaml
 
 # Python cache
-__pycache__/
+/**/__pycache__/
