@@ -1,0 +1,14 @@
+# devsec.hardening.ssh_hardening
+ssh_permit_root_login: "without-password"
+ssh_client_password_login: false
+sshd_authenticationmethods: "publickey"
+ssh_server_password_login: false
+ssh_allow_users: "{{ users_to_set | map(attribute='name') | unique | join(' ') }}"
+
+# devsec.hardening.os_hardening
+os_filesystem_whitelist: squashfs # Needed for Snaps, taken from https://github.com/robpomeroy/BrightOS/blob/b7cf9a61214a9156191abd03fb2998af222a69d2/main.yml#L44
+os_security_users_allow: ["change_user"]
+sysctl_overwrite:
+  # Enable IPv4 traffic forwarding. Because: https://galaxy.ansible.com/ui/repo/published/devsec/hardening/content/role/os_hardening/
+  net.ipv4.ip_forward: 1
+  os_user_pw_ageing: false

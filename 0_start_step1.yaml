@@ -1,3 +1,5 @@
 ---
 - import_playbook: ./general_vps_prepare_add_users.yaml
 - import_playbook: ./general_vps_prepare_add_keys.yaml
+- import_playbook: ./general_vps_prepare_disable_password_auth.yaml
+- import_playbook: ./general_vps_prepare_secure.yaml

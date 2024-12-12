@@ -9,3 +9,5 @@
 # Logs
 - src: linux-system-roles.journald
 - src: prometheus.prometheus
+# Security
+- src: devsec.hardening

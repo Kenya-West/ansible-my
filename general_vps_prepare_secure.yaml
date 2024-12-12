@@ -1,0 +1,8 @@
+---
+- name: Secure OS
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: devsec.hardening.os_hardening
