@@ -4,11 +4,8 @@
   register: eget_installed
   ignore_errors: true
 
-- name: Download packages using eget
-  ansible.builtin.command: >
-    eget {{ item.repo }}
-    {% if item.asset is defined and item.asset | length > 0 %} --asset {{ item.asset }}{% endif %}
-    --to {{ item.dest_loc | default('/usr/local/bin') }}
-  when: eget_installed.rc == 0
-  ignore_errors: true
+- name: Process each of base file names
+  ansible.builtin.include_tasks: process.yml
   loop: "{{ packages_binary_list }}"
+  loop_control:
+    loop_var: item

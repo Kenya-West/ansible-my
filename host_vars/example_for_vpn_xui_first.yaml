@@ -2,6 +2,10 @@
 standard_user: someuser
 root_password: pass
 
+# Can be defined if you are installing just a part of binary packages
+# using eget in relatively fresh OS. It skips already installed packages.
+# eget_skip_installed_packages: true
+
 domains_keys:
   xui: subdomain-xui.example.tld
 domains: "{{ domains_keys.values() | list }}"

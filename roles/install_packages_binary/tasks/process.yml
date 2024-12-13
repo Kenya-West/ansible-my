@@ -1,0 +1,38 @@
+- name: Get last part after '/' or get item.bin_name if defined
+  set_fact:
+    bin_name: "{{ item.bin_name | default(item.file, true) | default(item.repo | regex_replace('.*/', ''), true) }}"
+
+- name: Check if {{ bin_name | default('command') }} is installed
+  ansible.builtin.command: "which {{ bin_name }}"
+  register: bin_installed
+  ignore_errors: true
+  when:
+    - bin_name is defined
+    - bin_name | length > 0
+
+- name: Download package {{ item.repo }} using eget
+  ansible.builtin.command: >
+    eget {{ item.repo }}
+    {% if item.asset is defined and item.asset | length > 0 %} --asset {{ item.asset }}{% endif %}
+    {% if item.file is defined and item.file | length > 0 %} --file {{ item.file }}{% endif %}
+    --to {{ item.dest_loc | default('/usr/local/bin') }}
+  when: (eget_installed.rc == 0 and (eget_skip_installed_packages is not defined or eget_skip_installed_packages == false)) or (eget_installed.rc == 0 and bin_installed.rc != 0)
+  ignore_errors: true
+
+- name: Get binary location via command command
+  ansible.builtin.shell: "command -v {{ bin_name }}"
+  register: bin_location
+  ignore_errors: true
+
+# - name: Set fact of binary location
+#   set_fact:
+#     bin_loc: "{{ item.dest_loc | default('/usr/local/bin') }}/{{ bin_name }}"
+#   ignore_errors: true
+
+- name: Set executable permission for {{ bin_location.stdout }} if existed
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ bin_location.stdout }}"
+    mode: '0755'
+  ignore_errors: true

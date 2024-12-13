@@ -1,14 +1,29 @@
 ---
 packages_binary_list:
+  # full schema is:
+  # - repo: "tstack/lnav"         # repo name on github
+  #   asset: "lnav"               # asset name to download. Usually, a tar.gz file
+  #   dest_loc: "/usr/local/bin"  # location to put bin file
+  #   bin_name: "lnav"            # name of command that will be available in shell
+  #   file: "lnav"                # name of file to extract (glob)
   - repo: "tstack/lnav"
     asset: "lnav"
   - repo: "koenbollen/jl"
   - repo: "mikefarah/yq"
     asset: "yq_linux_amd64"
+  - repo: "ducaale/xh"
+  - repo: "orf/gping"
+    asset: "^musl"
   - repo: "jkfran/killport"
   - repo: "Lifailon/lazyjournal"
   - repo: "bensadeh/tailspin"
+    bin_name: "tspin"
   - repo: "tomnomnom/gron"
   - repo: "PaulJuliusMartinez/jless"
   - repo: "https://dystroy.org/broot/download/x86_64-linux/broot"
   - repo: "extrawurst/gitui"
+  - repo: "solidiquis/erdtree"
+    asset: "^gnu"
+    file: "erd"
+  - repo: "fioncat/otree"
+  - repo: "ajeetdsouza/zoxide"
