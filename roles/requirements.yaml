@@ -11,3 +11,4 @@
 - src: prometheus.prometheus
 # Security
 - src: devsec.hardening
+- src: oefenweb.fail2ban
