@@ -5,3 +5,10 @@
 
   roles:
     - name: ./roles/install_packages_binary
+
+  pre_tasks:
+    - name: Run eget with GitHub API token if available
+      command: echo $EGET_GITHUB_TOKEN
+      environment:
+        EGET_GITHUB_TOKEN: "{{ github_api_token_eget }}"
+      when: github_api_token_eget is defined and github_api_token_eget != ""

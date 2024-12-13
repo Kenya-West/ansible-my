@@ -34,6 +34,7 @@ assets/hosts-list/*
 
 # Do not include SSH keys
 group_vars/general_vps_prepare/ssh_keys.yaml
+group_vars/general_vps_prepare/api_tokens.yaml
 
 # Python cache
 /**/__pycache__/
