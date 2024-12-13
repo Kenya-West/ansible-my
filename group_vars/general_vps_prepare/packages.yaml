@@ -16,16 +16,15 @@ packages_list:
   - fd-find # Use 'fd' for Ubuntu/Debian, might need a PPA
   - fzf
   - httpie
-  - xh
   - cron
   - hstr
   - duf
   - jq
-  - zoxide
   - whois
   - ripgrep
   - micro
   - btop
   - sqlite3
+  - nala
   # Service packages
   - python3-docker # Needed for Ansible Docker modules
