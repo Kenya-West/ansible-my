@@ -1,0 +1,7 @@
+---
+- name: Install deb-get
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/install_debget

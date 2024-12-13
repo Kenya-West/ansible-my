@@ -1,0 +1,6 @@
+---
+# tasks file for roles/install_debget
+- name: Install deb-get
+  shell: curl -sL https://raw.githubusercontent.com/wimpysworld/deb-get/main/deb-get | sudo -E bash -s install deb-get
+  become: true
+  become_user: root
