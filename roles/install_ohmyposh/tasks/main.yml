@@ -33,11 +33,21 @@
     validate_certs: false
     dest: "{{ ohmyposh_script_dir }}/install.sh"
 
+# - name: Download oh-my-posh themes
+#   ansible.builtin.get_url:
+#     url: https://github.com/JanDeDobbeleer/oh-my-posh/releases/latest/download/themes.zip
+#     dest: "{{ ohmyposh_themes_dir }}"
+#     force: true
+
 - name: Download oh-my-posh themes
-  ansible.builtin.get_url:
-    url: https://github.com/JanDeDobbeleer/oh-my-posh/releases/latest/download/themes.zip
-    dest: "{{ ohmyposh_themes_dir }}"
-    force: true
+  ansible.builtin.include_role:
+    name: download_github_asset
+  vars:
+    download_github_asset_owner: JanDeDobbeleer
+    download_github_asset_repo: oh-my-posh
+    download_github_asset_filename: themes.zip
+    download_github_asset_dest: "{{ ohmyposh_themes_dir }}"
+    download_github_asset_github_token: "{{ github_api_token_eget | default(github_api_token_debget) | default('') }}"
 
 - name: Rename themes file
   ansible.builtin.command: "mv {{ ohmyposh_themes_dir }}/themes.zip {{ ohmyposh_themes_dir }}/themes.zip.gz"
