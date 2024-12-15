@@ -19,3 +19,5 @@ alias norg='gron --ungron'
 alias ungron='gron --ungron'
 
 alias br='broot'
+
+eval "$(zoxide init bash)"
