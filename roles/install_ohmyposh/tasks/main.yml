@@ -89,19 +89,27 @@
   ansible.builtin.command: "oh-my-posh font install CascadiaCode"
 - name: Ensure that profile exists
   ansible.builtin.file:
-    path: "{{ ohmyposh_project_fullpath }}/.profile"
+    path: "{{ ohmyposh_project_fullpath }}/.bashrc"
     state: touch
 
-- name: Remove oh-my-posh obsolete line from profile
+- name: Remove oh-my-posh obsolete line from .profile
   ansible.builtin.lineinfile:
     path: "{{ ohmyposh_project_fullpath }}/.profile"
     regexp: eval\s\"\$\(oh-my-posh.+
     state: absent
     backup: true
+  ignore_errors: true
 
-- name: Add oh-my-posh to profile
+- name: Remove oh-my-posh obsolete line from Bash profile
   ansible.builtin.lineinfile:
-    path: "{{ ohmyposh_project_fullpath }}/.profile"
+    path: "{{ ohmyposh_project_fullpath }}/.bashrc"
+    regexp: eval\s\"\$\(oh-my-posh.+
+    state: absent
+    backup: true
+
+- name: Add oh-my-posh to Bash profile
+  ansible.builtin.lineinfile:
+    path: "{{ ohmyposh_project_fullpath }}/.bashrc"
     line: "eval \"$(oh-my-posh init bash --config {{ ohmyposh_themes_dir }}/{{ ohmyposh_theme }}.omp.json)\""
 
 - name: Remove scripts directory
