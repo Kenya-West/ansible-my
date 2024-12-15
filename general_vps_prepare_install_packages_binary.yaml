@@ -12,3 +12,10 @@
       environment:
         EGET_GITHUB_TOKEN: "{{ github_api_token_eget }}"
       when: github_api_token_eget is defined and github_api_token_eget != ""
+
+  post_tasks:
+    - name: Empty $EGET_GITHUB_TOKEN
+      command: echo $EGET_GITHUB_TOKEN
+      environment:
+        EGET: ""
+      when: github_api_token_eget is defined and github_api_token_eget != ""
