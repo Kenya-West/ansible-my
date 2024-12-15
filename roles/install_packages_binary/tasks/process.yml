@@ -5,15 +5,17 @@
 - name: Check if {{ bin_name | default('command') }} is installed
   ansible.builtin.command: "which {{ bin_name }}"
   register: bin_installed
-  ignore_errors: true
   when:
     - bin_name is defined
     - bin_name | length > 0
+  failed_when: bin_installed.rc >= 2
 
 - name: Download package {{ item.repo }} using eget
   ansible.builtin.command: >
     eget {{ item.repo }}
-    {% if item.asset is defined and item.asset | length > 0 %} --asset {{ item.asset }}{% endif %}
+    {% if item.assets is defined and item.assets | length > 0 %}
+    {% for asset in item.assets %} --asset {{ asset }}{% endfor %}
+    {% endif %}
     {% if item.file is defined and item.file | length > 0 %} --file {{ item.file }}{% endif %}
     --to {{ item.dest_loc | default('/usr/local/bin') }}
   when: (eget_installed.rc == 0 and (eget_skip_installed_packages is not defined or eget_skip_installed_packages == false)) or (eget_installed.rc == 0 and bin_installed.rc != 0)

@@ -1,19 +1,33 @@
 ---
+# eget_skip_installed_packages: true
+
 packages_binary_list:
   # full schema is:
   # - repo: "tstack/lnav"         # repo name on github
-  #   asset: "lnav"               # asset name to download. Usually, a tar.gz file
-  #   dest_loc: "/usr/local/bin"  # location to put bin file
-  #   bin_name: "lnav"            # name of command that will be available in shell
-  #   file: "lnav"                # name of file to extract (glob)
+  #   assets:                     # Optional. Asset filter to download. ^ to negative filter.
+  #     - "lnav"                  # Usually, a package name
+  #     - "^musl"                 # and/or a negative filter to exclude unsupported architecture
+  #     - "tar.gz"                # and/or a file extension
+  #   dest_loc: "/usr/local/bin"  # Optional. Location to put bin file
+  #   bin_name: "lnav"            # Optional. Name of command that will be available in shell
+  #   file: "lnav"                # Optional. Name of file to extract (glob)
+  - repo: "eza-community/eza"
+    assets:
+      - "gnu"
+      - "tar.gz"
+  - repo: "jesseduffield/lazydocker"
+  - repo: "jesseduffield/lazygit"
   - repo: "tstack/lnav"
-    asset: "lnav"
+    assets:
+      - "lnav"
   - repo: "koenbollen/jl"
   - repo: "mikefarah/yq"
-    asset: "yq_linux_amd64"
+    assets:
+      - "yq_linux_amd64"
   - repo: "ducaale/xh"
   - repo: "orf/gping"
-    asset: "^musl"
+    assets:
+      - "^musl"
   - repo: "jkfran/killport"
   - repo: "Lifailon/lazyjournal"
   - repo: "bensadeh/tailspin"
@@ -23,7 +37,11 @@ packages_binary_list:
   - repo: "https://dystroy.org/broot/download/x86_64-linux/broot"
   - repo: "extrawurst/gitui"
   - repo: "solidiquis/erdtree"
-    asset: "^gnu"
+    assets:
+      - "^gnu"
     file: "erd"
   - repo: "fioncat/otree"
   - repo: "ajeetdsouza/zoxide"
+  - repo: "veeso/termscp"
+    assets:
+      - "gnu"
