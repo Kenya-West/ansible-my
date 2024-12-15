@@ -9,6 +9,7 @@ packages_list:
   - tree
   - gpg
   - gettext-base
+  - snapd
   # Extra packages
   - moreutils
   - neofetch
