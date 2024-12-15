@@ -1,0 +1,17 @@
+---
+# tasks file for roles/install_packages_deb
+- name: Check if deb-get is already installed
+  ansible.builtin.command: which deb-get
+  when:
+    - packages_deb_list is defined
+    - packages_deb_list | length > 0
+  register: debget_installed
+  ignore_errors: true
+
+- name: Run command deb-get install
+  ansible.builtin.command: deb-get install {{ packages_deb_list | join(' ') }}
+  when:
+    - debget_installed.rc == 0
+    - packages_deb_list is defined
+    - packages_deb_list | length > 0
+  ignore_errors: true
