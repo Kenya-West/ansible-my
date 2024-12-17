@@ -1,0 +1,36 @@
+---
+# tasks file for roles/install_bash_profile
+- name: Read content line-by-line from local file
+  ansible.builtin.set_fact:
+    source_file_content: "{{ lookup('file', source_file_path, errors='ignore').splitlines() }}"
+  failed_when: source_file_content == ['']
+  ignore_errors: true
+
+- name: Append lines from append_lines variable if it exists
+  ansible.builtin.set_fact:
+    source_file_content: "{{ source_file_content + append_lines }}"
+  when: append_lines is defined
+
+- name: Ensure destination file exists on target machine
+  ansible.builtin.file:
+    path: "{{ dest_file_path }}"
+    state: touch
+    mode: "{{ dest_file_path_mode | default('0644') }}"
+  when:
+    - source_file_content is defined
+    - source_file_content != ['']
+  ignore_errors: true
+
+- name: Add lines that are not present
+  ansible.builtin.lineinfile:
+    path: "{{ dest_file_path }}"
+    line: "{{ item }}"
+    state: present
+    create: true
+    insertafter: EOF
+  with_items: "{{ source_file_content }}"
+  when:
+    - item != ''
+    - source_file_content is defined
+    - source_file_content != ['']
+  ignore_errors: true

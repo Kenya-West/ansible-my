@@ -1,0 +1,26 @@
+---
+- name: Setup PowerShell profile
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/kwtoolset/line_in_file
+      vars:
+        source_file_path: "{{ powershell_asset_fullpath }}/Microsoft.PowerShell_profile.ps1"
+        dest_file_path: "{{ pwsh_profile.stdout }}"
+        dest_file_path_mode: "0755"
+        append_lines:
+          - "oh-my-posh init pwsh --config {{ ohmyposh_powershell_themes_dir }}/{{ ohmyposh_powershell_theme }}.omp.json | Invoke-Expression"
+
+  pre_tasks:
+    - name: Get Powershell executable path
+      ansible.builtin.shell: "command -v pwsh"
+      register: pwsh_path
+
+    - name: Get Powershell $PROFILE path
+      become: true
+      become_user: "{{ standard_user }}"
+      ansible.builtin.shell: $PROFILE
+      args:
+        executable: "{{ pwsh_path.stdout }}"
+      register: pwsh_profile
