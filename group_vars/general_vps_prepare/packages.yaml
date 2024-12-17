@@ -15,6 +15,10 @@ packages_list:
       - gpg
       - gettext-base
       - snapd
+      # TermSCP dependencies
+      - libdbus-1-dev
+      - pkg-config
+      - libsmbclient
       # Extra packages
       - moreutils
       - neofetch
