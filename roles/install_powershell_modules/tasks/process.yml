@@ -1,0 +1,11 @@
+- name: Check if {{ item.name }} module is installed
+  ansible.builtin.shell: "Get-Module -ListAvailable {{ item.name }}"
+  args:
+    executable: "{{ pwsh_path.stdout }}"
+  register: posh_module
+
+- name: Install {{ item.name }} module using pwsh
+  ansible.builtin.shell: "Install-Module {{ item.name }} -Scope {{ item.scope | default('CurrentUser') }} {% if item.force | default(true) %} -Force {% endif %}"
+  args:
+    executable: "{{ pwsh_path.stdout }}"
+  register: install_result_posh_module

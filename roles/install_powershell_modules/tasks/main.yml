@@ -1,0 +1,19 @@
+---
+# tasks file for roles/install_powershell_modules
+- name: Get Powershell executable path
+  ansible.builtin.shell: "command -v pwsh"
+  register: pwsh_path
+
+- name: Get Powershell $PROFILE path
+  become: true
+  become_user: "{{ standard_user }}"
+  ansible.builtin.shell: $PROFILE
+  args:
+    executable: "{{ pwsh_path.stdout }}"
+  register: pwsh_profile
+
+- name: Process each of base file names
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ powershell_modules }}"
+  loop_control:
+    loop_var: item

@@ -4,6 +4,7 @@
 - import_playbook: ./general_vps_prepare_install_packages_binary.yaml
 - import_playbook: ./general_vps_prepare_install_debget.yaml
 - import_playbook: ./general_vps_prepare_install_packages_deb.yaml
+- import_playbook: ./general_vps_prepare_install_powershell_modules.yaml
 # - import_playbook: ./general_vps_prepare_install_eza.yaml # is installed by eget
 # - import_playbook: ./general_vps_prepare_install_powershell.yaml # is installed by deb-get
 - import_playbook: ./general_vps_prepare_install_docker.yaml
