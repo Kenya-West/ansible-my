@@ -1,0 +1,8 @@
+---
+- name: Configure default editor - set micro system-wide
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/configure_default_editor
