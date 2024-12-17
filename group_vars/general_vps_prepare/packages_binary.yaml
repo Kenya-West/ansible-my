@@ -15,6 +15,7 @@ packages_binary_list:
     assets:
       - "gnu"
       - "tar.gz"
+  - repo: "junegunn/fzf"
   - repo: "jesseduffield/lazydocker"
   - repo: "jesseduffield/lazygit"
   - repo: "tstack/lnav"
