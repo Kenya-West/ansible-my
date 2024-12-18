@@ -1,0 +1,22 @@
+---
+# tasks file for roles/configure_locale
+- name: Ensure locale is removed
+  community.general.locale_gen:
+    name: "{{ item }}"
+    state: absent
+  loop: "{{ locales_disabled }}"
+  when:
+    - locales_disabled is defined
+    - locales_disabled | length > 0
+
+- name: Ensure a locale exists
+  community.general.locale_gen:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ locales_enabled }}"
+  when:
+    - locales_enabled is defined
+    - locales_enabled | length > 0
+
+- name: Generate locale
+  ansible.builtin.command: locale-gen
