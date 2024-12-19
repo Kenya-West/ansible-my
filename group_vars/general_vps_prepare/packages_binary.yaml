@@ -11,6 +11,7 @@ packages_binary_list:
   #   dest_loc: "/usr/local/bin"  # Optional. Location to put bin file
   #   bin_name: "lnav"            # Optional. Name of command that will be available in shell
   #   file: "lnav"                # Optional. Name of file to extract (glob)
+  #   post_install: "lnav -h"     # Optional. Command to run after installation
   - repo: "eza-community/eza"
     assets:
       - "gnu"
@@ -36,6 +37,7 @@ packages_binary_list:
   - repo: "tomnomnom/gron"
   - repo: "PaulJuliusMartinez/jless"
   - repo: "https://dystroy.org/broot/download/x86_64-linux/broot"
+    post_install: "broot --install"
   - repo: "extrawurst/gitui"
   - repo: "solidiquis/erdtree"
     assets:

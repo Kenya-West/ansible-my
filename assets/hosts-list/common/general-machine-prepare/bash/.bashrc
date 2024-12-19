@@ -18,8 +18,6 @@ alias cat='bat --paging=never'
 alias norg='gron --ungron'
 alias ungron='gron --ungron'
 
-alias br='broot'
-
 # Set up fzf key bindings and fuzzy completion
 eval "$(fzf --bash)"
 export FZF_DEFAULT_OPTS='--no-height --no-reverse'

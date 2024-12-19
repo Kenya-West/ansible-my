@@ -38,3 +38,7 @@
     path: "{{ bin_location.stdout }}"
     mode: '0755'
   ignore_errors: true
+
+- name: Run post install command
+  ansible.builtin.shell: "{{ item.post_install }}"
+  when: item.post_install is defined
