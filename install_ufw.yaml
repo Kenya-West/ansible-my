@@ -27,12 +27,12 @@
         filename_pattern: "*.env"
         substring_pattern: "PORT"
         files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
-        skip_if_not_found: true
     - name: ./roles/install_ufw
       become: true
       vars:
         ufw_ports: "{{ collected_ports }}"
         ufw_protos: ["tcp", "udp"]
+        skip_if_not_found: true
     # Analytics-node project
     - name: ./roles/kwtoolset/collect_ports
       vars:

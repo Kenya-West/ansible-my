@@ -6,7 +6,7 @@
   register: files_path_stat
   failed_when:
     - files_path_stat.stat.exists == false
-    - skip_if_not_found == false
+    - skip_if_not_found is defined and skip_if_not_found == false
 
 - name: Find all .env files recursively in the {{ files_path }} directory
   ansible.builtin.find:
