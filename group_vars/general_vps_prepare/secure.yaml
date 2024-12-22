@@ -12,3 +12,6 @@ sysctl_overwrite:
   # Enable IPv4 traffic forwarding. Because: https://galaxy.ansible.com/ui/repo/published/devsec/hardening/content/role/os_hardening/
   net.ipv4.ip_forward: 1
   os_user_pw_ageing: false
+
+# Fail2Ban
+fail2ban_backend: systemd
