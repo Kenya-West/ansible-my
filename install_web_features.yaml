@@ -44,6 +44,12 @@
       with_items:
         - python-certbot-nginx
         - certbot
+    - name: Install NGINX apt package if not installed
+      become: true
+      become_user: root
+      ansible.builtin.apt:
+        name: nginx
+        state: present
     - name: Determine if killport utility is installed
       ansible.builtin.command: which killport
       register: killport_installed
