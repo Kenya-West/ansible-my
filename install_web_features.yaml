@@ -44,6 +44,16 @@
       with_items:
         - python-certbot-nginx
         - certbot
+    - name: Determine if killport utility is installed
+      ansible.builtin.command: which killport
+      register: killport_installed
+      ignore_errors: true
+    - name: Kill port 80 using killport utility (if installed)
+      become: true
+      become_user: root
+      ansible.builtin.shell: killport 80
+      when: killport_installed.rc == 0
+      ignore_errors: true
 
   post_tasks:
     - name: Verify if update.sh exists
