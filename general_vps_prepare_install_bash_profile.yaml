@@ -9,5 +9,7 @@
         source_file_path: "{{ bash_asset_fullpath }}/.bashrc"
         dest_file_path: "/home/{{ standard_user }}/.bashrc"
         dest_file_path_mode: "0644"
+        remove_lines_regex:
+          - "alias\\sbr(\\s)?="
         append_lines:
           - "eval \"$(oh-my-posh init bash --config {{ ohmyposh_themes_dir }}/{{ ohmyposh_theme }}.omp.json)\""

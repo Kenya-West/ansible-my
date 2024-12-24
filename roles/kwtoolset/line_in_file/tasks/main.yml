@@ -21,6 +21,17 @@
     - source_file_content != ['']
   ignore_errors: true
 
+- name: Remove lines by regex {{ item }} if any
+  ansible.builtin.lineinfile:
+    path: "{{ dest_file_path }}"
+    regexp: "{{ item }}"
+    state: absent
+  with_items: "{{ remove_lines_regex | default([]) }}"
+  when:
+    - item != ''
+    - remove_lines_regex is defined
+    - remove_lines_regex != ['']
+
 - name: Add lines that are not present
   ansible.builtin.lineinfile:
     path: "{{ dest_file_path }}"
