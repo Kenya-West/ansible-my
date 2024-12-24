@@ -50,3 +50,7 @@
       ansible.builtin.group:
         name: "{{ cert_access_group }}"
         state: present
+
+    - name: Run certcopy job now
+      ansible.builtin.shell: "{{ dest_project_fullpath }}/scripts/copy.sh"
+      when: update_script_exists.stat.exists == true
