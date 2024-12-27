@@ -2,7 +2,7 @@
 standard_user: someuser
 root_password: pass
 
-# Can be defined if you are installing just a part of binary packages
+# The following variable could be defined if you are installing just a part of binary packages
 # using eget in relatively fresh OS. It skips already installed packages.
 # eget_skip_installed_packages: true
 
