@@ -1,6 +1,6 @@
 ---
 # tasks file for roles/kwtoolset/collect_ports
-- name: Check if {{ files_path }} directory exists
+- name: Check if {{ files_path | default('defined') }} directory exists
   ansible.builtin.stat:
     path: "{{ files_path }}"
   register: files_path_stat
@@ -27,3 +27,8 @@
   ansible.builtin.set_fact:
     collected_ports: "{{ (ports_from_file.results | selectattr('stdout', 'defined') | map(attribute='stdout_lines') | flatten | map('int')) | unique }}"
   when: files_path_stat.stat.exists == true
+
+- name: Say that directory does not exist
+  ansible.builtin.debug:
+    msg: "❕ Directory {{ files_path | default('<NO DIRECTORY NAME PROVIDED>') }} does not exist. Aborting"
+  when: files_path_stat.stat.exists == false

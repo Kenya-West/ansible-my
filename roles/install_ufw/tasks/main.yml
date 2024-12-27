@@ -15,6 +15,7 @@
     proto: tcp
   loop: "{{ ufw_ports }}"
   when:
+    - collected_ports is defined and collected_ports | length > 0
     - input_mode is not defined or input_mode == 'list'
     - "'tcp' in ufw_protos"
 - name: Allow collected ports in UFW (for UDP)
@@ -24,6 +25,7 @@
     proto: udp
   loop: "{{ ufw_ports }}"
   when:
+    - collected_ports is defined and collected_ports | length > 0
     - input_mode is not defined or input_mode == 'list'
     - "'udp' in ufw_protos"
 - name: Set rules for UFW on complex mode
@@ -35,3 +37,7 @@
   when:
     - input_mode is defined
     - input_mode == 'complex'
+- name: Say that collected_ports variable does not exist
+  ansible.builtin.debug:
+    msg: "❕ Variable collected_ports does not exist or is empty. Aborting"
+  when: collected_ports is not defined or collected_ports | length == 0
