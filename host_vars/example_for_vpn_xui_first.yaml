@@ -8,6 +8,7 @@ root_password: pass
 
 domains_keys:
   xui: subdomain-xui.example.tld
+  node_exporter: subdomain-node-exporter.example.tld
 domains: "{{ domains_keys.values() | list }}"
 
 emails:
