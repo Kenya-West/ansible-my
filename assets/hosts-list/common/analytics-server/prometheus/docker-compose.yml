@@ -13,7 +13,7 @@ services:
       - prom_data:/prometheus
       # - certs:/etc/ssl
     labels:
-      caddy: "${DOMAIN}:${PORT}"
+      caddy: "${DOMAIN}:${EXTERNAL_PORT}"
       caddy.import: "logging ${DOMAIN}"
       caddy.0_reverse_proxy: "{{ upstreams ${PORT}}}"
     restart: unless-stopped
