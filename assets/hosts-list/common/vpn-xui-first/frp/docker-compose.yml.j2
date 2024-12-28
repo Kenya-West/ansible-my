@@ -1,0 +1,34 @@
+---
+
+services:
+  frps:
+    image: snowdreamtech/frps
+    container_name: frps
+    cpus: "0.5"
+    mem_limit: 200m
+    ports:
+      - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}
+      - "${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}:${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}/tcp"
+    env_file:
+      - .env
+    volumes:
+      - ./config-frps:/etc/frp
+      - {{ cert_location_root_path }}:/etc/frp/certs:ro
+    networks:
+      - {{ docker_service_vars.network.name }}
+    restart: unless-stopped
+
+  frpc:
+    image: snowdreamtech/frpc
+    cpus: "0.5"
+    mem_limit: 200m
+    container_name: frpc
+    volumes:
+      - ./config-frpc:/etc/frp
+      - {{ cert_location_root_path }}:/etc/frp/certs:ro
+    network_mode: host
+    restart: unless-stopped
+
+networks:
+  {{ docker_service_vars.network.name }}:
+    external: true
