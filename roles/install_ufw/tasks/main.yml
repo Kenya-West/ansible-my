@@ -8,6 +8,7 @@
   community.general.ufw:
     state: enabled
     policy: deny
+
 - name: Allow collected ports in UFW (for TCP)
   community.general.ufw:
     rule: allow
@@ -17,7 +18,9 @@
   when:
     - collected_ports is defined and collected_ports | length > 0
     - input_mode is not defined or input_mode == 'list'
+    - item != 0
     - "'tcp' in ufw_protos"
+
 - name: Allow collected ports in UFW (for UDP)
   community.general.ufw:
     rule: allow
@@ -27,7 +30,9 @@
   when:
     - collected_ports is defined and collected_ports | length > 0
     - input_mode is not defined or input_mode == 'list'
+    - item != 0
     - "'udp' in ufw_protos"
+
 - name: Set rules for UFW on complex mode
   community.general.ufw:
     rule: "{{ item.rule }}"
