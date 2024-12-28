@@ -10,9 +10,9 @@ services:
     env_file:
       - .env
     networks:
-      - xui_network
+      - {{ docker_service_vars.network.name }}
     restart: unless-stopped
 
 networks:
-  xui_network:
+  {{ docker_service_vars.network.name }}:
     external: true

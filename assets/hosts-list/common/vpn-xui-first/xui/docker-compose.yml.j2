@@ -9,11 +9,11 @@ services:
       - type: bind
         source: ./db/x-ui.db
         target: /etc/x-ui/x-ui.db
-      - /etc/ssl/shared:/etc/letsencrypt:ro
+      - {{ cert_location_root_path }}:/etc/letsencrypt:ro
     env_file:
       - .env
     networks:
-      - xui_network
+      - {{ docker_service_vars.network.name }}
     environment:
       XRAY_VMESS_AEAD_FORCED: "false"
     tty: true
@@ -27,5 +27,5 @@ services:
     restart: unless-stopped
 
 networks:
-  xui_network:
+  {{ docker_service_vars.network.name }}:
     external: true
