@@ -1,0 +1,34 @@
+---
+# tasks file for roles/kwtoolset/collect_ports_range
+- name: Check if {{ files_path | default('defined') }} directory exists
+  ansible.builtin.stat:
+    path: "{{ files_path }}"
+  register: collect_ports_range_files_path_stat
+  failed_when:
+    - collect_ports_range_files_path_stat.stat.exists == false
+    - skip_if_not_found is defined and skip_if_not_found == false
+
+- name: Find all files by pattern {{ filename_pattern }} recursively in the {{ files_path }} directory
+  ansible.builtin.find:
+    paths: "{{ files_path }}"
+    patterns: "{{ filename_pattern }}"
+    recurse: true
+    hidden: true
+  register: found_files
+  when: collect_ports_range_files_path_stat.stat.exists == true
+
+- name: Process each of file
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ found_files.files }}"
+  loop_control:
+    loop_var: item
+
+- name: Display collected port values
+  ansible.builtin.debug:
+    msg: "Collected port values: {{ collected_ports_range | default('NO PORTS FOUND') }}"
+  when: collect_ports_range_files_path_stat.stat.exists == true
+
+- name: Say that directory does not exist
+  ansible.builtin.debug:
+    msg: "❕ Directory {{ files_path | default('<NO DIRECTORY NAME PROVIDED>') }} does not exist. Aborting"
+  when: collect_ports_range_files_path_stat.stat.exists == false

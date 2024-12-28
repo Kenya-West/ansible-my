@@ -8,7 +8,7 @@
     - files_path_stat.stat.exists == false
     - skip_if_not_found is defined and skip_if_not_found == false
 
-- name: Find all .env files recursively in the {{ files_path }} directory
+- name: Find all files by pattern {{ filename_pattern }} recursively in the {{ files_path }} directory
   ansible.builtin.find:
     paths: "{{ files_path }}"
     patterns: "{{ filename_pattern }}"
@@ -16,8 +16,8 @@
     hidden: true
   register: found_files
   when: files_path_stat.stat.exists == true
-- name: Extract PORT values from .env files
-  ansible.builtin.shell: "grep -E '^[A-Za-z_]+{{ substring_pattern }}[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | tr -d ' '"
+- name: Extract PORT values from file {{ item.path }}
+  ansible.builtin.shell: "grep -E '^[A-Za-z_]+{{ substring_pattern }}[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
   loop: "{{ found_files.files }}"
   loop_control:
     loop_var: item
@@ -26,6 +26,10 @@
 - name: Collect PORT values into a list
   ansible.builtin.set_fact:
     collected_ports: "{{ (ports_from_file.results | selectattr('stdout', 'defined') | map(attribute='stdout_lines') | flatten | map('int')) | unique }}"
+  when: files_path_stat.stat.exists == true
+- name: Display collected PORT values
+  ansible.builtin.debug:
+    msg: "Collected PORT values: {{ collected_ports | default('NO PORTS FOUND') | join(', ') }}"
   when: files_path_stat.stat.exists == true
 
 - name: Say that directory does not exist
