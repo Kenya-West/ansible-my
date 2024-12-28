@@ -16,8 +16,8 @@
     "rejectUnknownSni": true,
     "certificates": [
       {
-        "certificateFile": "/etc/letsencrypt/live/{{ docker_service_vars.xui.domain }}/fullchain.pem",
-        "keyFile": "/etc/letsencrypt/live/{{ docker_service_vars.xui.domain }}/privkey.pem",
+        "certificateFile": "/etc/letsencrypt/{{ docker_service_vars.xui.domain }}/fullchain.pem",
+        "keyFile": "/etc/letsencrypt/{{ docker_service_vars.xui.domain }}/privkey.pem",
         "ocspStapling": 3600
       }
     ],

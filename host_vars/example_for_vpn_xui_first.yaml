@@ -15,7 +15,16 @@ emails:
   main: YourEmail@domain.tld
   domain: YourEmail@domain.tld
 
-host_ip_address: 111.222.333.444
+host_ip_address: "{{ ansible_host }}"
+
+cert_access_group: "certaccess"
+cert_access_group_users:
+  - "{{ standard_user }}"
+  - "{{ node_exporter_system_user }}"
+cert_location_root_path: "/etc/ssl/shared"
+cert_location_root_owner: "root"
+cert_location_root_permissions: "0755"
+cert_location_files_permissions: "0644"
 
 node_exporter_system_group: node-exp
 node_exporter_system_user: node-exp
@@ -24,8 +33,8 @@ node_exporter_basic_auth_users:
   someuser: pass
   prometheus: pass
 node_exporter_tls_server_config:
-  cert_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/fullchain.pem"
-  key_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/privkey.pem"
+  cert_file: "{{ cert_location_root_path }}/{{ domains_keys.node_exporter | default(domains[0]) }}/fullchain.pem"
+  key_file: "{{ cert_location_root_path }}/{{ domains_keys.node_exporter | default(domains[0]) }}/privkey.pem"
 node_exporter_http_server_config:
   http2: true
 node_exporter_web_telemetry_path: /node_exporter_metrics
@@ -46,7 +55,6 @@ certbot_auto_renew_minute: 0
 certbot_auto_renew_options: "--quiet"
 certbot_certs:
   - domains: "{{ domains }}"
-cert_access_group: "certaccess"
 
 docker_service_vars:
   nginx:

@@ -9,7 +9,7 @@ services:
       - type: bind
         source: ./db/x-ui.db
         target: /etc/x-ui/x-ui.db
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/ssl/shared:/etc/letsencrypt:ro
     env_file:
       - .env
     networks:

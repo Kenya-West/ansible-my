@@ -83,6 +83,36 @@
         job: "{{ dest_project_fullpath }}/scripts/update.sh"
       when: update_script_exists.stat.exists == true
 
+    # GROUP, SSL DIRECTORY AND PERMISSIONS
+
+    - name: Create {{ cert_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.group:
+        name: "{{ cert_access_group }}"
+        state: present
+
+    - name: Add users to {{ cert_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: "{{ cert_access_group }}"
+        append: true
+      with_items: "{{ cert_access_group_users }}"
+
+    - name: Create {{ cert_location_root_path }} directory
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ cert_location_root_path }}"
+        state: directory
+        owner: "{{ cert_location_root_owner }}"
+        group: "{{ cert_access_group }}"
+        mode: "{{ cert_location_root_permissions }}"
+
+    # FIRST-RUN SCRIPT 
+
     - name: Verify if first-run.sh exists
       ansible.builtin.stat:
         path: "{{ dest_project_fullpath }}/scripts/first-run.sh"
@@ -109,10 +139,3 @@
       ansible.builtin.debug:
         var: first_launch_result.stderr
       when: first_launch_result.stderr is defined
-
-    - name: Create {{ cert_access_group }} group
-      become: true
-      become_user: root
-      ansible.builtin.group:
-        name: "{{ cert_access_group }}"
-        state: present

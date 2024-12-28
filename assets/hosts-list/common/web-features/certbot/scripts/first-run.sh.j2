@@ -1,5 +1,5 @@
 #!/bin/bash
 
 echo "Starting first-run.sh script"
-certbot certonly --expand --redirect --standalone --agree-tos --email {{ emails.domain }} -d {{ domains | join(',') }} --pre-hook '{{ dest_project_fullpath }}/hooks/pre-hook.sh' --deploy-hook '{{ dest_project_fullpath }}/hooks/deploy-hook.sh' --post-hook '{{ dest_project_fullpath }}/hooks/post-hook.sh' --non-interactive --force-renewal
+certbot certonly --expand --redirect --standalone --agree-tos --email {{ emails.domain }} {% for domain in domains | unique %}-d {{ domain }} {% endfor %} --pre-hook '{{ dest_project_fullpath }}/hooks/pre-hook.sh' --deploy-hook '{{ dest_project_fullpath }}/hooks/deploy-hook.sh' --post-hook '{{ dest_project_fullpath }}/hooks/post-hook.sh' --non-interactive --force-renewal
 echo "Completed first-run.sh script"
