@@ -18,6 +18,7 @@
   when:
     - collected_ports is defined and collected_ports | length > 0
     - input_mode is not defined or input_mode == 'list'
+    - ufw_ports is defined and ufw_ports | length > 0
     - item != 0
     - "'tcp' in ufw_protos"
 
@@ -30,6 +31,7 @@
   when:
     - collected_ports is defined and collected_ports | length > 0
     - input_mode is not defined or input_mode == 'list'
+    - ufw_ports is defined and ufw_ports | length > 0
     - item != 0
     - "'udp' in ufw_protos"
 
