@@ -18,6 +18,7 @@ host_vars/*
 !host_vars/example_for_analytics_server.yaml
 !host_vars/example_for_vpn_xui_first.yaml
 !host_vars/example_for_vpn.yaml
+!host_vars/example_for_proxy_client.yaml
 
 # Inventory
 inventory/*

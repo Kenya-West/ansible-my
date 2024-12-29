@@ -1,0 +1,12 @@
+---
+
+services:
+  frpc:
+    image: snowdreamtech/frpc
+    cpus: "0.5"
+    mem_limit: 200m
+    container_name: frpc
+    volumes:
+      - ./config-frpc:/etc/frp
+    network_mode: host
+    restart: unless-stopped

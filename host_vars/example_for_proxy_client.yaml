@@ -1,0 +1,11 @@
+# This file contents should be put in example_for_vpn_xui_first.yaml or example_for_vpn.yaml
+# Data that should be replaced is in <angle brackets>
+
+proxy_client:
+  frpc:
+    client_dashboard_port: 7400
+    client_dashboard_user: <user>
+    client_dashboard_password: <password>
+    client_remote_port: 22001
+    client_auth_method: token
+    client_auth_token: <token>
