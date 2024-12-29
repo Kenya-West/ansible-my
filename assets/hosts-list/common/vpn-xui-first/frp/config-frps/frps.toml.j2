@@ -6,5 +6,7 @@ webServer.addr = "0.0.0.0"
 webServer.port = {{ docker_service_vars.frp.dashboard_port }}
 webServer.user = "{{ docker_service_vars.frp.dashboard_user }}"
 webServer.password = "{{ docker_service_vars.frp.dashboard_password }}"
+webServer.tls.certFile = "/etc/frp/certs/{{ domains_keys.frps | default(domains[0]) }}/fullchain.pem"
+webServer.tls.keyFile = "/etc/frp/certs/{{ domains_keys.frps | default(domains[0]) }}/privkey.pem"
 auth.method = "{{ docker_service_vars.frp.auth_method }}"
 auth.token = "{{ docker_service_vars.frp.auth_token }}"

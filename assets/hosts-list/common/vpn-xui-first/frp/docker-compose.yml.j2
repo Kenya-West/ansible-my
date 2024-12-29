@@ -9,6 +9,7 @@ services:
     ports:
       - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}
       - "${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}:${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}/tcp"
+      - ${FRPS_DASHBOARD_PORT}:${FRPS_DASHBOARD_PORT}
     env_file:
       - .env
     volumes:
