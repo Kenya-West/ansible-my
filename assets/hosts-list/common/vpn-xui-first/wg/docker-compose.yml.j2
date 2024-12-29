@@ -1,0 +1,46 @@
+---
+
+services:
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy
+    cpus: "0.5"
+    mem_limit: 200m
+    container_name: wg-easy
+    volumes:
+      - etc_wireguard:/etc/wireguard
+    networks:
+      - {{ docker_service_vars.network.name }}
+    ports:
+      - "${WG_PORT}:${WG_PORT}/udp"
+    env_file:
+      - .env
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+
+  wg-nginx:
+    image: nginx:latest
+    cpus: "0.5"
+    mem_limit: 200m
+    container_name: wg-nginx
+    hostname: ${DOMAIN}
+    volumes:
+      - ./nginx/servers/:/etc/nginx/servers/
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - {{ cert_location_root_path }}:/etc/letsencrypt:ro
+    networks:
+      - {{ docker_service_vars.network.name }}
+    ports:
+      - "${PORT}:443/tcp"
+    restart: unless-stopped
+
+networks:
+  {{ docker_service_vars.network.name }}:
+    external: true
+
+volumes:
+  etc_wireguard:
