@@ -6,4 +6,5 @@
 - import_playbook: ./install_vpnxuifirst_nginx.yaml
 - import_playbook: ./install_vpnxuifirst_frp.yaml
 - import_playbook: ./install_vpnxuifirst_wg.yaml
+- import_playbook: ./install_vpnxuifirst_xray.yaml
 - import_playbook: ./install_ufw.yaml
