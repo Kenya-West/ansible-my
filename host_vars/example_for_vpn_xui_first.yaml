@@ -7,7 +7,11 @@ root_password: pass
 # eget_skip_installed_packages: true
 
 domains_keys:
+  main: subdomain.example.tld
   xui: subdomain-xui.example.tld
+  frps: subdomain-frps.example.tld
+  wg: subdomain-wg.example.tld
+  xray: subdomain-xray.example.tld
   node_exporter: subdomain-node-exporter.example.tld
 domains: "{{ domains_keys.values() | list }}"
 
@@ -76,3 +80,33 @@ docker_service_vars:
   xui_api_server:
     port: 3000
     enable_logging: true
+  frp:
+    domain: "{{ domains_keys.frps }}"
+    caddy_path: frp
+    server_port: 7000
+    auth_method: token
+    auth_token: sometoken
+    dashboard_port: 7500
+    dashboard_user: someuser
+    dashboard_password: pass
+    range_ports_1_start: 22001
+    range_ports_1_end: 22089
+    client_dashboard_port: 7400
+    client_dashboard_user: someuser
+    client_dashboard_password: pass
+  wg:
+    domain: "{{ domains_keys.wg }}"
+    wg_host: "{{ domains_keys.wg }}"
+    dashboard_port: 51821
+    server_port: 51920
+    lang: ru
+    password: pass # brcypt hash
+    ui_traffic_stats: "true" # Should be as string because it will be templated
+    ui_chart_type: 1
+  xray:
+    domain: "{{ domains_keys.xray }}"
+    port: 23
+    ws_path: xray_ws_path
+    ws_port: 8188
+  network:
+    name: xui_network
