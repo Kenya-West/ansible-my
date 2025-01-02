@@ -16,7 +16,7 @@ services:
     tty: true
     restart: unless-stopped
     networks:
-      - caddy
+      - {{ docker_service_vars.network.name }}
     ports:
       - "${XUI_WG_PORT}:${XUI_WG_PORT}/udp"
       - "${XUI_VLESS_PORT}:${XUI_VLESS_PORT}"
@@ -30,7 +30,7 @@ services:
 
 
 networks:
-  caddy:
+  {{ docker_service_vars.network.name }}:
     external: true
 
 volumes:

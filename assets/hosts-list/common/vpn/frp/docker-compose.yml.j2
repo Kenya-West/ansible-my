@@ -15,7 +15,7 @@ services:
       - ./config-frps:/etc/frp
       - certs:/etc/frp/certs
     networks:
-      - caddy
+      - {{ docker_service_vars.network.name }}
     labels:
       caddy: "${DOMAIN}"
       caddy.import: "logging ${DOMAIN}"
@@ -35,7 +35,7 @@ services:
     restart: unless-stopped
 
 networks:
-  caddy:
+  {{ docker_service_vars.network.name }}:
     external: true
 
 volumes:
