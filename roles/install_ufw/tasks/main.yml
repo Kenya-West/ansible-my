@@ -20,6 +20,7 @@
     - input_mode is not defined or input_mode == 'list'
     - ufw_ports is defined and ufw_ports | length > 0
     - item != 0
+    - item > 0 and item < 65536
     - "'tcp' in ufw_protos"
 
 - name: Allow collected ports in UFW (for UDP)
@@ -33,6 +34,7 @@
     - input_mode is not defined or input_mode == 'list'
     - ufw_ports is defined and ufw_ports | length > 0
     - item != 0
+    - item > 0 and item < 65536
     - "'udp' in ufw_protos"
 
 - name: Set rules for UFW on complex mode
@@ -53,6 +55,8 @@
   loop: "{{ ufw_ports_range }}"
   when:
     - ufw_ports_range is defined and ufw_ports_range | length > 0
+    - item.begin > 0 and item.begin < 65536
+    - item.end > 0 and item.end < 65536
     - "'tcp' in ufw_protos"
 
 - name: Set range of ports for UFW (UDP)
@@ -63,6 +67,8 @@
   loop: "{{ ufw_ports_range }}"
   when:
     - ufw_ports_range is defined and ufw_ports_range | length > 0
+    - item.begin > 0 and item.begin < 65536
+    - item.end > 0 and item.end < 65536
     - "'udp' in ufw_protos"
 
 - name: Say that collected_ports variable does not exist
