@@ -23,17 +23,6 @@ services:
 
     restart: unless-stopped
 
-  frpc:
-    image: snowdreamtech/frpc
-    cpus: "0.5"
-    mem_limit: 200m
-    container_name: frpc
-    volumes:
-      - ./config-frpc:/etc/frp
-      - certs:/etc/frp/certs
-    network_mode: host
-    restart: unless-stopped
-
 networks:
   {{ docker_service_vars.network.name }}:
     external: true
