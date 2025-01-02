@@ -7,5 +7,6 @@ proxy_client:
     client_dashboard_user: <user>
     client_dashboard_password: <password>
     client_remote_port: 22001
+    client_local_port: 23001
     client_auth_method: token
     client_auth_token: <token>
