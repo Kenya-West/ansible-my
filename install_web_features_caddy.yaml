@@ -26,6 +26,35 @@
             default_mode: "0775"
 
   post_tasks:
+
+    # GROUP, SSL DIRECTORY AND PERMISSIONS
+    - name: Create {{ cert_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.group:
+        name: "{{ cert_access_group }}"
+        state: present
+
+    - name: Add users to {{ cert_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: "{{ cert_access_group }}"
+        append: true
+      with_items: "{{ cert_access_group_users }}"
+
+    - name: Create {{ cert_location_root_path }} directory
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ cert_location_root_path }}"
+        state: directory
+        owner: "{{ cert_location_root_owner }}"
+        group: "{{ cert_access_group }}"
+        mode: "{{ cert_location_root_permissions }}"
+
+    # CERTCOPY SCRIPT
     - name: Verify if copy.sh exists
       ansible.builtin.stat:
         path: "{{ dest_project_fullpath }}/scripts/copy.sh"
@@ -37,6 +66,8 @@
       when: update_script_exists.stat.exists == false
 
     - name: Add cron job for certcopy
+      become: true
+      become_user: root
       ansible.builtin.cron:
         name: "Copy certs"
         minute: "{{ copy_certs_auto_renew_minute }}"
@@ -44,13 +75,8 @@
         job: "{{ dest_project_fullpath }}/scripts/copy.sh"
       when: update_script_exists.stat.exists == true
 
-    - name: Create {{ cert_access_group }} group
+    - name: Run certcopy job now
       become: true
       become_user: root
-      ansible.builtin.group:
-        name: "{{ cert_access_group }}"
-        state: present
-
-    - name: Run certcopy job now
       ansible.builtin.shell: "{{ dest_project_fullpath }}/scripts/copy.sh"
       when: update_script_exists.stat.exists == true
