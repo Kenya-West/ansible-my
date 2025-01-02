@@ -52,9 +52,11 @@
         substring_pattern: "PORT"
         files_path: "/home/{{ standard_user }}/{{ analytics_project_structure_root }}"
         skip_if_not_found: true
+      when: analytics_project_structure_root is defined
     - name: ./roles/install_ufw
       become: true
       vars:
         ufw_ports: "{{ collected_ports }}"
         ufw_protos: ["tcp", "udp"]
         skip_if_not_found: true
+      when: analytics_project_structure_root is defined
