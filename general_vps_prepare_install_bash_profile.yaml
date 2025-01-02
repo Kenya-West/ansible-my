@@ -6,10 +6,10 @@
   roles:
     - name: ./roles/kwtoolset/lines_from_file
       vars:
-        source_file_path: "{{ bash_asset_fullpath }}/.bashrc"
-        dest_file_path: "/home/{{ standard_user }}/.bashrc"
-        dest_file_path_mode: "0644"
-        remove_lines_regex:
+        lines_from_file_source_file_path: "{{ bash_asset_fullpath }}/.bashrc"
+        lines_from_file_dest_file_path: "/home/{{ standard_user }}/.bashrc"
+        lines_from_file_dest_file_path_mode: "0644"
+        lines_from_file_remove_lines_regex:
           - "alias\\sbr(\\s)?="
-        append_lines:
+        lines_from_file_append_lines:
           - "eval \"$(oh-my-posh init bash --config {{ ohmyposh_themes_dir }}/{{ ohmyposh_theme }}.omp.json)\""
