@@ -4,7 +4,7 @@
   become: true
 
   roles:
-    - name: ./roles/kwtoolset/line_in_file
+    - name: ./roles/kwtoolset/lines_from_file
       vars:
         source_file_path: "{{ bash_asset_fullpath }}/.bashrc"
         dest_file_path: "/home/{{ standard_user }}/.bashrc"

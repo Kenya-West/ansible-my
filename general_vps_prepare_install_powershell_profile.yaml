@@ -4,7 +4,7 @@
   become: true
 
   roles:
-    - name: ./roles/kwtoolset/line_in_file
+    - name: ./roles/kwtoolset/lines_from_file
       vars:
         source_file_path: "{{ powershell_asset_fullpath }}/Microsoft.PowerShell_profile.ps1"
         dest_file_path: "{{ pwsh_profile.stdout }}"
