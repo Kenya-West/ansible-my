@@ -28,8 +28,8 @@ node_exporter_basic_auth_users:
   someuser: pass
   prometheus: pass
 node_exporter_tls_server_config:
-  cert_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/fullchain.pem"
-  key_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/privkey.pem"
+  cert_file: "{{ cert_location_root_path }}/{{ domains_keys.node_exporter | default(domains[0]) }}/fullchain.pem"
+  key_file: "{{ cert_location_root_path }}/{{ domains_keys.node_exporter | default(domains[0]) }}/privkey.pem"
 node_exporter_http_server_config:
   http2: true
 node_exporter_web_telemetry_path: /node_exporter_metrics
