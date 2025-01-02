@@ -40,3 +40,10 @@
           - path: "{{ dest_project_fullpath }}"
             name: "{{ project_name }}"
             ignore_errors: false
+
+  post_tasks:
+    - name: Reminder to run install_ufw.yaml playbook
+      ansible.builtin.debug:
+        msg: |
+          Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
+          Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}
