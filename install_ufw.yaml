@@ -21,6 +21,17 @@
             port: 443
             proto: udp
         input_mode: complex
+    # SSH custom ports, if any
+    - name: ./roles/kwtoolset/get_strings_from_file
+      vars:
+        get_strings_from_file_file_path: "/etc/ssh/sshd_config"
+        get_strings_from_file_regex_pattern: "^Port [0-9]{1,5}$"
+    - name: ./roles/install_ufw
+      become: true
+      vars:
+        ufw_ports: "{{ get_strings_from_file_extracted_ints }}"
+        ufw_protos: ["tcp", "udp"]
+        skip_if_not_found: true
     # VPN project
     - name: ./roles/kwtoolset/collect_ports
       vars:

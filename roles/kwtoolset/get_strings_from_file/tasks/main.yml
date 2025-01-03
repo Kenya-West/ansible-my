@@ -1,0 +1,41 @@
+---
+# tasks file for roles/kwtoolset/get_strings_from_file
+
+- name: Check if the file exists
+  ansible.builtin.stat:
+    path: "{{ get_strings_from_file_file_path }}"
+  register: get_strings_from_file_file_stat
+
+- name: Debug file existence
+  ansible.builtin.debug:
+    msg: "File exists: {{ get_strings_from_file_file_stat.stat.exists }}"
+
+- name: Skip if file does not exist
+  ansible.builtin.debug:
+    msg: "File does not exist, skipping further tasks."
+  when: not get_strings_from_file_file_stat.stat.exists
+
+- name: Extract strings matching the regex
+  ansible.builtin.shell: "grep -oP '{{ get_strings_from_file_regex_pattern }}' {{ get_strings_from_file_file_path }}"
+  register: get_strings_from_file_matching_strings
+  when: get_strings_from_file_file_stat.stat.exists
+
+- name: Convert matching strings to a list
+  ansible.builtin.set_fact:
+    get_strings_from_file_extracted_strings: "{{ get_strings_from_file_matching_strings.stdout_lines }}"
+  when: get_strings_from_file_file_stat.stat.exists
+
+- name: Get int values from the extracted strings
+  ansible.builtin.set_fact:
+    get_strings_from_file_extracted_ints: "{{ get_strings_from_file_extracted_strings | map('regex_replace', '.*?([0-9]+).*', '\\1') | map('int') }}"
+  when: get_strings_from_file_file_stat.stat.exists
+
+- name: Debug extracted strings
+  ansible.builtin.debug:
+    var: get_strings_from_file_extracted_strings
+  when: get_strings_from_file_file_stat.stat.exists
+
+- name: Debug extracted ints
+  ansible.builtin.debug:
+    var: get_strings_from_file_extracted_ints
+  when: get_strings_from_file_file_stat.stat.exists
