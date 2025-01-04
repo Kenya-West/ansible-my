@@ -1,0 +1,10 @@
+# This file contents should be put in example_for_vpn_xui_first.yaml or example_for_vpn.yaml
+# Data that should be replaced is in <angle brackets>
+
+restic_server_docker_vars:
+  users:
+    - name: vps
+      password: <password>
+  port: 8010
+  network:
+    name: restic_backup

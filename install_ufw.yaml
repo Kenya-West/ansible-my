@@ -76,3 +76,18 @@
         ufw_protos: ["tcp", "udp"]
         skip_if_not_found: true
       when: analytics_project_structure_root is defined
+    # backup-restic project
+    - name: ./roles/kwtoolset/collect_ports
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern: "PORT"
+        files_path: "/home/{{ standard_user }}/{{ backup_restic_project_structure_root }}"
+        skip_if_not_found: true
+      when: backup_restic_project_structure_root is defined
+    - name: ./roles/install_ufw
+      become: true
+      vars:
+        ufw_ports: "{{ collected_ports }}"
+        ufw_protos: ["tcp", "udp"]
+        skip_if_not_found: true
+      when: backup_restic_project_structure_root is defined

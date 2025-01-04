@@ -37,5 +37,7 @@ packages_list:
       - nala
       # Service packages
       - python3-docker # Needed for Ansible Docker modules
+      - python3-passlib # Needed for Ansible htpasswd module
+      - python3-bcrypt # Needed for Ansible htpasswd module
     snap:
       - procs
