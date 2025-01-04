@@ -7,9 +7,12 @@ serverPort = {{ proxy_client.frpc.server_port }}
 auth.method = "{{ proxy_client.frpc.client_auth_method }}"
 auth.token = "{{ proxy_client.frpc.client_auth_token }}"
 
+{% for proxy in proxy_client.frpc.proxies %}
+
 [[proxies]]
-name = "{{ proxy_client.frpc.name | default(inventory_hostname) | default(ansible_host) | default('ssh_proxy') }}"
-type = "tcp"
-localIP = "127.0.0.1"
-localPort = {{ proxy_client.frpc.client_local_port | default(22) }}
-remotePort = {{ proxy_client.frpc.client_remote_port }}
+name = "{{ proxy.name | default(inventory_hostname) | default(ansible_host) | default('ssh_proxy') }}"
+type = "{{ proxy.type | default('tcp') }}"
+localIP = "{{ proxy.local_ip | default('127.0.0.1') }}"
+localPort = {{ proxy.local_port }}
+remotePort = {{ proxy.remote_port }}
+{% endfor %}

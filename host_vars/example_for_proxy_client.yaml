@@ -6,7 +6,14 @@ proxy_client:
     client_dashboard_port: 7400
     client_dashboard_user: <user>
     client_dashboard_password: <password>
-    client_remote_port: 22001
-    client_local_port: 23001
     client_auth_method: token
     client_auth_token: <token>
+    proxies:
+      - name: "{{ inventory_hostname }}"
+        local_port: 23001
+        remote_port: 22001
+      - name: "{{ inventory_hostname }}_restic_server"
+        type: tcp
+        local_ip: 127.0.0.1
+        local_port: 8010
+        remote_port: 22002
