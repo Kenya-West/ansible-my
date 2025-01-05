@@ -1,0 +1,28 @@
+# This file contents should be put in example_for_vpn_xui_first.yaml or example_for_vpn.yaml
+# Data that should be replaced is in <angle brackets>
+
+restic_node_vars:
+  locations:
+    home_user:
+      from: "/home/{{ standard_user }}"
+      to:
+        - restic-rest-server
+  remotes:
+    restic-rest-server:
+      type: rest
+      path: <restic_rest_server_url>
+      rest:
+        user: <restic_rest_server_user>
+        password: <restic_rest_server_password>
+    <remote_name>:
+      type: <remote_type>
+      host: <remote_host>
+      port: <remote_port>
+      user: <remote_user>
+      key: <remote_key>
+  # This section will be used in .autorestic.env.j2
+  # This is optional
+  remotes_dotenv_vars:
+    - name: <remote_name> # Should match the name in remotes, or use {{ restic_node_vars.remotes[<INT INDEX, e.g. 0>].name }}
+      vars:
+        - <key_name>: <key_value>

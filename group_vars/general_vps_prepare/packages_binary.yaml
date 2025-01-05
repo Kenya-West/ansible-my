@@ -48,3 +48,4 @@ packages_binary_list:
   - repo: "veeso/termscp"
     assets:
       - "gnu"
+  - repo: "cupcakearmy/autorestic"

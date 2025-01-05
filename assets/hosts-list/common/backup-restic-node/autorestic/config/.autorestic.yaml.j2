@@ -1,0 +1,7 @@
+version: 2
+ 
+locations:
+  {{ restic_node_vars.locations | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
+
+backends:
+  {{ restic_node_vars.remotes | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
