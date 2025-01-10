@@ -67,6 +67,8 @@ docker_service_vars:
     domain: "{{ domains_keys.frps }}"
     caddy_path: frp
     server_port: 7000
+    vhost_http_port: 8080
+    vhost_https_port: 8443
     auth_method: token
     auth_token: sometoken
     dashboard_port: 7500
