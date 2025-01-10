@@ -4,7 +4,7 @@ services:
   frps:
     image: snowdreamtech/frps
     container_name: frps
-    cpus: "0.5"
+    cpus: 0.5
     mem_limit: 200m
     ports:
       - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}

@@ -3,7 +3,7 @@
 services:
   xray:
     image: teddysun/xray
-    cpus: "0.5"
+    cpus: 0.5
     mem_limit: 200m
     container_name: xray
     volumes:
@@ -16,7 +16,7 @@ services:
 
   xray-nginx:
     image: nginx:latest
-    cpus: "0.5"
+    cpus: 0.5
     mem_limit: 200m
     container_name: xray-nginx
     hostname: ${DOMAIN}

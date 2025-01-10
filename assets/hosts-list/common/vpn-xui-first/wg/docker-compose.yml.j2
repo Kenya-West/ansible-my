@@ -3,7 +3,7 @@
 services:
   wg-easy:
     image: ghcr.io/wg-easy/wg-easy
-    cpus: "0.5"
+    cpus: 0.5
     mem_limit: 200m
     container_name: wg-easy
     volumes:
@@ -24,7 +24,7 @@ services:
 
   wg-nginx:
     image: nginx:latest
-    cpus: "0.5"
+    cpus: 0.5
     mem_limit: 200m
     container_name: wg-nginx
     hostname: ${DOMAIN}
