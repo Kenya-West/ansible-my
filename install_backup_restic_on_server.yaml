@@ -53,6 +53,7 @@
         path: "{{ dest_project_fullpath }}/data/.htpasswd"
         name: "{{ item.name }}"
         password: "{{ item.password }}"
+        hash_scheme: "{{ item.hash_scheme | default(restic_server_docker_vars.hash_scheme) | default('md5_crypt') }}"
         mode: "0644"
       loop: "{{ restic_server_docker_vars.users }}"
       failed_when:

@@ -5,6 +5,7 @@ restic_server_docker_vars:
   users:
     - name: vps
       password: <password>
+      hash_scheme: bcrypt
   port: 8010
   network:
     name: restic_backup
