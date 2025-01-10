@@ -39,9 +39,27 @@
       register: restic_version_newly_installed
       when: restic_version.rc != 0
   post_tasks:
+    - name: Get info about configuration
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./info.sh"
+        chdir: "{{ dest_project_fullpath }}/scripts"
     - name: Check configuration
       become: true
       become_user: root
       ansible.builtin.shell:
         cmd: "./check.sh"
         chdir: "{{ dest_project_fullpath }}/scripts"
+      ignore_errors: true
+      register: autorestic_check_config
+    - name: Debug configuration
+      debug:
+        var: autorestic_check_config
+    - name: Run yq command to fix corrupted config # Look for https://github.com/cupcakearmy/autorestic/issues/315
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/fix.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      when: autorestic_check_config.rc != 0
