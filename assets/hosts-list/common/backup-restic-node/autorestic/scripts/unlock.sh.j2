@@ -1,0 +1,2 @@
+autorestic unlock -c {{ dest_project_fullpath }}/config/.autorestic.yaml -v
+autorestic exec -c {{ dest_project_fullpath }}/config/.autorestic.yaml -av -- unlock
