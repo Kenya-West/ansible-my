@@ -11,12 +11,14 @@ restic_node_vars:
     restic-rest-server:
       type: rest
       path: <restic_rest_server_url>
+      key: <restic_rest_remote_key> # Optional, if you already have a key
       rest:
         user: <restic_rest_server_user>
         password: <restic_rest_server_password>
     <remote_name>:
       type: <remote_type>
       host: <remote_host>
+      key: <restic_rest_remote_key> # Optional, if you already have a key
       port: <remote_port>
       user: <remote_user>
       key: <remote_key>
