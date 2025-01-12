@@ -25,6 +25,9 @@
             dest: "{{ dest_project_rootpath }}"
             default_mode: "0775"
   pre_tasks:
+    - name: Add prefix dest_project_fullpath to each of restic_excludes_list_files
+      set_fact:
+        restic_excludes_list_files: "{{ [dest_project_fullpath + '/config/excludes'] | product(restic_excludes_list_files) | map('join', '/') | list }}"
     - name: Check if restic is installed
       ansible.builtin.shell: restic version
       register: restic_version

@@ -1,12 +1,27 @@
 # This file contents should be put in example_for_vpn_xui_first.yaml or example_for_vpn.yaml
 # Data that should be replaced is in <angle brackets>
 
+restic_excludes_list_files:
+  - excludes-common.txt
+  - excludes-dev-build.txt
+  - excludes-dev-code.txt
+  - excludes-home-dirs.txt
+  - excludes-root.txt
+
 restic_node_vars:
   locations:
     home_user:
       from: "/home/{{ standard_user }}"
       to:
         - restic-rest-server
+      options:
+        tobereplacedwith: "complete_options" # This will be replaced to alias defined in .autorestic.yaml.j2
+    shared_ssl:
+      from: "{{ cert_location_root_path }}"
+      to:
+        - restic-rest-server
+      options:
+        tobereplacedwith: "complete_options" # This will be replaced to alias defined in .autorestic.yaml.j2
   remotes:
     restic-rest-server:
       type: rest
@@ -21,7 +36,6 @@ restic_node_vars:
       key: <restic_rest_remote_key> # Optional, if you already have a key
       port: <remote_port>
       user: <remote_user>
-      key: <remote_key>
   # This section will be used in .autorestic.env.j2
   # This is optional
   remotes_dotenv_vars:

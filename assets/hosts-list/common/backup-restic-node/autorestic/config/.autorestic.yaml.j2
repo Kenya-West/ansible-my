@@ -1,7 +1,20 @@
 version: 2
- 
+
+extras:
+  backup: &backup
+    exclude-file: {{ restic_excludes_list_files }}
+  forget: &forget
+    keep-last:
+      - 10
+    forgetoption: prune
+  complete_options: &complete_options
+    backup:
+      <<: *backup
+    forget:
+      <<: *forget
+
 locations:
-  {{ restic_node_vars.locations | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
+  {{ restic_node_vars.locations | to_nice_yaml(indent=2, sort_keys=false) | replace(fillers.yaml + ': ', '<<: *') | trim | indent(2, false) }}
 
 backends:
   {{ restic_node_vars.remotes | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
