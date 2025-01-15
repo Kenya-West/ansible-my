@@ -141,3 +141,12 @@
     - name: Debug the keys
       debug:
         var: keys.stdout
+
+    # Cron
+    - name: Add cron job for autorestic
+      become: true
+      become_user: root
+      ansible.builtin.cron:
+        name: "Autorestic backup"
+        minute: 5
+        job: "{{ dest_project_fullpath }}/scripts/update-cron-debug.sh"
