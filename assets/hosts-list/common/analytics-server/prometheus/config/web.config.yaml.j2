@@ -1,8 +1,8 @@
 basic_auth_users:
-  {% for user, password in prometheus.basic_auth_users.items() %}
+  {% for user, password in prometheus_server_basic_auth_users.items() %}
   {{ user }}: {{ password }}
   {% endfor %}
 
 # tls_server_config:
-#   cert_file: "{{ prometheus.tls_server_config.cert_file }}"
-#   key_file: "{{ prometheus.tls_server_config.key_file }}"
+#   cert_file: "{{ prometheus_server_tls_cert_file }}"
+#   key_file: "{{ prometheus_server_tls_key_file }}"

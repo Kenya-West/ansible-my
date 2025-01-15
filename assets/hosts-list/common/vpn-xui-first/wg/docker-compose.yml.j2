@@ -9,7 +9,7 @@ services:
     volumes:
       - etc_wireguard:/etc/wireguard
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     ports:
       - "${WG_PORT}:${WG_PORT}/udp"
     env_file:
@@ -33,13 +33,13 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - {{ cert_location_root_path }}:/etc/letsencrypt:ro
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     ports:
       - "${PORT}:443/tcp"
     restart: unless-stopped
 
 networks:
-  {{ docker_service_vars.network.name }}:
+  {{ docker_vpn_network }}:
     external: true
 
 volumes:

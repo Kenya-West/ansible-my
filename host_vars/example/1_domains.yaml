@@ -1,0 +1,10 @@
+domains_keys:
+  main: sub.example.tld
+  xui: sub-xui.example.tld
+  frps: sub-frps.example.tld
+  wg: sub-wg.example.tld
+  xray: sub-xray.example.tld
+  node_exporter: sub-node_exporter.example.tld
+  prometheus: sub-prometheus.example.tld
+  backrest: sub-backrest.example.tld
+domains: "{{ domains_keys.values() | list }}"

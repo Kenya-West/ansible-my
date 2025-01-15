@@ -13,7 +13,7 @@ services:
     env_file:
       - .env
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     environment:
       XRAY_VMESS_AEAD_FORCED: "false"
     tty: true
@@ -27,5 +27,5 @@ services:
     restart: unless-stopped
 
 networks:
-  {{ docker_service_vars.network.name }}:
+  {{ docker_vpn_network }}:
     external: true

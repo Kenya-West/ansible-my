@@ -1,0 +1,14 @@
+# There are all possible domains listed, not everything will be used.
+# Set of domains depends on group host will be mentioned in.
+# They are set there for other groups to be able for inital substitution purposes.
+# You should reinitialize them in host_vars/host_name/1_domains.yaml
+domains_keys:
+  main: sub.example.tld
+  xui: sub-xui.example.tld
+  frps: sub-frps.example.tld
+  wg: sub-wg.example.tld
+  xray: sub-xray.example.tld
+  node_exporter: sub-node_exporter.example.tld
+  prometheus: sub-prometheus.example.tld
+  backrest: sub-backrest.example.tld
+domains: "{{ domains_keys.values() | list }}"

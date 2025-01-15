@@ -1,5 +1,6 @@
-# This file contents should be put in example_for_vpn_xui_first.yaml or example_for_vpn.yaml
-# Data that should be replaced is in <angle brackets>
+# The commented vars should be set in host_vars or in playbook
+# The `restic_node_vars` is an example of how to configure restic
+# You should set this var, too, in host_vars or in playbook
 
 restic_excludes_list_files:
   - excludes-common.txt

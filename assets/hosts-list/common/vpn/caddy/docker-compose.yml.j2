@@ -16,7 +16,7 @@ services:
     env_file:
       - .env
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/Caddyfile:/config/Caddyfile
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
 
 networks:
-  {{ docker_service_vars.network.name }}:
+  {{ docker_vpn_network }}:
     external: true
 
 volumes:

@@ -1,12 +1,12 @@
-bindPort = {{ docker_service_vars.frp.server_port }}
-vhostHTTPPort = {{ docker_service_vars.frp.vhost_http_port }}
-vhostHTTPSPort = {{ docker_service_vars.frp.vhost_https_port }}
+bindPort = {{ docker_frp_server_port }}
+vhostHTTPPort = {{ docker_frp_vhost_http_port }}
+vhostHTTPSPort = {{ docker_frp_vhost_https_port }}
 allowPorts = [
-  { start = {{ docker_service_vars.frp.range_ports_1_start }}, end = {{ docker_service_vars.frp.range_ports_1_end }} }
+  { start = {{ docker_frp_range_ports_1_start }}, end = {{ docker_frp_range_ports_1_end }} }
 ]
 webServer.addr = "0.0.0.0"
-webServer.port = {{ docker_service_vars.frp.dashboard_port }}
-webServer.user = "{{ docker_service_vars.frp.dashboard_user }}"
-webServer.password = "{{ docker_service_vars.frp.dashboard_password }}"
-auth.method = "{{ docker_service_vars.frp.auth_method }}"
-auth.token = "{{ docker_service_vars.frp.auth_token }}"
+webServer.port = {{ docker_frp_dashboard_port }}
+webServer.user = "{{ docker_frp_dashboard_user }}"
+webServer.password = "{{ docker_frp_dashboard_password }}"
+auth.method = "{{ docker_frp_auth_method }}"
+auth.token = "{{ docker_frp_auth_token }}"

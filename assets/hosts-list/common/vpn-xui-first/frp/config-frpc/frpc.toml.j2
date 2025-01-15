@@ -1,13 +1,13 @@
 webServer.addr = "0.0.0.0"
-webServer.port = {{ docker_service_vars.frp.client_dashboard_port }}
-webServer.user = "{{ docker_service_vars.frp.client_dashboard_user }}"
-webServer.password = "{{ docker_service_vars.frp.client_dashboard_password }}"
-auth.method = "{{ docker_service_vars.frp.auth_method }}"
-auth.token = "{{ docker_service_vars.frp.auth_token }}"
+webServer.port = {{ docker_frp_client_dashboard_port }}
+webServer.user = "{{ docker_frp_client_dashboard_user }}"
+webServer.password = "{{ docker_frp_client_dashboard_password }}"
+auth.method = "{{ docker_frp_auth_method }}"
+auth.token = "{{ docker_frp_auth_token }}"
 
 [[proxies]]
 name = "ssh"
 type = "tcp"
 localIP = "127.0.0.1"
 localPort = 22
-remotePort = {{ docker_service_vars.frp.range_ports_1_start }}
+remotePort = {{ docker_frp_range_ports_1_start }}

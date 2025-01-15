@@ -11,7 +11,7 @@ services:
     env_file:
       - .env
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     restart: unless-stopped
 
   xray-nginx:
@@ -26,11 +26,11 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - {{ cert_location_root_path }}:/etc/letsencrypt:ro
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     ports:
       - "${XRAY_WS_PORT}:443/tcp"
     restart: unless-stopped
 
 networks:
-  {{ docker_service_vars.network.name }}:
+  {{ docker_vpn_network }}:
     external: true

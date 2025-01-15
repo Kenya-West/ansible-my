@@ -15,7 +15,7 @@ services:
       - ./config-frps:/etc/frp
       - certs:/etc/frp/certs
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     labels:
       caddy: "${DOMAIN}"
       caddy.import: "logging ${DOMAIN}"
@@ -24,7 +24,7 @@ services:
     restart: unless-stopped
 
 networks:
-  {{ docker_service_vars.network.name }}:
+  {{ docker_vpn_network }}:
     external: true
 
 volumes:

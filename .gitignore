@@ -15,6 +15,7 @@ logs/
 
 # Host vars
 host_vars/*
+!host_vars/example/
 !host_vars/example_for_analytics_server.yaml
 !host_vars/example_for_backup_node.yaml
 !host_vars/example_for_backup_server_backrest.yaml
@@ -38,6 +39,7 @@ assets/hosts-list/*
 !assets/hosts-list/example/**/*
 
 # Do not include SSH keys
+group_vars/all/user.yaml
 group_vars/general_vps_prepare/ssh_keys.yaml
 group_vars/general_vps_prepare/api_tokens.yaml
 

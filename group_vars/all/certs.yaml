@@ -1,0 +1,7 @@
+cert_access_group: "certaccess"
+cert_access_group_users:
+  - "{{ standard_user }}"
+cert_location_root_path: "/etc/ssl/shared"
+cert_location_root_owner: "root"
+cert_location_root_permissions: "0755"
+cert_location_files_permissions: "0644"

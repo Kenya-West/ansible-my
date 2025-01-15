@@ -1,0 +1,4 @@
+restic_server_users:
+  - name: vps
+    password: <password>
+    hash_scheme: bcrypt

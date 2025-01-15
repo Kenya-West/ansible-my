@@ -1,12 +1,12 @@
 server {
-    server_name {{ docker_service_vars.wg.domain }};
+    server_name {{ docker_wg_domain }};
     
     listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/{{ docker_service_vars.wg.domain }}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/{{ docker_service_vars.wg.domain }}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/{{ docker_wg_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/{{ docker_wg_domain }}/privkey.pem;
 
     location / {
-        proxy_pass http://wg-easy:{{ docker_service_vars.wg.dashboard_port }}/;
+        proxy_pass http://wg-easy:{{ docker_wg_dashboard_port }}/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "Upgrade";

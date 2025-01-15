@@ -1,0 +1,8 @@
+# The commented vars should be set in host_vars or in playbook
+
+# restic_server_users:
+#   - name: vps
+#     password: <password>
+#     hash_scheme: bcrypt
+restic_server_port: 8010
+restic_server_network: restic_backup

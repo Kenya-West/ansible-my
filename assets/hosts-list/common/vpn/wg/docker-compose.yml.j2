@@ -7,7 +7,7 @@ services:
     volumes:
       - etc_wireguard:/etc/wireguard
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     ports:
       - "${WG_PORT}:51920/udp"
       - "${PORT}:51821/tcp"
@@ -27,7 +27,7 @@ services:
 
 
 networks:
-  {{ docker_service_vars.network.name }}:
+  {{ docker_vpn_network }}:
     external: true
 
 volumes:
