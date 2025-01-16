@@ -1,0 +1,33 @@
+- name: Get list of services defined in docker-compose.yml
+  command: yq eval '.services | keys | .[]' docker-compose.yml
+  register: container_stop_down_services_list
+  when: container_stop_down_yq_installed is not failed and container_stop_down_yq_installed.stdout != ""
+  failed_when:
+    - container_stop_down_services_list.rc != 0
+    - container_stop_down_services_list.rc != 1
+
+- name: Stop and down Docker Compose project
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    files:
+      - docker-compose.yml
+    state: absent
+  register: container_stop_down_stopped
+  # ignore_errors: true
+
+- name: Show results
+  ansible.builtin.debug:
+    var: container_stop_down_stopped
+
+- name: Verify that list of services is not running
+  shell: docker compose ps --format {% raw %}'{{.Names}}'{% endraw %} | grep -E "{{ item }}"
+  args:
+    chdir: "{{ item }}"
+  register: container_stop_down_services_running
+  loop: "{{ container_stop_down_services_list.stdout_lines }}"
+  loop_control:
+    loop_var: container_up_services_service
+  when:
+    - container_stop_down_stopped is not failed and container_stop_down_stopped.changed
+    - container_stop_down_yq_installed is not failed and container_stop_down_yq_installed.stdout != ""
+  failed_when: container_stop_down_services_running.stdout != ""
