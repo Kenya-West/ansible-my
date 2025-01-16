@@ -13,7 +13,23 @@
       - docker-compose.yml
     state: absent
   register: container_stop_down_stopped
-  # ignore_errors: true
+  ignore_errors: true
+
+# If error "No resource found to remove for project" happened
+- name: Stop and down Docker Compose project for each
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    project_name: "{{ container_stop_down_service }}"
+    files:
+      - docker-compose.yml
+    state: absent
+  register: container_stop_down_stopped
+  loop: "{{ container_stop_down_services_list.stdout_lines }}"
+  loop_control:
+    loop_var: container_stop_down_service
+  when:
+    - container_stop_down_stopped.rc == 0
+    - "'No resource found to remove for project' in container_stop_down_stopped.msg"
 
 - name: Show results
   ansible.builtin.debug:
