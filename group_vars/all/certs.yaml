@@ -1,5 +1,5 @@
 cert_access_group: "certaccess"
-cert_access_group_users:
+cert_access_group_users_initial:
   - "{{ standard_user }}"
 cert_location_root_path: "/etc/ssl/shared"
 cert_location_root_owner: "root"

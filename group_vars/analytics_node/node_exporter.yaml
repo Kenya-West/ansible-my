@@ -17,4 +17,4 @@ node_exporter_web_listen_address_port: 49876
 node_exporter_web_listen_address: "{{ node_exporter_web_listen_address_host }}:{{ node_exporter_web_listen_address_port }}"
 
 # Append node_exporter_system_user to cert_access_group_users
-cert_access_group_users: "{{ cert_access_group_users | union([node_exporter_system_user]) }}"
+cert_access_group_users: "{{ ((cert_access_group_users_initial | default([])) + ([node_exporter_system_user | default()])) | unique }}"
