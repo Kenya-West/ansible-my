@@ -2,6 +2,7 @@
 # The `restic_node_vars` is an example of how to configure restic
 # You should set this var, too, in host_vars or in playbook
 
+restic_node_cron_job_name: "Autorestic backup"
 restic_excludes_list_files:
   - excludes-common.txt
   - excludes-dev-build.txt

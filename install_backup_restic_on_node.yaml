@@ -147,6 +147,6 @@
       become: true
       become_user: root
       ansible.builtin.cron:
-        name: "Autorestic backup"
+        name: "{{ restic_node_cron_job_name }}"
         minute: 5
         job: "{{ dest_project_fullpath }}/scripts/update-cron-debug.sh"
