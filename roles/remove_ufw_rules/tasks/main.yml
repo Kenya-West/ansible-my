@@ -33,6 +33,8 @@
     - ufw_enabled
     - input_mode is not defined or input_mode == 'list'
     - "'tcp' in ufw_protos"
+    - item != 0
+    - item > 0 and item < 65536
 
 - name: Delete rule in UFW (for UDP)
   community.general.ufw:
@@ -48,6 +50,8 @@
     - ufw_enabled
     - input_mode is not defined or input_mode == 'list'
     - "'tcp' in ufw_protos"
+    - item != 0
+    - item > 0 and item < 65536
 
 - name: Remove range of ports for UFW (TCP)
   community.general.ufw:
