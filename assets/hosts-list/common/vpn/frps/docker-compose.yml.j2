@@ -8,6 +8,7 @@ services:
     mem_limit: 200m
     ports:
       - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}
+      - "${FRPS_RANGE_PORTS_2_START}-${FRPS_RANGE_PORTS_2_END}:${FRPS_RANGE_PORTS_2_START}-${FRPS_RANGE_PORTS_2_END}/tcp"
     env_file:
       - .env
     volumes:

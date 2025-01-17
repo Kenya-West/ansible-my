@@ -12,6 +12,8 @@ docker_frp_dashboard_user: "{{ common_username }}"
 # docker_frp_dashboard_password: password
 docker_frp_range_ports_1_start: 22001
 docker_frp_range_ports_1_end: 22089
+docker_frp_range_ports_2_start: 22501
+docker_frp_range_ports_2_end: 22589
 docker_frp_client_dashboard_port: 7400
 docker_frp_client_dashboard_user: "{{ common_username }}"
 # docker_frp_client_dashboard_password: password

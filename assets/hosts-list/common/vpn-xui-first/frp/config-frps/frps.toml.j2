@@ -1,6 +1,7 @@
 bindPort = {{ docker_frp_server_port }}
 allowPorts = [
-  { start = {{ docker_frp_range_ports_1_start }}, end = {{ docker_frp_range_ports_1_end }} }
+  { start = {{ docker_frp_range_ports_1_start }}, end = {{ docker_frp_range_ports_1_end }} },
+  { start = {{ docker_frp_range_ports_2_start }}, end = {{ docker_frp_range_ports_2_end }} }
 ]
 webServer.addr = "0.0.0.0"
 webServer.port = {{ docker_frp_dashboard_port }}
