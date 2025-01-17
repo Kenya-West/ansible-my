@@ -1,0 +1,3 @@
+for label in home_user shared_ssl; do
+    autorestic restore -l "$label" -c "{{ dest_project_fullpath }}/config/.autorestic.yaml" -v --to "./restored/$label"
+done

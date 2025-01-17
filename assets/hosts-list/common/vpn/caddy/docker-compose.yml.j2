@@ -4,7 +4,7 @@ services:
   caddy:
     image: lucaslorentz/caddy-docker-proxy:ci-alpine
     container_name: caddy
-    cpus: "0.5"
+    cpus: 0.5
     mem_limit: 200m
     ports:
       - 80:80
@@ -16,7 +16,7 @@ services:
     env_file:
       - .env
     networks:
-      - caddy
+      - {{ docker_service_vars.network.name }}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/Caddyfile:/config/Caddyfile
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
 
 networks:
-  caddy:
+  {{ docker_service_vars.network.name }}:
     external: true
 
 volumes:

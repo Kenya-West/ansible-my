@@ -1,4 +1,6 @@
 bindPort = {{ docker_service_vars.frp.server_port }}
+vhostHTTPPort = {{ docker_service_vars.frp.vhost_http_port }}
+vhostHTTPSPort = {{ docker_service_vars.frp.vhost_https_port }}
 allowPorts = [
   { start = {{ docker_service_vars.frp.range_ports_1_start }}, end = {{ docker_service_vars.frp.range_ports_1_end }} }
 ]

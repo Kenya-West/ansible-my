@@ -4,7 +4,7 @@ services:
   frps:
     image: snowdreamtech/frps
     container_name: frps
-    cpus: "0.5"
+    cpus: 0.5
     mem_limit: 200m
     ports:
       - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}
@@ -15,7 +15,7 @@ services:
       - ./config-frps:/etc/frp
       - certs:/etc/frp/certs
     networks:
-      - caddy
+      - {{ docker_service_vars.network.name }}
     labels:
       caddy: "${DOMAIN}"
       caddy.import: "logging ${DOMAIN}"
@@ -23,19 +23,8 @@ services:
 
     restart: unless-stopped
 
-  frpc:
-    image: snowdreamtech/frpc
-    cpus: "0.5"
-    mem_limit: 200m
-    container_name: frpc
-    volumes:
-      - ./config-frpc:/etc/frp
-      - certs:/etc/frp/certs
-    network_mode: host
-    restart: unless-stopped
-
 networks:
-  caddy:
+  {{ docker_service_vars.network.name }}:
     external: true
 
 volumes:

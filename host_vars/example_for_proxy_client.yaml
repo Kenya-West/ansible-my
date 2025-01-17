@@ -1,0 +1,19 @@
+# This file contents should be put in example_for_vpn_xui_first.yaml or example_for_vpn.yaml
+# Data that should be replaced is in <angle brackets>
+
+proxy_client:
+  frpc:
+    client_dashboard_port: 7400
+    client_dashboard_user: <user>
+    client_dashboard_password: <password>
+    client_auth_method: token
+    client_auth_token: <token>
+    proxies:
+      - name: "{{ inventory_hostname }}"
+        local_port: 23001
+        remote_port: 22001
+      - name: "{{ inventory_hostname }}_restic_server"
+        type: tcp
+        local_ip: 127.0.0.1
+        local_port: 8010
+        remote_port: 22002

@@ -17,7 +17,7 @@
   register: found_files
   when: files_path_stat.stat.exists == true
 - name: Extract PORT values from file {{ item.path }}
-  ansible.builtin.shell: "grep -E '^[A-Za-z_]+{{ substring_pattern }}[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
+  ansible.builtin.shell: "grep -E '^([A-Za-z_]*{{ substring_pattern }}|{{ substring_pattern }})[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
   loop: "{{ found_files.files }}"
   loop_control:
     loop_var: item

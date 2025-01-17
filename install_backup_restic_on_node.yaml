@@ -1,0 +1,152 @@
+---
+- name: Install and configure backup by Restic REST server
+  hosts: all
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: autorestic
+    project_name: autorestic
+    project_root_dir: "{{ backup_restic_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+
+  roles:
+    - name: ./roles/kwtoolset/copy_files
+      vars:
+        dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+  pre_tasks:
+    - name: Add prefix dest_project_fullpath to each of restic_excludes_list_files
+      set_fact:
+        restic_excludes_list_files: "{{ [dest_project_fullpath + '/config/excludes'] | product(restic_excludes_list_files) | map('join', '/') | list }}"
+    - name: Check if restic is installed
+      ansible.builtin.shell: restic version
+      register: restic_version
+      ignore_errors: true
+    - name: Run autorestic install if restic is not installed
+      become: true
+      become_user: root
+      ansible.builtin.shell: autorestic install
+      when: restic_version.rc != 0
+    - name: Check again if restic is installed
+      ansible.builtin.shell: restic version
+      register: restic_version_newly_installed
+      when: restic_version.rc != 0
+  post_tasks:
+    # Check
+    - name: Get info about configuration
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./info.sh"
+        chdir: "{{ dest_project_fullpath }}/scripts"
+    - name: Check configuration
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./check.sh"
+        chdir: "{{ dest_project_fullpath }}/scripts"
+      ignore_errors: true
+      register: autorestic_check_config
+    - name: Debug configuration
+      debug:
+        var: autorestic_check_config
+
+    # Error handling
+    - name: Run yq command to fix corrupted config # Look for https://github.com/cupcakearmy/autorestic/issues/315
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/fix.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      when:
+        - autorestic_check_config.rc != 0
+        - "('invalid keys: forgetoption' in autorestic_check_config.stdout) or ('invalid keys: copyoption' in autorestic_check_config.stdout)"
+
+    - name: Check if autorestic is running
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "ps aux | grep autorestic | grep -v grep"
+      failed_when: false
+      when:
+        - autorestic_check_config.rc != 0
+        - "'an instance is already running' in autorestic_check_config.stdout"
+      register: autorestic_processes
+    - name: Run unlock.sh script
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/unlock.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      when:
+        - autorestic_check_config.rc != 0
+        - "'an instance is already running' in autorestic_check_config.stdout"
+        - autorestic_processes.stdout == ""
+
+    # Backup: first try
+    - name: Make a backup using update.sh script
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/update.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      register: backup_result
+      ignore_errors: true
+    - name: Run yq command to fix corrupted config # Look for https://github.com/cupcakearmy/autorestic/issues/315
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/fix.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      when: backup_result.rc != 0
+
+    # Backup: second try
+    - name: Make a backup again using update.sh script because of the first failure
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/update.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      register: backup_result
+      when:
+        - backup_result.rc != 0
+        - "('invalid keys: forgetoption' in backup_result.stdout) or ('invalid keys: copyoption' in backup_result.stdout)"
+    - name: Display masterkey using key.sh script
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/masterkey.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      register: masterkey
+    - name: Debug the masterkey
+      debug:
+        var: masterkey.stdout
+    - name: Show keys by running key.sh script
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/key.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      register: keys
+    - name: Debug the keys
+      debug:
+        var: keys.stdout
+
+    # Cron
+    - name: Add cron job for autorestic
+      become: true
+      become_user: root
+      ansible.builtin.cron:
+        name: "Autorestic backup"
+        minute: 5
+        job: "{{ dest_project_fullpath }}/scripts/update-cron-debug.sh"

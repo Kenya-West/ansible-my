@@ -21,18 +21,31 @@
             port: 443
             proto: udp
         input_mode: complex
+    # SSH custom ports, if any
+    - name: ./roles/kwtoolset/get_strings_from_file
+      vars:
+        get_strings_from_file_file_path: "/etc/ssh/sshd_config"
+        get_strings_from_file_regex_pattern: "^Port [0-9]{1,5}$"
+    - name: ./roles/install_ufw
+      become: true
+      vars:
+        ufw_ports: "{{ get_strings_from_file_extracted_ints }}"
+        ufw_protos: ["tcp", "udp"]
+        skip_if_not_found: true
     # VPN project
     - name: ./roles/kwtoolset/collect_ports
       vars:
         filename_pattern: "*.env"
         substring_pattern: "PORT"
         files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+      when: vpn_project_structure_root is defined
     - name: ./roles/install_ufw
       become: true
       vars:
         ufw_ports: "{{ collected_ports }}"
         ufw_protos: ["tcp", "udp"]
         skip_if_not_found: true
+      when: vpn_project_structure_root is defined
     # VPN project - range of ports
     - name: ./roles/kwtoolset/collect_ports_range
       vars:
@@ -40,11 +53,14 @@
         substring_pattern_begin: "PORTS_[0-9]{1,3}_START"
         substring_pattern_end: "PORTS_[0-9]{1,3}_END"
         files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+      when: vpn_project_structure_root is defined
     - name: ./roles/install_ufw
       become: true
       vars:
         ufw_ports_range: "{{ collected_ports_range }}"
         ufw_protos: ["tcp", "udp"]
+        skip_if_not_found: true
+      when: vpn_project_structure_root is defined
     # Analytics-node project
     - name: ./roles/kwtoolset/collect_ports
       vars:
@@ -52,9 +68,26 @@
         substring_pattern: "PORT"
         files_path: "/home/{{ standard_user }}/{{ analytics_project_structure_root }}"
         skip_if_not_found: true
+      when: analytics_project_structure_root is defined
     - name: ./roles/install_ufw
       become: true
       vars:
         ufw_ports: "{{ collected_ports }}"
         ufw_protos: ["tcp", "udp"]
         skip_if_not_found: true
+      when: analytics_project_structure_root is defined
+    # backup-restic project
+    - name: ./roles/kwtoolset/collect_ports
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern: "PORT"
+        files_path: "/home/{{ standard_user }}/{{ backup_restic_project_structure_root }}"
+        skip_if_not_found: true
+      when: backup_restic_project_structure_root is defined
+    - name: ./roles/install_ufw
+      become: true
+      vars:
+        ufw_ports: "{{ collected_ports }}"
+        ufw_protos: ["tcp", "udp"]
+        skip_if_not_found: true
+      when: backup_restic_project_structure_root is defined

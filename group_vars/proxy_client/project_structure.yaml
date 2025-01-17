@@ -1,0 +1,6 @@
+---
+
+proxy_project_structure_root: proxy-client
+proxy_project_structure_end_dirs:
+  frp: "{{ proxy_project_structure_root }}/frp"
+proxy_project_structure_end_dirs_list: "{{ proxy_project_structure_end_dirs.values() | list }}"

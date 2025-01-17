@@ -8,10 +8,10 @@ root_password: pass
 
 domains_keys:
   main: subdomain.example.tld
+  xui: subdomain-xui.example.tld
   frps: subdomain-frps.example.tld
   wg: subdomain-wg.example.tld
   xray: subdomain-xray.example.tld
-  xui: subdomain-xui.example.tld
   node_exporter: subdomain-node-exporter.example.tld
 domains: "{{ domains_keys.values() | list }}"
 
@@ -19,7 +19,7 @@ emails:
   main: YourEmail@domain.tld
   domain: YourEmail@domain.tld
 
-host_ip_address: 111.222.333.444
+host_ip_address: "{{ ansible_host }}"
 
 node_exporter_system_group: node-exp
 node_exporter_system_user: node-exp
@@ -28,8 +28,8 @@ node_exporter_basic_auth_users:
   someuser: pass
   prometheus: pass
 node_exporter_tls_server_config:
-  cert_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/fullchain.pem"
-  key_file: "/home/{{ standard_user }}/{{ webfeatures_project_structure_end_dirs.certbot }}/.certs/{{ domains[0] }}/privkey.pem"
+  cert_file: "{{ cert_location_root_path }}/{{ domains_keys.node_exporter | default(domains[0]) }}/fullchain.pem"
+  key_file: "{{ cert_location_root_path }}/{{ domains_keys.node_exporter | default(domains[0]) }}/privkey.pem"
 node_exporter_http_server_config:
   http2: true
 node_exporter_web_telemetry_path: /node_exporter_metrics
@@ -37,39 +37,19 @@ node_exporter_web_listen_address_host: 0.0.0.0
 node_exporter_web_listen_address_port: 49876
 node_exporter_web_listen_address: "{{ node_exporter_web_listen_address_host }}:{{ node_exporter_web_listen_address_port }}"
 
+cert_access_group: "certaccess"
+cert_access_group_users:
+  - "{{ standard_user }}"
+  - "{{ node_exporter_system_user }}"
+cert_location_root_path: "/etc/ssl/shared"
+cert_location_root_owner: "root"
+cert_location_root_permissions: "0755"
+cert_location_files_permissions: "0644"
+
 copy_certs_auto_renew_hour: 0
 copy_certs_auto_renew_minute: 0
-cert_access_group: certaccess
 
 docker_service_vars:
-  wg:
-    domain: "{{ domains_keys.wg }}"
-    wg_host: "{{ domains_keys.wg }}"
-    port: 51821
-    wg_port: 51920
-    lang: ru
-    password: pass
-    ui_traffic_stats: "true" # Should be as string because it will be templated
-    ui_chart_type: 1
-  xray:
-    domain: "{{ domains_keys.xray }}"
-    port: 23
-    ws_path: xray_ws_path
-    ws_port: 8188
-  frp:
-    domain: "{{ domains_keys.frps }}"
-    caddy_path: frp
-    server_port: 7000
-    auth_method: token
-    auth_token: sometoken
-    dashboard_port: 7500
-    dashboard_user: someuser
-    dashboard_password: pass
-    range_ports_1_start: 22001
-    range_ports_1_end: 22089
-    client_dashboard_port: 7400
-    client_dashboard_user: someuser
-    client_dashboard_password: pass
   caddy:
     vpn_caddy_domain: "{{ domains_keys.main }}"
     external_ip: "{{ host_ip_address }}"
@@ -83,3 +63,35 @@ docker_service_vars:
     vless_port: 49990
     ss2022_port: 49991
     sub_port: 49998
+  frp:
+    domain: "{{ domains_keys.frps }}"
+    caddy_path: frp
+    server_port: 7000
+    vhost_http_port: 8080
+    vhost_https_port: 8443
+    auth_method: token
+    auth_token: sometoken
+    dashboard_port: 7500
+    dashboard_user: someuser
+    dashboard_password: pass
+    range_ports_1_start: 22001
+    range_ports_1_end: 22089
+    client_dashboard_port: 7400
+    client_dashboard_user: someuser
+    client_dashboard_password: pass
+  wg:
+    domain: "{{ domains_keys.wg }}"
+    wg_host: "{{ domains_keys.wg }}"
+    dashboard_port: 51821
+    server_port: 51920
+    lang: ru
+    password: pass
+    ui_traffic_stats: "true" # Should be as string because it will be templated
+    ui_chart_type: 1
+  xray:
+    domain: "{{ domains_keys.xray }}"
+    port: 23
+    ws_path: xray_ws_path
+    ws_port: 8188
+  network:
+    name: caddy

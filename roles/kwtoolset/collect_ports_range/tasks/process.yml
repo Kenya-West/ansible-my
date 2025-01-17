@@ -1,9 +1,9 @@
 - name: Extract port values beginning from file {{ item.path }} by pattern {{ substring_pattern_begin }}
-  ansible.builtin.shell: "grep -E '^[A-Za-z_]+{{ substring_pattern_begin }}[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
+  ansible.builtin.shell: "grep -E '^^([A-Za-z_]*{{ substring_pattern_begin }}|{{ substring_pattern_begin }})[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
   register: collect_ports_range_begin_raw
   when: collect_ports_range_files_path_stat.stat.exists == true
 - name: Extract port values ending from .env file {{ item.path }} by pattern {{ substring_pattern_end }}
-  ansible.builtin.shell: "grep -E '^[A-Za-z_]+{{ substring_pattern_end }}[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
+  ansible.builtin.shell: "grep -E '^^([A-Za-z_]*{{ substring_pattern_end }}|{{ substring_pattern_end }})[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
   register: collect_ports_range_end_raw
   when: collect_ports_range_files_path_stat.stat.exists == true
 

@@ -1,0 +1,41 @@
+webServer.addr = "0.0.0.0"
+webServer.port = {{ proxy_client.frpc.client_dashboard_port }}
+webServer.user = "{{ proxy_client.frpc.client_dashboard_user }}"
+webServer.password = "{{ proxy_client.frpc.client_dashboard_password }}"
+serverAddr = "{{ proxy_client.frpc.server_address }}"
+serverPort = {{ proxy_client.frpc.server_port }}
+auth.method = "{{ proxy_client.frpc.client_auth_method }}"
+auth.token = "{{ proxy_client.frpc.client_auth_token }}"
+
+{% for proxy in proxy_client.frpc.proxies %}
+
+[[proxies]]
+name = "{{ proxy.name | default(inventory_hostname) | default(ansible_host) | default('ssh_proxy') }}"
+type = "{{ proxy.type | default('tcp') }}"
+{% if proxy.custom_domain is defined %}
+customDomains = ["{{ proxy.custom_domain }}"]
+{% endif %}
+{% if proxy.local_ip is defined %}
+localIP = "{{ proxy.local_ip | default('127.0.0.1') }}"
+{% endif %}
+{% if proxy.local_port is defined %}
+localPort = {{ proxy.local_port }}
+{% endif %}
+{% if proxy.remote_port is defined %}
+remotePort = {{ proxy.remote_port }}
+{% endif %}
+{% endfor %}
+
+{% set block_added = false %}
+{% for proxy in proxy_client.frpc.proxies %}
+  {% if proxy.type is defined and proxy.type == 'https' and not block_added %}
+[proxies.plugin]
+type = "https2http"
+localAddr = "127.0.0.1:{{ restic_server_docker_vars.port }}"
+crtPath = "/etc/frp/certs/{{ proxy_client.frpc.server_address }}/{{ proxy_client.frpc.server_address }}.crt"
+keyPath = "/etc/frp/certs/{{ proxy_client.frpc.server_address }}/{{ proxy_client.frpc.server_address }}.key"
+hostHeaderRewrite = "127.0.0.1"
+requestHeaders.set.x-from-where = "frp"
+    {% set block_added = true %}
+  {% endif %}
+{% endfor %}

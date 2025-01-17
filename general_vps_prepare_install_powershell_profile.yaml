@@ -4,12 +4,12 @@
   become: true
 
   roles:
-    - name: ./roles/kwtoolset/line_in_file
+    - name: ./roles/kwtoolset/lines_from_file
       vars:
-        source_file_path: "{{ powershell_asset_fullpath }}/Microsoft.PowerShell_profile.ps1"
-        dest_file_path: "{{ pwsh_profile.stdout }}"
-        dest_file_path_mode: "0755"
-        append_lines:
+        lines_from_file_source_file_path: "{{ powershell_asset_fullpath }}/Microsoft.PowerShell_profile.ps1"
+        lines_from_file_dest_file_path: "{{ pwsh_profile.stdout }}"
+        lines_from_file_dest_file_path_mode: "0755"
+        lines_from_file_append_lines:
           - "oh-my-posh init pwsh --config {{ ohmyposh_powershell_themes_dir }}/{{ ohmyposh_powershell_theme }}.omp.json | Invoke-Expression"
 
   pre_tasks:

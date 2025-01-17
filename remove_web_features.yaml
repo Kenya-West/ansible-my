@@ -22,3 +22,9 @@
         # Be sure to set same name like in install_web_features.yaml
         name: "Certbot renew"
         state: absent
+    - name: Remove certs from {{ cert_location_root_path }}
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ cert_location_root_path }}"
+        state: absent

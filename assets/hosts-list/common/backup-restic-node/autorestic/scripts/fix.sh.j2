@@ -1,0 +1,1 @@
+yq eval 'del(.locations[].forgetoption | select(. == "")) | del(.locations[].copyoption | select(length == 0))' config/.autorestic.yaml > config/.autorestic.yaml.tmp && mv config/.autorestic.yaml.tmp config/.autorestic.yaml

@@ -1,1 +1,4 @@
 quote: "\""
+fillers:
+  common: "tobereplacedwith"
+  yaml: "tobereplacedwith"

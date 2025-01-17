@@ -1,0 +1,7 @@
+---
+sshd_config_file_location: /etc/ssh/sshd_config
+# This is complex list, its schema is:
+# - line: <port string like "Port 22">
+#   description: <description>
+#   insert_after: <regex to match line after which to insert>
+ssh_ports_to_add: []

@@ -1,0 +1,22 @@
+---
+- name: Add SSH ports to sshd_config
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: roles/kwtoolset/append_lines
+      vars:
+        append_lines_dest_file_path: "{{ sshd_config_file_location }}"
+        append_lines_list: "{{ ssh_ports_to_add }}"
+
+  post_tasks:
+    - name: Restart sshd
+      become: true
+      become_user: root
+      ansible.builtin.service:
+        name: sshd
+        state: restarted
+      when:
+        - ssh_ports_to_add is defined
+        - ssh_ports_to_add | length > 0
