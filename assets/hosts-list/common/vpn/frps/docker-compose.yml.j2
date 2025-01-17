@@ -8,7 +8,6 @@ services:
     mem_limit: 200m
     ports:
       - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}
-      - "${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}:${FRPS_RANGE_PORTS_1_START}-${FRPS_RANGE_PORTS_1_END}/tcp"
     env_file:
       - .env
     volumes:
@@ -20,6 +19,13 @@ services:
       caddy: "${DOMAIN}"
       caddy.import: "logging ${DOMAIN}"
       {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${FRPS_DASHBOARD_PORT} }}"{% endraw %}
+
+      {% for port in range(docker_frp_range_ports_1_start, docker_frp_range_ports_1_end + 1) %}
+
+      caddy_{{ loop.index }}: "${DOMAIN}:{{ port }}"
+      caddy_{{ loop.index }}.import: "logging ${DOMAIN}"
+      caddy_{{ loop.index }}.reverse_proxy: {% raw %}"{{ upstreams {% endraw %}{{port}}{% raw %} }}"{% endraw %}
+      {% endfor %}
 
     restart: unless-stopped
 
