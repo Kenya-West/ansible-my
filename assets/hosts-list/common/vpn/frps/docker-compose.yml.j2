@@ -20,12 +20,10 @@ services:
       caddy: "${DOMAIN}"
       caddy.import: "logging ${DOMAIN}"
       {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${FRPS_DASHBOARD_PORT} }}"{% endraw %}
-
       {% for port in range(docker_frp_range_ports_1_start, docker_frp_range_ports_1_end + 1) %}
 
-      caddy_{{ loop.index }}: "${DOMAIN}:{{ port }}"
-      caddy_{{ loop.index }}.import: "logging ${DOMAIN}"
-      caddy_{{ loop.index }}.reverse_proxy: {% raw %}"{{ upstreams {% endraw %}{{port}}{% raw %} }}"{% endraw %}
+      caddy.{{ loop.index }}_handle_path: "/frps/proxy/web/{{ port }}/*"
+      caddy.{{ loop.index }}_handle_path.reverse_proxy: {% raw %}"{{ upstreams {% endraw %}{{port}}{% raw %} }}"{% endraw %}
       {% endfor %}
 
     restart: unless-stopped
