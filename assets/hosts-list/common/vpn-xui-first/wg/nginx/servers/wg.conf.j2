@@ -2,8 +2,8 @@ server {
     server_name {{ docker_wg_domain }};
     
     listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/{{ docker_wg_domain }}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/{{ docker_wg_domain }}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/{{ cert_location_path_section.wg_crt }};
+    ssl_certificate_key /etc/letsencrypt/{{ cert_location_path_section.wg_key }};
 
     location / {
         proxy_pass http://wg-easy:{{ docker_wg_dashboard_port }}/;
