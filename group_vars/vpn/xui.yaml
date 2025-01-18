@@ -9,5 +9,8 @@ docker_xui_dashboard_port: 49999
 docker_xui_hostname: "{{ domains_keys.xui }}"
 docker_xui_wg_port: 49989
 docker_xui_vless_port: 49990
+docker_xui_vless_fallback_port_1: 8081
 docker_xui_ss2022_port: 49991
 docker_xui_sub_port: 49998
+docker_xui_sub_path: xui-subscription
+docker_xui_sub_json_path: xui-subscription-json
