@@ -9,6 +9,7 @@ services:
       - type: bind
         source: ./db/x-ui.db
         target: /etc/x-ui/x-ui.db
+      - certs:/etc/letsencrypt:ro
     env_file:
       - .env
     environment:
@@ -24,9 +25,12 @@ services:
       - "${XUI_SUB_PORT}:${XUI_SUB_PORT}"
     labels:
       caddy: "${DOMAIN}"
-      caddy.0_import: "logging ${DOMAIN}"
-      caddy.1_import: "cors"
-      {% raw %}caddy.3_reverse_proxy: "{{ upstreams ${XUI_DASHBOARD_PORT} }}"{% endraw %}
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams https ${XUI_DASHBOARD_PORT} }}"{% endraw %}
+
+      {% raw %}caddy.0_reverse_proxy.transport: "http"{% endraw %}
+
+      {% raw %}caddy.0_reverse_proxy.transport.tls_insecure_skip_verify: ""{% endraw %}
 
 
 networks:

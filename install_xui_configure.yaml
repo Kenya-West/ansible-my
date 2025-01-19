@@ -9,8 +9,8 @@
     project_name: xui_configure
     project_name_xui: xui
     project_root_dir: "{{ vpn_project_structure_root }}"
-    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
-    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}"
     source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
     source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"

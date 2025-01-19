@@ -1,10 +1,10 @@
 UPDATE "main"."users" set "username" = '{{ docker_xui_dashboard_login }}';
 UPDATE "main"."users" set "password" = '{{ docker_xui_dashboard_password }}';
 
-UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ docker_xui_domain }}/fullchain.pem' WHERE "key" = 'webCertFile';
-UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ docker_xui_domain }}/privkey.pem' WHERE "key" = 'webKeyFile';
-UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ docker_xui_domain }}/fullchain.pem' WHERE "key" = 'subCertFile';
-UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ docker_xui_domain }}/privkey.pem' WHERE "key" = 'subKeyFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.xui_crt }}' WHERE "key" = 'webCertFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.xui_key }}' WHERE "key" = 'webKeyFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.xui_crt }}' WHERE "key" = 'subCertFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.xui_key }}' WHERE "key" = 'subKeyFile';
 
 UPDATE "main"."settings" SET "value" = '{{ docker_xui_domain }}' WHERE "key" = 'webDomain';
 
