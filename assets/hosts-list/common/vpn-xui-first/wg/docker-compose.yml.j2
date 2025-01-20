@@ -7,7 +7,7 @@ services:
     mem_limit: 200m
     container_name: wg-easy
     volumes:
-      - etc_wireguard:/etc/wireguard
+      - ./wg-easy:/etc/wireguard
     networks:
       - {{ docker_vpn_network }}
     ports:

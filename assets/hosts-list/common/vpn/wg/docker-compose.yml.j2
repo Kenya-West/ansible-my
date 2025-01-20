@@ -5,7 +5,7 @@ services:
     image: ghcr.io/wg-easy/wg-easy
     container_name: wg
     volumes:
-      - etc_wireguard:/etc/wireguard
+      - ./wg-easy:/etc/wireguard
     networks:
       - {{ docker_vpn_network }}
     ports:
