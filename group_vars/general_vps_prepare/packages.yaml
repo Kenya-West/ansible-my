@@ -41,3 +41,4 @@ packages_list:
       - python3-bcrypt # Needed for Ansible htpasswd module
     snap:
       - procs
+      - trippy
