@@ -148,5 +148,5 @@
       become_user: root
       ansible.builtin.cron:
         name: "{{ restic_node_cron_job_name }}"
-        minute: 5
-        job: "{{ dest_project_fullpath }}/scripts/update-cron-debug.sh"
+        minute: "*/30"
+        job: "{{ dest_project_fullpath }}/scripts/update-cron.sh"
