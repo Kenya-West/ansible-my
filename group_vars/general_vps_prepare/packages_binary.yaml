@@ -49,3 +49,6 @@ packages_binary_list:
     assets:
       - "gnu"
   - repo: "cupcakearmy/autorestic"
+  - repo: "mr-karan/doggo"
+    assets:
+      - "^web"
