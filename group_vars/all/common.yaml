@@ -2,3 +2,4 @@ quote: "\""
 fillers:
   common: "tobereplacedwith"
   yaml: "tobereplacedwith"
+  yaml_remove_single_quotes: "removesinglequotesfrom_"

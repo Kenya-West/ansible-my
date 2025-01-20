@@ -10,6 +10,7 @@ extras:
   complete_options: &complete_options
     backup:
       <<: *backup
+  cron: '0 */2 * * *'
 
 global:
   forget:
@@ -20,7 +21,7 @@ global:
     keep-yearly: 7
 
 locations:
-  {{ restic_node_vars.locations | to_nice_yaml(indent=2, sort_keys=false) | replace(fillers.yaml + ': ', '<<: *') | trim | indent(2, false) }}
+  {{ restic_node_vars.locations | to_nice_yaml(indent=2, sort_keys=false) | replace(fillers.yaml + ': ', '<<: *') | regex_replace(fillers.yaml_remove_single_quotes + '(?:\_)?([A-Za-z\_\-]+)\:(?:\s)?([A-Za-z\*\_\-\.]+)', '\\1: \"{{ \\2 }}\"') | trim | indent(2, false) }}
 
 backends:
   {{ restic_node_vars.remotes | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}

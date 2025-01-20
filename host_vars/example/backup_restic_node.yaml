@@ -4,6 +4,7 @@ restic_node_vars:
       from: "/home/{{ standard_user }}"
       to:
         - restic-rest-server
+      tobereplacedwith: "cron" # This will be replaced to alias defined in .autorestic.yaml.j2
       options:
         tobereplacedwith: "complete_options" # This will be replaced to alias defined in .autorestic.yaml.j2
     shared_ssl:
