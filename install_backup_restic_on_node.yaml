@@ -142,6 +142,25 @@
       debug:
         var: keys.stdout
 
+    # Change permissions for config for easier access
+    - name: Find config files to change permissions
+      become: true
+      become_user: root
+      ansible.builtin.find:
+        paths: "{{ dest_project_fullpath }}/config/"
+        patterns: ".autorestic.*"
+        hidden: true
+      register: autorestic_config_files_to_change_perms
+    - name: Change config files ownership to user and access rights to 775
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+      loop: "{{ autorestic_config_files_to_change_perms.files }}"
+
     # Cron
     - name: Add cron job for autorestic
       become: true
