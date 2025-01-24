@@ -53,12 +53,12 @@
         path: "{{ dest_project_fullpath }}/data/.htpasswd"
         name: "{{ item.name }}"
         password: "{{ item.password }}"
-        hash_scheme: "{{ item.hash_scheme | default(restic_server_docker_vars.hash_scheme) | default('md5_crypt') }}"
+        hash_scheme: "{{ item.hash_scheme | default(restic_server_hash_scheme) | default('md5_crypt') }}"
         mode: "0644"
-      loop: "{{ restic_server_docker_vars.users }}"
+      loop: "{{ restic_server_users }}"
       failed_when:
-        - restic_server_docker_vars.users is not defined
-        - restic_server_docker_vars.users | length == 0
+        - restic_server_users is not defined
+        - restic_server_users | length == 0
         - item.name is not defined or item.name == ""
         - item.password is not defined or item.password == ""
     - name: Check if .htpasswd file exists

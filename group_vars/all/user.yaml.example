@@ -1,0 +1,3 @@
+standard_user: <your_username> # This is a username to connect to host
+root_password: <your_password> # This is a password to connect to host
+common_username: <your_username> # This is username used in configs to autofill

@@ -16,9 +16,9 @@ services:
       - ./config-frps:/etc/frp
       - {{ cert_location_root_path }}:/etc/frp/certs:ro
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
     restart: unless-stopped
 
 networks:
-  {{ docker_service_vars.network.name }}:
+  {{ docker_vpn_network }}:
     external: true

@@ -1,13 +1,13 @@
 webServer.addr = "0.0.0.0"
-webServer.port = {{ proxy_client.frpc.client_dashboard_port }}
-webServer.user = "{{ proxy_client.frpc.client_dashboard_user }}"
-webServer.password = "{{ proxy_client.frpc.client_dashboard_password }}"
-serverAddr = "{{ proxy_client.frpc.server_address }}"
-serverPort = {{ proxy_client.frpc.server_port }}
-auth.method = "{{ proxy_client.frpc.client_auth_method }}"
-auth.token = "{{ proxy_client.frpc.client_auth_token }}"
+webServer.port = {{ proxy_client_frpc_client_dashboard_port }}
+webServer.user = "{{ proxy_client_frpc_client_dashboard_user }}"
+webServer.password = "{{ proxy_client_frpc_client_dashboard_password }}"
+serverAddr = "{{ proxy_client_frpc_server_address }}"
+serverPort = {{ proxy_client_frpc_server_port }}
+auth.method = "{{ proxy_client_frpc_client_auth_method }}"
+auth.token = "{{ proxy_client_frpc_client_auth_token }}"
 
-{% for proxy in proxy_client.frpc.proxies %}
+{% for proxy in proxy_client_frpc_proxies %}
 
 [[proxies]]
 name = "{{ proxy.name | default(inventory_hostname) | default(ansible_host) | default('ssh_proxy') }}"
@@ -27,13 +27,13 @@ remotePort = {{ proxy.remote_port }}
 {% endfor %}
 
 {% set block_added = false %}
-{% for proxy in proxy_client.frpc.proxies %}
+{% for proxy in proxy_client_frpc_proxies %}
   {% if proxy.type is defined and proxy.type == 'https' and not block_added %}
 [proxies.plugin]
 type = "https2http"
-localAddr = "127.0.0.1:{{ restic_server_docker_vars.port }}"
-crtPath = "/etc/frp/certs/{{ proxy_client.frpc.server_address }}/{{ proxy_client.frpc.server_address }}.crt"
-keyPath = "/etc/frp/certs/{{ proxy_client.frpc.server_address }}/{{ proxy_client.frpc.server_address }}.key"
+localAddr = "127.0.0.1:{{ restic_server_port }}"
+crtPath = "/etc/frp/certs/{{ proxy_client_frpc_server_address }}/{{ proxy_client_frpc_server_address }}.crt"
+keyPath = "/etc/frp/certs/{{ proxy_client_frpc_server_address }}/{{ proxy_client_frpc_server_address }}.key"
 hostHeaderRewrite = "127.0.0.1"
 requestHeaders.set.x-from-where = "frp"
     {% set block_added = true %}

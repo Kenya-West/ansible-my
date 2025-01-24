@@ -1,6 +1,0 @@
-# This file contents should be put in example_for_vpn_xui_first.yaml or example_for_vpn.yaml
-# Data that should be replaced is in <angle brackets>
-
-backrest_server_docker_vars:
-  domain: <domain>
-  port: 9898

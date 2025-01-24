@@ -1,7 +1,7 @@
 global:
-  scrape_interval: "{{ prometheus.scrape_interval | default('15s') }}"
-  scrape_timeout: "{{ prometheus.scrape_timeout | default('10s') }}"
-  evaluation_interval: "{{ prometheus.evaluation_interval | default('15s') }}"
+  scrape_interval: "{{ prometheus_server_scrape_interval | default('15s') }}"
+  scrape_timeout: "{{ prometheus_server_scrape_timeout | default('10s') }}"
+  evaluation_interval: "{{ prometheus_server_evaluation_interval | default('15s') }}"
 alerting:
   alertmanagers:
   - static_configs:
@@ -10,6 +10,6 @@ alerting:
     timeout: 10s
     api_version: v1
 scrape_configs:
-  {{ prometheus.scrape_configs | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
+  {{ prometheus_server_scrape_configs | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
 remote_write:
-  {{ prometheus.remote_write_list | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
+  {{ prometheus_server_remote_write_list | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}

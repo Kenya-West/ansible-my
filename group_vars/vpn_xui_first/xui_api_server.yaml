@@ -1,0 +1,2 @@
+docker_xui_api_server_port: 3000
+docker_xui_api_server_enable_logging: true

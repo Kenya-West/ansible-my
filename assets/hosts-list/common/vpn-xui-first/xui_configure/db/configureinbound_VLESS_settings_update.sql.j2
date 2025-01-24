@@ -1,3 +1,0 @@
-UPDATE "main"."inbounds" SET "port" = '{{ docker_service_vars.xui.vless_port | default("443") }}' WHERE "remark" = 'VLESS';
-UPDATE "main"."inbounds" SET "tag" = 'inbound-{{ docker_service_vars.xui.vless_port | default("443") }}' WHERE "remark" = 'VLESS';
-UPDATE "main"."inbounds" SET "settings" = '{{ JQ_RESULT.stdout }}' WHERE "remark" = 'VLESS';

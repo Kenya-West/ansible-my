@@ -1,0 +1,2 @@
+backrest_server_domain: "{{ domains_keys.backrest }}"
+backrest_server_port: 9898

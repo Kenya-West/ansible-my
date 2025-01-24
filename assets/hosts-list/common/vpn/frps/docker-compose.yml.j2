@@ -1,0 +1,38 @@
+---
+
+services:
+  frps:
+    image: snowdreamtech/frps
+    container_name: frps
+    cpus: 0.5
+    mem_limit: 200m
+    ports:
+      - ${FRPS_SERVER_PORT}:${FRPS_SERVER_PORT}
+      - "${FRPS_RANGE_PORTS_2_START}-${FRPS_RANGE_PORTS_2_END}:${FRPS_RANGE_PORTS_2_START}-${FRPS_RANGE_PORTS_2_END}/tcp"
+    env_file:
+      - .env
+    volumes:
+      - ./config-frps:/etc/frp
+      - certs:/etc/frp/certs
+    networks:
+      - {{ docker_vpn_network }}
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${FRPS_DASHBOARD_PORT} }}"{% endraw %}
+      {% for port in range(docker_frp_range_ports_1_start, docker_frp_range_ports_1_end + 1) %}
+
+      caddy.{{ loop.index }}_handle_path: "/frps/proxy/web/{{ port }}/*"
+      caddy.{{ loop.index }}_handle_path.reverse_proxy: {% raw %}"{{ upstreams {% endraw %}{{port}}{% raw %} }}"{% endraw %}
+      {% endfor %}
+
+    restart: unless-stopped
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true
+
+volumes:
+  certs:
+    external: true
+    name: caddy_caddy-certs

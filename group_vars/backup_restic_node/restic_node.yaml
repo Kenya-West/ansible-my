@@ -1,0 +1,55 @@
+# The commented vars should be set in host_vars or in playbook
+# The `restic_node_vars` is an example of how to configure restic
+# You should set this var, too, in host_vars or in playbook
+
+restic_node_cron_job_name: "Autorestic backup"
+restic_node_cron_job_name_forget: "Autorestic forget"
+restic_excludes_list_files:
+  - excludes-common.txt
+  - excludes-dev-build.txt
+  - excludes-dev-code.txt
+  - excludes-home-dirs.txt
+  - excludes-root.txt
+
+restic_global_forget:
+  keep-last: 5
+  keep-daily: 4
+  keep-weekly: 1
+  keep-monthly: 12
+  keep-yearly: 7
+
+restic_node_vars:
+  locations:
+    home_user:
+      from: "/home/{{ standard_user }}"
+      to:
+        - restic-rest-server
+      options:
+        tobereplacedwith: "complete_options" # This will be replaced to alias defined in .autorestic.yaml.j2
+    shared_ssl:
+      from: "{{ cert_location_root_path }}"
+      to:
+        - restic-rest-server
+      options:
+        tobereplacedwith: "complete_options" # This will be replaced to alias defined in .autorestic.yaml.j2
+  remotes:
+    restic-rest-server:
+      type: rest
+      path: <restic_rest_server_url>
+      key: <restic_rest_remote_key> # Optional, if you already have a key
+      rest:
+        user: <restic_rest_server_user>
+        password: <restic_rest_server_password>
+      tobereplacedwith: "cron" # This will be replaced to alias defined in .autorestic.yaml.j2
+    <remote_name>:
+      type: <remote_type>
+      host: <remote_host>
+      key: <restic_rest_remote_key> # Optional, if you already have a key
+      port: <remote_port>
+      user: <remote_user>
+  # This section will be used in .autorestic.env.j2
+  # This is optional
+  remotes_dotenv_vars:
+    - name: <remote_name> # Should match the name in remotes, or use {{ restic_node_vars.remotes[<INT INDEX, e.g. 0>].name }}
+      vars:
+        - <key_name>: <key_value>

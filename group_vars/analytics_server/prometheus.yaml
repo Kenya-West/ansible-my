@@ -1,0 +1,46 @@
+# The commented vars should be set in host_vars or in playbook
+# The `prometheus_server_scrape_configs` and `prometheus_server_remote_write_list` are examples
+# of how to configure Prometheus to scrape and push metrics from other services
+# You should set these vars, too, in host_vars or in playbook
+
+prometheus_server_domain: "{{ domains_keys.prometheus }}"
+prometheus_server_external_port: 443
+prometheus_server_port: 9090
+prometheus_server_tls_cert_file: "/etc/ssl/{{ cert_location_path_section.prometheus_crt }}"
+prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.prometheus_key }}"
+prometheus_server_scrape_interval: 15s
+prometheus_server_scrape_timeout: 10s
+# prometheus_server_basic_auth_users:
+#   username: password
+#   username2: password2
+prometheus_server_scrape_configs:
+  - job_name: X-UI panels
+    static_configs:
+      - targets: ["sub.example.tld:49876"]
+      - targets: ["sub2.example.tld:49876"]
+    basic_auth:
+      username: prometheus
+      password: password
+    scheme: https
+    metrics_path: /node_exporter_metrics
+    tls_config:
+      insecure_skip_verify: true
+    # Relabeling "instance" to remove the ":9100" part
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(:[0-9]+)?'
+        replacement: '${1}'
+prometheus_server_remote_write_list:
+  - url: https://sub.example.tld/api/prom/push
+    basic_auth:
+      username: username
+      password: password
+    queue_config:
+      capacity: 5000
+      max_shards: 200
+      min_shards: 1
+      max_samples_per_send: 10000
+      batch_send_deadline: 5s
+      min_backoff: 30ms
+      max_backoff: 100ms

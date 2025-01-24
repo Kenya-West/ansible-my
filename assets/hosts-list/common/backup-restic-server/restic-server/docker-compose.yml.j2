@@ -11,7 +11,7 @@ services:
     ports:
       - "127.0.0.1:${PORT}:8000"
     networks:
-      - {{ restic_server_docker_vars.network.name }}
+      - {{ restic_server_network }}
 
 networks:
-  {{ restic_server_docker_vars.network.name }}:
+  {{ restic_server_network }}:

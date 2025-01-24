@@ -1,3 +1,7 @@
 {
-    "ansible.python.interpreterPath": "/bin/python3"
+    "ansible.python.interpreterPath": "/bin/python3",
+    "search.exclude": {
+        "**/ansible-log.log": true
+    },
+    "search.useIgnoreFiles": false
 }

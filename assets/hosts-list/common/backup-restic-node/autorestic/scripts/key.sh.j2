@@ -1,1 +1,1 @@
-yq eval '.backends | to_entries | .[] | {"name": .key, "key": .value.key, "path": .value.path}' config/.autorestic.yaml
+yq eval '.backends | to_entries | .[] | {"name": .key, "key": .value.key, "path": .value.path}' {{ dest_project_fullpath }}/config/.autorestic.yaml

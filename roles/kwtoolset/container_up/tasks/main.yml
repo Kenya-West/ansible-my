@@ -1,13 +1,30 @@
 ---
 # tasks file for roles/kwtoolset/container_up
-- name: Docker Compose project - container up
-  community.docker.docker_compose_v2:
-    project_src: "{{ item.path }}"
-    project_name: "{{ item.name }}"
-    files:
-      - docker-compose.yml
-    state: present
+- name: Check if yq is installed
+  command: yq --version
+  register: container_up_yq_installed
+  ignore_errors: true
+
+- name: Initialize filtered list
+  set_fact:
+    container_up_list_filtered: []
+
+- name: Remove invalid paths
+  ansible.builtin.include_tasks: process-paths.yml
   loop: "{{ container_up_list }}"
   loop_control:
     loop_var: item
-  ignore_errors: "{{ item.ignore_errors | default(false) }}"
+  when:
+    - item is defined
+    - item != ""
+
+- name: These projects will be up
+  debug:
+    var: container_up_list_filtered
+
+- name: Process each of project
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ container_up_list_filtered }}"
+  loop_control:
+    loop_var: item
+  when: container_stop_down_list_filtered | length > 0

@@ -1,18 +1,18 @@
 server {
-    server_name {{ docker_service_vars.xray.domain }};
+    server_name {{ docker_xray_domain }};
     
     listen 443 ssl;
     listen [::]:443 ssl;
     http2 on;
-    ssl_certificate /etc/letsencrypt/{{ docker_service_vars.xray.domain }}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/{{ docker_service_vars.xray.domain }}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/{{ cert_location_path_section.xray_crt }};
+    ssl_certificate_key /etc/letsencrypt/{{ cert_location_path_section.xray_key }};
 	ssl_protocols TLSv1.2 TLSv1.3;
 	ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
 
     index index.html;
 	root /var/www/html;
 
-	location /{{ docker_service_vars.xray.ws_path }} {
+	location /{{ docker_xray_ws_path }} {
         if ($http_upgrade != "websocket") {
             return 404;
         }

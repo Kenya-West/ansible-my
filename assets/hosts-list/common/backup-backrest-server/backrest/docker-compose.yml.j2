@@ -20,8 +20,8 @@ services:
       - ${PORT}:${PORT}
     restart: unless-stopped
     networks:
-      - {{ docker_service_vars.network.name }}
+      - {{ docker_vpn_network }}
 
 networks:
-  {{ docker_service_vars.network.name }}:
+  {{ docker_vpn_network }}:
     external: true

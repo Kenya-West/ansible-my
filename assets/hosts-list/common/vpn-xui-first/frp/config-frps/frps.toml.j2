@@ -1,12 +1,13 @@
-bindPort = {{ docker_service_vars.frp.server_port }}
+bindPort = {{ docker_frp_server_port }}
 allowPorts = [
-  { start = {{ docker_service_vars.frp.range_ports_1_start }}, end = {{ docker_service_vars.frp.range_ports_1_end }} }
+  { start = {{ docker_frp_range_ports_1_start }}, end = {{ docker_frp_range_ports_1_end }} },
+  { start = {{ docker_frp_range_ports_2_start }}, end = {{ docker_frp_range_ports_2_end }} }
 ]
 webServer.addr = "0.0.0.0"
-webServer.port = {{ docker_service_vars.frp.dashboard_port }}
-webServer.user = "{{ docker_service_vars.frp.dashboard_user }}"
-webServer.password = "{{ docker_service_vars.frp.dashboard_password }}"
-webServer.tls.certFile = "/etc/frp/certs/{{ domains_keys.frps | default(domains[0]) }}/{{ domains_keys.frps | default(domains[0]) }}.crt"
-webServer.tls.keyFile = "/etc/frp/certs/{{ domains_keys.frps | default(domains[0]) }}/{{ domains_keys.frps | default(domains[0]) }}.key"
-auth.method = "{{ docker_service_vars.frp.auth_method }}"
-auth.token = "{{ docker_service_vars.frp.auth_token }}"
+webServer.port = {{ docker_frp_dashboard_port }}
+webServer.user = "{{ docker_frp_dashboard_user }}"
+webServer.password = "{{ docker_frp_dashboard_password }}"
+webServer.tls.certFile = "/etc/frp/certs/{{ cert_location_path_section.frps_crt }}"
+webServer.tls.keyFile = "/etc/frp/certs/{{ cert_location_path_section.frps_key }}"
+auth.method = "{{ docker_frp_auth_method }}"
+auth.token = "{{ docker_frp_auth_token }}"
