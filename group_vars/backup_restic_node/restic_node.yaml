@@ -3,12 +3,20 @@
 # You should set this var, too, in host_vars or in playbook
 
 restic_node_cron_job_name: "Autorestic backup"
+restic_node_cron_job_name_forget: "Autorestic forget"
 restic_excludes_list_files:
   - excludes-common.txt
   - excludes-dev-build.txt
   - excludes-dev-code.txt
   - excludes-home-dirs.txt
   - excludes-root.txt
+
+restic_global_forget:
+  keep-last: 5
+  keep-daily: 4
+  keep-weekly: 1
+  keep-monthly: 12
+  keep-yearly: 7
 
 restic_node_vars:
   locations:
