@@ -12,6 +12,7 @@ services:
       - "127.0.0.1:${PORT}:8000"
     networks:
       - {{ restic_server_network }}
+    restart: unless-stopped
 
 networks:
   {{ restic_server_network }}:
