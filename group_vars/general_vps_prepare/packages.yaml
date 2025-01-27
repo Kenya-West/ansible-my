@@ -16,6 +16,7 @@ packages_list:
       - gettext-base
       - snapd
       - locales
+      - rsync
       # TermSCP dependencies
       - libdbus-1-dev
       - pkg-config
