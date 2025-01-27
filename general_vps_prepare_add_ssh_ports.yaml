@@ -11,12 +11,20 @@
         append_lines_list: "{{ ssh_ports_to_add }}"
 
   post_tasks:
-    - name: Restart sshd
-      become: true
-      become_user: root
-      ansible.builtin.service:
-        name: sshd
-        state: restarted
-      when:
-        - ssh_ports_to_add is defined
-        - ssh_ports_to_add | length > 0
+    - name: Ensure SSH service is restarted safely
+      block:
+        - name: Restart SSH service
+          ansible.builtin.service:
+            name: ssh
+            state: restarted
+
+        - name: Pause to allow SSH to restart
+          ansible.builtin.pause:
+            seconds: 5
+
+        - name: Reset Ansible connection after SSH restart
+          meta: reset_connection
+      rescue:
+        - name: Fallback message if SSH restart fails
+          debug:
+            msg: "Failed to restart SSH. Ensure the service is configured properly."
