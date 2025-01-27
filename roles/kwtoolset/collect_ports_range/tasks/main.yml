@@ -22,6 +22,10 @@
   loop: "{{ found_files.files }}"
   loop_control:
     loop_var: item
+  when:
+    - found_files is defined
+    - found_files.files is defined
+    - found_files.matched > 0
 
 - name: Display collected port values
   ansible.builtin.debug:
