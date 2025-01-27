@@ -8,4 +8,4 @@ domains_keys:
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
   backrest: sub-backrest.example.tld
-domains: "{{ domains_keys.values() | list }}"
+domains: "{{ domains_keys.values() | list | unique }}"
