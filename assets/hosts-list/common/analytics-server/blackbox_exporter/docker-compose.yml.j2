@@ -1,0 +1,17 @@
+services:
+  blackbox:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox
+    cpus: 0.3
+    mem_limit: 100m
+    command:
+      - '--config.file=/etc/blackbox/blackbox.yml'
+    networks:
+      - caddy
+    volumes:
+      - ./config/blackbox.yml:/etc/blackbox/blackbox.yml
+    restart: unless-stopped
+
+networks:
+  caddy:
+    external: true

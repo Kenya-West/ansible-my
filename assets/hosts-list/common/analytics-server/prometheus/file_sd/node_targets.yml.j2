@@ -1,0 +1,16 @@
+{% set targets = [] %}
+{% for host in groups['analytics_node'] %}
+  {% set hv = hostvars[host] %}
+  {% if hv.get('domains_keys') and hv.domains_keys.get('node_exporter') is defined %}
+    {% set addr = hv.domains_keys.node_exporter %}
+    {% set port = hv.get('node_exporter_web_listen_address_port') %}
+    {% set target = addr ~ (':' ~ port if port is defined else '') %}
+    {% if target not in targets %}
+      {% set _ = targets.append(target) %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+---
+- targets:
+  {{ targets | unique | list | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}

@@ -1,0 +1,2 @@
+# This variable make a list of users that should have access to the certificates directory
+cert_access_group_users: "{{ ((cert_access_group_users_initial | default([])) + ([node_exporter_system_user | default()])) + ([blackbox_exporter_system_user | default()])) | unique }}"

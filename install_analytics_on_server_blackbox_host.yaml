@@ -1,0 +1,67 @@
+---
+- name: Install and configure blackbox_exporter with dependencies
+  hosts: all
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: blackbox_exporter
+    project_name: blackbox_exporter
+    project_root_dir: "{{ analytics_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+
+  roles:
+    - name: ./roles/kwtoolset/copy_files
+      vars:
+        dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+    - name: prometheus.prometheus.blackbox_exporter
+      become: true
+      become_user: root
+
+  post_tasks:
+    - name: Add {{ blackbox_exporter_system_user }} user to {{ cert_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ blackbox_exporter_system_user }}"
+        groups: "{{ cert_access_group }}"
+        append: true
+        state: present
+    - name: Add {{ blackbox_exporter_system_user }} user to {{ standard_user }} group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ blackbox_exporter_system_user }}"
+        groups: "{{ standard_user }}"
+        append: true
+        state: present
+
+    - name: Move blackbox_exporter config to /etc/blackbox_exporter
+      become: true
+      become_user: root
+      ansible.builtin.command:
+        cmd: mv -f {{ dest_project_fullpath }}/config/blackbox_exporter.yml /etc/blackbox_exporter/blackbox_exporter.yml
+    - name: Change ownership of /etc/blackbox_exporter/blackbox_exporter.yml
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: /etc/blackbox_exporter/blackbox_exporter.yml
+        owner: "{{ blackbox_exporter_system_user }}"
+        group: "{{ blackbox_exporter_system_group }}"
+        mode: "0775"
+
+    - name: Reminder to run install_ufw.yaml playbook
+      ansible.builtin.debug:
+        msg: |
+          Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
+          Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}

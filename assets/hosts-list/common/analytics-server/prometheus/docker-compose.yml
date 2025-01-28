@@ -12,6 +12,7 @@ services:
       - caddy
     volumes:
       - ./config:/etc/prometheus
+      - ./file_sd:/etc/file_sd
       - prom_data:/prometheus
       # - certs:/etc/ssl
     labels:

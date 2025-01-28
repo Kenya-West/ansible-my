@@ -1,0 +1,18 @@
+---
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    cpus: 0.5
+    mem_limit: 200m
+    networks:
+      - caddy
+    volumes:
+      - ./data:/storage
+    command:
+      - '--retentionPeriod=12'
+      - '--storageDataPath=/storage'
+
+networks:
+  caddy:
+    external: true
