@@ -4,11 +4,11 @@ global:
   evaluation_interval: "{{ prometheus_server_evaluation_interval | default('15s') }}"
 alerting:
   alertmanagers:
-  - static_configs:
-    - targets: []
-    scheme: http
-    timeout: 10s
-    api_version: v1
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+rule_files:
+  - "/etc/alerts/alerts.yml"
 scrape_configs:
   {{ prometheus_server_scrape_configs | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
 remote_write:

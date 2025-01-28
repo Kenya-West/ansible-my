@@ -2,4 +2,5 @@
 - import_playbook: ./install_analytics_on_server_prometheus.yaml
 - import_playbook: ./install_analytics_on_server_victoriametrics.yaml
 - import_playbook: ./install_analytics_on_server_blackbox.yaml
+- import_playbook: ./install_analytics_on_server_alertmanager.yaml
 - import_playbook: ./install_analytics_on_server_grafana.yaml

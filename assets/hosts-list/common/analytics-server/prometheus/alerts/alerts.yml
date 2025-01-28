@@ -1,0 +1,169 @@
+groups:
+- name: alerts
+  rules:
+  - alert: EndpointDown
+    expr: probe_success == 0
+    for: 30m
+    labels: 
+      severity: "critical"
+    annotations:
+      summary:
+        "Service {{ $labels.instance }} is unavailable!"
+
+  - alert: SSLCertExpire
+    expr: probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 30
+    for: 8h
+    labels:
+      severity: "warning"
+    annotations:
+      summary: "SSL certificate will expire in: {{ $value | humanizeDuration }} (service: {{ $labels.instance }})"
+
+#==========CPU==================================================================
+  - alert: NodeCPUUsage
+    expr: (100 - (irate(node_cpu{mode="idle", job="<instance_address>"}[5m]) * 100)) > 50
+    for: 2m
+    labels:
+      severity: page
+    annotations:
+      summary: High CPU usage detected CPU usage is above 75%
+# ==============Memory==========================================================
+  - alert: NodeSwapUsageSwap
+    expr: (((node_memory_SwapTotal-node_memory_SwapFree{job="<instance_address>"})/node_memory_SwapTotal{job="<instance_address>"})*100) > 30
+    for: 2m 
+    labels:
+      severity: page
+    annotations:
+      summary: Swap usage detected Swap usage usage is above 50%
+  - alert: NodeMemoryUsageMemFree
+    expr: (((node_memory_MemTotal-node_memory_MemFree-node_memory_Cached{job="<instance_address>"})/(node_memory_MemTotal{job="<instance_address>"})*100)) > 30
+    for: 2m
+    labels:
+      severity: page
+    annotations:
+      summary: High memory usage detected, Memory usage is above 50%
+#==============Load=============================================================
+
+  - alert: nodeLoad1
+    expr: node_load1{job="<instance_address>"} > 0.7
+    for: 1m
+    labels:
+      severity: page
+    annotations:
+      summary: Load
+#================Disk space Used ================================================
+  - alert: diskSpaceUsed
+    expr: (100.0 - 100 * (node_filesystem_avail{job="<instance_address>"} / node_filesystem_size{job="<instance_address>"})) > 80
+    for: 10m
+    labels:
+      severity: page
+    annotations:
+      summary: Disk space userd 80
+#=============nodeContrack========================================
+  - alert: nodeContrack
+    expr: node_nf_conntrack_entries{job="<instance_address>"} > 200
+    for: 10m
+    labels:
+      severity: page
+    annotations:
+      summary: nodeContrack
+#=============nodeCntextSwitches ========================================
+  - alert: nodeCntextSwitches
+    expr: irate(node_context_switches{job="<instance_address>"}[5m]) > 100
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: nodeCntextSwitches
+#=============Disk Utilization per Device ========================================
+  - alert: DiskUtilizationPerDevice
+    expr: irate(node_disk_io_time_ms{job="<instance_address>"}[5m])/10 > 0.2
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: DiskUtilizationPerDevice
+#============Disk IOs per Device ========================================
+  - alert: DiskIOsPerDeviceRead
+    expr: irate(node_disk_reads_completed{job="<instance_address>"}[5m]) >10
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: DiskIOsPerDevice
+
+  - alert: DiskIOsPerDeviceWrite
+    expr: irate(node_disk_writes_completed{job="<instance_address>"}[5m]) > 10
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: DiskIOsPerDevice
+#===========Disk Throughput per Device========================================
+  - alert: DiskThroughputPerDeviceReads
+    expr: irate(node_disk_sectors_read{job="<instance_address>"}[5m]) * 512 >10000000
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: DiskIOsPerDevice
+  - alert: DiskThroughputPerDeviceWrites
+    expr: irate(node_disk_sectors_written{job="<instance_address>"}[5m]) * 512 > 10000000
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: DiskIOsPerDevice
+#===========Network Traffic========================================
+  - alert: NetworkTrafficReceive
+    expr: irate(node_network_receive_bytes{job="<instance_address>"}[5m])*8 > 5000
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: NetworkTrafficReceive
+  - alert: NetworkTrafficTransmit
+    expr: irate(node_network_transmit_bytes{job="<instance_address>"}[5m])*8 > 5000
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: NetworkTrafficTransmit
+
+#===========Netstat========================================
+  - alert: Netstat
+    expr: node_netstat_Tcp_CurrEstab{job="<instance_address>"} > 20
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: Netstat
+
+#===========UDP Stats============================
+  - alert: UDPStatsInDatagrams
+    expr: irate(node_netstat_Udp_InDatagrams{job="<instance_address>"}[5m]) > 50
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: UDPStats
+  - alert: UDPStatsInErrors
+    expr: irate(node_netstat_Udp_InErrors{job="<instance_address>"}[5m]) > 20
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: UDPStats
+  - alert: UDPStatsOutDatagrams
+    expr: irate(node_netstat_Udp_OutDatagrams{job="<instance_address>"}[5m]) > 50
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: UDPStats
+  - alert: UDPStatsNoPorts
+    expr: irate(node_netstat_Udp_NoPorts{job="<instance_address>"}[5m]) > 20
+    for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: UDPStats
