@@ -1,0 +1,35 @@
+---
+- name: Disable suspend after lid close
+  hosts: all
+  become: true
+  become_user: root
+
+  roles:
+    - name: roles/kwtoolset/append_lines
+      vars:
+        append_lines_dest_file_path: "/etc/systemd/logind.conf"
+        append_lines_remove_lines_regex:
+          - "^(?:#)?(?:\\s)?HandleLidSwitch(?:\\s)?="
+        append_lines_list:
+          - line: "HandleLidSwitch=ignore"
+            description: "Disable suspend after lid close in logind"
+            insert_after: "EOF"
+    - name: roles/kwtoolset/append_lines
+      vars:
+        append_lines_dest_file_path: "/etc/UPower/UPower.conf"
+        append_lines_remove_lines_regex:
+          - "^(?:#)?(?:\\s)?IgnoreLid(?:\\s)?="
+        append_lines_list:
+          - line: "IgnoreLid=true"
+            description: "Disable suspend after lid close in UPower"
+            insert_after: "EOF"
+
+  post_tasks:
+    - name: Restart systemd-logind service
+      ansible.builtin.systemd:
+        name: systemd-logind
+        state: restarted
+    - name: Restart UPower service
+      ansible.builtin.systemd:
+        name: upower
+        state: restarted
