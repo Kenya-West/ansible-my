@@ -1,0 +1,3 @@
+---
+- targets:
+  {{ restic_rest_server_targets | unique | list | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
