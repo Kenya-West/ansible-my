@@ -7,5 +7,6 @@ domains_keys:
   node_exporter: sub-node_exporter.example.tld
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
+  victoriametrics: sub-victoriametrics.example.tld
   backrest: sub-backrest.example.tld
 domains: "{{ domains_keys.values() | list | unique }}"

@@ -7,11 +7,18 @@ services:
     mem_limit: 200m
     networks:
       - caddy
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams 8428 }}"{% endraw %}
+
     volumes:
       - ./data:/storage
     command:
       - '--retentionPeriod=12'
       - '--storageDataPath=/storage'
+      - '--httpAuth.username=${HTTPAUTH_USERNAME}'
+      - '--httpAuth.password=${HTTPAUTH_PASSWORD}'
 
 networks:
   caddy:
