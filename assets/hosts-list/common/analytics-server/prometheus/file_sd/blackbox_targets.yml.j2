@@ -2,6 +2,7 @@
             groups['analytics_node']
             | map('extract', hostvars, 'domains_keys')
             | select('defined')
+            | reject('match', '.*example\.tld')
             | map(attribute='main')
             | select('defined')
             | map('regex_replace', '^(.*)$', 'https://\g<1>')
