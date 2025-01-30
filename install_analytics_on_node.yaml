@@ -29,6 +29,12 @@
       become_user: root
 
   post_tasks:
+    - name: Create {{ cert_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.group:
+        name: "{{ cert_access_group }}"
+        state: present
     - name: Add {{ node_exporter_system_user }} user to {{ cert_access_group }} group
       become: true
       become_user: root
