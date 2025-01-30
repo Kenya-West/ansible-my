@@ -7,12 +7,3 @@ proxy_client_frpc_client_dashboard_user: username
 # proxy_client_frpc_client_dashboard_password: password
 proxy_client_frpc_client_auth_method: token
 # proxy_client_frpc_client_auth_token: sometoken
-proxy_client_frpc_proxies:
-  - name: "{{ inventory_hostname }}"
-    local_port: 23001
-    remote_port: 22501
-  - name: "{{ inventory_hostname }}_restic_server"
-    type: tcp
-    local_ip: 127.0.0.1
-    local_port: "{{ restic_server_docker_vars.port }}"
-    remote_port: 22001

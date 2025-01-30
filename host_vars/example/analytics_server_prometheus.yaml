@@ -3,9 +3,11 @@ prometheus_server_basic_auth_users:
   username2: password2
 prometheus_server_scrape_configs:
   - job_name: X-UI panels
-    static_configs:
-      - targets: ["sub.example.tld:49876"]
-      - targets: ["sub2.example.tld:49876"]
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/node_targets.yml
+          - /etc/file_sd/node_targets_custom.yml
+        refresh_interval: 30s
     basic_auth:
       username: prometheus
       password: password
@@ -19,6 +21,34 @@ prometheus_server_scrape_configs:
         target_label: instance
         regex: '([^:]+)(:[0-9]+)?'
         replacement: '${1}'
+
+  - job_name: Restic REST server - your host
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/restic_targets.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: metrics
+      password: password
+    scheme: https
+    metrics_path: /frps/proxy/web/22002/metrics
+
+  - job_name: blackbox
+    metrics_path: /probe
+    params:
+      module: [http_2xx]  # Look for a HTTP 200 response.
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/blackbox_targets.yml
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox:9115"  # The blackbox exporter's real hostname:port.
+
 prometheus_server_remote_write_list:
   - url: https://sub.example.tld/api/prom/push
     basic_auth:
