@@ -4,6 +4,7 @@
 
 restic_node_cron_job_name: "Autorestic backup"
 restic_node_cron_job_name_forget: "Autorestic forget"
+restic_node_cron_job_name_prefix: "/bin/bash -c 'sleep $((RANDOM%300))' &&"
 restic_excludes_list_files:
   - excludes-common.txt
   - excludes-dev-build.txt

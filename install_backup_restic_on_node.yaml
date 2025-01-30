@@ -168,12 +168,12 @@
       ansible.builtin.cron:
         name: "{{ restic_node_cron_job_name }}"
         minute: "*/30"
-        job: "{{ dest_project_fullpath }}/scripts/update-cron.sh"
+        job: "{{ restic_node_cron_job_name_prefix | default('') }} {{ dest_project_fullpath }}/scripts/update-cron.sh"
     - name: Add cron job for autorestic to forget
       become: true
       become_user: root
       ansible.builtin.cron:
         name: "{{ restic_node_cron_job_name_forget }}"
-        minute: "1"
+        minute: "16"
         hour: "0"
         job: "{{ dest_project_fullpath }}/scripts/forget.sh"
