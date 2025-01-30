@@ -4,7 +4,13 @@ restic_server_users:
     hash_scheme: bcrypt
 
 # If you are using a proxy server to expose some of host ports the Internet, set the following vars
-# restic_server_proxy_server_hostname: sub-frps.example.tld # Domain with FRP server
-# restic_server_proxy_server_url_port: 443 # Port of FRP server defined in config
-# restic_server_proxy_server_url_path: "/frps/proxy/web/22002/metrics" # Path to access the node_exporter metrics from Internet (by Prometheus)
-# restic_server_proxy_server_url_full: "{{ restic_server_proxy_server_hostname }}:{{ restic_server_proxy_server_url_port }}{{ restic_server_proxy_server_url_path }}" # Full URL to access the node_exporter metrics from Internet (by Prometheus)
+# restic_server_proxy_server_list:
+#   - hostname: sub-frps.example.tld              # Domain with FRP server
+#     url_port: 443                               # Port of FRP server defined in config
+#     url_path: "/frps/proxy/web/22010/metrics"   # Path to access the node_exporter metrics from Internet (by Prometheus)
+#   - hostname: sub-frps.example.tld
+#     url_port: 443
+#     url_path: "/frps/proxy/web/22011/metrics"
+#   - hostname: sub-frps.example.tld
+#     url_port: 443
+#     url_path: "/frps/proxy/web/22012/metrics"
