@@ -17,11 +17,15 @@
       {%- set metrics_path = '/metrics' -%}
     {%- endif -%}
 
-    {# 4. Build the item we will append to the list #}
+    {# 4. Hostname fallback logic #}
+    {%- set hostname = hv.get('node_exporter_proxy_server_label', hv.inventory_hostname) -%}
+
+    {# 5. Build the item we will append to the list #}
     {%- set item = {
       'targets': [ final_target ],
       'labels': {
-        '__metrics_path__': metrics_path
+        '__metrics_path__': metrics_path,
+        'hostname': hostname
       }
     } -%}
 

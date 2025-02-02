@@ -17,10 +17,8 @@ prometheus_server_scrape_configs:
       insecure_skip_verify: true
     # Relabeling "instance" to remove the ":9100" part
     relabel_configs:
-      - source_labels: [__address__]
+      - source_labels: [hostname]
         target_label: instance
-        regex: '([^:]+)(:[0-9]+)?'
-        replacement: '${1}'
 
   - job_name: Restic REST server - your host
     file_sd_configs:
@@ -32,6 +30,12 @@ prometheus_server_scrape_configs:
       password: password
     scheme: https
     metrics_path: /frps/proxy/web/22002/metrics
+
+  - job_name: MongoDB
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/mongodb_targets_custom.yml
+        refresh_interval: 30s
 
   - job_name: blackbox
     metrics_path: /probe

@@ -27,10 +27,8 @@ prometheus_server_scrape_configs:
       insecure_skip_verify: true
     # Relabeling "instance" to remove the ":9100" part
     relabel_configs:
-      - source_labels: [__address__]
+      - source_labels: [hostname]
         target_label: instance
-        regex: '([^:]+)(:[0-9]+)?'
-        replacement: '${1}'
 prometheus_server_remote_write_list:
   - url: https://sub.example.tld/api/prom/push
     basic_auth:
