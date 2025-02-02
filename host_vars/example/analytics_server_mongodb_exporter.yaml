@@ -1,0 +1,8 @@
+mongodb_exporter_endpoints:
+  - name: your-name-just-for-description-purpose
+    schema: mongodb # or mongodb+srv
+    user: username
+    password: password
+    host: localhost
+    port: 27017
+    database: admin

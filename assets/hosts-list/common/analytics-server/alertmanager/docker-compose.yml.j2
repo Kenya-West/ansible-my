@@ -11,6 +11,7 @@ services:
       - ./config/config.yml:/etc/alertmanager/config.yml
     command:
       - '--config.file=/etc/alertmanager/config.yml'
+    restart: unless-stopped
 
 networks:
   caddy:
