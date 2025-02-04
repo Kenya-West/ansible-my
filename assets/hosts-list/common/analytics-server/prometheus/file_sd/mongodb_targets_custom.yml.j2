@@ -1,4 +1,6 @@
 - targets:
   - mongodb_exporter:9216
   labels:
-    __metrics_path__: /scrape?target=mongodb://127.0.0.1:27018
+    __metrics_path__: /scrape
+    __param_target: name_of_your_mongodb_instance
+    hostname: your_unique_name
