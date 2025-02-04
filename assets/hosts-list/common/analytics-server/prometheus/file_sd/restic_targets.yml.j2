@@ -14,11 +14,15 @@
       {# 2. Metrics path fallback #}
       {%- set metrics_path = entry.url_path if entry.url_path else '/metrics' -%}
 
-      {# 3. Build the item to append #}
+      {# 3. Hostname fallback logic #}
+      {%- set hostname = hv.get('restic_server_proxy_server_label', hv.inventory_hostname) -%}
+
+      {# 4. Build the item to append #}
       {%- set item = {
         'targets': [ final_target ],
         'labels': {
-          '__metrics_path__': metrics_path
+          '__metrics_path__': metrics_path,
+          'hostname': hostname
         }
       } -%}
 
