@@ -9,6 +9,7 @@ domains_keys:
   wg: sub-wg.example.tld
   xray: sub-xray.example.tld
   node_exporter: sub-node_exporter.example.tld
+  cadvisor: sub-cadvisor.example.tld
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
   victoriametrics: sub-victoriametrics.example.tld

@@ -2,6 +2,23 @@ prometheus_server_basic_auth_users:
   username: password
   username2: password2
 prometheus_server_scrape_configs:
+  - job_name: cAdvisor
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/cadvisor_targets.yml
+          - /etc/file_sd/cadvisor_targets_custom.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: prometheus
+      password: password
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
   - job_name: X-UI panels
     file_sd_configs:
       - files:

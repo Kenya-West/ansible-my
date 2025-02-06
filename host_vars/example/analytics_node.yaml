@@ -2,9 +2,20 @@ node_exporter_basic_auth_users:
   username: password
   username2: password2
 
+cadvisor_server_users:
+  - name: username
+    password: <password>
+    hash_scheme: bcrypt
+
 # If you are using a proxy server to expose some of host ports the Internet, set the following vars
 # node_exporter_tls_server_config: {} # Remove SSL because there is no need to SSL if soem ports are proxied
 # node_exporter_proxy_server_hostname: sub-frps.example.tld # Domain with FRP server
 # node_exporter_proxy_server_url_port: 443 # Port of FRP server defined in config
 # node_exporter_proxy_server_url_path: "/frps/proxy/web/22003{{ node_exporter_web_telemetry_path }}" # Path to access the node_exporter metrics from Internet (by Prometheus)
 # node_exporter_proxy_server_url_full: "{{ node_exporter_proxy_server_hostname }}:{{ node_exporter_proxy_server_url_port }}{{ node_exporter_proxy_server_url_path }}" # Full URL to access the node_exporter metrics from Internet (by Prometheus)
+# 
+# cadvisor_tls_server_config: {} # Remove SSL because there is no need to SSL if soem ports are proxied
+# cadvisor_proxy_server_hostname: sub-frps.example.tld # Domain with FRP server
+# cadvisor_proxy_server_url_port: 443 # Port of FRP server defined in config
+# cadvisor_proxy_server_url_path: "/frps/proxy/web/22004{{ cadvisor_web_telemetry_path }}" # Path to access the cadvisor metrics from Internet (by Prometheus)
+# cadvisor_proxy_server_url_full: "{{ cadvisor_proxy_server_hostname }}:{{ cadvisor_proxy_server_url_port }}{{ cadvisor_proxy_server_url_path }}" # Full URL to access the node_exporter metrics from Internet (by Prometheus)
