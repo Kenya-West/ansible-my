@@ -83,3 +83,7 @@ prometheus_server_remote_write_list:
       batch_send_deadline: 5s
       min_backoff: 30ms
       max_backoff: 100ms
+
+restic_rest_server_targets:
+  - "https://sub.example.tld/frps/proxy/web/22001/metrics"
+  - "https://sub.example2.tld/metrics"
