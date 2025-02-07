@@ -5,7 +5,8 @@ prometheus_server_scrape_configs:
   - job_name: cAdvisor
     file_sd_configs:
       - files:
-          - /etc/file_sd/cadvisor_targets.yml
+          - /etc/file_sd/cadvisor_targets_direct.yml
+          - /etc/file_sd/cadvisor_targets_proxied.yml
           - /etc/file_sd/cadvisor_targets_custom.yml
         refresh_interval: 30s
     basic_auth:
@@ -22,7 +23,8 @@ prometheus_server_scrape_configs:
   - job_name: X-UI panels
     file_sd_configs:
       - files:
-          - /etc/file_sd/node_targets.yml
+          - /etc/file_sd/node_targets_direct.yml
+          - /etc/file_sd/node_targets_proxied.yml
           - /etc/file_sd/node_targets_custom.yml
         refresh_interval: 30s
     basic_auth:
@@ -40,7 +42,9 @@ prometheus_server_scrape_configs:
   - job_name: Restic REST server - your host
     file_sd_configs:
       - files:
-          - /etc/file_sd/restic_targets.yml
+          - /etc/file_sd/restic_targets_direct.yml
+          - /etc/file_sd/restic_targets_proxied.yml
+          - /etc/file_sd/restic_targets_custom.yml
         refresh_interval: 30s
     basic_auth:
       username: metrics
@@ -61,6 +65,7 @@ prometheus_server_scrape_configs:
     file_sd_configs:
       - files:
           - /etc/file_sd/blackbox_targets.yml
+          - /etc/file_sd/blackbox_targets_custom.yml
         refresh_interval: 30s
     relabel_configs:
       - source_labels: [__address__]

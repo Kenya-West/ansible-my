@@ -2,7 +2,7 @@
 {%- for host in groups['analytics_node'] -%}
   {%- set hv = hostvars[host] -%}
 
-  {%- if (hv.domains_keys|default({})).node_exporter is defined or hv.node_exporter_proxy_server_hostname is defined -%}
+  {%- if (hv.domains_keys|default({})).node_exporter is defined -%}
 
     {# Skip adding the host if domains_keys.node_exporter contains example.tld #}
     {%- set skip_host = False -%}
@@ -12,21 +12,21 @@
 
       {%- if not skip_host -%}
 
-      {# 1. Hostname fallback logic #}
-      {%- set target_hostname = hv.get('node_exporter_proxy_server_hostname', hv.domains_keys.node_exporter) -%}
+      {# 1. Hostname #}
+      {%- set target_hostname = hv.domains_keys.node_exporter -%}
 
-      {# 2. Port fallback #}
-      {%- set port = hv.get('node_exporter_proxy_server_url_port', hv.node_exporter_web_listen_address_port) -%}
+      {# 2. Port #}
+      {%- set port = hv.node_exporter_web_listen_address_port -%}
       {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
 
-      {# 3. Metrics path fallback logic #}
-      {%- set metrics_path = hv.get('node_exporter_proxy_server_url_path', hv.node_exporter_web_telemetry_path) -%}
+      {# 3. Metrics path #}
+      {%- set metrics_path = hv.node_exporter_web_telemetry_path -%}
       {%- if not metrics_path -%}
         {%- set metrics_path = '/metrics' -%}
       {%- endif -%}
 
-      {# 4. Hostname fallback logic #}
-      {%- set hostname = hv.get('node_exporter_proxy_server_label', hv.inventory_hostname) -%}
+      {# 4. Hostname logic #}
+      {%- set hostname = hv.inventory_hostname -%}
 
       {# 5. Build the item we will append to the list #}
       {%- set item = {
