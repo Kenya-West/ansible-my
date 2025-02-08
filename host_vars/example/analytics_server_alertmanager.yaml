@@ -1,11 +1,15 @@
 alertmanager_route:
-  receiver: telegram
+  receiver: telepush
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 1h
 
 alertmanager_receivers_list:
-  - name: 'telegram'
+  - name: telepush
+    webhook_configs:
+    - url: 'https://telepush.dev/api/inlets/alertmanager/<token>'
+    http_config:
+  - name: telegram
     telegram_configs:
       - bot_token: token
         api_url: https://api.telegram.org
