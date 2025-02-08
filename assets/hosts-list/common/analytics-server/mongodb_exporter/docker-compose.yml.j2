@@ -7,6 +7,14 @@ services:
     mem_limit: 200m
     env_file:
       - .env
+    command: [
+        "--mongodb.direct-connect=false",
+        "--discovering-mode",
+        "--collector.replicasetstatus=true",
+        "--collector.indexstats=true",
+        "--collector.collstats=true",
+        "--log.level=info",
+    ]
     networks:
       - caddy
     restart: unless-stopped
