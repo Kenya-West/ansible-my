@@ -52,3 +52,8 @@ packages_binary_list:
   - repo: "mr-karan/doggo"
     assets:
       - "^web"
+  - repo: "babarot/gomi"
+  - repo: "Byron/dua-cli"
+  - repo: "peltho/tufw"
+    assets:
+      - "tar.gz"
