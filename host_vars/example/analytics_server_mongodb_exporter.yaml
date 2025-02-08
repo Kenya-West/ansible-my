@@ -6,3 +6,7 @@ mongodb_exporter_endpoints:
     host: localhost
     port: 27017
     database: admin
+    searchParams:
+      authSource: admin
+      retryWrites: "true"
+      w: majority
