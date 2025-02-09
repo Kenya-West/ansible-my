@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name {{ domains_keys.cadvisor }};
+    server_name ${SERVICE_DOMAIN};
     
     location / {
         return 301 https://$host$request_uri;
@@ -8,17 +8,17 @@ server {
 }
 
 server {
-    server_name {{ domains_keys.cadvisor }};
+    server_name ${SERVICE_DOMAIN};
     
     listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/{{ cert_location_path_section.cadvisor_crt }};
-    ssl_certificate_key /etc/letsencrypt/{{ cert_location_path_section.cadvisor_key }};
+    ssl_certificate /etc/letsencrypt/${CERTS_SUBPATH_CRT};
+    ssl_certificate_key /etc/letsencrypt/${CERTS_SUBPATH_KEY};
 
     location / {
         auth_basic "Restricted Access";
         auth_basic_user_file /etc/nginx/.htpasswd;
 
-        proxy_pass http://cadvisor:8080/;
+        proxy_pass http://${SERVICE_NAME}:${SERVICE_PORT_INTERNAL}/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "Upgrade";

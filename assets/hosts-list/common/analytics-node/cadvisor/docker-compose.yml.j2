@@ -5,7 +5,7 @@ services:
     image: gcr.io/cadvisor/cadvisor:v0.51.0
     cpus: 0.5
     mem_limit: 200m
-    container_name: cadvisor
+    container_name: "${SERVICE_NAME}"
     privileged: true
     env_file:
       - .env
@@ -19,20 +19,19 @@ services:
       - {{ analytics_node_network_name }}
     restart: unless-stopped
 
-  analytics_node_proxy:
+  proxy:
     image: nginx:latest
-    container_name: analytics_node_proxy
+    container_name: "${SERVICE_NAME}_proxy"
     cpus: 0.5
     mem_limit: 200m
     env_file:
       - .env
     ports:
-      - "${CADVISOR_EXTERNAL_PORT}:443/tcp"
+      - "${EXTERNAL_PORT}:443/tcp"
     networks:
       - {{ analytics_node_network_name }}
     volumes:
       - ./nginx/templates:/etc/nginx/templates
-      - ./nginx/servers:/etc/nginx/servers
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
       - {{ cert_location_root_path }}:/etc/letsencrypt:ro
