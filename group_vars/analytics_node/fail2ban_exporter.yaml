@@ -1,0 +1,3 @@
+fail2ban_exporter_external_port: 50112
+fail2ban_exporter_web_telemetry_path: /metrics
+fail2ban_exporter_web_listen_address: "{{ fail2ban_exporter_web_listen_address_host }}:{{ fail2ban_exporter_external_port }}"

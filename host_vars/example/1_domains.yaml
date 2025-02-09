@@ -7,6 +7,7 @@ domains_keys:
   restic: sub-restic.example.tld
   node_exporter: sub-node_exporter.example.tld
   cadvisor: sub-cadvisor.example.tld
+  fail2ban_exporter: sub-fail2ban_exporter.example.tld
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
   victoriametrics: sub-victoriametrics.example.tld

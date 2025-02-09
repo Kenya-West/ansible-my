@@ -1,0 +1,37 @@
+{%- set node_list = [] -%}
+{%- for host in groups['analytics_node'] -%}
+  {%- set hv = hostvars[host] -%}
+
+  {# Grab the list of proxy items, defaulting to an empty list if missing #}
+  {%- set proxy_list = hv.get('fail2ban_exporter_proxy_server_list', []) -%}
+
+  {%- if proxy_list | length > 0 -%}
+    {# We have multiple proxy entries to process #}
+    {%- for entry in proxy_list -%}
+      {# 1. Build the final target (hostname + optional port) #}
+      {%- set final_target = entry.hostname ~ (':' ~ entry.url_port if entry.url_port is defined else '') -%}
+
+      {# 2. Metrics path fallback #}
+      {%- set metrics_path = entry.url_path if entry.url_path else '/metrics' -%}
+
+      {# 3. Hostname fallback logic #}
+      {%- set hostname = hv.get('fail2ban_exporter_proxy_server_label', hv.inventory_hostname) -%}
+
+      {# 4. Build the item to append #}
+      {%- set item = {
+        'targets': [ final_target ],
+        'labels': {
+          '__metrics_path__': metrics_path,
+          'hostname': hostname
+        }
+      } -%}
+
+      {# 4. Avoid duplicates #}
+      {%- if item not in node_list -%}
+        {%- set _ = node_list.append(item) -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{{ node_list | to_nice_yaml(indent=2, sort_keys=false) }}
