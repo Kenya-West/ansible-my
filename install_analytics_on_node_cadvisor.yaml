@@ -53,7 +53,7 @@
         path: "{{ dest_project_fullpath }}/nginx/.htpasswd"
         name: "{{ item.name }}"
         password: "{{ item.password }}"
-        hash_scheme: "{{ item.hash_scheme | default(restic_server_hash_scheme) | default('md5_crypt') }}"
+        hash_scheme: "{{ item.hash_scheme | default('md5_crypt') }}"
         mode: "0644"
       loop: "{{ cadvisor_server_users }}"
       failed_when:
