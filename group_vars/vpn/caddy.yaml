@@ -1,2 +1,3 @@
 docker_caddy_domain: "{{ domains_keys.main }}"
 docker_caddy_external_ip: "{{ host_ip_address }}"
+caddy_web_listen_address_port: 50110

@@ -93,6 +93,24 @@ prometheus_server_scrape_configs:
       - source_labels: [hostname]
         target_label: instance
 
+  - job_name: Caddy
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/caddy_targets_direct.yml
+          - /etc/file_sd/caddy_targets_proxied.yml
+          - /etc/file_sd/caddy_targets_custom.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: prometheus
+      password: password
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
 prometheus_server_remote_write_list:
   - url: https://sub.example.tld/api/prom/push
     basic_auth:

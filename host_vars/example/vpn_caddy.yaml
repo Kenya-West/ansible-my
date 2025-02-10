@@ -1,0 +1,2 @@
+docker_caddy_metrics_client_user_password: $2a$ # bcrypt hash for user 'client'
+docker_caddy_metrics_prometheus_user_password: $2a$ # bcrypt hash for user 'prometheus'

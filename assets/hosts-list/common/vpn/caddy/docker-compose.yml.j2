@@ -10,6 +10,7 @@ services:
       - 80:80
       - 443:443
       - "443:443/udp"
+      - "${METRICS_EXTERNAL_PORT:-2020}:2020"
     environment:
       - CADDY_INGRESS_NETWORKS=caddy
       - CADDY_DOCKER_CADDYFILE_PATH=/config/Caddyfile
@@ -24,6 +25,15 @@ services:
       - ./static:/var/www/public
       - caddy-data:/data
       - caddy-certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
+    labels:
+      caddy_0:
+      caddy_0.servers:
+      caddy_0.servers.metrics:
+      caddy_1: "${DOMAIN}:2020"
+      caddy_1.metrics: "/metrics"
+      caddy_1.metrics.disable_openmetrics:
+      caddy_1.basic_auth.prometheus: "${METRICS_PROMETHEUS_USER_PASSWORD}"
+      caddy_1.basic_auth.client: "${METRICS_CLIENT_USER_PASSWORD}"
     restart: unless-stopped
 
 networks:
