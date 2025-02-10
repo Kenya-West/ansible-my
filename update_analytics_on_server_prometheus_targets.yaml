@@ -18,9 +18,9 @@
     - name: ./roles/kwtoolset/copy_files
       vars:
         dir_list:
-          - src: "{{ source_asset_fullpath_common }}"
-            dest: "{{ dest_project_rootpath }}/file_sd"
+          - src: "{{ source_asset_fullpath_common }}/file_sd"
+            dest: "{{ dest_project_fullpath }}"
             default_mode: "0775"
-          - src: "{{ source_asset_fullpath_project }}"
-            dest: "{{ dest_project_rootpath }}/file_sd"
+          - src: "{{ source_asset_fullpath_project }}/file_sd"
+            dest: "{{ dest_project_fullpath }}"
             default_mode: "0775"
