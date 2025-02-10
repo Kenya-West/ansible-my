@@ -1,1 +1,2 @@
-docker_wg_password: pass
+docker_wg_password: pass # bcrypt hash
+docker_wg_prometheus_metrics_password: pass # bcrypt hash

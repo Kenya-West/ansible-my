@@ -8,3 +8,4 @@ docker_wg_lang: ru
 # docker_wg_password: pass # brcypt hash
 docker_wg_ui_traffic_stats: "true" # Should be as string because it will be templated
 docker_wg_ui_chart_type: 1
+wg_web_telemetry_path: /metrics
