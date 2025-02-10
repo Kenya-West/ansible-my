@@ -111,6 +111,24 @@ prometheus_server_scrape_configs:
       - source_labels: [hostname]
         target_label: instance
 
+  - job_name: FRPS
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/frps_targets_direct.yml
+          - /etc/file_sd/frps_targets_proxied.yml
+          - /etc/file_sd/frps_targets_custom.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: username # the same user name from docker_frp_dashboard_user
+      password: password # the same password from docker_frp_dashboard_password
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
 prometheus_server_remote_write_list:
   - url: https://sub.example.tld/api/prom/push
     basic_auth:

@@ -17,3 +17,4 @@ docker_frp_range_ports_2_end: 22589
 docker_frp_client_dashboard_port: 7400
 docker_frp_client_dashboard_user: "{{ common_username }}"
 # docker_frp_client_dashboard_password: password
+frps_web_telemetry_path: /metrics
