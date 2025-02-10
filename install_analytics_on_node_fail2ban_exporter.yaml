@@ -1,5 +1,5 @@
 ---
-- name: Install and configure Fail2Ban exportr with dependencies
+- name: Install and configure Fail2Ban exporter with dependencies
   hosts: all
   become: false
   become_user: "{{ standard_user }}"
