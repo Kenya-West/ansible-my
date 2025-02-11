@@ -10,11 +10,18 @@ services:
     env_file:
       - .env
     volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/machine-id:/etc/machine-id:ro
       - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+      - /sys:/sys:ro
+      - /var/run:/var/run:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    command:
+      - "--storage_duration=5m0s"
+      - "--housekeeping_interval=60s"
+      - "--docker_only=true"
+      - "--enable_metrics=cpu,memory,network"
     networks:
       - {{ analytics_node_network_name }}
     restart: unless-stopped
