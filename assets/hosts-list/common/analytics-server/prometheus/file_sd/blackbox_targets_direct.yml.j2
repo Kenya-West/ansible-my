@@ -1,0 +1,52 @@
+{%- set node_list = [] -%}
+{%- for host in groups['analytics_node'] -%}
+  {%- set hv = hostvars[host] -%}
+
+  {%- if (hv.domains_keys|default({})).main is defined -%}
+
+    {# Skip adding the host if domains_keys.main contains example.tld #}
+    {%- set skip_host = False -%}
+    {%- if hv.domains_keys is defined and hv.domains_keys.main is defined and 'example.tld' in hv.domains_keys.main -%}
+      {%- set skip_host = True -%}
+    {%- endif -%}
+
+      {%- if not skip_host -%}
+
+      {# 1. Hostname #}
+      {%- set target_hostname = hv.domains_keys.main -%}
+
+      {# 2. Port #}
+      {%- set port = (hv.blackbox_web_listen_address_port|default(null)) -%}
+      {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
+
+      {# 3. Metrics path #}
+      {%- set metrics_path = (hv.blackbox_web_telemetry_path|default('')) -%}
+      {%- if not metrics_path -%}
+        {%- set metrics_path = '' -%}
+      {%- endif -%}
+
+      {# 4. Hostname logic #}
+      {%- set hostname = hv.inventory_hostname -%}
+
+      {# 5. Build the item we will append to the list #}
+      {%- for proxy in blackbox_exporter_worldwide_proxies %}
+
+        {%- set item = {
+          'targets': [
+            proxy.hostname+':_:http_2xx:_:'+proxy.location_display_name+':_:'+proxy.geohash+':_:https://'+final_target,
+            proxy.hostname+':_:icmp_ipv4:_:'+proxy.location_display_name+':_:'+proxy.geohash+':_:'+final_target
+          ]
+        } -%}
+
+        {# Avoid duplicates if needed #}
+        {%- if item not in node_list -%}
+          {%- set _ = node_list.append(item) -%}
+        {%- endif -%}
+
+      {%- endfor -%}
+
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{{ node_list | to_nice_yaml(indent=2, sort_keys=false) }}
