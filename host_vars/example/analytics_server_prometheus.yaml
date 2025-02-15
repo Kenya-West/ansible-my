@@ -130,6 +130,12 @@ prometheus_server_scrape_configs:
         target_label: instance
 
 prometheus_server_remote_write_list:
+  # This is victoriametrics service that is used by grafana
+  - url: "http://victoriametrics:8428/api/v1/write"
+    basic_auth:
+      username: victoriametrics-service-account
+      password: <password>
+  # This is some another endpoint to write you could possibly add
   - url: https://sub.example.tld/api/prom/push
     basic_auth:
       username: username
