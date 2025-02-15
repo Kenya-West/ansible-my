@@ -61,6 +61,22 @@
       when: killport_installed.rc == 0
       ignore_errors: true
 
+    # Check UFW and enable 80 port
+    - name: Check if UFW is installed
+      ansible.builtin.shell: "command -v ufw"
+      register: ufw_installed
+      changed_when: false
+      failed_when: false
+    - name: Enable port 80 in UFW
+      become: true
+      become_user: root
+      community.general.ufw:
+        rule: allow
+        port: 80
+        proto: tcp
+        state: enabled
+      when: ufw_installed.stdout != ""
+
   post_tasks:
     - name: Verify if update.sh exists
       ansible.builtin.stat:
@@ -123,19 +139,19 @@
         msg: "The first-run.sh script does not exist at {{ dest_project_fullpath }}/scripts/first-run.sh"
       when: update_script_exists.stat.exists == false
 
-    - name: Launch first-run.sh
-      become: true
-      become_user: root
-      ansible.builtin.command: "{{ dest_project_fullpath }}/scripts/first-run.sh"
-      when: update_script_exists.stat.exists == true
-      register: first_launch_result
+    # - name: Launch first-run.sh
+    #   become: true
+    #   become_user: root
+    #   ansible.builtin.command: "{{ dest_project_fullpath }}/scripts/first-run.sh"
+    #   when: update_script_exists.stat.exists == true
+    #   register: first_launch_result
 
-    - name: Debug first-launch result
-      ansible.builtin.debug:
-        var: first_launch_result.stdout
-      when: first_launch_result.stdout is defined
+    # - name: Debug first-launch result
+    #   ansible.builtin.debug:
+    #     var: first_launch_result.stdout
+    #   when: first_launch_result.stdout is defined
 
-    - name: Debug first-launch error result
-      ansible.builtin.debug:
-        var: first_launch_result.stderr
-      when: first_launch_result.stderr is defined
+    # - name: Debug first-launch error result
+    #   ansible.builtin.debug:
+    #     var: first_launch_result.stderr
+    #   when: first_launch_result.stderr is defined

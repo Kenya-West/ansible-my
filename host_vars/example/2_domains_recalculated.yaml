@@ -29,5 +29,5 @@ docker_xui_domain: "{{ domains_keys.xui }}"
 docker_xui_hostname: "{{ domains_keys.xui }}"
 
 # VPN - Web_features
-certbot_certs:
-  - domains: "{{ domains }}"
+certbot_certs: "{{ domains | map('regex_replace', '^(.*)$', '{\"domains\": [\"\\1\"]}') | map('from_json') | list }}"
+
