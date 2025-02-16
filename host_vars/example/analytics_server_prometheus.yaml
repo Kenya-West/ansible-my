@@ -5,9 +5,7 @@ prometheus_server_scrape_configs:
   - job_name: cAdvisor
     file_sd_configs:
       - files:
-          - /etc/file_sd/cadvisor_targets_direct.yml
-          - /etc/file_sd/cadvisor_targets_proxied.yml
-          - /etc/file_sd/cadvisor_targets_custom.yml
+          - /etc/file_sd/cadvisor_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: prometheus
@@ -23,9 +21,7 @@ prometheus_server_scrape_configs:
   - job_name: X-UI panels
     file_sd_configs:
       - files:
-          - /etc/file_sd/node_targets_direct.yml
-          - /etc/file_sd/node_targets_proxied.yml
-          - /etc/file_sd/node_targets_custom.yml
+          - /etc/file_sd/node_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: prometheus
@@ -42,9 +38,7 @@ prometheus_server_scrape_configs:
   - job_name: Restic REST server - your host
     file_sd_configs:
       - files:
-          - /etc/file_sd/restic_targets_direct.yml
-          - /etc/file_sd/restic_targets_proxied.yml
-          - /etc/file_sd/restic_targets_custom.yml
+          - /etc/file_sd/restic_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: metrics
@@ -55,7 +49,7 @@ prometheus_server_scrape_configs:
   - job_name: MongoDB
     file_sd_configs:
       - files:
-          - /etc/file_sd/mongodb_targets_custom.yml
+          - /etc/file_sd/mongodb_targets_*.yml
         refresh_interval: 30s
 
   - job_name: blackbox
@@ -78,9 +72,7 @@ prometheus_server_scrape_configs:
   - job_name: Fail2Ban
     file_sd_configs:
       - files:
-          - /etc/file_sd/fail2ban_targets_direct.yml
-          - /etc/file_sd/fail2ban_targets_proxied.yml
-          - /etc/file_sd/fail2ban_targets_custom.yml
+          - /etc/file_sd/fail2ban_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: prometheus
@@ -96,9 +88,7 @@ prometheus_server_scrape_configs:
   - job_name: Caddy
     file_sd_configs:
       - files:
-          - /etc/file_sd/caddy_targets_direct.yml
-          - /etc/file_sd/caddy_targets_proxied.yml
-          - /etc/file_sd/caddy_targets_custom.yml
+          - /etc/file_sd/caddy_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: prometheus
@@ -114,9 +104,7 @@ prometheus_server_scrape_configs:
   - job_name: FRPS
     file_sd_configs:
       - files:
-          - /etc/file_sd/frps_targets_direct.yml
-          - /etc/file_sd/frps_targets_proxied.yml
-          - /etc/file_sd/frps_targets_custom.yml
+          - /etc/file_sd/frps_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: username # the same user name from docker_frp_dashboard_user
