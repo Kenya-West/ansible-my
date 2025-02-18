@@ -66,16 +66,31 @@
       vars:
         filename_pattern: "*.env"
         substring_pattern: "PORT"
-        files_path: "/home/{{ standard_user }}/{{ analytics_project_structure_root }}"
+        files_path: "/home/{{ standard_user }}/{{ analytics_node_project_structure_root }}"
         skip_if_not_found: true
-      when: analytics_project_structure_root is defined
+      when: analytics_node_project_structure_root is defined
     - name: ./roles/install_ufw
       become: true
       vars:
         ufw_ports: "{{ collected_ports }}"
         ufw_protos: ["tcp", "udp"]
         skip_if_not_found: true
-      when: analytics_project_structure_root is defined
+      when: analytics_node_project_structure_root is defined
+    # Analytics-node project
+    - name: ./roles/kwtoolset/collect_ports
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern: "PORT"
+        files_path: "/home/{{ standard_user }}/{{ analytics_server_project_structure_root }}"
+        skip_if_not_found: true
+      when: analytics_server_project_structure_root is defined
+    - name: ./roles/install_ufw
+      become: true
+      vars:
+        ufw_ports: "{{ collected_ports }}"
+        ufw_protos: ["tcp", "udp"]
+        skip_if_not_found: true
+      when: analytics_server_project_structure_root is defined
     # backup-restic project
     - name: ./roles/kwtoolset/collect_ports
       vars:
