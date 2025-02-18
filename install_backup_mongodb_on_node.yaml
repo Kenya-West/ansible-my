@@ -6,7 +6,7 @@
   vars:
     project_dir: mongo-tools
     project_name: mongo-tools
-    project_root_dir: "{{ backup_restic_project_structure_root }}"
+    project_root_dir: "{{ backup_restic_node_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
     source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
