@@ -1,0 +1,13 @@
+# If you are using a proxy server to expose some of host ports the Internet, set the following vars
+node_exporter_tls_server_config: {} # Remove SSL because there is no need to SSL if some ports are proxied
+node_exporter_proxy_server_label: "{{ inventory_hostname }}" # also optional but if you want other label than hostname in Prometheus, set it there
+node_exporter_proxy_server_list:
+  - hostname: sub-frps.example.tld              # Domain with FRP server
+    url_port: 443                               # Port of FRP server defined in config
+    url_path: "/frps/proxy/web/22010/metrics"   # Path to access the node_exporter metrics from Internet (by Prometheus)
+  - hostname: sub-frps.example.tld
+    url_port: 443
+    url_path: "/frps/proxy/web/22011/metrics"
+  - hostname: sub-frps.example.tld
+    url_port: 443
+    url_path: "/frps/proxy/web/22012/metrics"
