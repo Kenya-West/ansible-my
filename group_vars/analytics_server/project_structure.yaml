@@ -4,4 +4,8 @@ analytics_project_structure_end_dirs:
   prometheus: "{{ analytics_project_structure_root }}/prometheus"
   grafana: "{{ analytics_project_structure_root }}/grafana"
   blackbox: "{{ analytics_project_structure_root }}/blackbox_exporter"
+  blackbox_exporter: "{{ analytics_project_structure_root }}/blackbox_exporter"
+  mongodb_exporter: "{{ analytics_project_structure_root }}/mongodb_exporter"
+  alertmanager: "{{ analytics_project_structure_root }}/alertmanager"
+  victoriametrics: "{{ analytics_project_structure_root }}/victoriametrics"
 analytics_project_structure_end_dirs_list: "{{ analytics_project_structure_end_dirs.values() | list }}"
