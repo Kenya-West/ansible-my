@@ -4,6 +4,7 @@ analytics_project_structure_end_dirs:
   prometheus: "{{ analytics_project_structure_root }}/prometheus"
   grafana: "{{ analytics_project_structure_root }}/grafana"
   blackbox: "{{ analytics_project_structure_root }}/blackbox_exporter"
+  pushgateway: "{{ analytics_project_structure_root }}/pushgateway"
   blackbox_exporter: "{{ analytics_project_structure_root }}/blackbox_exporter"
   mongodb_exporter: "{{ analytics_project_structure_root }}/mongodb_exporter"
   alertmanager: "{{ analytics_project_structure_root }}/alertmanager"

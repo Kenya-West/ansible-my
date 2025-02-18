@@ -4,4 +4,5 @@ analytics_project_structure_end_dirs:
   node_exporter: "{{ analytics_project_structure_root }}/node_exporter"
   cadvisor: "{{ analytics_project_structure_root }}/cadvisor"
   fail2ban_exporter: "{{ analytics_project_structure_root }}/fail2ban_exporter"
+  pushgateway: "{{ analytics_project_structure_root }}/pushgateway"
 analytics_project_structure_end_dirs_list: "{{ analytics_project_structure_end_dirs.values() | list }}"

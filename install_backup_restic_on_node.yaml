@@ -14,6 +14,11 @@
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
+    cronjob_script_path_without_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix | default('') }} {{ dest_project_fullpath }}/scripts/update-cron.sh"
+    cronjob_script_path_with_analytics_autorestic_backup: "{{ cronjob_script_path_without_analytics_autorestic_backup }}"
+    cronjob_script_path_without_analytics_autorestic_forget: "{{ dest_project_fullpath }}/scripts/forget.sh"
+    cronjob_script_path_with_analytics_autorestic_forget: "{{ cronjob_script_path_without_analytics_autorestic_forget }}"
+
   roles:
     - name: ./roles/kwtoolset/copy_files
       vars:
@@ -25,6 +30,11 @@
             dest: "{{ dest_project_rootpath }}"
             default_mode: "0775"
   pre_tasks:
+    - name: Change cron job path to monitoring if it is in analytics_node group
+      set_fact:
+        cronjob_script_path_with_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix | default('') }} {{ cron_wrapped_task_prefix }} --job-name autorestic_backup -- {{ dest_project_fullpath }}/scripts/update-cron.sh {{ cron_wrapped_task_suffix }}"
+        cronjob_script_path_with_analytics_autorestic_forget: "{{ cron_wrapped_task_prefix }} --job-name autorestic_forget -- {{ cronjob_script_path_without_analytics_autorestic_forget }} {{ cron_wrapped_task_suffix }}"
+      when: "'analytics_node' in group_names"
     - name: Add prefix dest_project_fullpath to each of restic_excludes_list_files
       set_fact:
         restic_excludes_list_files: "{{ [dest_project_fullpath + '/config/excludes'] | product(restic_excludes_list_files) | map('join', '/') | list }}"
@@ -168,7 +178,7 @@
       ansible.builtin.cron:
         name: "{{ restic_node_cron_job_name }}"
         minute: "*/30"
-        job: "{{ restic_node_cron_job_name_prefix | default('') }} {{ dest_project_fullpath }}/scripts/update-cron.sh"
+        job: "{{ cronjob_script_path_with_analytics_autorestic_backup }}"
     - name: Add cron job for autorestic to forget
       become: true
       become_user: root
@@ -176,4 +186,4 @@
         name: "{{ restic_node_cron_job_name_forget }}"
         minute: "16"
         hour: "0"
-        job: "{{ dest_project_fullpath }}/scripts/forget.sh"
+        job: "{{ cronjob_script_path_with_analytics_autorestic_forget }}"

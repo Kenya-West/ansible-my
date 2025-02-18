@@ -2,6 +2,21 @@ prometheus_server_basic_auth_users:
   username: password
   username2: password2
 prometheus_server_scrape_configs:
+  - job_name: PushGateway
+    honor_labels: true
+    static_configs:
+      - targets:
+          - 'pushgateway:9091'
+    basic_auth:
+      username: prometheus
+      password: password
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
   - job_name: cAdvisor
     file_sd_configs:
       - files:

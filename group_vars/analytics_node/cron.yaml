@@ -1,0 +1,2 @@
+cron_wrapped_task_prefix: "/home/{{ standard_user }}/{{ analytics_project_structure_end_dirs.pushgateway }}/scripts/monitor-cronjob.sh --env-file /home/{{ standard_user }}/{{ analytics_project_structure_end_dirs.pushgateway }}/scripts/.env"
+cron_wrapped_task_suffix: ""
