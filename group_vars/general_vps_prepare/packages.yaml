@@ -17,6 +17,7 @@ packages_list:
       - snapd
       - locales
       - rsync
+      - bc
       # TermSCP dependencies
       - libdbus-1-dev
       - pkg-config
