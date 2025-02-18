@@ -2,12 +2,25 @@ prometheus_server_basic_auth_users:
   username: password
   username2: password2
 prometheus_server_scrape_configs:
+  - job_name: PushGateway
+    honor_labels: true
+    static_configs:
+      - targets:
+          - 'pushgateway:9091'
+    basic_auth:
+      username: prometheus
+      password: password
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
   - job_name: cAdvisor
     file_sd_configs:
       - files:
-          - /etc/file_sd/cadvisor_targets_direct.yml
-          - /etc/file_sd/cadvisor_targets_proxied.yml
-          - /etc/file_sd/cadvisor_targets_custom.yml
+          - /etc/file_sd/cadvisor_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: prometheus
@@ -23,9 +36,7 @@ prometheus_server_scrape_configs:
   - job_name: X-UI panels
     file_sd_configs:
       - files:
-          - /etc/file_sd/node_targets_direct.yml
-          - /etc/file_sd/node_targets_proxied.yml
-          - /etc/file_sd/node_targets_custom.yml
+          - /etc/file_sd/node_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: prometheus
@@ -42,9 +53,7 @@ prometheus_server_scrape_configs:
   - job_name: Restic REST server - your host
     file_sd_configs:
       - files:
-          - /etc/file_sd/restic_targets_direct.yml
-          - /etc/file_sd/restic_targets_proxied.yml
-          - /etc/file_sd/restic_targets_custom.yml
+          - /etc/file_sd/restic_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: metrics
@@ -55,7 +64,7 @@ prometheus_server_scrape_configs:
   - job_name: MongoDB
     file_sd_configs:
       - files:
-          - /etc/file_sd/mongodb_targets_custom.yml
+          - /etc/file_sd/mongodb_targets_*.yml
         refresh_interval: 30s
 
   - job_name: blackbox
@@ -78,9 +87,7 @@ prometheus_server_scrape_configs:
   - job_name: Fail2Ban
     file_sd_configs:
       - files:
-          - /etc/file_sd/fail2ban_targets_direct.yml
-          - /etc/file_sd/fail2ban_targets_proxied.yml
-          - /etc/file_sd/fail2ban_targets_custom.yml
+          - /etc/file_sd/fail2ban_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: prometheus
@@ -96,9 +103,7 @@ prometheus_server_scrape_configs:
   - job_name: Caddy
     file_sd_configs:
       - files:
-          - /etc/file_sd/caddy_targets_direct.yml
-          - /etc/file_sd/caddy_targets_proxied.yml
-          - /etc/file_sd/caddy_targets_custom.yml
+          - /etc/file_sd/caddy_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: prometheus
@@ -114,9 +119,7 @@ prometheus_server_scrape_configs:
   - job_name: FRPS
     file_sd_configs:
       - files:
-          - /etc/file_sd/frps_targets_direct.yml
-          - /etc/file_sd/frps_targets_proxied.yml
-          - /etc/file_sd/frps_targets_custom.yml
+          - /etc/file_sd/frps_targets_*.yml
         refresh_interval: 30s
     basic_auth:
       username: username # the same user name from docker_frp_dashboard_user
@@ -130,6 +133,12 @@ prometheus_server_scrape_configs:
         target_label: instance
 
 prometheus_server_remote_write_list:
+  # This is victoriametrics service that is used by grafana
+  - url: "http://victoriametrics:8428/api/v1/write"
+    basic_auth:
+      username: victoriametrics-service-account
+      password: <password>
+  # This is some another endpoint to write you could possibly add
   - url: https://sub.example.tld/api/prom/push
     basic_auth:
       username: username

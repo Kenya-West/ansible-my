@@ -9,5 +9,4 @@ certbot_auto_renew_weekday: 3
 certbot_auto_renew_hour: 0
 certbot_auto_renew_minute: 0
 certbot_auto_renew_options: "--quiet"
-certbot_certs:
-  - domains: "{{ domains }}"
+certbot_certs: "{{ domains | map('regex_replace', '^(.*)$', '{\"domains\": [\"\\1\"]}') | map('from_json') | list }}"

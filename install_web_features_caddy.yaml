@@ -14,6 +14,9 @@
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
+    cronjob_script_path_without_analytics: "{{ dest_project_fullpath }}/scripts/copy.sh"
+    cronjob_script_path_with_analytics: "{{ cronjob_script_path_without_analytics }}"
+
   roles:
     - name: ./roles/kwtoolset/copy_files
       vars:
@@ -26,6 +29,10 @@
             default_mode: "0775"
 
   post_tasks:
+    - name: Change cron job path to monitoring if it is in analytics_node group
+      set_fact:
+        cronjob_script_path_with_analytics: "{{ cron_wrapped_task_prefix }} --job-name copy_certs -- {{ cronjob_script_path_without_analytics }} {{ cron_wrapped_task_suffix }}"
+      when: "'analytics_node' in group_names"
 
     # GROUP, SSL DIRECTORY AND PERMISSIONS
     - name: Create {{ cert_access_group }} group
@@ -72,11 +79,11 @@
         name: "Copy certs"
         minute: "{{ copy_certs_auto_renew_minute }}"
         hour: "{{ copy_certs_auto_renew_hour }}"
-        job: "{{ dest_project_fullpath }}/scripts/copy.sh"
+        job: "{{ cronjob_script_path_with_analytics }}"
       when: update_script_exists.stat.exists == true
 
     - name: Run certcopy job now
       become: true
       become_user: root
-      ansible.builtin.shell: "{{ dest_project_fullpath }}/scripts/copy.sh"
+      ansible.builtin.shell: "{{ cronjob_script_path_with_analytics }}"
       when: update_script_exists.stat.exists == true
