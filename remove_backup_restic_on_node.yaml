@@ -1,6 +1,6 @@
 ---
 - name: Remove Autorestic on node
-  hosts: all
+  hosts: backup_restic_node
   become: false
   become_user: "{{ standard_user }}"
   vars:

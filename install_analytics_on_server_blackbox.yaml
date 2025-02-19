@@ -1,6 +1,6 @@
 ---
 - name: Install and configure blackbox_exporter with dependencies
-  hosts: all
+  hosts: analytics_server
   become: false
   become_user: "{{ standard_user }}"
   vars:

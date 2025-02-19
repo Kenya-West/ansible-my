@@ -1,6 +1,6 @@
 ---
 - name: Install packages by deb-get
-  hosts: all
+  hosts: general_vps_prepare
   become: true
 
   roles:

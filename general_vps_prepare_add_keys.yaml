@@ -1,6 +1,6 @@
 ---
 - name: Add keys
-  hosts: all
+  hosts: general_vps_prepare
   become: false
   become_user: "{{ standard_user }}"
 

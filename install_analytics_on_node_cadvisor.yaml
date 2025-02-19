@@ -1,6 +1,6 @@
 ---
 - name: Install and configure cadvisor with dependencies
-  hosts: all
+  hosts: analytics_node
   become: false
   become_user: "{{ standard_user }}"
   vars:

@@ -2,7 +2,7 @@
 - name: Remove VPN directories and project (WARNING - This will remove data files, too!)
   hosts: all
   become: true
-  become_user: root
+  become_user: analytics_node
 
   roles:
     - name: ./roles/remove_project_dirs

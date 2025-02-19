@@ -1,6 +1,6 @@
 ---
 - name: Install and configure Backrest webserver
-  hosts: all
+  hosts: backup_backrest_server
   become: false
   become_user: "{{ standard_user }}"
   vars:

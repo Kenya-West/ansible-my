@@ -1,6 +1,6 @@
 ---
 - name: Install Docker mirrors
-  hosts: all
+  hosts: general_vps_prepare
   become: true
 
   roles:

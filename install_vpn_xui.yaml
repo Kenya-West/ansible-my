@@ -1,6 +1,6 @@
 ---
 - name: Install X-UI (Dockerized)
-  hosts: all
+  hosts: vpn
   become: false
   become_user: "{{ standard_user }}"
   vars:

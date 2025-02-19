@@ -1,6 +1,6 @@
 ---
 - name: Add SSH ports to sshd_config
-  hosts: all
+  hosts: general_vps_prepare
   become: true
   become_user: root
 

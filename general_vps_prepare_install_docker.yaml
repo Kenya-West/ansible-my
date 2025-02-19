@@ -1,6 +1,6 @@
 ---
 - name: Install Docker
-  hosts: all
+  hosts: general_vps_prepare
   become: true
 
   roles:

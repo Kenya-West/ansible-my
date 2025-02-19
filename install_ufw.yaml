@@ -1,6 +1,6 @@
 ---
 - name: Install UFW and configure it
-  hosts: all
+  hosts: vpn:vpn_xui_first
   become: false
 
   roles:

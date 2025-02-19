@@ -1,6 +1,6 @@
 ---
 - name: Configure locale
-  hosts: all
+  hosts: general_vps_prepare
   become: true
   become_user: root
 
