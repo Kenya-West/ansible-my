@@ -18,39 +18,3 @@ restic_global_forget:
   keep-weekly: 1
   keep-monthly: 12
   keep-yearly: 7
-
-restic_node_vars:
-  locations:
-    home_user:
-      from: "/home/{{ standard_user }}"
-      to:
-        - restic-rest-server
-      options:
-        tobereplacedwith: "complete_options" # This will be replaced to alias defined in .autorestic.yaml.j2
-    shared_ssl:
-      from: "{{ cert_location_root_path }}"
-      to:
-        - restic-rest-server
-      options:
-        tobereplacedwith: "complete_options" # This will be replaced to alias defined in .autorestic.yaml.j2
-  remotes:
-    restic-rest-server:
-      type: rest
-      path: <restic_rest_server_url>
-      key: <restic_rest_remote_key> # Optional, if you already have a key
-      rest:
-        user: <restic_rest_server_user>
-        password: <restic_rest_server_password>
-      tobereplacedwith: "cron" # This will be replaced to alias defined in .autorestic.yaml.j2
-    <remote_name>:
-      type: <remote_type>
-      host: <remote_host>
-      key: <restic_rest_remote_key> # Optional, if you already have a key
-      port: <remote_port>
-      user: <remote_user>
-  # This section will be used in .autorestic.env.j2
-  # This is optional
-  remotes_dotenv_vars:
-    - name: <remote_name> # Should match the name in remotes, or use {{ restic_node_vars.remotes[<INT INDEX, e.g. 0>].name }}
-      vars:
-        - <key_name>: <key_value>

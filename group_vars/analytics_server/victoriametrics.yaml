@@ -1,5 +1,4 @@
 # The commented vars should be set in host_vars or in playbook
 
 victoriametrics_server_domain: "{{ domains_keys.victoriametrics }}"
-victoriametrics_server_httpauth_username: username
-victoriametrics_server_httpauth_password: password
+victoriametrics_server_httpauth_username: victoriametrics-service-account

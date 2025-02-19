@@ -17,13 +17,17 @@ restic_node_vars:
     restic-rest-server:
       type: rest
       path: "<restic_rest_server_url>/{{ inventory_hostname }}/"
-      key: <restic_rest_remote_key> # Optional, if you already have a key
+      # On first launch, this prop below should not exist.
+      # Then, after the first backup, you should set it to the key value from the restic server
+      key: <restic_rest_remote_key>
       rest:
         user: <restic_rest_server_user>
         password: <restic_rest_server_password>
     <remote_name>:
       type: <remote_type>
       host: "<remote_host>/{{ inventory_hostname }}/"
-      key: <restic_rest_remote_key> # Optional, if you already have a key
+      # On first launch, this prop below should not exist.
+      # Then, after the first backup, you should set it to the key value from the restic server
+      key: <restic_rest_remote_key>
       port: <remote_port>
       user: <remote_user>
