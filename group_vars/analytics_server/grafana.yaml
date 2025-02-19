@@ -1,3 +1,0 @@
-# The commented vars should be set in host_vars or in playbook
-
-grafana_server_domain: "{{ domains_keys.grafana }}"

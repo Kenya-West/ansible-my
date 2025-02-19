@@ -4,28 +4,20 @@ node_exporter_tls_server_config:
   key_file: "{{ cert_location_root_path }}/{{ cert_location_path_section.node_exporter_key }}"
 
 # Analytics_server
-prometheus_server_domain: "{{ domains_keys.prometheus }}"
 prometheus_server_tls_cert_file: "/etc/ssl/{{ cert_location_path_section.prometheus_crt }}"
 prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.prometheus_key }}"
 
 # Bakcup_node_backrest
-backrest_server_domain: "{{ domains_keys.backrest }}"
 
 # VPN - Caddy
-docker_caddy_domain: "{{ domains_keys.main }}"
 
 # VPN - FRP
-docker_frp_domain: "{{ domains_keys.frps }}"
 
 # VPN - WG
-docker_wg_domain: "{{ domains_keys.wg }}"
-docker_wg_wg_host: "{{ domains_keys.wg }}"
 
 # VPN - XRay
-docker_xray_domain: "{{ domains_keys.xray }}"
 
 # VPN - X-UI
-docker_xui_domain: "{{ domains_keys.xui }}"
 docker_xui_hostname: "{{ domains_keys.xui }}"
 
 # VPN - Web_features

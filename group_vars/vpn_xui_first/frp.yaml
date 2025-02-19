@@ -1,4 +1,3 @@
-docker_frp_domain: "{{ domains_keys.frps }}"
 docker_frp_caddy_path: frp
 docker_frp_server_port: 7000
 docker_frp_vhost_http_port: 8080

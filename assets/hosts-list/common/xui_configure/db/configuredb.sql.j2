@@ -6,7 +6,7 @@ UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_s
 UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.xui_crt }}' WHERE "key" = 'subCertFile';
 UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.xui_key }}' WHERE "key" = 'subKeyFile';
 
-UPDATE "main"."settings" SET "value" = '{{ docker_xui_domain }}' WHERE "key" = 'webDomain';
+UPDATE "main"."settings" SET "value" = '{{ domains_keys.xui }}' WHERE "key" = 'webDomain';
 
 UPDATE "main"."settings" SET "value" = 'true' WHERE "key" = 'subEnable';
 UPDATE "main"."settings" SET "value" = 'true' WHERE "key" = 'subEncrypt';

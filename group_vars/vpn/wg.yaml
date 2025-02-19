@@ -1,5 +1,3 @@
-docker_wg_domain: "{{ domains_keys.wg }}"
-docker_wg_wg_host: "{{ domains_keys.wg }}"
 docker_wg_dashboard_port: 51821
 docker_wg_server_port: 51920
 docker_wg_lang: ru

@@ -1,3 +1,2 @@
-pushgateway_server_domain: "{{ domains_keys.pushgateway }}"
 pushgateway_server_external_port: 443
 pushgateway_server_internal_port: 9091

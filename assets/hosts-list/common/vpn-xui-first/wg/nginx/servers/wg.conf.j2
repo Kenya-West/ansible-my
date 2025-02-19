@@ -1,5 +1,5 @@
 server {
-    server_name {{ docker_wg_domain }};
+    server_name {{ domains_keys.wg }};
     
     listen 443 ssl;
     ssl_certificate /etc/letsencrypt/{{ cert_location_path_section.wg_crt }};

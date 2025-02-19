@@ -1,4 +1,3 @@
-docker_xui_domain: "{{ domains_keys.xui }}"
 docker_xui_email: "{{ emails.domain }}"
 docker_xui_dashboard_login: "{{ common_username }}"
 docker_xui_dashboard_path: xui-dashboard

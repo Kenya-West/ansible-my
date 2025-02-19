@@ -1,1 +1,0 @@
-grafana_server_domain: "{{ domains_keys.grafana }}"
