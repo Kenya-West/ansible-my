@@ -1,2 +1,2 @@
-pushgateway_metrics_client_user_password: $2a$ # bcrypt hash for user 'client'
-pushgateway_metrics_prometheus_user_password: $2a$ # bcrypt hash for user 'prometheus'
+pushgateway_metrics_client_user_password: <$2a$> # bcrypt hash for user 'client'
+pushgateway_metrics_prometheus_user_password: <$2a$> # bcrypt hash for user 'prometheus'

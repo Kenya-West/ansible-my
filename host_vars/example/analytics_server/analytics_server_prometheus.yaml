@@ -1,6 +1,6 @@
 prometheus_server_basic_auth_users:
-  username: password
-  username2: password2
+  <username>: <password>
+  <username2>: <password2>
 prometheus_server_scrape_configs:
   - job_name: PushGateway
     honor_labels: true
@@ -9,7 +9,7 @@ prometheus_server_scrape_configs:
           - 'pushgateway:9091'
     basic_auth:
       username: prometheus
-      password: password
+      password: <password>
     metrics_path: /metrics
     tls_config:
       insecure_skip_verify: true
@@ -24,7 +24,7 @@ prometheus_server_scrape_configs:
         refresh_interval: 30s
     basic_auth:
       username: prometheus
-      password: password
+      password: <password>
     scheme: https
     metrics_path: /metrics
     tls_config:
@@ -40,7 +40,7 @@ prometheus_server_scrape_configs:
         refresh_interval: 30s
     basic_auth:
       username: prometheus
-      password: password
+      password: <password>
     scheme: https
     metrics_path: /node_exporter_metrics
     tls_config:
@@ -57,7 +57,7 @@ prometheus_server_scrape_configs:
         refresh_interval: 30s
     basic_auth:
       username: metrics
-      password: password
+      password: <password>
     scheme: https
     metrics_path: /frps/proxy/web/22002/metrics
 
@@ -91,7 +91,7 @@ prometheus_server_scrape_configs:
         refresh_interval: 30s
     basic_auth:
       username: prometheus
-      password: password
+      password: <password>
     scheme: https
     metrics_path: /metrics
     tls_config:
@@ -107,7 +107,7 @@ prometheus_server_scrape_configs:
         refresh_interval: 30s
     basic_auth:
       username: prometheus
-      password: password
+      password: <password>
     scheme: https
     metrics_path: /metrics
     tls_config:
@@ -123,7 +123,7 @@ prometheus_server_scrape_configs:
         refresh_interval: 30s
     basic_auth:
       username: username # the same user name from docker_frp_dashboard_user
-      password: password # the same password from docker_frp_dashboard_password
+      password: <password # the same password from docker_frp_dashboard_password>
     scheme: https
     metrics_path: /metrics
     tls_config:
@@ -142,7 +142,7 @@ prometheus_server_remote_write_list:
   - url: https://sub.example.tld/api/prom/push
     basic_auth:
       username: username
-      password: password
+      password: <password>
     queue_config:
       capacity: 5000
       max_shards: 200

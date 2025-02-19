@@ -1,3 +1,3 @@
-docker_frp_auth_token: sometoken
-docker_frp_dashboard_password: password
-docker_frp_client_dashboard_password: password
+docker_frp_auth_token: <sometoken>
+docker_frp_dashboard_password: <password>
+docker_frp_client_dashboard_password: <password>

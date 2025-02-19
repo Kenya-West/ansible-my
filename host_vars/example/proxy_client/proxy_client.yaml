@@ -1,5 +1,5 @@
-proxy_client_frpc_client_dashboard_password: password
-proxy_client_frpc_client_auth_token: sometoken
+proxy_client_frpc_client_dashboard_password: <password>
+proxy_client_frpc_client_auth_token: <sometoken>
 proxy_client_frpc_proxies:
   - name: "{{ inventory_hostname }}"
     local_port: 23001

@@ -11,6 +11,6 @@ alertmanager_receivers_list:
     http_config:
   - name: telegram
     telegram_configs:
-      - bot_token: token
+      - bot_token: <token>
         api_url: https://api.telegram.org
-        chat_id: chatId_digits
+        chat_id: <chatId_digits>
