@@ -57,3 +57,7 @@ packages_binary_list:
   - repo: "peltho/tufw"
     assets:
       - "tar.gz"
+  - repo: "rgwood/systemctl-tui"
+  - repo: "aurc/loggo"
+    assets:
+      - "tar.gz"
