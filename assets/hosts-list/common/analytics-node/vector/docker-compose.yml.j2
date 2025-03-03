@@ -1,0 +1,38 @@
+---
+services:
+  vector:
+    image: timberio/vector:latest-debian
+    cpus: 0.5
+    mem_limit: 200m
+    container_name: vector
+    environment:
+      - HOST_MACHINE={{ inventory_hostname }}
+    volumes:
+      - /run/systemd/journal/socket:/run/systemd/journal/socket:ro
+      - /var/log/journal:/var/log/journal:ro
+      - ./config/vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - {{ analytics_node_network_name }}
+
+  proxy:
+    image: nginx:latest
+    container_name: "${SERVICE_NAME}_proxy"
+    cpus: 0.5
+    mem_limit: 200m
+    env_file:
+      - .env
+    ports:
+      - "${EXTERNAL_PORT}:443/tcp"
+    networks:
+      - {{ analytics_node_network_name }}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+      - {{ cert_location_root_path }}:/etc/letsencrypt:ro
+    restart: unless-stopped
+
+networks:
+  {{ analytics_node_network_name }}:
+    external: true

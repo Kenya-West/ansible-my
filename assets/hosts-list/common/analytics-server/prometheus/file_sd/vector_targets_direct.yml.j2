@@ -1,0 +1,48 @@
+{%- set node_list = [] -%}
+{%- for host in groups['analytics_node'] -%}
+  {%- set hv = hostvars[host] -%}
+
+  {%- if (hv.domains_keys|default({})).vector_exporter is defined-%}
+
+    {# Skip adding the host if domains_keys.vector_exporter contains example.tld #}
+    {%- set skip_host = False -%}
+    {%- if hv.domains_keys is defined and hv.domains_keys.vector_exporter is defined and 'example.tld' in hv.domains_keys.vector_exporter -%}
+      {%- set skip_host = True -%}
+    {%- endif -%}
+
+    {%- if not skip_host -%}
+
+      {# 1. Hostname logic #}
+      {%- set target_hostname = hv.domains_keys.vector_exporter -%}
+
+      {# 2. Port #}
+      {%- set port = hv.vector_exporter_external_port -%}
+      {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
+
+      {# 3. Metrics path logic #}
+      {%- set metrics_path = hv.get('vector_exporter_proxy_server_url_path', hv.vector_exporter_web_telemetry_path) -%}
+      {%- if not metrics_path -%}
+        {%- set metrics_path = '/metrics' -%}
+      {%- endif -%}
+
+      {# 4. Hostname logic #}
+      {%- set hostname = hv.get('vector_exporter_proxy_server_label', hv.inventory_hostname) -%}
+
+      {# 5. Build the item we will append to the list #}
+      {%- set item = {
+        'targets': [ final_target ],
+        'labels': {
+          '__metrics_path__': metrics_path,
+          'hostname': hostname
+        }
+      } -%}
+
+      {# 5. Avoid duplicates if needed #}
+      {%- if item not in node_list -%}
+        {%- set _ = node_list.append(item) -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{{ node_list | to_nice_yaml(indent=2, sort_keys=false) }}
