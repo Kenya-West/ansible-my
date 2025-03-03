@@ -11,6 +11,7 @@ domains_keys:
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
   victoriametrics: sub-victoriametrics.example.tld
+  victorialogs: sub-victorialogs.example.tld
   pushgateway: sub-pushgateway.example.tld
   backrest: sub-backrest.example.tld
 domains: "{{ domains_keys.values() | list | unique }}"

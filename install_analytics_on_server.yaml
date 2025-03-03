@@ -5,4 +5,5 @@
 - import_playbook: ./install_analytics_on_server_mongodb.yaml
 - import_playbook: ./install_analytics_on_server_alertmanager.yaml
 - import_playbook: ./install_analytics_on_server_pushgateway.yaml
+- import_playbook: ./install_analytics_on_server_victorialogs.yaml
 - import_playbook: ./install_analytics_on_server_grafana.yaml

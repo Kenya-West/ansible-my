@@ -1,0 +1,42 @@
+---
+services:
+  victorialogs:
+    image: victoriametrics/victoria-logs:latest
+    container_name: victorialogs
+    cpus: 0.5
+    mem_limit: 200m
+    networks:
+      - caddy
+    volumes:
+      - ./data:/victoria-logs-data
+    command:
+      - '--storageDataPath=/victoria-logs-data'
+      - '--retentionPeriod=8w'
+      - '--retention.maxDiskSpaceUsageBytes=10GiB'
+      - '--httpAuth.username=${HTTPAUTH_USERNAME}'
+      - '--httpAuth.password=${HTTPAUTH_PASSWORD}'
+    restart: unless-stopped
+
+  vmauth:
+    image: victoriametrics/vmauth:latest
+    container_name: vmauth-victorialogs
+    cpus: 0.5
+    mem_limit: 200m
+    networks:
+      - caddy
+    environment:
+      USERNAME: ${HTTPAUTH_USERNAME}
+      PASSWORD: ${HTTPAUTH_PASSWORD}
+    volumes:
+      - ./vmauth/config.yml:/etc/vmauth/vmauth-config.yml:ro
+    command: -auth.config=/etc/vmauth/vmauth-config.yml
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams 8427 }}"{% endraw %}
+
+    restart: unless-stopped
+
+networks:
+  caddy:
+    external: true
