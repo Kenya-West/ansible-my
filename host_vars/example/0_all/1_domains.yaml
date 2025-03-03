@@ -8,6 +8,7 @@ domains_keys:
   node_exporter: sub-node_exporter.example.tld
   cadvisor: sub-cadvisor.example.tld
   fail2ban_exporter: sub-fail2ban_exporter.example.tld
+  vector_exporter: sub-vector_exporter.example.tld
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
   victoriametrics: sub-victoriametrics.example.tld
