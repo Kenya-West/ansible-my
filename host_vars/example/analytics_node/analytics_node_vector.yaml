@@ -10,17 +10,24 @@ victorialogs_endpoints:
 
 vector_sinks:
   sinks:
-    prometheus_sink:
+    exporter_sink:
+      type: prometheus_exporter
       inputs:
-        - host_metrics_source # you can change this name in vector.yaml.j2
-      type: prometheus_pushgateway
-      endpoint: <url to prometheus server starting from https://> # e.g. https://<prometheus_compatible_sink_url>/api/v1/write, like PushGateway
-      auth:
-        strategy: basic
-        user: <prometheus_user>
-        password: <prometheus_password>
-      healthcheck:
-        enabled: false
+        - host_metrics_source
+        - internal_metrics_source
+      address: "0.0.0.0:9598"
+
+    axiom_sink:
+      type: axiom
+      inputs:
+        - journald_source
+        - parse_logs_containers
+      compression: zstd
+      # You can switch to hard-coded values if you want,
+      # otherwise provide the following variables in docker-compose.yml or .env file
+      dataset: ${AXIOM_DATASET}
+      org_id: ${AXIOM_ORG_ID}
+      token: ${AXIOM_TOKEN}
 
     victorialogs_sink:
       inputs:
