@@ -1,9 +1,8 @@
 # If you are using a proxy server to expose some of host ports the Internet, set the following vars
-vector_exporter_tls_server_config: {} # Remove SSL because there is no need to SSL if some ports are proxied
 vector_exporter_proxy_server_list:
   - hostname: sub-frps.example.tld              # Domain with FRP server
     url_port: 443                               # Port of FRP server defined in config
-    url_path: "/frps/proxy/web/22013/metrics"   # Path to access the node_exporter metrics from Internet (by Prometheus)
+    url_path: "/frps/proxy/web/22013/metrics"   # Path to access the vector_exporter metrics from Internet (by Prometheus)
   - hostname: sub-frps.example.tld
     url_port: 443
     url_path: "/frps/proxy/web/22014/metrics"
