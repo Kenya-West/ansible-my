@@ -14,3 +14,8 @@ proxy_client_frpc_proxies:
     local_ip: 127.0.0.1
     local_port: "{{ node_exporter_web_listen_address_port }}"
     remote_port: 22002
+  - name: "{{ inventory_hostname }}_vector_exporter"
+    type: tcp
+    local_ip: 127.0.0.1
+    local_port: "{{ vector_exporter_external_port }}"
+    remote_port: 22003
