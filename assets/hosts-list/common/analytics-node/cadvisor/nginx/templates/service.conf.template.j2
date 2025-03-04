@@ -1,3 +1,4 @@
+{% if domains_keys.cadvisor is defined %}
 server {
     listen 80;
     server_name ${SERVICE_DOMAIN};
@@ -25,3 +26,21 @@ server {
         proxy_set_header Host $host;
     }
 }
+{% else %}
+server {
+    server_name ${SERVICE_DOMAIN};
+    
+    listen 80;
+
+    location / {
+        auth_basic "Restricted Access";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://${SERVICE_NAME}:${SERVICE_PORT_INTERNAL}/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+    }
+}
+{% endif %}
