@@ -3,7 +3,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     cpus: 0.5
-    mem_limit: 400m
+    mem_limit: 2GB
     # user: root
     command:
       - '--config.file=/etc/prometheus/config.yaml'
