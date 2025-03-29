@@ -29,7 +29,7 @@ packages_binary_list:
   - repo: "ducaale/xh"
   - repo: "orf/gping"
     assets:
-      - "^musl"
+      - "musl"
   - repo: "jkfran/killport"
   - repo: "Lifailon/lazyjournal"
   - repo: "bensadeh/tailspin"
