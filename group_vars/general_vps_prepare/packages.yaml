@@ -18,6 +18,8 @@ packages_list:
       - locales
       - rsync
       - bc
+      - lsof
+      - net-tools
       # TermSCP dependencies
       - libdbus-1-dev
       - pkg-config
