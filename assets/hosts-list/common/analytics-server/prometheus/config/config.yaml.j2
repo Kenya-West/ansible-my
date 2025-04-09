@@ -9,6 +9,7 @@ alerting:
           - alertmanager:9093
 rule_files:
   - "/etc/alerts/alerts.yml"
+  - "/etc/alerts/cronjobs.yml"
 scrape_configs:
   {{ prometheus_server_scrape_configs | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
 remote_write:
