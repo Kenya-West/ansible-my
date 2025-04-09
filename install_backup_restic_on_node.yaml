@@ -71,7 +71,6 @@
                 dest: "{{ temp_path }}"
                 default_mode: "0775"
       delegate_to: localhost
-      run_once: true
 
 - name: Copy templated files to remote host
   hosts: backup_restic_node

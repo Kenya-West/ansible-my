@@ -35,7 +35,6 @@
                 dest: "{{ temp_path }}"
                 default_mode: "0775"
       delegate_to: localhost
-      run_once: true
 
 # Second play: Run on the remote host to copy the templated files
 
