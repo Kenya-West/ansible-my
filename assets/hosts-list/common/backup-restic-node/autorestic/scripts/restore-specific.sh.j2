@@ -1,0 +1,3 @@
+#!/bin/bash
+tag=${2:-latest}
+autorestic restore -l home_user -c "{{ dest_project_fullpath }}/config/.autorestic.yaml" "$tag" --to ~/restored/specific --include "$1"

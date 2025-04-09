@@ -1,5 +1,5 @@
 ---
-- name: Install and configure backup by Restic REST server
+- name: Install and configure an Autorestic backup
   hosts: backup_restic_node
   become: false
   become_user: "{{ standard_user }}"
@@ -19,17 +19,7 @@
     cronjob_script_path_without_analytics_autorestic_forget: "{{ dest_project_fullpath }}/scripts/forget.sh"
     cronjob_script_path_with_analytics_autorestic_forget: "{{ cronjob_script_path_without_analytics_autorestic_forget }}"
 
-  roles:
-    - name: ./roles/kwtoolset/copy_files
-      vars:
-        dir_list:
-          - src: "{{ source_asset_fullpath_common }}"
-            dest: "{{ dest_project_rootpath }}"
-            default_mode: "0775"
-          - src: "{{ source_asset_fullpath_project }}"
-            dest: "{{ dest_project_rootpath }}"
-            default_mode: "0775"
-  pre_tasks:
+  tasks:
     - name: Change cron job path to monitoring if it is in analytics_node group
       set_fact:
         cronjob_script_path_with_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix | default('') }} {{ cron_wrapped_task_prefix }} --job-name autorestic_backup -- {{ dest_project_fullpath }}/scripts/update-cron.sh {{ cron_wrapped_task_suffix }}"
@@ -51,6 +41,58 @@
       ansible.builtin.shell: restic version
       register: restic_version_newly_installed
       when: restic_version.rc != 0
+
+- name: Template files locally
+  hosts: backup_restic_node
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: autorestic
+    project_name: autorestic
+    project_root_dir: "{{ backup_restic_node_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+    temp_path: "{{ playbook_dir }}/temp"
+  tasks:
+    - block:
+        - name: Run local templating tasks for files
+          include_role:
+            name: ./roles/kwtoolset/copy_files
+          vars:
+            dir_list:
+              - src: "{{ source_asset_fullpath_common }}"
+                dest: "{{ temp_path }}"
+                default_mode: "0775"
+              - src: "{{ source_asset_fullpath_project }}"
+                dest: "{{ temp_path }}"
+                default_mode: "0775"
+      delegate_to: localhost
+      run_once: true
+
+- name: Copy templated files to remote host
+  hosts: backup_restic_node
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: autorestic
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ backup_restic_node_project_structure_root }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+    local_templated_dir: "{{ playbook_dir }}/temp/{{ project_dir}}"
+
+  tasks:
+    - name: Synchronize templated files to remote host
+      ansible.builtin.synchronize:
+        mode: push
+        src: "{{ local_templated_dir }}/"
+        dest: "{{ dest_project_fullpath }}/"
+        rsync_opts:
+          - "--chmod=ug=rwX,o=rX"
+      delegate_to: localhost
+
   post_tasks:
     # Check
     - name: Get info about configuration
