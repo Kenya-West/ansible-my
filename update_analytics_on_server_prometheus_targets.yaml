@@ -14,7 +14,7 @@
     source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
-    temp_path: "{{ playbook_dir }}/temp/{{ project_dir }}"
+    temp_path: "{{ playbook_dir }}/temp/{{ inventory_hostname }}/{{ project_dir }}"
   tasks:
     - block:
         - name: Run local templating tasks for files
@@ -46,7 +46,7 @@
     project_dir: prometheus
     dest_project_rootpath: "/home/{{ standard_user }}/{{ analytics_server_project_structure_root }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
-    local_templated_dir: "{{ playbook_dir }}/temp/{{ project_dir}}"
+    local_templated_dir: "{{ playbook_dir }}/temp/{{ inventory_hostname }}/{{ project_dir}}"
 
   tasks:
     - name: Synchronize templated files to remote host
