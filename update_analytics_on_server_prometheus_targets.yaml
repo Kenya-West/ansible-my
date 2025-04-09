@@ -1,5 +1,6 @@
 ---
-- name: Update Prometheus with dependencies
+
+- name: Template files locally
   hosts: analytics_server
   become: false
   become_user: "{{ standard_user }}"
@@ -13,20 +14,47 @@
     source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+    temp_path: "{{ playbook_dir }}/temp/{{ project_dir }}"
+  tasks:
+    - block:
+        - name: Run local templating tasks for files
+          include_role:
+            name: ./roles/kwtoolset/copy_files
+          vars:
+            dir_list:
+              - src: "{{ source_asset_fullpath_common }}/file_sd"
+                dest: "{{ temp_path }}"
+                default_mode: "0775"
+              - src: "{{ source_asset_fullpath_project }}/file_sd"
+                dest: "{{ temp_path }}"
+                default_mode: "0775"
+              - src: "{{ source_asset_fullpath_common }}/alerts"
+                dest: "{{ temp_path }}"
+                default_mode: "0775"
+              - src: "{{ source_asset_fullpath_project }}/alerts"
+                dest: "{{ temp_path }}"
+                default_mode: "0775"
+      delegate_to: localhost
+      run_once: true
 
-  roles:
-    - name: ./roles/kwtoolset/copy_files
-      vars:
-        dir_list:
-          - src: "{{ source_asset_fullpath_common }}/file_sd"
-            dest: "{{ dest_project_fullpath }}"
-            default_mode: "0775"
-          - src: "{{ source_asset_fullpath_project }}/file_sd"
-            dest: "{{ dest_project_fullpath }}"
-            default_mode: "0775"
-          - src: "{{ source_asset_fullpath_common }}/alerts"
-            dest: "{{ dest_project_fullpath }}"
-            default_mode: "0775"
-          - src: "{{ source_asset_fullpath_project }}/alerts"
-            dest: "{{ dest_project_fullpath }}"
-            default_mode: "0775"
+# Second play: Run on the remote host to copy the templated files
+
+- name: Copy templated files to remote host
+  hosts: analytics_server
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: prometheus
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ analytics_server_project_structure_root }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+    local_templated_dir: "{{ playbook_dir }}/temp/{{ project_dir}}"
+
+  tasks:
+    - name: Synchronize templated files to remote host
+      ansible.builtin.synchronize:
+        mode: push
+        src: "{{ local_templated_dir }}/"
+        dest: "{{ dest_project_fullpath }}/"
+        rsync_opts:
+          - "--chmod=ug=rwX,o=rX"
+      delegate_to: localhost
