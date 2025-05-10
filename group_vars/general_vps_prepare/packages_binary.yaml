@@ -61,3 +61,6 @@ packages_binary_list:
   - repo: "aurc/loggo"
     assets:
       - "tar.gz"
+  - repo: "wait4x/wait4x"
+  - repo: "medialab/xan"
+  - repo: "walles/riff"
