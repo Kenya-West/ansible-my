@@ -10,16 +10,44 @@
     - bin_name | length > 0
   failed_when: bin_installed.rc >= 2
 
+- name: Construct download command for {{ item.repo }} using eget
+  set_fact:
+    download_cmd: >-
+      timeout 30s
+      eget {{ item.repo }}
+      {% if item.assets is defined and item.assets | length > 0 %}
+      {% for asset in item.assets %}--asset {{ asset }}{% endfor %}
+      {% endif %}
+      {% if item.file is defined and item.file | length > 0 %}--file {{ item.file }}{% endif %}
+      --to {{ item.dest_loc | default('/usr/local/bin') }}
+  when: eget_installed.rc == 0 and (eget_skip_installed_packages is not defined or eget_skip_installed_packages == false)
+
+- name: Debug constructed command for {{ item.repo }}
+  ansible.builtin.debug:
+    msg: "Constructed command: {{ download_cmd }}"
+  when: download_cmd is defined
+
 - name: Download package {{ item.repo }} using eget
-  ansible.builtin.command: >
-    eget {{ item.repo }}
-    {% if item.assets is defined and item.assets | length > 0 %}
-    {% for asset in item.assets %} --asset {{ asset }}{% endfor %}
-    {% endif %}
-    {% if item.file is defined and item.file | length > 0 %} --file {{ item.file }}{% endif %}
-    --to {{ item.dest_loc | default('/usr/local/bin') }}
-  when: (eget_installed.rc == 0 and (eget_skip_installed_packages is not defined or eget_skip_installed_packages == false)) or (eget_installed.rc == 0 and bin_installed.rc != 0)
+  ansible.builtin.command: "{{ download_cmd }}"
+  when: download_cmd is defined
+  register: bin_download_result
   ignore_errors: true
+
+- name: Display output of package {{ item.repo }} download if interaction required
+  ansible.builtin.debug:
+    msg: "{{ bin_download_result.stderr_lines | default(bin_download_result.stderr) }}"
+  when: "'please select manually' in bin_download_result.stderr"
+  register: bin_download_result_interaction
+
+- name: Include interaction_fallback if interaction required
+  ansible.builtin.include_tasks: interaction_fallback.yml
+  when: bin_download_result_interaction is defined
+
+- name: Display output of package {{ item.repo }} download if no upgrade performed
+  ansible.builtin.debug:
+    msg: "{{ bin_download_result.stderr }}"
+  when: "'is not more recent than' in bin_download_result.stderr"
+  register: bin_download_result_no_upgrade
 
 - name: Get binary location via command command
   ansible.builtin.shell: "command -v {{ bin_name }}"
