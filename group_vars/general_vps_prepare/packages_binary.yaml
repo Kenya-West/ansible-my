@@ -64,3 +64,5 @@ packages_binary_list:
   - repo: "wait4x/wait4x"
   - repo: "medialab/xan"
   - repo: "walles/riff"
+  - repo: "isd-project/isd"
+  - repo: "wzv5/pping"
