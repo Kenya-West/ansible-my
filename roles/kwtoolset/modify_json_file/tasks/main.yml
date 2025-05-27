@@ -1,0 +1,44 @@
+# tasks file for roles/modify_json_file
+---
+# Grab file's current owner/group
+- name: Gather existing JSON file ownership
+  ansible.builtin.stat:
+    path: "{{ modify_json_file_path }}"
+  register: modify_json_file_stat
+
+- name: Ensure JSON file exists
+  ansible.builtin.file:
+    path: "{{ modify_json_file_path }}"
+    state: touch
+    owner: "{{ modify_json_file_owner | default(modify_json_file_stat.stat.pw_name) | default('root') }}"
+    group: "{{ modify_json_file_group | default(modify_json_file_stat.stat.gr_name) | default('root') }}"
+    mode: "{{ modify_json_file_mode | default(modify_json_file_stat.stat.mode) | default('0755') }}"
+
+- name: Get file contents
+  become: true
+  ansible.builtin.slurp:
+    path: "{{ modify_json_file_path }}"
+  register: modify_json_file_content
+
+- name: Parse existing JSON file contents or initialize to empty dict
+  ansible.builtin.set_fact:
+    modify_json_file_var: "{{ modify_json_file_content.content | b64decode | from_json | default({}) }}"
+  when: modify_json_file_content.content | b64decode | length > 0
+
+- name: Append file contents to a variable
+  ansible.builtin.set_fact:
+    modify_json_file_var: "{{ (modify_json_file_var | default({})) | combine(modify_json_file_var_lines_append) }}"
+
+- name: Completely replace file contents with a variable
+  ansible.builtin.set_fact:
+    modify_json_file_var: "{{ modify_json_file_var_lines_rewrite }}"
+  when:
+    - modify_json_file_var_lines_rewrite is defined
+    - modify_json_file_var_lines_rewrite | length > 1
+
+- name: Write contents to JSON file
+  become: true
+  ansible.builtin.copy:
+    content: "{{ modify_json_file_var | to_nice_json }}"
+    dest: "{{ modify_json_file_path }}"
+    backup: true
