@@ -38,11 +38,6 @@
     docker_config: "{{ docker_config_file_content.content | b64decode | from_json | default({}) }}"
   when: (country == docker_mirror_country_code) and (docker_config_file_content.content | b64decode | length > 0)
 
-- name: Use default Docker configuration
-  ansible.builtin.set_fact:
-    docker_config: {}
-  when: (country == docker_mirror_country_code) and not (docker_config_file_content.content | b64decode | length > 0)
-
 - name: Set Docker Hub mirrors
   ansible.builtin.set_fact:
     docker_config: "{{ docker_config | combine({'registry-mirrors': docker_mirrors_ru}) }}"
