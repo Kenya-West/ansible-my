@@ -9,3 +9,4 @@ docker_mirrors_ru:
   - "https://c.163.com"
   - "https://registry.docker-cn.com"
 docker_mirror_country_code: "RU"
+docker_metrics_addr: "127.0.0.1:9323"
