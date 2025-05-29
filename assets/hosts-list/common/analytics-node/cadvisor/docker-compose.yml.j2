@@ -6,24 +6,19 @@ services:
     cpus: 0.5
     mem_limit: 200m
     container_name: "${SERVICE_NAME}"
-    privileged: true
     env_file:
       - .env
     volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/machine-id:/etc/machine-id:ro
       - /:/rootfs:ro
-      - /dev/disk/:/dev/disk:ro
-      - /sys:/sys:ro
       - /var/run:/var/run:ro
+      - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
-    command:
-      - "--storage_duration=5m0s"
-      - "--housekeeping_interval=60s"
-      - "--docker_only=true"
-      - "--enable_metrics=cpu,memory,network"
+      - /dev/disk/:/dev/disk:ro
     networks:
       - {{ analytics_node_network_name }}
+{% if 'vpn' in group_names or 'vpn_xui_first' in group_names %}
+      - {{ docker_vpn_network }}
+{% endif %}
     restart: unless-stopped
 
   cadvisor_proxy:
@@ -53,3 +48,7 @@ services:
 networks:
   {{ analytics_node_network_name }}:
     external: true
+{% if 'vpn' in group_names or 'vpn_xui_first' in group_names %}
+  {{ docker_vpn_network }}:
+    external: true
+{% endif %}
