@@ -15,7 +15,7 @@ services:
     networks:
       - {{ analytics_node_network_name }}
 
-  proxy:
+  vector_proxy:
     image: nginx:latest
     container_name: "${SERVICE_NAME}_proxy"
     cpus: 0.5

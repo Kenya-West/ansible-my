@@ -13,7 +13,7 @@ services:
       - {{ analytics_node_network_name }}
     restart: unless-stopped
 
-  proxy:
+  fail2ban_exporter_proxy:
     image: nginx:latest
     container_name: "${SERVICE_NAME}_proxy"
     cpus: 0.5
