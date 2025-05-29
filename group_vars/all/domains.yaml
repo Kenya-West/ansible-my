@@ -8,6 +8,7 @@ domains_keys:
   frps: sub-frps.example.tld
   wg: sub-wg.example.tld
   xray: sub-xray.example.tld
+  docker_exporter: sub-docker_exporter.example.tld
   node_exporter: sub-node_exporter.example.tld
   cadvisor: sub-cadvisor.example.tld
   fail2ban_exporter: sub-fail2ban_exporter.example.tld

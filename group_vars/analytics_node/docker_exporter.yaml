@@ -1,0 +1,3 @@
+docker_exporter_external_port: 50109
+docker_exporter_web_telemetry_path: /metrics
+docker_exporter_web_listen_address: "127.0.0.1:9323"

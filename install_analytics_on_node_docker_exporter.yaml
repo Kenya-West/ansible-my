@@ -1,0 +1,92 @@
+---
+- name: Install and configure Docker exporter with dependencies
+  hosts: analytics_node
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: docker_exporter
+    project_name: docker_exporter
+    project_root_dir: "{{ analytics_node_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+
+  roles:
+    - name: ./roles/kwtoolset/container_stop_down
+      vars:
+        container_stop_down_list:
+          - "{{ dest_project_fullpath }}"
+    - name: ./roles/kwtoolset/copy_files
+      vars:
+        dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+    - name: ./roles/kwtoolset/container_pull
+      vars:
+        container_pull_list:
+          - path: "{{ dest_project_fullpath }}"
+            name: "{{ project_name }}"
+            policy: "policy"
+    - name: ./roles/kwtoolset/container_up
+      vars:
+        container_up_list:
+          - path: "{{ dest_project_fullpath }}"
+            name: "{{ project_name }}"
+            ignore_errors: false
+  pre_tasks:
+    # .htpasswd file
+    - name: Remove .htpasswd file if exists
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ dest_project_fullpath }}/nginx/.htpasswd"
+        state: absent
+    - name: Add .htpasswd file with users
+      community.general.htpasswd:
+        path: "{{ dest_project_fullpath }}/nginx/.htpasswd"
+        name: "{{ item.name }}"
+        password: "{{ item.password }}"
+        hash_scheme: "{{ item.hash_scheme | default('md5_crypt') }}"
+        mode: "0644"
+      loop: "{{ docker_exporter_server_users }}"
+      failed_when:
+        - docker_exporter_server_users is not defined
+        - docker_exporter_server_users | length == 0
+        - item.name is not defined or item.name == ""
+        - item.password is not defined or item.password == ""
+    - name: Check if .htpasswd file exists
+      stat:
+        path: "{{ dest_project_fullpath }}/nginx/.htpasswd"
+      register: htpasswd_file
+      failed_when: htpasswd_file.stat.exists == false
+    - name: Check if .htpasswd file is empty
+      command: "test -s {{ dest_project_fullpath }}/nginx/.htpasswd"
+      register: htpasswd_file_empty
+      failed_when: htpasswd_file_empty.rc != 0
+    # Docker network
+    - name: Ensure Docker network {{ analytics_node_network_name }} exists with specific settings
+      community.docker.docker_network:
+        name: "{{ analytics_node_network_name }}"
+        driver: bridge
+        state: present
+
+  post_tasks:
+    - name: Add port {{ docker_exporter_external_port }} to UFW
+      become: true
+      become_user: root
+      community.general.ufw:
+        rule: allow
+        port: "{{ docker_exporter_external_port }}"
+        proto: tcp
+    - name: Reminder to run install_ufw.yaml playbook
+      ansible.builtin.debug:
+        msg: |
+          Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
+          Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}

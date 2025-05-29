@@ -5,6 +5,7 @@ domains_keys:
   wg: sub-wg.example.tld
   xray: sub-xray.example.tld
   restic: sub-restic.example.tld
+  docker_exporter: sub-docker_exporter.example.tld
   node_exporter: sub-node_exporter.example.tld
   cadvisor: sub-cadvisor.example.tld
   fail2ban_exporter: sub-fail2ban_exporter.example.tld
