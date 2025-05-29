@@ -13,10 +13,8 @@
     - name: ./roles/kwtoolset/modify_json_file
       vars:
         modify_json_file_path: "{{ docker_config_file }}"
-        # modify_json_file_path: "/home/{{ standard_user }}/some.json"
         modify_json_file_var_lines_append:
           metrics-addr: "{{ docker_metrics_addr }}"
-        # modify_json_file_mode: "0644"
   
   post_tasks:
     - name: Restart Docker service
