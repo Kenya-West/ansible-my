@@ -19,9 +19,9 @@
       vars:
         container_stop_down_list:
           - "{{ dest_project_fullpath }}"
-    - name: ./roles/kwtoolset/copy_files
+    - name: ./roles/kwtoolset/copy_files_templating
       vars:
-        dir_list:
+        copy_files_templating_dir_list:
           - src: "{{ source_asset_fullpath_common }}"
             dest: "{{ dest_project_rootpath }}"
             default_mode: "0777"

@@ -51,9 +51,9 @@
     - block:
         - name: Run local templating tasks for files
           include_role:
-            name: ./roles/kwtoolset/copy_files
+            name: ./roles/kwtoolset/copy_files_templating
           vars:
-            dir_list:
+            copy_files_templating_dir_list:
               - src: "{{ source_asset_fullpath_common }}"
                 dest: "{{ temp_path }}"
                 default_mode: "0775"

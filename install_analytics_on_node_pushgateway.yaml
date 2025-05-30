@@ -15,9 +15,9 @@
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
   roles:
-    - name: ./roles/kwtoolset/copy_files
+    - name: ./roles/kwtoolset/copy_files_templating
       vars:
-        dir_list:
+        copy_files_templating_dir_list:
           - src: "{{ source_asset_fullpath_common }}"
             dest: "{{ dest_project_rootpath }}"
             default_mode: "0775"

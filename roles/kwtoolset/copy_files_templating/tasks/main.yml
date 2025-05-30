@@ -1,0 +1,85 @@
+---
+# tasks file for roles/kwtoolset/copy_files
+
+# - name: Check the item (which is a path) exists locally
+#   ansible.builtin.stat:
+#     path: "{{ item.src }}"
+#   register: item_stat
+#   delegate_to: localhost
+#   loop: "{{ copy_files_templating_dir_list }}"
+#   loop_control:
+#     loop_var: item
+
+# - name: Find any files with Jinja templating across all dirs
+#   ansible.builtin.find:
+#     paths: "{{ copy_files_templating_dir_list | map(attribute='src') | list }}"
+#     patterns: "{{ copy_files_templating_jinja_patterns 
+#                   | default('*.j,*.j2,*.jinja,*.jinja2,*.template') }}"
+#     recurse: true
+#   register: copy_files_templating_jinja_files
+#   delegate_to: localhost
+
+- name: Check each src path locally to find directories
+  ansible.builtin.stat:
+    path: "{{ item.src }}"
+  loop: "{{ copy_files_templating_dir_list }}"
+  loop_control:
+    loop_var: item
+  register: copy_files_templating_dir_stats
+  delegate_to: localhost
+
+- name: Get only existing items
+  ansible.builtin.set_fact:
+    copy_files_templating_src_exists: >-
+      {{
+        copy_files_templating_dir_stats.results
+        | selectattr('stat.exists','equalto',true)
+        | map(attribute='item')
+        | list
+      }}
+
+- name: Find any files with Jinja templating under each src
+  ansible.builtin.find:
+    paths: "{{ item.src }}"
+    patterns:
+      - "*.j"
+      - "*.j2"
+      - "*.jinja"
+      - "*.jinja2"
+    recurse: true
+    hidden: true
+  loop: "{{ copy_files_templating_src_exists }}"
+  loop_control:
+    loop_var: item
+  register: _jinja_find_results
+  delegate_to: localhost
+
+- name: Combine all found Jinja files into one list
+  ansible.builtin.set_fact:
+    copy_files_templating_jinja_files_list: >-
+      {{
+        _jinja_find_results.results
+        | map(attribute='files')
+        | flatten
+      }}
+
+- name: Process each of path (no templating)
+  ansible.builtin.include_tasks: copy_dumb.yml
+  loop: "{{ copy_files_templating_src_exists }}"
+  loop_control:
+    loop_var: item
+  when: copy_files_templating_jinja_files_list | length == 0
+
+- name: Check if rsync is installed
+  ansible.builtin.shell: "command -v rsync"
+  register: copy_files_templating_rsync_installed
+  failed_when: copy_files_templating_rsync_installed.rc >= 2
+  when: copy_files_templating_jinja_files_list | length > 0
+  delegate_to: localhost
+
+- name: Process each of path
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ copy_files_templating_src_exists }}"
+  loop_control:
+    loop_var: item
+  when: copy_files_templating_jinja_files_list | length > 0

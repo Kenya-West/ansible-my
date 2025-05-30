@@ -1,0 +1,28 @@
+- name: Create temporary directory
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: copy_files_templating_
+  register: copy_files_templating_temp_dir
+
+- name: Copy files recuresively with templating {{ item.src }}
+  template_tree:
+    src: "{{ item.src }}"
+    dest: "{{ copy_files_templating_temp_dir.path }}"
+    mode: "{{ item.default_mode | default('0775') }}"
+  delegate_to: localhost
+
+- name: Synchronize templated files to remote host {{ item.dest }}
+  ansible.builtin.synchronize:
+    mode: push
+    src: "{{ copy_files_templating_temp_dir.path }}/"
+    dest: "{{ item.dest }}/"
+    rsync_opts:
+      - "--chmod=ug=rwX,o=rX"
+  delegate_to: localhost
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ copy_files_templating_temp_dir.path }}"
+    state: absent
+  when:
+    - copy_files_templating_temp_dir.path is defined
