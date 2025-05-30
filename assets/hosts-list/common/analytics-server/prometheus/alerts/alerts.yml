@@ -11,7 +11,7 @@ groups:
         "Service {{ $labels.instance }} is unavailable!"
 
   - alert: SSLCertExpire
-    expr: probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 30
+    expr: probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 10
     for: 8h
     labels:
       severity: "warning"
