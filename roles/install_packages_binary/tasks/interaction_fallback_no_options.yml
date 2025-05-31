@@ -1,3 +1,15 @@
+- name: Download package using eget without asset
+  ansible.builtin.command: "{{ download_cmd_without_assets }}"
+  when: download_cmd is defined
+  register: bin_download_result
+  ignore_errors: true
+
+- name: Display output of package download if interaction required
+  ansible.builtin.debug:
+    msg: "{{ bin_download_result.stderr_lines | default(bin_download_result.stderr) }}"
+  when: "'please select manually' in bin_download_result.stderr"
+  register: bin_download_result_interaction
+
 - name: Extract available options from stderr_lines or stderr
   set_fact:
     bin_download_options: >-
@@ -38,18 +50,8 @@
     - bin_download_option_selected is not defined
     - (bin_download_options | lower | select('search', '\\.appimage$') | list | length) == 1
 
-# - name: Select random option
-#   set_fact:
-#     bin_download_option_selected: "{{ bin_download_options | random }}"
-#   when:
-#     - bin_download_option_selected is not defined
-
-- name: Include interaction_fallback_no_options if interaction required
-  ansible.builtin.include_tasks: interaction_fallback_no_options.yml
+- name: Select random option
+  set_fact:
+    bin_download_option_selected: "{{ bin_download_options | random }}"
   when:
-    - bin_download_result_interaction is not defined
-
-- name: Run download command with selected asset
-  ansible.builtin.command: "{{ download_cmd }} --asset {{ bin_download_option_selected }}"
-  when:
-    - bin_download_option_selected is defined
+    - bin_download_option_selected is not defined

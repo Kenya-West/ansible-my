@@ -21,6 +21,12 @@
       {% if bin_installed.rc == 0 %} --upgrade-only{% endif %}
       {% if item.file is defined and item.file | length > 0 %}--file {{ item.file }}{% endif %}
       --to {{ item.dest_loc | default('/usr/local/bin') }}
+    download_cmd_without_assets: >-
+      timeout 30s
+      eget {{ item.repo }}
+      {% if bin_installed.rc == 0 %} --upgrade-only{% endif %}
+      {% if item.file is defined and item.file | length > 0 %}--file {{ item.file }}{% endif %}
+      --to {{ item.dest_loc | default('/usr/local/bin') }}
   when: eget_installed.rc == 0 and (eget_skip_installed_packages is not defined or eget_skip_installed_packages == false)
 
 - name: Debug constructed command for {{ item.repo }}
