@@ -8,7 +8,7 @@
         | list
       }}
 
-- name: Debug available download options
+- name: Show available download options
   ansible.builtin.debug:
     msg: "Available download options: {{ bin_download_options | length }}"
 
