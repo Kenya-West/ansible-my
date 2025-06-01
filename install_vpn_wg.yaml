@@ -1,6 +1,6 @@
 ---
 - name: Install WireGuard as separate service (Dockerized)
-  hosts: vpn
+  hosts: vpn:vpn_remna
   become: false
   become_user: "{{ standard_user }}"
   vars:

@@ -4,6 +4,7 @@
 # You should reinitialize them in host_vars/host_name/1_domains.yaml
 domains_keys:
   main: sub.example.tld
+  remna_server: sub-remna.example.tld
   xui: sub-xui.example.tld
   frps: sub-frps.example.tld
   wg: sub-wg.example.tld

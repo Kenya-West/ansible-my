@@ -1,12 +1,12 @@
 ---
-- name: Install FRP (Dockerized)
-  hosts: vpn:vpn_remna
+- name: Install and configure Remnawave panel
+  hosts: vpn_remna_server_caddy
   become: false
   become_user: "{{ standard_user }}"
   vars:
-    project_dir: frps
-    project_name: frps
-    project_root_dir: "{{ vpn_project_structure_root }}"
+    project_dir: remna
+    project_name: remnawave
+    project_root_dir: "{{ remna_server_caddy_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
     source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
@@ -40,3 +40,24 @@
           - path: "{{ dest_project_fullpath }}"
             name: "{{ project_name }}"
             ignore_errors: false
+  # pre_tasks:
+  #   # Docker network
+  #   - name: Ensure Docker network {{ docker_remna_server_caddy_network }} exists with specific settings
+  #     community.docker.docker_network:
+  #       name: "{{ docker_remna_server_caddy_network }}"
+  #       driver: bridge
+  #       state: present
+
+  # post_tasks:
+  #   - name: Add port {{ remnawave_external_port }} to UFW
+  #     become: true
+  #     become_user: root
+  #     community.general.ufw:
+  #       rule: allow
+  #       port: "{{ remnawave_external_port }}"
+  #       proto: tcp
+  #   - name: Reminder to run install_ufw.yaml playbook
+  #     ansible.builtin.debug:
+  #       msg: |
+  #         Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
+  #         Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}

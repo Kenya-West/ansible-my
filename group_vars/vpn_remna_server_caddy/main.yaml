@@ -1,0 +1,10 @@
+remna_server_caddy_is_telegram_notifications_enabled: false
+
+remna_server_caddy_telegram_oauth_enabled: false
+
+remna_server_caddy_metrics_user: prometheus
+
+remna_server_caddy_webhook_enabled: true
+remna_server_caddy_webhook_url_path: api/webhook
+
+remna_server_caddy_subscription_path: api/sub
