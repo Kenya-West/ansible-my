@@ -1,0 +1,4 @@
+# (1) Take the base64 text, decode it into a variable.  Nothing is printed.
+SECRET_DECODED="$(printf '%s' "{{ rclone_password_base64 }}" | base64 -d)"
+# (2) Export it.  
+export RCLONE_CONFIG_PASS="$SECRET_DECODED"

@@ -1,0 +1,64 @@
+---
+- name: Install and configure RClone
+  hosts: backup_restic_node
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: rclone
+    project_name: rclone
+    project_root_dir: "{{ backup_restic_node_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+    root_config_dir: "/root/.config"
+    user_config_dir: "/home/{{ standard_user }}/.config"
+
+    cronjob_script_path_without_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix | default('') }} {{ dest_project_fullpath }}/scripts/update-cron.sh"
+    cronjob_script_path_with_analytics_autorestic_backup: "{{ cronjob_script_path_without_analytics_autorestic_backup }}"
+    cronjob_script_path_without_analytics_autorestic_forget: "{{ dest_project_fullpath }}/scripts/forget.sh"
+    cronjob_script_path_with_analytics_autorestic_forget: "{{ cronjob_script_path_without_analytics_autorestic_forget }}"
+
+  pre_tasks:
+    - name: Check if rclone is installed
+      ansible.builtin.shell: "command -v rclone"
+      register: rclone_installed
+      failed_when: rclone_installed.rc != 0
+
+  roles:
+    - name: ./roles/kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ user_config_dir }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ user_config_dir }}"
+            default_mode: "0775"
+
+    - name: ./roles/kwtoolset/copy_files_templating
+      become: true
+      become_user: root
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ root_config_dir }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ root_config_dir }}"
+            default_mode: "0775"
+
+  post_tasks:
+    - name: Check RClone configuration
+      ansible.builtin.shell: |
+        export RCLONE_CONFIG_PASS={{ rclone_password }}
+        timeout 3s rclone config show
+      register: rclone_config_check
+      failed_when: rclone_config_check.rc != 0
+
+    - name: Fail if RClone configuration lines are fewer than 5
+      ansible.builtin.fail:
+        msg: "RClone configuration is not valid. Please check the configuration file."
+      when: rclone_config_check.stdout_lines | length < 5
