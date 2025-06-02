@@ -20,6 +20,9 @@
     cronjob_script_path_with_analytics_autorestic_backup: "{{ cronjob_script_path_without_analytics_autorestic_backup }}"
     cronjob_script_path_without_analytics_autorestic_forget: "{{ dest_project_fullpath }}/scripts/forget.sh"
     cronjob_script_path_with_analytics_autorestic_forget: "{{ cronjob_script_path_without_analytics_autorestic_forget }}"
+  
+  environment:
+    RCLONE_CONFIG_PASS: "{{ rclone_password | default(omit) }}"
 
   pre_tasks:
     - name: Check if rclone is installed
@@ -53,7 +56,6 @@
   post_tasks:
     - name: Check RClone configuration
       ansible.builtin.shell: |
-        export RCLONE_CONFIG_PASS={{ rclone_password }}
         timeout 3s rclone config show
       register: rclone_config_check
       failed_when: rclone_config_check.rc != 0
