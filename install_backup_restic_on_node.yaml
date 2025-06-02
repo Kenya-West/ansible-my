@@ -14,7 +14,12 @@
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
-  tasks:
+    cronjob_script_path_without_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix | default('') }} {{ dest_project_fullpath }}/scripts/update-cron.sh"
+    cronjob_script_path_with_analytics_autorestic_backup: "{{ cronjob_script_path_without_analytics_autorestic_backup }}"
+    cronjob_script_path_without_analytics_autorestic_forget: "{{ dest_project_fullpath }}/scripts/forget.sh"
+    cronjob_script_path_with_analytics_autorestic_forget: "{{ cronjob_script_path_without_analytics_autorestic_forget }}"
+
+  pre_tasks:
     - name: Add prefix dest_project_fullpath to each of restic_excludes_list_files
       set_fact:
         restic_excludes_list_files: "{{ [dest_project_fullpath + '/config/excludes'] | product(restic_excludes_list_files) | map('join', '/') | list }}"
@@ -32,77 +37,22 @@
       register: restic_version_newly_installed
       when: restic_version.rc != 0
 
-- name: Template files locally
-  hosts: backup_restic_node
-  become: false
-  become_user: "{{ standard_user }}"
-  vars:
-    project_dir: autorestic
-    project_name: autorestic
-    project_root_dir: "{{ backup_restic_node_project_structure_root }}"
-    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
-    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
-    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
-    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
-    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
-    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
-    temp_path: "{{ playbook_dir }}/temp/{{ inventory_hostname }}"
-  tasks:
-    - block:
-        - name: Run local templating tasks for files
-          include_role:
-            name: ./roles/kwtoolset/copy_files_templating
-          vars:
-            copy_files_templating_dir_list:
-              - src: "{{ source_asset_fullpath_common }}"
-                dest: "{{ temp_path }}"
-                default_mode: "0775"
-              - src: "{{ source_asset_fullpath_project }}"
-                dest: "{{ temp_path }}"
-                default_mode: "0775"
-      delegate_to: localhost
+  roles:
+    - name: ./roles/kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
 
-- name: Copy templated files to remote host
-  hosts: backup_restic_node
-  become: false
-  become_user: "{{ standard_user }}"
-  vars:
-    project_dir: autorestic
-    dest_project_rootpath: "/home/{{ standard_user }}/{{ backup_restic_node_project_structure_root }}"
-    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
-    local_templated_dir: "{{ playbook_dir }}/temp/{{ inventory_hostname }}/{{ project_dir}}"
+  post_tasks:
+    - name: Make all scripts executable in one go
+      ansible.builtin.shell: |
+        find "{{ dest_project_fullpath }}/scripts" -type f -name '*.sh' -exec chmod 0775 {} +
 
-  tasks:
-    - name: Synchronize templated files to remote host
-      ansible.builtin.synchronize:
-        mode: push
-        src: "{{ local_templated_dir }}/"
-        dest: "{{ dest_project_fullpath }}/"
-        rsync_opts:
-          - "--chmod=ug=rwX,o=rX"
-      delegate_to: localhost
-
-- name: Setup cron jobs and try first backup
-  hosts: backup_restic_node
-  become: false
-  become_user: "{{ standard_user }}"
-  vars:
-    project_dir: autorestic
-    project_name: autorestic
-    project_root_dir: "{{ backup_restic_node_project_structure_root }}"
-    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
-    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
-    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
-    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
-    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
-    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
-
-    cronjob_script_path_without_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix | default('') }} {{ dest_project_fullpath }}/scripts/update-cron.sh"
-    cronjob_script_path_with_analytics_autorestic_backup: "{{ cronjob_script_path_without_analytics_autorestic_backup }}"
-    cronjob_script_path_without_analytics_autorestic_forget: "{{ dest_project_fullpath }}/scripts/forget.sh"
-    cronjob_script_path_with_analytics_autorestic_forget: "{{ cronjob_script_path_without_analytics_autorestic_forget }}"
-
-  tasks:
     # Cron job
     - name: Change cron job path to monitoring if it is in analytics_node group
       set_fact:
