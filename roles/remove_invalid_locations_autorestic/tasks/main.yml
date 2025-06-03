@@ -1,0 +1,33 @@
+---
+# tasks file for roles/remove_invalid_locations_autorestic
+
+- name: Ensure autorestic_config_path is defined or set default
+  ansible.builtin.set_fact:
+    _autorestic_config_path: "{{ remove_invalid_locations_autorestic_config_path }}"
+
+- name: Read autorestic configuration file
+  ansible.builtin.slurp:
+    src: "{{ _autorestic_config_path }}"
+  register: autorestic_file
+
+- name: Decode and parse YAML into variable
+  ansible.builtin.set_fact:
+    _autorestic_cfg: "{{ (autorestic_file.content | b64decode) | from_yaml }}"
+
+- name: Check existence of each 'from' directory in locations
+  ansible.builtin.stat:
+    path: "{{ item.value.from }}"
+  loop: "{{ _autorestic_cfg.locations | dict2items }}"
+  register: location_stats
+
+- name: Build dictionary of valid locations
+  ansible.builtin.set_fact:
+    valid_locations: "{{ valid_locations | default({}) | combine({ (item.item.key): item.item.value }) }}"
+  loop: "{{ location_stats.results }}"
+  when: item.stat.exists
+
+- name: Write back updated autorestic configuration without invalid locations
+  ansible.builtin.copy:
+    dest: "{{ _autorestic_config_path }}"
+    content: "{{ _autorestic_cfg | combine({'locations': valid_locations}) | to_nice_yaml(indent=2) }}"
+    backup: yes

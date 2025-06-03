@@ -47,6 +47,9 @@
           - src: "{{ source_asset_fullpath_project }}"
             dest: "{{ dest_project_rootpath }}"
             default_mode: "0775"
+    - name: ./roles/remove_invalid_locations_autorestic
+      vars:
+        remove_invalid_locations_autorestic_config_path: "{{ dest_project_fullpath }}/config/.autorestic.yaml"
 
   post_tasks:
     - name: Make all scripts executable in one go
