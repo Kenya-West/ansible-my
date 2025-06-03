@@ -44,11 +44,10 @@
   ansible.builtin.debug:
     msg: "{{ bin_download_result.stderr_lines | default(bin_download_result.stderr) }}"
   when: "'please select manually' in bin_download_result.stderr"
-  register: bin_download_result_interaction
 
 - name: Include interaction_fallback if interaction required
   ansible.builtin.include_tasks: interaction_fallback.yml
-  when: bin_download_result_interaction is defined
+  when: "'please select manually' in bin_download_result.stderr"
 
 - name: Display output of package {{ item.repo }} download if no upgrade performed
   ansible.builtin.debug:
