@@ -13,6 +13,10 @@ logs/
 !.vscode/extensions.json
 .history/*
 
+# Group_vars
+group_vars/all/z_common_hosts_secrets/*
+!group_vars/all/z_common_hosts_secrets/.gitkeep
+
 # Host vars
 host_vars/*
 !host_vars/example/
