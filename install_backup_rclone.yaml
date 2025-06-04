@@ -25,10 +25,38 @@
     RCLONE_CONFIG_PASS: "{{ rclone_password | default(omit) }}"
 
   pre_tasks:
-    - name: Check if rclone is installed
-      ansible.builtin.shell: "command -v rclone"
-      register: rclone_installed
-      failed_when: rclone_installed.rc != 0
+    - name: Ensure RCLone is installed
+      environment:
+        EGET_GITHUB_TOKEN: "{{ github_api_token_eget | default(omit) }}"
+      block: 
+        - name: Check if rclone is installed
+          ansible.builtin.shell: "command -v rclone"
+          register: rclone_installed
+        - name: Debug rclone installed
+          ansible.builtin.debug:
+            msg: "{{ rclone_installed }}"
+        - name: Fail if rclone is not installed
+          ansible.builtin.fail:
+            msg: "RClone is not installed. Please install RClone before running this playbook."
+          failed_when: rclone_installed.rc != 0 or rclone_installed.stdout == ""
+      rescue:
+        - name: "Extract rclone package info"
+          ansible.builtin.set_fact:
+            rclone_pkg: "{{ packages_binary_list
+                           | selectattr('repo','search','rclone')
+                           | list
+                           | first }}"
+        - name: "Install rclone using eget"
+          ansible.builtin.include_role:
+            name: ./roles/install_packages_binary
+          vars:
+            # now pass in a one-element list, so we don’t shadow the original
+            packages_binary_list:
+              - "{{ rclone_pkg }}"
+          args:
+            apply:
+              become: true
+              become_user: root
 
   roles:
     - name: ./roles/kwtoolset/copy_files_templating
