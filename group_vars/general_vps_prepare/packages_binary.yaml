@@ -66,3 +66,5 @@ packages_binary_list:
   - repo: "walles/riff"
   - repo: "isd-project/isd"
   - repo: "wzv5/pping"
+  - repo: "https://downloads.rclone.org/rclone-current-linux-amd64.zip"
+    bin_name: "rclone"
