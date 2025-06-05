@@ -20,14 +20,28 @@
   loop: "{{ _autorestic_cfg.locations | dict2items }}"
   register: location_stats
 
+- name: Count locations
+  ansible.builtin.set_fact:
+    defined_locations_count: "{{ location_stats | length }}"
+
 - name: Build dictionary of valid locations
   ansible.builtin.set_fact:
     valid_locations: "{{ valid_locations | default({}) | combine({ (item.item.key): item.item.value }) }}"
   loop: "{{ location_stats.results }}"
   when: item.stat.exists
 
+- name: Count valid locations
+  ansible.builtin.set_fact:
+    valid_location_count: "{{ valid_locations | length }}"
+
+- name: Will update autorestic configuration because valid locations are less than defined locations
+  ansible.builtin.debug:
+    msg: "Valid locations count {{ valid_location_count }} is less than defined locations count {{ defined_locations_count }}"
+  when: valid_location_count < defined_locations_count
+
 - name: Write back updated autorestic configuration without invalid locations
   ansible.builtin.copy:
     dest: "{{ _autorestic_config_path }}"
     content: "{{ _autorestic_cfg | combine({'locations': valid_locations}) | to_nice_yaml(indent=2) }}"
     backup: yes
+  when: valid_location_count < defined_locations_count
