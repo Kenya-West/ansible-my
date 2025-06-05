@@ -1,5 +1,10 @@
+# This prop follows the same structure as backup_restic_node_locations
+backup_restic_node_locations_additional: {}
+
 restic_node_vars:
-  locations: "{{ backup_restic_node_locations }}"
+  locations: >-
+    {{ lookup('vars','backup_restic_node_locations')
+       | combine(backup_restic_node_locations_additional|default({}), recursive=True) }}
   remotes: >-
     {{ lookup('vars','backup_restic_node_remotes')
       | combine(
