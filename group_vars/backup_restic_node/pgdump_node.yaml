@@ -1,0 +1,8 @@
+pgdump_backup_location_root_path: "/etc/postgres/db_backup"
+pgdump_backup_access_group: "pgdump"
+pgdump_backup_access_group_users: "{{ standard_user }}"
+pgdump_backup_location_root_owner: "root"
+pgdump_backup_location_root_permissions: "0755"
+pgdump_backup_location_files_permissions: "0644"
+pgdump_backup_cron_job_name: "PGDump backup"
+pgdump_backup_cron_job_name_prefix: ""

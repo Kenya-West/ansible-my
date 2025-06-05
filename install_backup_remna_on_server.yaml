@@ -1,0 +1,75 @@
+---
+- name: Install and configure backup of Postgres panel
+  hosts: backup_restic_node
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: pgdump
+    project_name: pgdump
+    project_root_dir: "{{ backup_restic_node_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+
+  roles:
+    - name: ./roles/kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+
+  post_tasks:
+    # GROUP, SSL DIRECTORY AND PERMISSIONS
+    - name: Create {{ pgdump_backup_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.group:
+        name: "{{ pgdump_backup_access_group }}"
+        state: present
+
+    - name: Add users to {{ pgdump_backup_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: "{{ pgdump_backup_access_group }}"
+        append: true
+      with_items: "{{ pgdump_backup_access_group_users }}"
+
+    - name: Ensure that pgdump_backup_location_root_path exists
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ pgdump_backup_location_root_path }}"
+        state: directory
+        owner: "{{ pgdump_backup_location_root_owner }}"
+        group: "{{ pgdump_backup_access_group }}"
+        mode: "{{ pgdump_backup_location_root_permissions }}"
+
+    # RUN SCRIPTS AND SET
+    - name: Run backup script
+      become: true 
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/backup.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      register: backup_result
+    - name: Fail if backup script failed
+      ansible.builtin.fail:
+        msg: "Backup script failed with error: {{ backup_result.stderr }}"
+      when: "'Error' in backup_result.stderr"
+    - name: Add cron job for pgdump
+      become: true
+      become_user: root
+      ansible.builtin.cron:
+        name: "{{ pgdump_backup_cron_job_name }}"
+        minute: 0
+        hour: 0
+        job: "{{ pgdump_backup_cron_job_name_prefix | default('') }}{{ dest_project_fullpath }}/scripts/backup.sh"

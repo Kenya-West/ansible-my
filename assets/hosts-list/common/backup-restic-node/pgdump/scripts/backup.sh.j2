@@ -1,0 +1,24 @@
+#! /usr/bin/env bash
+
+# Настройка переменных
+CONTAINER_ID="remnawave-db"
+DB_USER="postgres"
+BACKUP_DIR="{{ pgdump_backup_location_root_path }}"
+TIMESTAMP=$(date +%Y-%m-%d"_"%H_%M_%S)
+BACKUP_FILE_DB="dump_${TIMESTAMP}.sql.gz"
+BACKUP_FILE_FINAL="remnawave_backup_${TIMESTAMP}.tar.gz"
+
+# Создание директории резервного копирования, если она не существует
+mkdir -p "$BACKUP_DIR"
+
+echo "[INFO] Creating PostgreSQL dump directly to disk..."
+docker exec -t "$CONTAINER_ID" pg_dumpall -c -U "$DB_USER" \
+  | gzip -9 > "$BACKUP_DIR/$BACKUP_FILE_DB"
+
+echo "[INFO] Creating final archive..."
+tar -czf "$BACKUP_DIR/$BACKUP_FILE_FINAL" -C "$BACKUP_DIR" "$BACKUP_FILE_DB"
+
+echo "[INFO] Removing temporary dump file..."
+rm -f "$BACKUP_DIR/$BACKUP_FILE_DB"
+
+echo "[INFO] Backup completed successfully: $BACKUP_DIR/$BACKUP_FILE_FINAL"
