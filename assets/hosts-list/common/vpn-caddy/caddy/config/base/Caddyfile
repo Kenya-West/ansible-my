@@ -38,3 +38,6 @@
     file_server
     rewrite * /index.html
 }
+
+# In caddy-docker-proxy, we need to use absolute paths because of wrong CWD: https://github.com/lucaslorentz/caddy-docker-proxy/issues/422
+import /config/base/snippets/*

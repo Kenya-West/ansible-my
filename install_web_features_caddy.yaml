@@ -1,6 +1,6 @@
 ---
 - name: Install web features - currently includes certcopy only
-  hosts: vpn_caddy:vpn_remna:vpn_remna_server_caddy
+  hosts: vpn_caddy:vpn_remna:vpn_remna_server_caddy:analytics_node
   become: false
   become_user: "{{ standard_user }}"
   vars:

@@ -13,14 +13,14 @@ services:
       - "${METRICS_EXTERNAL_PORT:-2020}:2020"
     environment:
       - CADDY_INGRESS_NETWORKS=caddy
-      - CADDY_DOCKER_CADDYFILE_PATH=/config/Caddyfile
+      - CADDY_DOCKER_CADDYFILE_PATH=/config/base/Caddyfile
     env_file:
       - .env
     networks:
       - {{ docker_vpn_network }}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./config/Caddyfile:/config/Caddyfile
+      - ./config/base:/config/base:ro
       - ./logs:/var/log/caddy
       - ./static:/var/www/public
       - caddy-data:/data

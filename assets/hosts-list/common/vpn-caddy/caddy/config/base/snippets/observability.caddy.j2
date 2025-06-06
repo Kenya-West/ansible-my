@@ -1,0 +1,10 @@
+{% if 'analytics_node' in group_names %}
+
+{{ domains_keys.observability }} {
+    import logging {{ domains_keys.observability }}
+    root * /var/www/public
+    file_server
+    rewrite * /index.html
+}
+
+{% endif %}
