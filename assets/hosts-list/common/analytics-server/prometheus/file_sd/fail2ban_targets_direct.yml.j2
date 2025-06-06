@@ -2,7 +2,7 @@
 {%- for host in groups['analytics_node'] -%}
   {%- set hv = hostvars[host] -%}
 
-  {%- if (hv.domains_keys|default({})).fail2ban_exporter is defined-%}
+  {%- if (hv.analytics_node_project_structure_end_dirs|default({})).fail2ban_exporter is defined-%}
 
     {# Skip adding the host if domains_keys.observability contains example.tld #}
     {%- set skip_host = False -%}
