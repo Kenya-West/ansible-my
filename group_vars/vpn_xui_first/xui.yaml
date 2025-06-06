@@ -2,7 +2,7 @@ xui_email: "{{ emails.domain }}"
 xui_dashboard_login: "{{ common_username }}"
 xui_dashboard_path: xui-dashboard
 xui_dashboard_port: 49999
-xui_hostname: "{{ domains_keys.xui }}"
+xui_hostname: "{{ domains_keys.vpn }}"
 xui_wg_port: 49989
 xui_vless_port: 443
 xui_vless_fallback_port_1: 8081

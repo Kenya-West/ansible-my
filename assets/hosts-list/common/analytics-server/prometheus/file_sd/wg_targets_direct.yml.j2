@@ -4,16 +4,16 @@
 
   {%- if (hv.domains_keys|default({})).wg is defined -%}
 
-    {# Skip adding the host if domains_keys.frp contains example.tld #}
+    {# Skip adding the host if domains_keys.vpn contains example.tld #}
     {%- set skip_host = False -%}
-    {%- if hv.domains_keys is defined and hv.domains_keys.wg is defined and 'example.tld' in hv.domains_keys.wg -%}
+    {%- if hv.domains_keys is defined and hv.domains_keys.vpn is defined and 'example.tld' in hv.domains_keys.vpn -%}
       {%- set skip_host = True -%}
     {%- endif -%}
 
       {%- if not skip_host -%}
 
       {# 1. Hostname #}
-      {%- set target_hostname = hv.domains_keys.wg -%}
+      {%- set target_hostname = hv.domains_keys.vpn -%}
 
       {# 2. Port #}
       {%- set port = hv.wg_web_listen_address_port -%}

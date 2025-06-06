@@ -29,7 +29,7 @@ services:
     env_file:
       - .env
     ports:
-{% if domains_keys.cadvisor is defined %}
+{% if domains_keys.observability is defined %}
       - "${EXTERNAL_PORT}:443/tcp"
 {% else %}
       - "${EXTERNAL_PORT}:80/tcp"
@@ -40,7 +40,7 @@ services:
       - ./nginx/templates:/etc/nginx/templates
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
-{% if domains_keys.cadvisor is defined %}
+{% if domains_keys.observability is defined %}
       - {{ cert_location_root_path }}:/etc/letsencrypt:ro
 {% endif %}
     restart: unless-stopped
