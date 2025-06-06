@@ -4,15 +4,15 @@
 # You should reinitialize them in host_vars/host_name/1_domains.yaml
 domains_keys:
   main: sub.example.tld
-  remna_server: sub-remna.example.tld
-  xui: sub-xui.example.tld
-  frps: sub-frps.example.tld
-  wg: sub-wg.example.tld
-  xray: sub-xray.example.tld
-  docker_exporter: sub-docker_exporter.example.tld
-  node_exporter: sub-node_exporter.example.tld
-  cadvisor: sub-cadvisor.example.tld
-  fail2ban_exporter: sub-fail2ban_exporter.example.tld
+  remna_server: sub-vpn.example.tld
+  xui: sub-vpn.example.tld
+  frps: sub-vpn.example.tld # Yes I understand that this is not a vpn but a proxy
+  wg: sub-vpn.example.tld
+  xray: sub-vpn.example.tld
+  docker_exporter: sub-observability.example.tld
+  node_exporter: sub-observability.example.tld
+  cadvisor: sub-observability.example.tld
+  fail2ban_exporter: sub-observability.example.tld
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
   victoriametrics: sub-victoriametrics.example.tld
