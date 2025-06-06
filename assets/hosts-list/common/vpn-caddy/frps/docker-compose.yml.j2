@@ -17,10 +17,10 @@ services:
     networks:
       - {{ docker_vpn_network }}
     labels:
-      caddy: "${DOMAIN}"
-      caddy.import: "logging ${DOMAIN}"
+      caddy: "${DOMAIN}:${EXTERNAL_PORT}"
+      caddy.import: "logging ${DOMAIN}-frps"
       {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${FRPS_DASHBOARD_PORT} }}"{% endraw %}
-      {% for port in range(docker_frp_range_ports_1_start, docker_frp_range_ports_1_end + 1) %}
+      {% for port in range(frp_range_ports_1_start, frp_range_ports_1_end + 1) %}
 
       caddy.{{ loop.index }}_handle_path: "/frps/proxy/web/{{ port }}/*"
       caddy.{{ loop.index }}_handle_path.reverse_proxy: {% raw %}"{{ upstreams {% endraw %}{{port}}{% raw %} }}"{% endraw %}

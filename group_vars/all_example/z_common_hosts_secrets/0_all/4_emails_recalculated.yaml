@@ -4,4 +4,4 @@
 certbot_admin_email: "{{ emails.domain }}"
 
 # VPN - X-UI
-docker_xui_email: "{{ emails.domain }}"
+xui_email: "{{ emails.domain }}"

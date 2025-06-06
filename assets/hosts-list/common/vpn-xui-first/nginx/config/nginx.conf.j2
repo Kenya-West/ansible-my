@@ -5,7 +5,7 @@ error_log /var/log/nginx/error.log debug;
 http {
 
     map $http_x_proxy_port $xproxyport {
-        default {{ docker_xui_vless_fallback_port_1 }};  # Default port if X-PROXY-PORT header is not set
+        default {{ xui_vless_fallback_port_1 }};  # Default port if X-PROXY-PORT header is not set
         ~^[0-9]+$ $http_x_proxy_port;  # Use the value of X-PROXY-PORT if it is a number
     }
 
@@ -19,7 +19,7 @@ http {
     add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
 
     server {
-        listen {{ docker_xui_vless_fallback_port_1 }};
+        listen {{ xui_vless_fallback_port_1 }};
         http2 on;
         server_name proxy;
 

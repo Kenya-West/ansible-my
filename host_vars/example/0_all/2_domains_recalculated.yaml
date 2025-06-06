@@ -18,7 +18,7 @@ prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.promethe
 # VPN - XRay
 
 # VPN - X-UI
-docker_xui_hostname: "{{ domains_keys.xui }}"
+xui_hostname: "{{ domains_keys.xui }}"
 
 # VPN - Web_features
 certbot_certs: "{{ domains | map('regex_replace', '^(.*)$', '{\"domains\": [\"\\1\"]}') | map('from_json') | list }}"

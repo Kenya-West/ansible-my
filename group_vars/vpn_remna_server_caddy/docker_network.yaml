@@ -1,1 +1,1 @@
-docker_remna_server_caddy_network: "remnawave-network"
+docker_remna_server_caddy_network: remnawave-network

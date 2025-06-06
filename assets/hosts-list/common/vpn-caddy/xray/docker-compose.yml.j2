@@ -14,8 +14,8 @@ services:
     networks:
       - {{ docker_vpn_network }}
     labels:
-      caddy: "${DOMAIN}"
-      caddy.import: "logging ${DOMAIN}"
+      caddy: "${DOMAIN}:${EXTERNAL_PORT}"
+      caddy.import: "logging ${DOMAIN}-xray"
       caddy.handle_path: "/${XRAY_WS_PATH}"
       {% raw %}caddy.handle_path.0_reverse_proxy: "{{ upstreams ${XRAY_WS_PORT} }}"{% endraw %}
 

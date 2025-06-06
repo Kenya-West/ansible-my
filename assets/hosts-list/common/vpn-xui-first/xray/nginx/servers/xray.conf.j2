@@ -12,7 +12,7 @@ server {
     index index.html;
 	root /var/www/html;
 
-	location /{{ docker_xray_ws_path }} {
+	location /{{ xray_ws_path }} {
         if ($http_upgrade != "websocket") {
             return 404;
         }

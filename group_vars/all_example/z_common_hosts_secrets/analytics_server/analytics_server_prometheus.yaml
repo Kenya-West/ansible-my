@@ -151,8 +151,8 @@ prometheus_server_scrape_configs:
           - /etc/file_sd/frps_targets_*.yml
         refresh_interval: 30s
     basic_auth:
-      username: username # the same user name from docker_frp_dashboard_user
-      password: <password # the same password from docker_frp_dashboard_password>
+      username: username # the same user name from frp_dashboard_user
+      password: <password # the same password from frp_dashboard_password>
     scheme: https
     metrics_path: /metrics
     tls_config:

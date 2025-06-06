@@ -24,8 +24,8 @@ services:
       - "${XUI_SS2022_PORT}:${XUI_SS2022_PORT}"
       - "${XUI_SUB_PORT}:${XUI_SUB_PORT}"
     labels:
-      caddy: "${DOMAIN}"
-      caddy.import: "logging ${DOMAIN}"
+      caddy: "${DOMAIN}:${EXTERNAL_PORT}"
+      caddy.import: "logging ${DOMAIN}-xui"
       {% raw %}caddy.0_reverse_proxy: "{{ upstreams https ${XUI_DASHBOARD_PORT} }}"{% endraw %}
 
       {% raw %}caddy.0_reverse_proxy.transport: "http"{% endraw %}
