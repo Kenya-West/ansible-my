@@ -1,6 +1,6 @@
 ---
 - name: Remove Web features directories and project (WARNING - This will remove data files, too!)
-  hosts: vpn:vpn_remna:vpn_remna_server_caddy
+  hosts: vpn_caddy:vpn_remna:vpn_remna_server_caddy
   become: true
 
   roles:

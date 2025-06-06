@@ -1,11 +1,11 @@
 ---
-- name: Install FRP (Dockerized)
-  hosts: vpn:vpn_remna
+- name: Install X-UI (Dockerized)
+  hosts: vpn_caddy:vpn_remna
   become: false
   become_user: "{{ standard_user }}"
   vars:
-    project_dir: frps
-    project_name: frps
+    project_dir: xui
+    project_name: xui
     project_root_dir: "{{ vpn_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"

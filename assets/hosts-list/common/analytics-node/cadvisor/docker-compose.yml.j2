@@ -16,7 +16,7 @@ services:
       - /dev/disk/:/dev/disk:ro
     networks:
       - {{ analytics_node_network_name }}
-{% if 'vpn' in group_names or 'vpn_xui_first' in group_names %}
+{% if 'vpn_caddy' in group_names or 'vpn_xui_first' in group_names %}
       - {{ docker_vpn_network }}
 {% endif %}
     restart: unless-stopped
@@ -48,7 +48,7 @@ services:
 networks:
   {{ analytics_node_network_name }}:
     external: true
-{% if 'vpn' in group_names or 'vpn_xui_first' in group_names %}
+{% if 'vpn_caddy' in group_names or 'vpn_xui_first' in group_names %}
   {{ docker_vpn_network }}:
     external: true
 {% endif %}

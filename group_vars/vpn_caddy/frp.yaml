@@ -1,0 +1,15 @@
+frp_caddy_path: frp
+frp_web_external_port: 48510
+frp_server_port: 7000
+frp_vhost_http_port: 8080
+frp_vhost_https_port: 8443
+frp_auth_method: token
+frp_dashboard_port: 7500
+frp_dashboard_user: "{{ common_username }}"
+frp_range_ports_1_start: 22001
+frp_range_ports_1_end: 22089
+frp_range_ports_2_start: 22501
+frp_range_ports_2_end: 22589
+frp_client_dashboard_port: 7400
+frp_client_dashboard_user: "{{ common_username }}"
+frps_web_telemetry_path: /metrics

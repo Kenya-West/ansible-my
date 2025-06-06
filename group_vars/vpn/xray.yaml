@@ -1,3 +1,0 @@
-docker_xray_port: 23
-docker_xray_ws_path: xray_ws_path
-docker_xray_ws_port: 8188

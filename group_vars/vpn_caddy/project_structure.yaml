@@ -1,6 +1,6 @@
 ---
 
-vpn_project_structure_root: vpn
+vpn_project_structure_root: vpn-caddy
 vpn_project_structure_end_dirs:
   frp: "{{ vpn_project_structure_root }}/frp"
   xui: "{{ vpn_project_structure_root }}/xui"

@@ -1,0 +1,4 @@
+xray_port: 23
+xray_web_external_port: 48530
+xray_ws_path: xray_ws_path
+xray_ws_port: 8188

@@ -1,11 +1,11 @@
 ---
-- name: Install XRay as separate service (Dockerized)
-  hosts: vpn:vpn_remna
+- name: Install Caddy (Docker)
+  hosts: vpn_caddy:vpn_remna
   become: false
   become_user: "{{ standard_user }}"
   vars:
-    project_dir: xray
-    project_name: xray
+    project_dir: caddy
+    project_name: caddy
     project_root_dir: "{{ vpn_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
@@ -15,17 +15,6 @@
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
   roles:
-    - name: ./roles/kwtoolset/create_dirs
-      vars:
-        dir_list:
-          - path: "{{ dest_project_fullpath }}"
-            mode: "0775"
-            owner: "{{ standard_user }}"
-            group: "{{ standard_user }}"
-          - path: "{{ dest_project_fullpath }}/config"
-            mode: "0775"
-            owner: "{{ standard_user }}"
-            group: "{{ standard_user }}"
     - name: ./roles/kwtoolset/container_stop_down
       vars:
         container_stop_down_list:
@@ -51,3 +40,17 @@
           - path: "{{ dest_project_fullpath }}"
             name: "{{ project_name }}"
             ignore_errors: false
+
+  pre_tasks:
+    - name: Ensure user is in the 'docker' group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ standard_user }}"
+        groups: docker
+        append: true
+    - name: Ensure Docker network 'caddy' exists with specific settings
+      community.docker.docker_network:
+        name: caddy
+        driver: bridge
+        state: present

@@ -1,6 +1,6 @@
 ---
 - name: Configure X-UI database
-  hosts: vpn:vpn_xui_first
+  hosts: vpn_caddy:vpn_xui_first
   become: false
   become_user: "{{ standard_user }}"
   vars:
