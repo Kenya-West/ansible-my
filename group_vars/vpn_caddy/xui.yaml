@@ -1,7 +1,7 @@
 xui_email: "{{ emails.domain }}"
 xui_dashboard_login: "{{ common_username }}"
 xui_dashboard_path: xui-dashboard
-xui_web_external_port: "{{ common_username }}"
+xui_web_external_port: 49999
 xui_dashboard_port: 49999
 xui_hostname: "{{ domains_keys.vpn }}"
 xui_wg_port: 49989
