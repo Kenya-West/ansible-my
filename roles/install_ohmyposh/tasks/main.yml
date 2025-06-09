@@ -16,10 +16,12 @@
     state: directory
     path: "{{ ohmyposh_script_dir }}"
     mode: "0775"
+    owner: "{{ standard_user }}"
 - ansible.builtin.file:
     state: directory
     path: "{{ ohmyposh_themes_dir }}"
     mode: "0775"
+    owner: "{{ standard_user }}"
 
 - name: Change script and themes permissions
   ansible.builtin.command: "{{ item }}"
