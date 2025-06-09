@@ -27,8 +27,7 @@ services:
       - caddy-certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
     labels:
       caddy_0:
-      caddy_0.servers:
-      caddy_0.servers.metrics:
+      caddy_0.metrics:
       caddy_1: "${DOMAIN}:2020"
       caddy_1.metrics: "/metrics"
       caddy_1.metrics.disable_openmetrics:
