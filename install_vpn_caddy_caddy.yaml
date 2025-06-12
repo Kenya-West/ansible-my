@@ -54,3 +54,11 @@
         name: caddy
         driver: bridge
         state: present
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+    - name: Mask NGINX service
+      ansible.builtin.systemd:
+        name: nginx
+        state: masked
+        enabled: false
+      when: "'nginx.service' in ansible_facts.services"
