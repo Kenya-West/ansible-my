@@ -3,6 +3,7 @@
 vpn_project_structure_root: vpn-caddy
 vpn_project_structure_end_dirs:
   frp: "{{ vpn_project_structure_root }}/frp"
+  remna: "{{ vpn_project_structure_root }}/remna"
   xui: "{{ vpn_project_structure_root }}/xui"
   xray: "{{ vpn_project_structure_root }}/xray"
   wg: "{{ vpn_project_structure_root }}/wg"

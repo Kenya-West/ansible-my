@@ -1,0 +1,23 @@
+---
+
+services:
+  remna:
+    image: remnawave/node:latest
+    container_name: remna
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/var/log/remnanode
+    ports:
+      - "${EXTERNAL_PORT}:${APP_PORT}"
+      - "${SS2022_PORT_EXTERNAL}:${SS2022_PORT_INTERNAL}"
+      - "${VLESS_PORT_EXTERNAL}:${VLESS_PORT_INTERNAL}"
+    networks:
+      - {{ docker_vpn_network }}
+
+    restart: unless-stopped
+
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true
