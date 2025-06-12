@@ -1,6 +1,7 @@
 ---
 analytics_node_project_structure_root: analytics-node
 analytics_node_project_structure_end_dirs:
+  docker_exporter: "{{ analytics_node_project_structure_root }}/docker_exporter"
   node_exporter: "{{ analytics_node_project_structure_root }}/node_exporter"
   fail2ban_exporter: "{{ analytics_node_project_structure_root }}/fail2ban_exporter"
   pushgateway: "{{ analytics_node_project_structure_root }}/pushgateway"
