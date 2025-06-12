@@ -11,3 +11,6 @@ xui_ss2022_port: 49991
 xui_sub_port: 49998
 xui_sub_path: xui-subscription
 xui_sub_json_path: xui-subscription-json
+
+caddy_external_ports_allowlist__xui:
+  - '{{ xui_web_external_port }}:{{ xui_dashboard_port }}'

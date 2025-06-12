@@ -1,2 +1,8 @@
 docker_caddy_external_ip: "{{ host_ip_address }}"
 caddy_web_listen_address_port: 50110
+
+caddy_external_ports_allowlist__base:
+  - 80:80
+  - 443:443
+  - 443:443/udp
+  - '${METRICS_EXTERNAL_PORT:-2020}:2020'

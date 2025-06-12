@@ -5,3 +5,6 @@ wg_lang: ru
 wg_ui_traffic_stats: "true" # Should be as string because it will be templated
 wg_ui_chart_type: 1
 wg_web_telemetry_path: /metrics
+
+caddy_external_ports_allowlist__wg:
+  - '{{ wg_web_external_port }}:{{ wg_dashboard_port }}'

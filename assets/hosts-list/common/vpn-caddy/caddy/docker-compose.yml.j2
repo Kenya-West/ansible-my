@@ -7,10 +7,10 @@ services:
     cpus: 0.5
     mem_limit: 200m
     ports:
-      - 80:80
-      - 443:443
-      - "443:443/udp"
-      - "${METRICS_EXTERNAL_PORT:-2020}:2020"
+{% for port in caddy_external_ports_allowlist %}
+      - "{{port}}"
+{% endfor %}
+
     environment:
       - CADDY_INGRESS_NETWORKS=caddy
       - CADDY_DOCKER_CADDYFILE_PATH=/config/base/Caddyfile
