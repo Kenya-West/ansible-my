@@ -24,3 +24,9 @@
       args:
         executable: "{{ pwsh_path.stdout }}"
       register: pwsh_profile
+  
+  post_tasks:
+    - name: Change .config owner and group
+      ansible.builtin.command: "chown -R {{ standard_user }}:{{ standard_user }} {{ ohmyposh_powershell_project_fullpath }}/.config"
+    - name: Change .config permissions
+      ansible.builtin.command: "chmod -R 775 {{ ohmyposh_powershell_project_fullpath }}/.config"
