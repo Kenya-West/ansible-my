@@ -57,8 +57,10 @@
     - name: Gather service facts
       ansible.builtin.service_facts:
     - name: Mask NGINX service
+      become: true
+      become_user: root
       ansible.builtin.systemd:
         name: nginx
-        state: masked
+        masked: true
         enabled: false
       when: "'nginx.service' in ansible_facts.services"
