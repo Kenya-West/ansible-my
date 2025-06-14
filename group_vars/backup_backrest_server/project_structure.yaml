@@ -1,5 +1,6 @@
 ---
 backup_backrest_project_structure_root: backup-backrest-server
-backup_backrest_project_structure_end_dirs:
+backup_backrest_project_structure_end_dirs__base:
   restic_server: "{{ backup_backrest_project_structure_root }}/backrest"
+backup_backrest_project_structure_end_dirs: "{{ backup_backrest_project_structure_end_dirs__base }}"
 backup_backrest_project_structure_end_dirs_list: "{{ backup_backrest_project_structure_end_dirs.values() | list }}"

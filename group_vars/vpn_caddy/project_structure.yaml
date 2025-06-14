@@ -1,13 +1,14 @@
 ---
 
 vpn_project_structure_root: vpn-caddy
-vpn_project_structure_end_dirs:
+vpn_project_structure_end_dirs__base:
   frp: "{{ vpn_project_structure_root }}/frp"
   remna: "{{ vpn_project_structure_root }}/remna"
   xui: "{{ vpn_project_structure_root }}/xui"
   xray: "{{ vpn_project_structure_root }}/xray"
   wg: "{{ vpn_project_structure_root }}/wg"
   caddy: "{{ vpn_project_structure_root }}/caddy"
+vpn_project_structure_end_dirs: "{{ vpn_project_structure_end_dirs__base }}"
 vpn_project_structure_end_dirs_list: "{{ vpn_project_structure_end_dirs.values() | list }}"
 
 main_webserver:
