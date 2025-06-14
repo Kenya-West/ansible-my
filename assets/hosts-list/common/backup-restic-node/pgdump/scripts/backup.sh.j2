@@ -4,8 +4,7 @@
 CONTAINER_ID="remnawave-db"
 DB_USER="postgres"
 BACKUP_DIR="{{ pgdump_backup_location_root_path }}"
-TIMESTAMP=$(date +%Y-%m-%d"_"%H_%M_%S)
-BACKUP_FILE_DB="dump_${TIMESTAMP}.sql"
+BACKUP_FILE_DB="dump_remna_server.sql"
 
 # Создание директории резервного копирования, если она не существует
 mkdir -p "$BACKUP_DIR"
