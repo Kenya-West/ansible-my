@@ -20,6 +20,7 @@ packages_list:
       - bc
       - lsof
       - net-tools
+      - acl
       # TermSCP dependencies
       - libdbus-1-dev
       - pkg-config
@@ -40,6 +41,7 @@ packages_list:
       - btop
       - sqlite3
       - nala
+      - doas
       # Service packages
       - python3-docker # Needed for Ansible Docker modules
       - python3-passlib # Needed for Ansible htpasswd module
