@@ -32,7 +32,7 @@ services:
     hostname: remnawave
     restart: always
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:3000:${APP_PORT}'
     env_file:
       - .env
     networks:
@@ -44,9 +44,9 @@ services:
       remnawave-redis:
         condition: service_healthy
     labels:
-      caddy: "${FRONT_END_DOMAIN}"
-      caddy.import: "logging ${FRONT_END_DOMAIN}"
-      {% raw %}caddy.0_reverse_proxy: "{{ upstreams 3000}}"{% endraw %}
+      caddy: "${FRONT_END_DOMAIN}:${EXTERNAL_PORT}"
+      caddy.import: "logging ${FRONT_END_DOMAIN}-remna-server-caddy"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${APP_PORT} }}"{% endraw %}
 
   remnawave-redis:
     image: valkey/valkey:8.0.2-alpine
