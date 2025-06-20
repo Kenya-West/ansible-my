@@ -21,7 +21,7 @@ services:
       - net.ipv4.conf.all.src_valid_mark=1
     labels:
       caddy: "${DOMAIN}:${EXTERNAL_PORT}"
-      caddy.import: "logging ${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}-wg"
       {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${PORT}}}"{% endraw %}
 
 
