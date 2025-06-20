@@ -1,7 +1,6 @@
 {% if 'analytics_node' in group_names %}
-
-{{ domains_keys.observability }} {
-    import logging {{ domains_keys.observability }}
+{$DOMAIN_ANALYTICS_NODE} {
+    import logging {$DOMAIN_ANALYTICS_NODE}
     root * /var/www/public
     file_server
     rewrite * /index.html
