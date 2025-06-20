@@ -1,0 +1,16 @@
+{% if vpn_remna_server_caddy_domains.subscription is defined %}
+*.{$DOMAIN_REMNA_SERVER_CADDY_SUBSCRIPTION}, {$DOMAIN_REMNA_SERVER_CADDY_SUBSCRIPTION} {
+    tls {
+        dns cloudflare {{ vpn_remna_server_caddy_domains.subscription.cloudflare_api_token_dns | default('{$CLOUDFLARE_API_TOKEN}') }}
+    }
+}
+
+{% endif %}
+{% if vpn_remna_server_caddy_domains.node is defined %}
+*.{$DOMAIN_REMNA_SERVER_CADDY_NODE}, {$DOMAIN_REMNA_SERVER_CADDY_NODE} {
+    tls {
+        dns cloudflare {{ vpn_remna_server_caddy_domains.node.cloudflare_api_token_dns | default('{$CLOUDFLARE_API_TOKEN}') }}
+    }
+}
+
+{% endif %}
