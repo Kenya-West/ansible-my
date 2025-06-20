@@ -11,3 +11,5 @@ remna_server_caddy_subscription_path: api/sub
 
 remna_server_caddy_external_port: 48560
 
+caddy_external_ports_allowlist__remna_server:
+  - '{{ remna_server_caddy_external_port }}:{{ remna_server_caddy_external_port }}'
