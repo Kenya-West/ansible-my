@@ -8,7 +8,6 @@
   template_tree:
     src: "{{ item.src }}"
     dest: "{{ copy_files_templating_temp_dir.path }}"
-    mode: "{{ item.default_mode | default('0775') }}"
   delegate_to: localhost
 
 - name: Synchronize templated files to remote host {{ item.dest }}
@@ -17,8 +16,8 @@
     src: "{{ copy_files_templating_temp_dir.path }}/"
     dest: "{{ item.dest }}/"
     rsync_opts:
-      - "--chmod=ugo=rwX"
-      - "--chmod=F+x"
+      - "--chmod=F{{ (item.default_mode | int) | default(755) }}"
+      - "--chmod=D{{ (item.default_mode | int) | default(755) }}"
   delegate_to: localhost
 
 - name: Remove temporary directory
