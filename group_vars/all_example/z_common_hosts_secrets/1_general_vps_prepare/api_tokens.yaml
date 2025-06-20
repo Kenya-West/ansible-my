@@ -7,6 +7,12 @@
 github_api_token_eget: ghp_sometoken
 github_api_token_debget: ghp_sometoken
 
+# This one you create on Cloudflare
+# the access token should have permissions to manage DNS records
+
+acme_email: email+name@example.tld
+cloudflare_api_token_dns: sometoken
+
 # Do not use this file! It is only for example purposes.
 # Create and use api_tokens.yaml instead.
 # It will be ignored by git.

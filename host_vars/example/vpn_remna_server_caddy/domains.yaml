@@ -1,0 +1,3 @@
+vpn_remna_server_caddy_domains:
+  subscription: <your domain>
+  node: <your domain>
