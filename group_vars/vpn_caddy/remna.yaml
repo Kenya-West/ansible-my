@@ -1,4 +1,4 @@
 remna_node_app_port: 2220
 remna_node_external_port: 48540
-remna_node_ss2022_port_external: 49980
-remna_node_vless_port_external: 49981
+remna_node_ss2022_external_port: 49980
+remna_node_vless_external_port: 49981

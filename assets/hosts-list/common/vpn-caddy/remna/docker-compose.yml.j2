@@ -10,8 +10,8 @@ services:
       - ./logs:/var/log/remnanode
     ports:
       - "${EXTERNAL_PORT}:${APP_PORT}"
-      - "${SS2022_PORT_EXTERNAL}:${SS2022_PORT_INTERNAL}"
-      - "${VLESS_PORT_EXTERNAL}:${VLESS_PORT_INTERNAL}"
+      - "${SS2022_EXTERNAL_PORT}:${SS2022_PORT_INTERNAL}"
+      - "${VLESS_EXTERNAL_PORT}:${VLESS_PORT_INTERNAL}"
     networks:
       - {{ docker_vpn_network }}
 
