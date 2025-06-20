@@ -28,10 +28,6 @@
     }
 }
 
-* {
-    import logging wildcard
-}
-
 {$DOMAIN} {
     import logging {$DOMAIN}
     root * /var/www/public
