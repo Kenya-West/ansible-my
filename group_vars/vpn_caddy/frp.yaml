@@ -15,4 +15,4 @@ frp_client_dashboard_user: "{{ common_username }}"
 frps_web_telemetry_path: /metrics
 
 caddy_external_ports_allowlist__frp:
-  - '{{ frp_web_external_port }}:{{ frp_dashboard_port }}'
+  - '{{ frp_web_external_port }}:{{ frp_web_external_port }}'
