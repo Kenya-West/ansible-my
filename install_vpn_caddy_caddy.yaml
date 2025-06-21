@@ -21,6 +21,7 @@
           - "{{ dest_project_fullpath }}"
     - name: ./roles/kwtoolset/copy_files_templating
       vars:
+        copy_files_templating_remove_files_size_less_or_equal_than: -5b
         copy_files_templating_dir_list:
           - src: "{{ source_asset_fullpath_common }}"
             dest: "{{ dest_project_rootpath }}"
