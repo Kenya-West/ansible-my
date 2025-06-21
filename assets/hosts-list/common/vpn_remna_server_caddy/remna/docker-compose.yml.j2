@@ -35,6 +35,8 @@ services:
       - '127.0.0.1:3000:${APP_PORT}'
     env_file:
       - .env
+    volumes:
+      - certs:/etc/remna/certs
     networks:
       - {{ docker_remna_server_caddy_network }}
       - {{ docker_vpn_network }}
@@ -80,3 +82,6 @@ volumes:
     driver: local
     external: false
     name: remnawave-redis-data
+  certs:
+    external: true
+    name: caddy_caddy-certs
