@@ -5,7 +5,7 @@
 
 prometheus_server_external_port: 443
 prometheus_server_port: 9090
-prometheus_server_tls_cert_file: "/etc/ssl/{{ cert_location_path_section.prometheus_crt }}"
-prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.prometheus_key }}"
+prometheus_server_tls_cert_file: "/etc/ssl/{{ cert_location_path_section.prometheus_crt | default(cert_location_path_section.main_crt) }}"
+prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.prometheus_key | default(cert_location_path_section.main_key) }}"
 prometheus_server_scrape_interval: 15s
 prometheus_server_scrape_timeout: 10s

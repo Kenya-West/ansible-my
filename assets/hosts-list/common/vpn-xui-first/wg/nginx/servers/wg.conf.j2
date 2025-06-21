@@ -1,9 +1,9 @@
 server {
-    server_name {{ domains_keys.vpn }};
+    server_name {{ domains_keys.main }};
     
     listen 443 ssl;
-    ssl_certificate /etc/letsencrypt/{{ cert_location_path_section.vpn_crt }};
-    ssl_certificate_key /etc/letsencrypt/{{ cert_location_path_section.vpn_key }};
+    ssl_certificate /etc/letsencrypt/{{ cert_location_path_section.main_crt }};
+    ssl_certificate_key /etc/letsencrypt/{{ cert_location_path_section.main_key }};
 
     location / {
         proxy_pass http://wg-easy:{{ wg_dashboard_port }}/;

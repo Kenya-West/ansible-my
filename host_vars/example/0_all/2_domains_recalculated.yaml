@@ -1,11 +1,11 @@
 # Analytics_node
 node_exporter_tls_server_config:
-  cert_file: "{{ cert_location_root_path }}/{{ cert_location_path_section.observability_crt }}"
-  key_file: "{{ cert_location_root_path }}/{{ cert_location_path_section.observability_key }}"
+  cert_file: "{{ cert_location_root_path }}/{{ cert_location_path_section.main_crt }}"
+  key_file: "{{ cert_location_root_path }}/{{ cert_location_path_section.main_key }}"
 
 # Analytics_server
-prometheus_server_tls_cert_file: "/etc/ssl/{{ cert_location_path_section.prometheus_crt }}"
-prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.prometheus_key }}"
+prometheus_server_tls_cert_file: "/etc/ssl/{{ cert_location_path_section.prometheus_crt | default(cert_location_path_section.main_crt) }}"
+prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.prometheus_key | default(cert_location_path_section.main_key) }}"
 
 # Bakcup_node_backrest
 
@@ -18,7 +18,7 @@ prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.promethe
 # VPN - XRay
 
 # VPN - X-UI
-xui_hostname: "{{ domains_keys.vpn }}"
+xui_hostname: "{{ domains_keys.main }}"
 
 # VPN - Web_features
 certbot_certs: "{{ domains | map('regex_replace', '^(.*)$', '{\"domains\": [\"\\1\"]}') | map('from_json') | list }}"

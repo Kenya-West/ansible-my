@@ -9,6 +9,7 @@ services:
     volumes:
       - ./logs:/var/log/remnanode
     ports:
+      - "443:443"
       - "${EXTERNAL_PORT}:${APP_PORT}"
       - "${SS2022_EXTERNAL_PORT}:${SS2022_PORT_INTERNAL}"
       - "${VLESS_EXTERNAL_PORT}:${VLESS_PORT_INTERNAL}"

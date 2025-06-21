@@ -4,16 +4,16 @@
 
   {%- if (hv.analytics_node_project_structure_end_dirs|default({})).wg_exporter is defined -%}
 
-    {# Skip adding the host if domains_keys.observability contains example.tld #}
+    {# Skip adding the host if domains_keys.main contains example.tld #}
     {%- set skip_host = False -%}
-    {%- if hv.domains_keys is defined and hv.domains_keys.observability is defined and 'example.tld' in hv.domains_keys.observability -%}
+    {%- if hv.domains_keys is defined and hv.domains_keys.main is defined and 'example.tld' in hv.domains_keys.main -%}
       {%- set skip_host = True -%}
     {%- endif -%}
 
       {%- if not skip_host -%}
 
       {# 1. Hostname #}
-      {%- set target_hostname = hv.domains_keys.observability -%}
+      {%- set target_hostname = hv.domains_keys.main -%}
 
       {# 2. Port #}
       {%- set port = hv.wg_web_listen_address_port -%}
