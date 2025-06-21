@@ -14,7 +14,7 @@ services:
     labels:
       caddy: "${DOMAIN}"
       caddy.import: "logging ${DOMAIN}"
-      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${PORT}}}"{% endraw %}
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${PORT} }}"{% endraw %}
 
     ports:
       - ${PORT}:${PORT}

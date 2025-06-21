@@ -19,7 +19,7 @@ services:
     labels:
       caddy: "${DOMAIN}:${EXTERNAL_PORT}"
       caddy.import: "logging ${DOMAIN}"
-      caddy.0_reverse_proxy: "{{ upstreams ${PORT}}}"
+      caddy.0_reverse_proxy: "{{ upstreams ${PORT} }}"
     restart: unless-stopped
 
 volumes:

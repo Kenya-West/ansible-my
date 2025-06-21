@@ -12,7 +12,7 @@ services:
     labels:
       caddy: "${DOMAIN}:${EXTERNAL_PORT}"
       caddy.import: "logging ${DOMAIN}"
-      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${PORT}}}"{% endraw %}
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${PORT} }}"{% endraw %}
 
       caddy.basic_auth.prometheus: "${METRICS_PROMETHEUS_USER_PASSWORD}"
       caddy.basic_auth.client: "${METRICS_CLIENT_USER_PASSWORD}"
