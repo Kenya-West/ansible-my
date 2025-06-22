@@ -1,3 +1,6 @@
 vector_exporter_external_port: 50113
 vector_exporter_web_telemetry_path: /metrics
 vector_exporter_web_listen_address: "{{ vector_exporter_web_listen_address_host }}:{{ vector_exporter_external_port }}"
+
+caddy_external_ports_allowlist__vector_exporter:
+  - '{{ vector_exporter_external_port }}:{{ vector_exporter_external_port }}'

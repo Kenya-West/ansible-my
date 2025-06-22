@@ -14,34 +14,19 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+    labels:
+      caddy: "${SERVICE_DOMAIN}:${EXTERNAL_PORT}"
+      caddy.import: "logging ${SERVICE_DOMAIN}-cadvisor"
+      caddy.basic_auth:
+{% for user in cadvisor_server_users %}
+      caddy.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
+{% endfor %}
+
+      {% raw %}caddy.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
     networks:
       - {{ analytics_node_network_name }}
 {% if 'vpn_caddy' in group_names or 'vpn_xui_first' in group_names %}
       - {{ docker_vpn_network }}
-{% endif %}
-    restart: unless-stopped
-
-  cadvisor_proxy:
-    image: nginx:latest
-    container_name: "${SERVICE_NAME}_proxy"
-    cpus: 0.5
-    mem_limit: 200m
-    env_file:
-      - .env
-    ports:
-{% if domains_keys.observability is defined %}
-      - "${EXTERNAL_PORT}:443/tcp"
-{% else %}
-      - "${EXTERNAL_PORT}:80/tcp"
-{% endif %}
-    networks:
-      - {{ analytics_node_network_name }}
-    volumes:
-      - ./nginx/templates:/etc/nginx/templates
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
-{% if domains_keys.observability is defined %}
-      - {{ cert_location_root_path }}:/etc/letsencrypt:ro
 {% endif %}
     restart: unless-stopped
 
