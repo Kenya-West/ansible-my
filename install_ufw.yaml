@@ -1,6 +1,6 @@
 ---
 - name: Install UFW and configure it
-  hosts: vpn_caddy:vpn_xui_first
+  hosts: vpn_caddy
   become: false
 
   roles:

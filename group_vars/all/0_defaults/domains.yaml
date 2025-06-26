@@ -4,17 +4,9 @@
 # You should reinitialize them in host_vars/host_name/1_domains.yaml
 domains_keys:
   main: sub.example.tld
-  remna_server: sub-vpn.example.tld
-  xui: sub-vpn.example.tld
-  frps: sub-vpn.example.tld # Yes I understand that this is not a vpn but a proxy
-  wg: sub-vpn.example.tld
-  xray: sub-vpn.example.tld
-  docker_exporter: sub-observability.example.tld
-  node_exporter: sub-observability.example.tld
-  cadvisor: sub-observability.example.tld
-  fail2ban_exporter: sub-observability.example.tld
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
   victoriametrics: sub-victoriametrics.example.tld
-  backrest: sub-backrest.example.tld
+  victorialogs: sub-victorialogs.example.tld
+  pushgateway: sub-pushgateway.example.tld
 domains: "{{ domains_keys.values() | list | unique }}"
