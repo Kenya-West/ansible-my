@@ -1,12 +1,12 @@
 UPDATE "main"."users" set "username" = '{{ xui_dashboard_login }}';
 UPDATE "main"."users" set "password" = '{{ xui_dashboard_password }}';
 
-UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.vpn_crt }}' WHERE "key" = 'webCertFile';
-UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.vpn_key }}' WHERE "key" = 'webKeyFile';
-UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.vpn_crt }}' WHERE "key" = 'subCertFile';
-UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.vpn_key }}' WHERE "key" = 'subKeyFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.main_crt }}' WHERE "key" = 'webCertFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.main_key }}' WHERE "key" = 'webKeyFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.main_crt }}' WHERE "key" = 'subCertFile';
+UPDATE "main"."settings" set "value" = '/etc/letsencrypt/{{ cert_location_path_section.main_key }}' WHERE "key" = 'subKeyFile';
 
-UPDATE "main"."settings" SET "value" = '{{ domains_keys.vpn }}' WHERE "key" = 'webDomain';
+UPDATE "main"."settings" SET "value" = '{{ domains_keys.main }}' WHERE "key" = 'webDomain';
 
 UPDATE "main"."settings" SET "value" = 'true' WHERE "key" = 'subEnable';
 UPDATE "main"."settings" SET "value" = 'true' WHERE "key" = 'subEncrypt';

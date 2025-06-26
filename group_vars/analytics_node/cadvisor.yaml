@@ -1,3 +1,1 @@
-cadvisor_external_port: 50111
 cadvisor_web_telemetry_path: /metrics
-cadvisor_web_listen_address: "{{ cadvisor_web_listen_address_host }}:{{ cadvisor_external_port }}"

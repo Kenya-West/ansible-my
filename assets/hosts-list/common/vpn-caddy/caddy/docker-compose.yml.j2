@@ -25,6 +25,8 @@ services:
       - ./static:/var/www/public
       - caddy-data:/data
       - caddy-certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     labels:
       caddy_0:
       caddy_0.metrics:

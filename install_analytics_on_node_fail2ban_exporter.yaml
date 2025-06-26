@@ -60,57 +60,6 @@
       ansible.builtin.fail:
         msg: "Fail2Ban is not running on this host."
       when: fail2ban_running.failed
-    # .htpasswd file
-    - name: Remove .htpasswd file if exists
-      become: true
-      become_user: root
-      ansible.builtin.file:
-        path: "{{ dest_project_fullpath }}/nginx/.htpasswd"
-        state: absent
-    - name: Make sure {{ project_dir }} directory exists
-      ansible.builtin.file:
-        state: directory
-        path: "{{ dest_project_fullpath }}"
-        mode: "0775"
-    - name: Synchronize directory structure from src to dest
-      ansible.builtin.synchronize:
-        src: "{{ source_asset_fullpath_common }}/"
-        dest: "{{ dest_project_fullpath }}/"
-        recursive: true
-        rsync_opts:
-          - "--include=*/"
-          - "--exclude=*"
-    - name: Synchronize directory structure from src to dest (project-specific)
-      ansible.builtin.synchronize:
-        src: "{{ source_asset_fullpath_project }}/"
-        dest: "{{ dest_project_fullpath }}/"
-        recursive: true
-        rsync_opts:
-          - "--include=*/"
-          - "--exclude=*"
-      ignore_errors: true
-    - name: Add .htpasswd file with users
-      community.general.htpasswd:
-        path: "{{ dest_project_fullpath }}/nginx/.htpasswd"
-        name: "{{ item.name }}"
-        password: "{{ item.password }}"
-        hash_scheme: "{{ item.hash_scheme | default('md5_crypt') }}"
-        mode: "0644"
-      loop: "{{ fail2ban_exporter_server_users }}"
-      failed_when:
-        - fail2ban_exporter_server_users is not defined
-        - fail2ban_exporter_server_users | length == 0
-        - item.name is not defined or item.name == ""
-        - item.password is not defined or item.password == ""
-    - name: Check if .htpasswd file exists
-      stat:
-        path: "{{ dest_project_fullpath }}/nginx/.htpasswd"
-      register: htpasswd_file
-      failed_when: htpasswd_file.stat.exists == false
-    - name: Check if .htpasswd file is empty
-      command: "test -s {{ dest_project_fullpath }}/nginx/.htpasswd"
-      register: htpasswd_file_empty
-      failed_when: htpasswd_file_empty.rc != 0
     # Docker network
     - name: Ensure Docker network {{ analytics_node_network_name }} exists with specific settings
       community.docker.docker_network:
@@ -126,8 +75,14 @@
         rule: allow
         port: "{{ fail2ban_exporter_external_port }}"
         proto: tcp
+      when:
+        - fail2ban_exporter_external_port is defined
+        - fail2ban_exporter_external_port | length > 0
     - name: Reminder to run install_ufw.yaml playbook
       ansible.builtin.debug:
         msg: |
           Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
           Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}
+      when:
+        - fail2ban_exporter_external_port is defined
+        - fail2ban_exporter_external_port | length > 0
