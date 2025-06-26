@@ -75,8 +75,14 @@
         rule: allow
         port: "{{ fail2ban_exporter_external_port }}"
         proto: tcp
+      when:
+        - fail2ban_exporter_external_port is defined
+        - fail2ban_exporter_external_port | length > 0
     - name: Reminder to run install_ufw.yaml playbook
       ansible.builtin.debug:
         msg: |
           Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
           Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}
+      when:
+        - fail2ban_exporter_external_port is defined
+        - fail2ban_exporter_external_port | length > 0

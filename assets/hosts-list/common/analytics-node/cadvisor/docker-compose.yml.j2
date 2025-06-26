@@ -14,26 +14,23 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
-    labels:
-      caddy: "${SERVICE_DOMAIN}:${EXTERNAL_PORT}"
-      caddy.import: "logging ${SERVICE_DOMAIN}-cadvisor"
-      caddy.basic_auth:
-{% for user in cadvisor_server_users %}
-      caddy.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
-{% endfor %}
-
-      {% raw %}caddy.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
     networks:
       - {{ analytics_node_network_name }}
-{% if 'vpn_caddy' in group_names or 'vpn_xui_first' in group_names %}
       - {{ docker_vpn_network }}
-{% endif %}
+    labels:
+      caddy: "${SERVICE_DOMAIN}"
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
+      caddy.handle_path.import: "logging ${SERVICE_DOMAIN}-cadvisor"
+      caddy.handle_path.basic_auth:
+{% for user in cadvisor_server_users %}
+      caddy.handle_path.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
+{% endfor %}
+      {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+
     restart: unless-stopped
 
 networks:
   {{ analytics_node_network_name }}:
     external: true
-{% if 'vpn_caddy' in group_names or 'vpn_xui_first' in group_names %}
   {{ docker_vpn_network }}:
     external: true
-{% endif %}

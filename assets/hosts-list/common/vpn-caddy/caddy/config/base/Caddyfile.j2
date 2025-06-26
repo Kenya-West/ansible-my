@@ -1,0 +1,125 @@
+(cors) {
+        @origin header Origin "*"
+        header @origin Access-Control-Allow-Origin "*"
+        header @origin Access-Control-Allow-Methods "OPTIONS,HEAD,GET,POST,PUT,PATCH,DELETE"
+        header @origin Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Accept"
+        header @origin Access-Control-Allow-Credentials "true"
+        header @origin Access-Control-Expose-Headers "Content-Length,Content-Range"
+}
+
+(logging) {
+    log {
+        output file /var/log/caddy/{args[0]}.access.log {
+            roll_size 10mb
+            roll_keep 20
+            roll_keep_for 3d
+        }
+    }
+}
+
+(autodiscovery) {
+    # -----------------------------------------------------------
+    # 0. Capture the container slug and keep the rest of the path
+    # -----------------------------------------------------------
+    @auto path_regexp ad ^/{{ path_to_internal_services_autodiscovery_full }}/(?P<slug>[A-Za-z0-9_-]+)(?P<rest>/.*)?$
+
+    # ---- helpers --------------------------------------------------------------
+    {% set qp = path_to_internal_services_autodiscovery_searchparams_prefix_base %}
+    @want_port       expression `{query.{{ qp }}_port} != ""`
+    @want_tls        expression `{query.{{ qp }}_tls}.matches("(?i)^(1|true|yes)$")`
+
+    @want_tls_port   expression `
+        {query.{{ qp }}_tls}.matches("(?i)^(1|true|yes)$") &&
+        {query.{{ qp }}_port} != ""
+    `
+
+    # ---------------------------------------------------------------------------
+    handle @auto {
+
+        # 1. basic-auth (unchanged)
+        basic_auth {
+{% for user in docker_autodiscovery_basic_auth_users %}
+            {{ user.name }} {{ user.password | ansible.builtin.password_hash(user.hash_scheme) }}
+{% endfor %}
+        }
+
+        # 2. Drop the discovery prefix so upstream sees /<rest>
+        uri strip_prefix /{{ path_to_internal_services_autodiscovery_full }}/{re.ad.slug}
+
+        # 3-a. HTTPS + custom port
+        handle @want_tls_port {
+            uri query delete {{ qp }}_tls {{ qp }}_port
+            reverse_proxy {re.ad.slug}:{query.{{ qp }}_port} {
+                transport http {
+                    tls
+                    tls_insecure_skip_verify    # or 'tls_server_name {re.ad.slug}'
+                }
+            }
+        }
+
+        # 3-b. HTTPS + default port 443
+        handle @want_tls {
+            uri query delete {{ qp }}_tls
+            reverse_proxy {re.ad.slug}:443 {
+                transport http {
+                    tls
+                    tls_insecure_skip_verify
+                }
+            }
+        }
+
+        # 3-c. HTTP + custom port
+        handle @want_port {
+            uri query delete {{ qp }}_port
+            reverse_proxy {re.ad.slug}:{query.{{ qp }}_port}
+        }
+
+        # 3-d. HTTP + default port 80  (fallback)
+        reverse_proxy {re.ad.slug}:80
+    }
+}
+
+{% if 'analytics_node' in group_names %}
+(observability) {
+    handle_path /{{ path_to_internal_services_predefined_full }}/node_exporter/* {
+        basic_auth {
+{% for user in node_exporter_basic_auth_users_for_caddy %}
+            {{user.name}} {{ user.password | ansible.builtin.password_hash(user.hash_scheme) }}
+{% endfor %}
+        }
+        reverse_proxy host.docker.internal:{{ node_exporter_web_listen_address_port }}
+    }
+
+    handle_path /{{ path_to_internal_services_predefined_full }}/docker_exporter/* {
+        basic_auth {
+{% for user in docker_exporter_server_users %}
+            {{user.name}} {{ user.password | ansible.builtin.password_hash(user.hash_scheme) }}
+{% endfor %}
+        }
+        reverse_proxy host.docker.internal:{{ docker_metrics_addr_port }}
+    }
+}
+{% endif %}
+
+{
+    order log after handle_path
+
+    log {
+        output file /var/log/caddy/common.access.log {
+            roll_size 10mb
+            roll_keep 20
+            roll_keep_for 3d
+        }
+    }
+}
+
+{{ domains_keys.main }} {
+    import logging {{ domains_keys.main }}
+    import autodiscovery
+{% if 'analytics_node' in group_names %}
+    import observability
+{% endif %}
+    @not_internal not path /{$INTERNAL_PATH_BASE}*
+    root @not_internal /var/www/public
+    file_server @not_internal
+}

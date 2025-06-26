@@ -4,3 +4,10 @@ caddy_web_listen_address_port: 50110
 caddy_external_ports_allowlist__base:
   - 80:80
   - '${METRICS_EXTERNAL_PORT:-2020}:2020'
+
+path_to_internal_services_base: internal-network
+path_to_internal_services_autodiscovery: autodiscovery
+path_to_internal_services_predefined: predefined
+path_to_internal_services_autodiscovery_full: "{{ path_to_internal_services_base }}/{{ path_to_internal_services_autodiscovery }}"
+path_to_internal_services_autodiscovery_searchparams_prefix_base: "{{ path_to_internal_services_autodiscovery }}-options"
+path_to_internal_services_predefined_full: "{{ path_to_internal_services_base }}/{{ path_to_internal_services_predefined }}"

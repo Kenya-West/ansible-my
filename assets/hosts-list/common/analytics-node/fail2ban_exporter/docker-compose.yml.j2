@@ -13,13 +13,14 @@ services:
       - {{ analytics_node_network_name }}
       - {{ docker_vpn_network }}
     labels:
-      caddy: "${SERVICE_DOMAIN}:${EXTERNAL_PORT}"
-      caddy.import: "logging ${SERVICE_DOMAIN}-fail2ban"
-      caddy.basic_auth:
+      caddy: "${SERVICE_DOMAIN}"
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
+      caddy.handle_path.import: "logging ${SERVICE_DOMAIN}-fail2ban"
+      caddy.handle_path.basic_auth:
 {% for user in fail2ban_exporter_server_users %}
-      caddy.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
+      caddy.handle_path.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
 {% endfor %}
-      {% raw %}caddy.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+      {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
 
     restart: unless-stopped
 

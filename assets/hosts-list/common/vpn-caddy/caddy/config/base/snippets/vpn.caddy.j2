@@ -1,9 +1,0 @@
-{% if group_names | select('match', '^vpn_') | list %}
-{$DOMAIN_VPN} {
-    import logging {$DOMAIN_VPN}
-    root * /var/www/public
-    file_server
-    rewrite * /index.html
-}
-
-{% endif %}
