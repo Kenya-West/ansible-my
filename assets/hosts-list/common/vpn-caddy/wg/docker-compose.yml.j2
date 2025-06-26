@@ -3,7 +3,7 @@
 services:
   wg:
     image: ghcr.io/wg-easy/wg-easy
-    container_name: wg
+    container_name: ${SERVICE_NAME}
     volumes:
       - ./wg-easy:/etc/wireguard
     networks:
@@ -20,9 +20,9 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
     labels:
-      caddy: "${DOMAIN}:${EXTERNAL_PORT}"
-      caddy.import: "logging ${DOMAIN}-wg"
-      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${PORT} }}"{% endraw %}
+      caddy: "${SERVICE_DOMAIN}:${EXTERNAL_PORT:-443}"
+      caddy.import: "logging ${SERVICE_DOMAIN}-wg"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
 
 
 networks:
