@@ -1,0 +1,42 @@
+---
+# tasks file for roles/kwtoolset/envsubst_files
+- name: Ensure all required files are present
+  ansible.builtin.assert:
+    that:
+      - envsubst_files.chdir is defined
+      - envsubst_files.files is defined
+    msg: "Required variables are not defined"
+
+- name: Ensure all files in envsubst_files.files are present
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+    msg: "Required variables are not defined"
+  loop: "{{ envsubst_files.files }}"
+  loop_control:
+    loop_var: item
+
+- name: Substitute variables in config files
+  loop: "{{ envsubst_files.files }}"
+  loop_control:
+    loop_var: file
+  ansible.builtin.command: >
+    docker container run --rm -it --env-file .env -v .:/wd bhgedigital/envsubst sh -c
+    "envsubst < /wd/{{ file.name }} > /wd/{{ file.new_name | default(file.name.split('.')[:-1] | join('.')) }}"
+    {% if envsubst_files.show_subst_result %}
+    && cat {{ file.new_name | default(file.name.split('.')[:-1] | join('.')) }}
+    {% endif %}
+  args:
+    chdir: "{{ envsubst_files.chdir }}"
+  register: envsubst_result
+
+- name: Remove original template files if substitution succeeds
+  ansible.builtin.file:
+    path: "{{ envsubst_files.chdir }}/{{ file.name }}"
+    state: absent
+  when:
+    - envsubst_result is succeeded
+    - envsubst_files.remove_original
+  loop: "{{ envsubst_files.files }}"
+  loop_control:
+    loop_var: file

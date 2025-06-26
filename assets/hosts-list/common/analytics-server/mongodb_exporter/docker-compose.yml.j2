@@ -1,0 +1,24 @@
+---
+services:
+  mongodb_exporter:
+    image: percona/mongodb_exporter:0.43.1
+    container_name: mongodb_exporter
+    cpus: 0.5
+    mem_limit: 200m
+    env_file:
+      - .env
+    command: [
+        "--mongodb.direct-connect=false",
+        "--discovering-mode",
+        "--collector.replicasetstatus=true",
+        "--collector.indexstats=true",
+        "--collector.collstats=true",
+        "--log.level=info",
+    ]
+    networks:
+      - caddy
+    restart: unless-stopped
+
+networks:
+  caddy:
+    external: true

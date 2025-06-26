@@ -1,0 +1,7 @@
+---
+# tasks file for roles/add_keys
+- name: Add keys to each of user
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ users_to_set | map(attribute='name') }}"
+  loop_control:
+    loop_var: user_name

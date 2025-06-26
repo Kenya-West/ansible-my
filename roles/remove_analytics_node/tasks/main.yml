@@ -1,0 +1,65 @@
+---
+# tasks file for roles/remove_analytics_node
+- name: Check if Node Exporter service is present
+  ansible.builtin.systemd:
+    name: node_exporter
+    state: stopped
+  register: node_exporter_service_status
+  ignore_errors: true
+  failed_when: false
+
+- name: Stop Node Exporter service if it exists
+  ansible.builtin.systemd:
+    name: node_exporter
+    state: stopped
+  when: node_exporter_service_status.failed is not defined
+
+- name: Disable Node Exporter service if it exists
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: false
+  when: node_exporter_service_status.failed is not defined
+
+- name: Remove Node Exporter systemd service file
+  ansible.builtin.file:
+    path: /etc/systemd/system/node_exporter.service
+    state: absent
+
+- name: Reload systemd daemon to remove Node Exporter service
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Remove Node Exporter binary
+  ansible.builtin.file:
+    path: "{{ node_exporter_binary_install_dir }}/node_exporter"
+    state: absent
+
+- name: Remove Node Exporter user
+  ansible.builtin.user:
+    name: "{{ node_exporter_system_user }}"
+    state: absent
+    remove: true
+
+- name: Clean up Node Exporter cache (if exists)
+  ansible.builtin.file:
+    path: /var/cache/node_exporter
+    state: absent
+
+- name: Remove Node Exporter logs (if exists)
+  ansible.builtin.file:
+    path: /var/log/node_exporter
+    state: absent
+
+- name: Remove any additional Node Exporter related directories
+  ansible.builtin.find:
+    paths:
+      - "/tmp"
+      - "/usr/local"
+    patterns: "node_exporter*"
+  register: node_exporter_dirs
+
+- name: Clean found Node Exporter directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ node_exporter_dirs.files }}"

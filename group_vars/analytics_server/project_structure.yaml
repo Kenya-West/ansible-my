@@ -1,0 +1,13 @@
+---
+analytics_server_project_structure_root: analytics-server
+analytics_server_project_structure_end_dirs__base:
+  prometheus: "{{ analytics_server_project_structure_root }}/prometheus"
+  grafana: "{{ analytics_server_project_structure_root }}/grafana"
+  blackbox: "{{ analytics_server_project_structure_root }}/blackbox_exporter"
+  pushgateway: "{{ analytics_server_project_structure_root }}/pushgateway"
+  blackbox_exporter: "{{ analytics_server_project_structure_root }}/blackbox_exporter"
+  mongodb_exporter: "{{ analytics_server_project_structure_root }}/mongodb_exporter"
+  alertmanager: "{{ analytics_server_project_structure_root }}/alertmanager"
+  victoriametrics: "{{ analytics_server_project_structure_root }}/victoriametrics"
+analytics_server_project_structure_end_dirs: "{{ analytics_server_project_structure_end_dirs__base }}"
+analytics_server_project_structure_end_dirs_list: "{{ analytics_server_project_structure_end_dirs.values() | list }}"

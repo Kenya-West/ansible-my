@@ -1,0 +1,27 @@
+---
+
+services:
+  backrest:
+    image: garethgeorge/backrest:latest
+    cpus: 0.5
+    mem_limit: 200m
+    container_name: backrest
+    hostname: backrest
+    volumes:
+      - ./backrest/data:/data
+      - ./backrest/config:/config
+      - ./backrest/cache:/cache
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${PORT} }}"{% endraw %}
+
+    ports:
+      - ${PORT}:${PORT}
+    restart: unless-stopped
+    networks:
+      - {{ docker_vpn_network }}
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true

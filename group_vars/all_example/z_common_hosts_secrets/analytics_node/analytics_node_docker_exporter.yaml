@@ -1,0 +1,4 @@
+docker_exporter_server_users:
+  - name: username
+    password: <password>
+    hash_scheme: bcrypt

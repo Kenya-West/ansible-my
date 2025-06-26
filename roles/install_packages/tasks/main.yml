@@ -1,0 +1,33 @@
+---
+# tasks file for roles/install_packages
+- name: Uninstall Apt packages
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: absent
+  loop: "{{ packages_list.uninstall.apt }}"
+  when: packages_list.uninstall.apt is defined
+  ignore_errors: true
+
+- name: Uninstall Snap packages
+  community.general.snap:
+    name: "{{ item }}"
+    state: absent
+  loop: "{{ packages_list.uninstall.snap }}"
+  when: packages_list.uninstall.snap is defined
+  ignore_errors: true
+
+- name: Install Apt packages
+  ansible.builtin.apt:
+    update_cache: true
+    name: "{{ item }}"
+    state: present
+  loop: "{{ packages_list.install.apt }}"
+  when: packages_list.install.apt is defined
+  ignore_errors: true
+
+- name: Install Snap packages
+  community.general.snap:
+    name: "{{ item }}"
+  loop: "{{ packages_list.install.snap }}"
+  when: packages_list.install.snap is defined
+  ignore_errors: true

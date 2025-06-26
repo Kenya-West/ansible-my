@@ -1,0 +1,3 @@
+---
+- import_playbook: ./general_vps_prepare_update.yaml
+- import_playbook: ./general_vps_prepare_reboot.yaml

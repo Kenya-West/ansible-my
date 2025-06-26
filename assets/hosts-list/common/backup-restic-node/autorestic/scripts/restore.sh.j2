@@ -1,0 +1,8 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+. "$SCRIPT_DIR/rclone-pass.sh"
+
+for label in home_user shared_ssl; do
+    autorestic restore -l "$label" -c "{{ dest_project_fullpath }}/config/.autorestic.yaml" -v --to "./restored/$label"
+done

@@ -1,0 +1,80 @@
+---
+# tasks file for roles/remove_ufw_rules
+
+- name: Check if UFW is installed
+  ansible.builtin.command: dpkg -l | grep ufw
+  register: ufw_installed
+  changed_when: false
+  failed_when: false
+
+- name: Check if UFW is enabled
+  ansible.builtin.command: ufw status
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+  when: ufw_installed.stdout != ""
+
+- name: Set fact that UFW is (not) enabled
+  ansible.builtin.set_fact:
+    ufw_enabled: "{{ 'inactive' not in ufw_status.stdout }}"
+  when: ufw_installed.stdout != ""
+
+- name: Delete rule in UFW (for TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    delete: true
+  loop: "{{ ufw_ports }}"
+  when:
+    - ufw_ports is defined and ufw_ports | length > 0
+    - collected_ports is defined and collected_ports | length > 0
+    - ufw_installed.stdout != ""
+    - ufw_enabled
+    - input_mode is not defined or input_mode == 'list'
+    - "'tcp' in ufw_protos"
+    - item != 0
+    - item > 0 and item < 65536
+
+- name: Delete rule in UFW (for UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+    delete: true
+  loop: "{{ ufw_ports }}"
+  when:
+    - ufw_ports is defined and ufw_ports | length > 0
+    - collected_ports is defined and collected_ports | length > 0
+    - ufw_installed.stdout != ""
+    - ufw_enabled
+    - input_mode is not defined or input_mode == 'list'
+    - "'tcp' in ufw_protos"
+    - item != 0
+    - item > 0 and item < 65536
+
+- name: Remove range of ports for UFW (TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.begin }}:{{ item.end }}"
+    proto: tcp
+    delete: true
+  loop: "{{ ufw_ports_range }}"
+  when:
+    - ufw_ports_range is defined and ufw_ports_range | length > 0
+    - ufw_installed.stdout != ""
+    - ufw_enabled
+    - "'tcp' in ufw_protos"
+
+- name: Remove range of ports for UFW (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.begin }}:{{ item.end }}"
+    proto: udp
+    delete: true
+  loop: "{{ ufw_ports_range }}"
+  when:
+    - ufw_ports_range is defined and ufw_ports_range | length > 0
+    - ufw_installed.stdout != ""
+    - ufw_enabled
+    - "'udp' in ufw_protos"

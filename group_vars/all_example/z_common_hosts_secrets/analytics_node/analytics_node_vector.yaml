@@ -1,0 +1,50 @@
+vector_exporter_server_users:
+  - name: username
+    password: <password>
+    hash_scheme: bcrypt
+
+victorialogs_endpoints:
+  - url: <url to victorialogs server>
+    username: <username>
+    password: <password>
+
+vector_sinks:
+  sinks:
+    exporter_sink:
+      type: prometheus_exporter
+      inputs:
+        - host_metrics_source
+        - internal_metrics_source
+      address: "0.0.0.0:9598"
+
+    axiom_sink:
+      type: axiom
+      inputs:
+        - journald_source
+        - parse_logs_containers
+      compression: zstd
+      # You can switch to hard-coded values if you want,
+      # otherwise provide the following variables in docker-compose.yml or .env file
+      dataset: ${AXIOM_DATASET}
+      org_id: ${AXIOM_ORG_ID}
+      token: ${AXIOM_TOKEN}
+
+    victorialogs_sink:
+      inputs:
+        - journald_source # you can change this name in vector.yaml.j2
+        - parse_logs_containers # you can change this name in vector.yaml.j2
+      type: elasticsearch
+      endpoints:
+        - <url to victorialogs server starting from https://> # e.g. https://<victorialogs_url>/insert/elasticsearch/
+      auth:
+        strategy: basic
+        user: <victorialogs_user>
+        password: <victorialogs_password>
+      mode: bulk
+      api_version: v8
+      healthcheck:
+        enabled: false
+      query:
+        _msg_field: message
+        _time_field: timestamp
+        _stream_fields: host,container_name

@@ -1,0 +1,2 @@
+# You should set it in host_vars or in playbook
+mongotools_mongodb_endpoints: []

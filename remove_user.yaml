@@ -1,0 +1,25 @@
+---
+- name: Remove user, stop his Docker containers and remove his directories completely
+  hosts: all
+  become: true
+
+  roles:
+    - name: ./roles/stop_docker_containers
+
+  pre_tasks:
+    - name: Prompt for the username to remove
+      ansible.builtin.pause:
+        prompt: "Enter the username to remove"
+        echo: true
+      register: username_to_remove
+
+  post_tasks:
+    - name: Remove user
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ username_to_remove.user_input }}"
+        state: absent
+        remove: true
+        force: true
+      when: username_to_remove.user_input != ''

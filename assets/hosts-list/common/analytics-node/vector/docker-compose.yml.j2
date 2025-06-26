@@ -1,0 +1,34 @@
+---
+services:
+  vector:
+    image: timberio/vector:latest-debian
+    cpus: 0.5
+    mem_limit: 200m
+    container_name: "${SERVICE_NAME}"
+    environment:
+      - HOST_MACHINE={{ inventory_hostname }}
+    volumes:
+      - /run/systemd/journal/socket:/run/systemd/journal/socket:ro
+      - /var/log/journal:/var/log/journal:ro
+      - ./config/vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - {{ analytics_node_network_name }}
+      - {{ docker_vpn_network }}
+    labels:
+      caddy: "${SERVICE_DOMAIN}"
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
+      caddy.handle_path.import: "logging ${SERVICE_DOMAIN}-vector"
+      caddy.handle_path.basic_auth:
+{% for user in vector_exporter_server_users %}
+      caddy.handle_path.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
+{% endfor %}
+      {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+
+    restart: unless-stopped
+
+networks:
+  {{ analytics_node_network_name }}:
+    external: true
+  {{ docker_vpn_network }}:
+    external: true

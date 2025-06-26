@@ -1,0 +1,186 @@
+prometheus_server_basic_auth_users:
+  <username>: <password>
+  <username2>: <password2>
+prometheus_server_scrape_configs:
+  - job_name: PushGateway
+    honor_labels: true
+    static_configs:
+      - targets:
+          - 'pushgateway:9091'
+    basic_auth:
+      username: prometheus
+      password: <password>
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
+  - job_name: cAdvisor
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/cadvisor_targets_*.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: prometheus
+      password: <password>
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
+  - job_name: Docker exporter
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/docker_exporter_targets_*.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: prometheus
+      password: <password>
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+
+  - job_name: Vector
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/vector_targets_*.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: prometheus
+      password: <password>
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
+  - job_name: X-UI panels
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/node_targets_*.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: prometheus
+      password: <password>
+    scheme: https
+    metrics_path: /node_exporter_metrics
+    tls_config:
+      insecure_skip_verify: true
+    # Relabeling "instance" to remove the ":9100" part
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
+  - job_name: Restic REST server - your host
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/restic_targets_*.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: metrics
+      password: <password>
+    scheme: https
+    metrics_path: /frps/proxy/web/22002/metrics
+
+  - job_name: MongoDB
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/mongodb_targets_*.yml
+        refresh_interval: 30s
+
+  - job_name: blackbox
+    metrics_path: /probe
+    params:
+      module: [http_2xx]  # Look for a HTTP 200 response.
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/blackbox_targets.yml
+          - /etc/file_sd/blackbox_targets_custom.yml
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox:9115"  # The blackbox exporter's real hostname:port.
+
+  - job_name: Fail2Ban
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/fail2ban_targets_*.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: prometheus
+      password: <password>
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
+  - job_name: Caddy
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/caddy_targets_*.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: prometheus
+      password: <password>
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
+  - job_name: FRPS
+    file_sd_configs:
+      - files:
+          - /etc/file_sd/frps_targets_*.yml
+        refresh_interval: 30s
+    basic_auth:
+      username: username # the same user name from frp_dashboard_user
+      password: <password # the same password from frp_dashboard_password>
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      insecure_skip_verify: true
+    relabel_configs:
+      - source_labels: [hostname]
+        target_label: instance
+
+prometheus_server_remote_write_list:
+  # This is victoriametrics service that is used by grafana
+  - url: "http://victoriametrics:8428/api/v1/write"
+    basic_auth:
+      username: victoriametrics-service-account
+      password: <password>
+  # This is some another endpoint to write you could possibly add
+  - url: https://sub.example.tld/api/prom/push
+    basic_auth:
+      username: username
+      password: <password>
+    queue_config:
+      capacity: 5000
+      max_shards: 200
+      min_shards: 1
+      max_samples_per_send: 10000
+      batch_send_deadline: 5s
+      min_backoff: 30ms
+      max_backoff: 100ms
+
+restic_rest_server_targets:
+  - "https://sub.example.tld/frps/proxy/web/22001/metrics"
+  - "https://sub.example2.tld/metrics"

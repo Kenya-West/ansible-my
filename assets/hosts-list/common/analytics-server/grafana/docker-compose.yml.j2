@@ -1,0 +1,20 @@
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    cpus: 0.5
+    mem_limit: 200m
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+    networks:
+      - caddy
+    labels:
+      caddy: "${DOMAIN}:${EXTERNAL_PORT}"
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams 3000 }}"{% endraw %}
+
+    restart: unless-stopped
+
+networks:
+  caddy:
+    external: true

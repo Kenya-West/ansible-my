@@ -1,0 +1,13 @@
+---
+# tasks file for roles/kwtoolset/container_pull
+- name: Docker Compose project - pull new images
+  community.docker.docker_compose_v2:
+    project_src: "{{ item.path }}"
+    project_name: "{{ item.name }}"
+    files:
+      - docker-compose.yml
+    pull: "{{ item.policy }}"
+  loop: "{{ container_pull_list }}"
+  loop_control:
+    loop_var: item
+  ignore_errors: true

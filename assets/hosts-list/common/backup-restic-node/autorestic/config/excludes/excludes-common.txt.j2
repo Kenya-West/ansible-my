@@ -1,0 +1,34 @@
+*.log
+/**/tmp/
+/**/temp/
+/**/tmp-*
+/**/temp-*
+/**/cache
+
+#
+# note: this is run with the option `--one-file-system`, so it takes care
+# of /dev, /sys, /proc, /media. Otherwise add those paths to this list.
+# restic exclude patterns
+*.!Sync
+*.Cache
+*.SyncOld
+*.SyncPart
+*.SyncTemp
+*.bak
+*.bts
+*.crdownload
+*.lock
+*.part
+*.shm
+*.swp
+*.sync
+*.tmp
+*.wal
+*~
+.*.swp
+.Trash*
+.gvfs
+.local/share/trash
+.trash*
+.~lock.
+lost+found

@@ -1,0 +1,75 @@
+---
+# tasks file for roles/install_ufw
+- name: Ensure UFW is installed
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    policy: deny
+
+- name: Allow collected ports in UFW (for TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ ufw_ports }}"
+  when:
+    - input_mode is not defined or input_mode == 'list'
+    - ufw_ports is defined and ufw_ports | length > 0
+    - item != 0
+    - item > 0 and item < 65536
+    - "'tcp' in ufw_protos"
+
+- name: Allow collected ports in UFW (for UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+  loop: "{{ ufw_ports }}"
+  when:
+    - input_mode is not defined or input_mode == 'list'
+    - ufw_ports is defined and ufw_ports | length > 0
+    - item != 0
+    - item > 0 and item < 65536
+    - "'udp' in ufw_protos"
+
+- name: Set rules for UFW on complex mode
+  community.general.ufw:
+    rule: "{{ item.rule }}"
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+  loop: "{{ ufw_rules }}"
+  when:
+    - input_mode is defined
+    - input_mode == 'complex'
+
+- name: Set range of ports for UFW (TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.begin }}:{{ item.end }}"
+    proto: tcp
+  loop: "{{ ufw_ports_range }}"
+  when:
+    - ufw_ports_range is defined and ufw_ports_range | length > 0
+    - item.begin > 0 and item.begin < 65536
+    - item.end > 0 and item.end < 65536
+    - "'tcp' in ufw_protos"
+
+- name: Set range of ports for UFW (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.begin }}:{{ item.end }}"
+    proto: udp
+  loop: "{{ ufw_ports_range }}"
+  when:
+    - ufw_ports_range is defined and ufw_ports_range | length > 0
+    - item.begin > 0 and item.begin < 65536
+    - item.end > 0 and item.end < 65536
+    - "'udp' in ufw_protos"
+
+- name: Say that ufw_ports variable does not exist
+  ansible.builtin.debug:
+    msg: "❕ Variable ufw_ports does not exist or is empty. Aborting"
+  when: ufw_ports is not defined or ufw_ports | length == 0

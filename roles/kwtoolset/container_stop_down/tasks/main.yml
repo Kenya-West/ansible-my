@@ -1,0 +1,30 @@
+---
+# tasks file for roles/kwtoolset/container_stop_down
+- name: Check if yq is installed
+  command: yq --version
+  register: container_stop_down_yq_installed
+  ignore_errors: true
+
+- name: Initialize filtered list
+  set_fact:
+    container_stop_down_list_filtered: []
+
+- name: Remove invalid paths
+  ansible.builtin.include_tasks: process-paths.yml
+  loop: "{{ container_stop_down_list }}"
+  loop_control:
+    loop_var: item
+  when:
+    - item is defined
+    - item != ""
+
+- name: These projects will be stopped and downed
+  debug:
+    var: container_stop_down_list_filtered
+
+- name: Process each of project
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ container_stop_down_list_filtered }}"
+  loop_control:
+    loop_var: item
+  when: container_stop_down_list_filtered | length > 0

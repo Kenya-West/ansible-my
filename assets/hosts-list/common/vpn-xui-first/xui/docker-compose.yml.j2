@@ -1,0 +1,31 @@
+---
+
+services:
+  xui:
+    image: alireza7/x-ui
+    container_name: xui
+    hostname: ${XUI_HOSTNAME}
+    volumes:
+      - type: bind
+        source: ./db/x-ui.db
+        target: /etc/x-ui/x-ui.db
+      - {{ cert_location_root_path }}:/etc/letsencrypt:ro
+    env_file:
+      - .env
+    networks:
+      - {{ docker_vpn_network }}
+    environment:
+      XRAY_VMESS_AEAD_FORCED: "false"
+    tty: true
+    ports:
+      - 80:80
+      - 443:443
+      - "${XUI_DASHBOARD_PORT}:${XUI_DASHBOARD_PORT}"
+      - "${XUI_WG_PORT}:${XUI_WG_PORT}/udp"
+      - "${XUI_SS2022_PORT}:${XUI_SS2022_PORT}"
+      - "${XUI_SUB_PORT}:${XUI_SUB_PORT}"
+    restart: unless-stopped
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true

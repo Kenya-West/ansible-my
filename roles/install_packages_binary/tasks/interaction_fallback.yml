@@ -1,0 +1,55 @@
+- name: Extract available options from stderr_lines or stderr
+  set_fact:
+    bin_download_options: >-
+      {{
+        (bin_download_result.stderr_lines | default(bin_download_result.stderr.split('\n')))
+        | select('match', '^\(\d+\)\s+.+$')
+        | map('regex_replace', '^\(\d+\)\s+', '')
+        | list
+      }}
+
+- name: Show available download options
+  ansible.builtin.debug:
+    msg: "Available download options: {{ bin_download_options | length }}"
+
+- name: Select option containing 'musl' if only one unique match
+  set_fact:
+    bin_download_option_selected: "{{ bin_download_options | select('search', 'musl') | list | first }}"
+  when: (bin_download_options | select('search', 'musl') | list | length) == 1
+
+- name: Select option containing 'amd64' if only one unique match and not already selected
+  set_fact:
+    bin_download_option_selected: "{{ bin_download_options | select('search', 'amd64') | list | first }}"
+  when:
+    - bin_download_option_selected is not defined
+    - (bin_download_options | select('search', 'amd64') | list | length) == 1
+
+- name: Select option containing '.tar.gz' if only one unique match and not already selected
+  set_fact:
+    bin_download_option_selected: "{{ bin_download_options | select('search', '\\.tar\\.gz$') | list | first }}"
+  when:
+    - bin_download_option_selected is not defined
+    - (bin_download_options | select('search', '\\.tar\\.gz$') | list | length) == 1
+
+- name: Select option containing '.appimage' if only one unique match and not already selected
+  set_fact:
+    bin_download_option_selected: "{{ bin_download_options | select('search', '\\.appimage$') | list | first }}"
+  when:
+    - bin_download_option_selected is not defined
+    - (bin_download_options | lower | select('search', '\\.appimage$') | list | length) == 1
+
+# - name: Select random option
+#   set_fact:
+#     bin_download_option_selected: "{{ bin_download_options | random }}"
+#   when:
+#     - bin_download_option_selected is not defined
+
+- name: Include interaction_fallback_no_options if interaction required
+  ansible.builtin.include_tasks: interaction_fallback_no_options.yml
+  when:
+    - bin_download_result_interaction is not defined
+
+- name: Run download command with selected asset
+  ansible.builtin.command: "{{ download_cmd }} --asset {{ bin_download_option_selected }}"
+  when:
+    - bin_download_option_selected is defined

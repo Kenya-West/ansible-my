@@ -1,0 +1,18 @@
+---
+
+services:
+  restic_rest_server:
+    image: restic/rest-server:latest
+    container_name: restic_rest_server
+    volumes:
+      - ./data:/data
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:${PORT}:8000"
+    networks:
+      - {{ restic_server_network }}
+    restart: unless-stopped
+
+networks:
+  {{ restic_server_network }}:

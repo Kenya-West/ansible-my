@@ -1,0 +1,107 @@
+---
+- name: Install and configure backup by Restic REST server
+  hosts: backup_restic_node
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: mongo-tools
+    project_name: mongo-tools
+    project_root_dir: "{{ backup_restic_node_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+
+  roles:
+    - name: ./roles/kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+  pre_tasks:
+    - name: Check if eget is installed
+      ansible.builtin.shell: command -v eget
+      register: eget_installed
+      failed_when: eget_installed.rc != 0 or eget_installed.stdout == ""
+    - name: Check if mongotools_mongodb_endpoints is more than 0
+      fail:
+        msg: "mongotools_mongodb_endpoints is not set"
+      when: mongotools_mongodb_endpoints | length == 0
+  post_tasks:
+    # Check
+    - name: Install mongo-tools using script
+      block:
+        - name: Try to install mongo-tools
+          become: true
+          become_user: root
+          ansible.builtin.shell:
+            cmd: "./scripts/install_mongotools.sh"
+            chdir: "{{ dest_project_fullpath }}"
+          register: installation_result
+        - name: Check if mongodump is installed
+          ansible.builtin.shell: command -v mongodump
+          register: mongodump_installed
+          failed_when: mongodump_installed.rc != 0 or mongodump_installed.stdout == ""
+          when: installation_result.rc == 0
+      rescue:
+        - name: Print when low memoty error happened
+          ansible.builtin.debug:
+            msg: "Due to low memory, the tools are not installed. Install the tools by yourself"
+          when: installation_result.rc == 137
+        - name: Print the common error
+          ansible.builtin.debug:
+            msg: "Error installing mongo-tools"
+          when:
+            - installation_result.rc != 0
+            - installation_result.rc != 137
+
+    # GROUP, SSL DIRECTORY AND PERMISSIONS
+    - name: Create {{ mongotools_mongodb_backup_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.group:
+        name: "{{ mongotools_mongodb_backup_access_group }}"
+        state: present
+
+    - name: Add users to {{ mongotools_mongodb_backup_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: "{{ mongotools_mongodb_backup_access_group }}"
+        append: true
+      with_items: "{{ mongotools_mongodb_backup_access_group_users }}"
+
+    - name: Ensure that mongotools_mongodb_backup_location_root_path exists
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ mongotools_mongodb_backup_location_root_path }}"
+        state: directory
+        owner: "{{ mongotools_mongodb_backup_location_root_owner }}"
+        group: "{{ mongotools_mongodb_backup_access_group }}"
+        mode: "{{ mongotools_mongodb_backup_location_root_permissions }}"
+
+    # RUN SCRIPTS AND SET
+    - name: Run backup script
+      become: true 
+      become_user: root
+      ansible.builtin.shell:
+        cmd: "./scripts/backup.sh"
+        chdir: "{{ dest_project_fullpath }}"
+      register: backup_result
+    - name: Add cron job for mongodump
+      become: true
+      become_user: root
+      ansible.builtin.cron:
+        name: "{{ mongotools_mongodb_backup_cron_job_name }}"
+        minute: 0
+        hour: 0
+        weekday: "1-5"
+        job: "{{ mongotools_mongodb_backup_cron_job_name_prefix | default('') }}{{ dest_project_fullpath }}/scripts/backup.sh"

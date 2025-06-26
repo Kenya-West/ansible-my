@@ -1,0 +1,9 @@
+---
+- name: Destroy docker-compose project for {{ item.path }}
+  community.docker.docker_compose_v2:
+    project_src: "{{ item.path }}"
+    files: "{{ item.filename }}"
+    state: absent
+    remove_orphans: true
+    remove_volumes: true
+  ignore_errors: true

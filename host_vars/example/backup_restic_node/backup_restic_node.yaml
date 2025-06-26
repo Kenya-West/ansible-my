@@ -1,0 +1,21 @@
+# This prop follows the same structure as backup_restic_node_locations
+backup_restic_node_locations_additional: {}
+
+restic_node_vars:
+  locations: >-
+    {{ lookup('vars','backup_restic_node_locations')
+       | combine(backup_restic_node_locations_additional|default({}), recursive=True) }}
+  remotes: >-
+    {{ lookup('vars','backup_restic_node_remotes')
+      | combine(
+          { 
+            'your_location_name': { 
+              'key': '<key_from_encrypted_restic_file_made_after_first_backup>'
+            },
+            'your_location_name2': { 
+              'key': '<key_from_encrypted_restic_file_made_after_first_backup>'
+            }
+          },
+          recursive=True
+        )
+    }}

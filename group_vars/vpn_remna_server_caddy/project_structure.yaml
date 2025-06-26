@@ -1,0 +1,7 @@
+---
+
+remna_server_caddy_project_structure_root: vpn_remna_server_caddy
+remna_server_caddy_project_structure_end_dirs__base:
+  remna: "{{ remna_server_caddy_project_structure_root }}/remna"
+remna_server_caddy_project_structure_end_dirs: "{{ remna_server_caddy_project_structure_end_dirs__base }}"
+remna_server_caddy_project_structure_end_dirs_list: "{{ remna_server_caddy_project_structure_end_dirs.values() | list }}"

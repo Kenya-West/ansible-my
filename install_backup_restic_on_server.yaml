@@ -1,0 +1,78 @@
+---
+- name: Install and configure backup by Restic REST server
+  hosts: backup_restic_server
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: restic-server
+    project_name: restic_rest_server
+    project_root_dir: "{{ backup_restic_server_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+
+  roles:
+    - name: ./roles/kwtoolset/container_stop_down
+      vars:
+        container_stop_down_list:
+          - "{{ dest_project_fullpath }}"
+    - name: ./roles/kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+    - name: ./roles/kwtoolset/container_pull
+      vars:
+        container_pull_list:
+          - path: "{{ dest_project_fullpath }}"
+            name: "{{ project_name }}"
+            policy: "policy"
+    - name: ./roles/kwtoolset/container_up
+      vars:
+        container_up_list:
+          - path: "{{ dest_project_fullpath }}"
+            name: "{{ project_name }}"
+            ignore_errors: false
+
+  pre_tasks:
+    - name: Remove .htpasswd file if exists
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ dest_project_fullpath }}/data/.htpasswd"
+        state: absent
+    - name: Add .htpasswd file with users
+      community.general.htpasswd:
+        path: "{{ dest_project_fullpath }}/data/.htpasswd"
+        name: "{{ item.name }}"
+        password: "{{ item.password }}"
+        hash_scheme: "{{ item.hash_scheme | default(restic_server_hash_scheme) | default('md5_crypt') }}"
+        mode: "0644"
+      loop: "{{ restic_server_users }}"
+      failed_when:
+        - restic_server_users is not defined
+        - restic_server_users | length == 0
+        - item.name is not defined or item.name == ""
+        - item.password is not defined or item.password == ""
+    - name: Check if .htpasswd file exists
+      stat:
+        path: "{{ dest_project_fullpath }}/data/.htpasswd"
+      register: htpasswd_file
+      failed_when: htpasswd_file.stat.exists == false
+    - name: Check if .htpasswd file is empty
+      command: "test -s {{ dest_project_fullpath }}/data/.htpasswd"
+      register: htpasswd_file_empty
+      failed_when: htpasswd_file_empty.rc != 0
+
+  post_tasks:
+    - name: Check if .htpasswd file is empty
+      command: "test -s {{ dest_project_fullpath }}/data/.htpasswd"
+      register: htpasswd_file_empty
+      failed_when: htpasswd_file_empty.rc != 0

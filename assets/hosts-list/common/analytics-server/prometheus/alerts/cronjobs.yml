@@ -1,0 +1,14 @@
+groups:
+- name: cronjobs
+  rules:
+  - alert: CronJobLastRunMissing
+    expr: |
+      count_over_time(job_last_run_timestamp[10d]) > 0
+      and
+      count_over_time(job_last_run_timestamp[2d]) == 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Job Last Run Missing on instance {{ $labels.instance }}"
+      description: "The job_last_run_timestamp metric was seen within the last 10 days but not in the past 2 days."

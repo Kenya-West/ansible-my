@@ -1,0 +1,14 @@
+---
+# tasks file for roles/download_github_asset
+
+- name: Template the asset_download.sh.j2 script
+  ansible.builtin.template:
+    src: "{{ role_path }}/files/asset_download.sh.j2"
+    dest: "{{ download_github_asset_dest }}/asset_download.sh"
+
+- name: Execute the asset_download.sh script
+  ansible.builtin.shell:
+    cmd: "bash {{ download_github_asset_dest }}/asset_download.sh"
+    chdir: "{{ download_github_asset_dest }}"
+    creates: "{{ download_github_asset_dest }}/{{ download_github_asset_filename }}"
+  register: download_github_asset_result

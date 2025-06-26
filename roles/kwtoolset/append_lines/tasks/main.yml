@@ -1,0 +1,38 @@
+---
+# tasks file for roles/kwtoolset/append_lines
+
+- name: Ensure destination file exists on target machine
+  ansible.builtin.file:
+    path: "{{ append_lines_dest_file_path }}"
+    state: touch
+    mode: "{{ append_lines_dest_file_path_mode | default('0644') }}"
+  when:
+    - append_lines_list is defined
+    - append_lines_list | length > 0
+  ignore_errors: true
+
+- name: Remove lines by regex {{ item }} if any
+  ansible.builtin.lineinfile:
+    path: "{{ append_lines_dest_file_path }}"
+    regexp: "{{ item }}"
+    state: absent
+  with_items: "{{ append_lines_remove_lines_regex | default([]) }}"
+  when:
+    - item != ''
+    - append_lines_remove_lines_regex is defined
+    - append_lines_remove_lines_regex != ['']
+
+- name: Add lines that are not present
+  ansible.builtin.lineinfile:
+    path: "{{ append_lines_dest_file_path }}"
+    line: "{{ item.line }}"
+    state: present
+    create: true
+    insertafter: "{{ item.insert_after | default('EOF') }}"
+  with_items: "{{ append_lines_list | default([]) }}"
+  when:
+    - item != ''
+    - item.line != ''
+    - append_lines_list is defined
+    - append_lines_list != ['']
+  ignore_errors: true

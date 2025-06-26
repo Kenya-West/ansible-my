@@ -1,0 +1,11 @@
+powershell_asset_fullpath: "{{ playbook_dir }}/assets/hosts-list/common/general-machine-prepare/pwsh"
+
+powershell_modules:
+  # full schema is:
+  # - name: "posh-git"            # module name on PowerShell Gallery
+  #   scope: "CurrentUser"      # Optional. Default is "CurrentUser"
+  #   force: true                 # Optional. Default is true
+  - name: "PSReadline"
+  - name: "PSScriptTools"
+  - name: "posh-git"
+  - name: "PSFzf"

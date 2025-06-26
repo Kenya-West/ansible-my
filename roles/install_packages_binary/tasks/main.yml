@@ -1,0 +1,11 @@
+---
+- name: Check if eget is already installed
+  ansible.builtin.command: which eget
+  register: eget_installed
+  ignore_errors: true
+
+- name: Process each of base file names
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ packages_binary_list }}"
+  loop_control:
+    loop_var: item

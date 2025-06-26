@@ -1,0 +1,6 @@
+#!/bin/bash
+PATH="/usr/local/bin:/usr/bin:/bin"
+
+{% for endpoint in mongotools_mongodb_endpoints %}
+mongodump --uri "{{ endpoint.uri }}" --gzip --archive={{ mongotools_mongodb_backup_location_root_path }}/{{ endpoint.out_file }}
+{% endfor %}

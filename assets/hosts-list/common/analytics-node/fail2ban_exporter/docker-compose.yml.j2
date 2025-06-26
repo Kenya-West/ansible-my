@@ -1,0 +1,31 @@
+---
+services:
+  fail2ban_exporter:
+    image: registry.gitlab.com/hctrdev/fail2ban-prometheus-exporter:latest
+    cpus: 0.5
+    mem_limit: 200m
+    container_name: "${SERVICE_NAME}"
+    env_file:
+      - .env
+    volumes:
+      - /var/run/fail2ban/:/var/run/fail2ban:ro
+    networks:
+      - {{ analytics_node_network_name }}
+      - {{ docker_vpn_network }}
+    labels:
+      caddy: "${SERVICE_DOMAIN}"
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
+      caddy.handle_path.import: "logging ${SERVICE_DOMAIN}-fail2ban"
+      caddy.handle_path.basic_auth:
+{% for user in fail2ban_exporter_server_users %}
+      caddy.handle_path.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
+{% endfor %}
+      {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+
+    restart: unless-stopped
+
+networks:
+  {{ analytics_node_network_name }}:
+    external: true
+  {{ docker_vpn_network }}:
+    external: true

@@ -1,0 +1,6 @@
+---
+journald_persistent: true
+journald_max_disk_size: 512
+journald_max_files: 2
+journald_per_user: true
+journald_sync_interval: 1

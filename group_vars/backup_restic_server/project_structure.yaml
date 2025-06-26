@@ -1,0 +1,6 @@
+---
+backup_restic_server_project_structure_root: backup-restic-server
+backup_restic_server_project_structure_end_dirs__base:
+  restic_server: "{{ backup_restic_server_project_structure_root }}/restic-server"
+backup_restic_server_project_structure_end_dirs: "{{ backup_restic_server_project_structure_end_dirs__base }}"
+backup_restic_server_project_structure_end_dirs_list: "{{ backup_restic_server_project_structure_end_dirs.values() | list }}"

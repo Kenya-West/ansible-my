@@ -1,0 +1,54 @@
+---
+- name: Template the base file without _update - SQL for {{ item }}
+  ansible.builtin.template:
+    src: "{{ source_asset_fullpath_common }}/db/{{ item }}.sql.j2"
+    dest: "{{ dest_project_fullpath }}/db/{{ item }}.sql"
+
+- name: Template the base file without _update - JSON for {{ item }}
+  ansible.builtin.template:
+    src: "{{ source_asset_fullpath_common }}/db/{{ item }}.json.j2"
+    dest: "{{ dest_project_fullpath }}/db/{{ item }}.json"
+
+- name: Execute the base SQL file on SQLite database for {{ item }}
+  ansible.builtin.shell: "sqlite3 {{ dest_project_fullpath }}/db/x-ui.db < {{ dest_project_fullpath }}/db/{{ item }}.sql"
+  register: sql_output
+
+- name: Save SQL execution output to JSON file for {{ item }}
+  ansible.builtin.copy:
+    content: "{{ sql_output.stdout }}"
+    dest: "{{ dest_project_fullpath }}/db/{{ item }}_output.json"
+
+- name: Merge JSON outputs into one for {{ item }}
+  ansible.builtin.shell: >
+    jq -s '
+    def merge_values(a; b):
+      if (a | type) == "array" and (b | type) == "array" then
+        if (a | length) == 0 then b
+        elif (b | length) == 0 then a
+        else a + b
+        end
+      elif (a | type) == (b | type) then
+        b
+      else
+        b
+      end;
+
+    reduce .[] as $item ({};
+      reduce ($item | keys_unsorted[]) as $key (
+        .;
+        .[$key] = if .[$key] == null then $item[$key]
+                  else merge_values(.[ $key ]; $item[$key])
+                  end
+      )
+    )' "{{ item }}_output.json" "{{ item }}.json"
+  args:
+    chdir: "{{ dest_project_fullpath }}/db"
+  register: JQ_RESULT
+
+- name: Template the update file with _update in the name for {{ item }}
+  ansible.builtin.template:
+    src: "{{ source_asset_fullpath_common }}/db/{{ item }}_update.sql.j2"
+    dest: "{{ dest_project_fullpath }}/db/{{ item }}_update.sql"
+
+- name: Execute the update SQL file on SQLite database for {{ item }}
+  ansible.builtin.shell: "sqlite3 {{ dest_project_fullpath }}/db/x-ui.db < {{ dest_project_fullpath }}/db/{{ item }}_update.sql"

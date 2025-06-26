@@ -1,0 +1,78 @@
+- name: Get last part after '/' or get item.bin_name if defined
+  set_fact:
+    bin_name: "{{ item.bin_name | default(item.file, true) | default(item.repo | regex_replace('.*/', ''), true) }}"
+
+- name: Check if {{ bin_name | default('command') }} is installed
+  ansible.builtin.command: "which {{ bin_name }}"
+  register: bin_installed
+  when:
+    - bin_name is defined
+    - bin_name | length > 0
+  failed_when: bin_installed.rc >= 2
+
+- name: Construct download command for {{ item.repo }} using eget
+  set_fact:
+    download_cmd: >-
+      timeout 30s
+      eget {{ item.repo }}
+      {% if item.assets is defined and item.assets | length > 0 %}
+      {% for asset in item.assets %} --asset {{ asset }}{% endfor %}
+      {% endif %}
+      {% if bin_installed.rc == 0 %} --upgrade-only{% endif %}
+      {% if item.file is defined and item.file | length > 0 %}--file {{ item.file }}{% endif %}
+      --to {{ item.dest_loc | default('/usr/local/bin') }}
+    download_cmd_without_assets: >-
+      timeout 30s
+      eget {{ item.repo }}
+      {% if bin_installed.rc == 0 %} --upgrade-only{% endif %}
+      {% if item.file is defined and item.file | length > 0 %}--file {{ item.file }}{% endif %}
+      --to {{ item.dest_loc | default('/usr/local/bin') }}
+  when: eget_installed.rc == 0 and (eget_skip_installed_packages is not defined or eget_skip_installed_packages == false)
+
+- name: Debug constructed command for {{ item.repo }}
+  ansible.builtin.debug:
+    msg: "Constructed command: {{ download_cmd }}"
+  when: download_cmd is defined
+
+- name: Download package {{ item.repo }} using eget
+  ansible.builtin.command: "{{ download_cmd }}"
+  when: download_cmd is defined
+  register: bin_download_result
+  ignore_errors: true
+
+- name: Display output of package {{ item.repo }} download if interaction required
+  ansible.builtin.debug:
+    msg: "{{ bin_download_result.stderr_lines | default(bin_download_result.stderr) }}"
+  when: "'please select manually' in bin_download_result.stderr"
+
+- name: Include interaction_fallback if interaction required
+  ansible.builtin.include_tasks: interaction_fallback.yml
+  when: "'please select manually' in bin_download_result.stderr"
+
+- name: Display output of package {{ item.repo }} download if no upgrade performed
+  ansible.builtin.debug:
+    msg: "{{ bin_download_result.stderr }}"
+  when: "'is not more recent than' in bin_download_result.stderr"
+  register: bin_download_result_no_upgrade
+
+- name: Get binary location via command command
+  ansible.builtin.shell: "command -v {{ bin_name }}"
+  register: bin_location
+  ignore_errors: true
+
+# - name: Set fact of binary location
+#   set_fact:
+#     bin_loc: "{{ item.dest_loc | default('/usr/local/bin') }}/{{ bin_name }}"
+#   ignore_errors: true
+
+- name: Set executable permission for {{ bin_location.stdout }} if existed
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ bin_location.stdout }}"
+    mode: '0755'
+  ignore_errors: true
+
+- name: Run post install command
+  ansible.builtin.shell: "{{ item.post_install }}"
+  when: item.post_install is defined

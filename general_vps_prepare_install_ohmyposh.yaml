@@ -1,0 +1,7 @@
+---
+- name: Install Oh-My-Posh
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - name: ./roles/install_ohmyposh

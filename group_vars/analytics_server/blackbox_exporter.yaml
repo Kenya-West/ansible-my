@@ -1,0 +1,27 @@
+# Credits: https://samber.github.io/awesome-prometheus-alerts/blackbox-exporter
+
+blackbox_exporter_worldwide_proxies:
+  - hostname: screeb-probe-montreal.cleverapps.io
+    location_code: montreal
+    location_display_name: Montreal
+    geohash: f229cy
+  - hostname: screeb-probe-paris.cleverapps.io
+    location_code: paris
+    location_display_name: Paris
+    geohash: u09tgy
+  # - hostname: screeb-probe-jeddah.cleverapps.io # Jeddah is not available
+  #   location_code: jeddah
+  #   location_display_name: Jeddah
+  #   geohash: sggf5w
+  - hostname: screeb-probe-singapore.cleverapps.io
+    location_code: singapore
+    location_display_name: Singapore
+    geohash: w21z74
+  - hostname: screeb-probe-sydney.cleverapps.io
+    location_code: sydney
+    location_display_name: Sydney
+    geohash: r3gpkn
+  - hostname: screeb-probe-warsaw.cleverapps.io
+    location_code: warsaw
+    location_display_name: Warsaw
+    geohash: u3qcnj

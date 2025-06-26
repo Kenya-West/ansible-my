@@ -1,0 +1,57 @@
+---
+- name: Install Docker
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - name: ./roles/install_docker
+      vars:
+        docker_users:
+          - "{{ standard_user }}"
+        docker_package_state: present
+
+    - name: ./roles/kwtoolset/modify_json_file
+      vars:
+        modify_json_file_path: "{{ docker_config_file }}"
+        modify_json_file_var_lines_append:
+          metrics-addr: "{{ docker_metrics_addr }}"
+  
+  post_tasks:
+    - name: Restart Docker service
+      ansible.builtin.service:
+        name: docker
+        state: restarted
+
+    - name: Wait for Docker socket
+      ansible.builtin.wait_for:
+        path: /var/run/docker.sock
+        state: present
+        timeout: 30
+
+    - name: Ensure Docker is running
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Wait until Docker daemon is responsive
+      ansible.builtin.command: docker info
+      register: docker_info
+      retries: 6
+      delay: 5
+      until: docker_info.rc == 0
+      changed_when: false
+
+    - name: Confirm Docker is running
+      ansible.builtin.debug:
+        msg: "✅ Docker restarted and is responding correctly on {{ inventory_hostname }}"
+    
+    - name: Check that metrics are being exposed
+      ansible.builtin.command: curl -s http://{{ docker_metrics_addr }}/metrics
+      register: metrics_response
+      changed_when: false
+      failed_when: metrics_response.rc != 0
+
+    - name: Confirm Docker metrics are exposed
+      ansible.builtin.debug:
+        msg: "✅ Docker metrics are being exposed on http://{{ docker_metrics_addr }}"

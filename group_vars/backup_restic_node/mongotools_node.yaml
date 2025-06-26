@@ -1,0 +1,8 @@
+mongotools_mongodb_backup_location_root_path: "/etc/mongodb/db_backup"
+mongotools_mongodb_backup_access_group: "mongotools"
+mongotools_mongodb_backup_access_group_users: "{{ standard_user }}"
+mongotools_mongodb_backup_location_root_owner: "root"
+mongotools_mongodb_backup_location_root_permissions: "0755"
+mongotools_mongodb_backup_location_files_permissions: "0644"
+mongotools_mongodb_backup_cron_job_name: "Mongotools backup"
+mongotools_mongodb_backup_cron_job_name_prefix: ""

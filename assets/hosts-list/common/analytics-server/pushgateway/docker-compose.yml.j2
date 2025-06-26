@@ -1,0 +1,24 @@
+---
+services:
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    cpus: 0.5
+    mem_limit: 200m
+    env_file:
+      - .env
+    networks:
+      - {{ docker_vpn_network }}
+    labels:
+      caddy: "${DOMAIN}:${EXTERNAL_PORT}"
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${PORT} }}"{% endraw %}
+
+      caddy.basic_auth.prometheus: "${METRICS_PROMETHEUS_USER_PASSWORD}"
+      caddy.basic_auth.client: "${METRICS_CLIENT_USER_PASSWORD}"
+
+    restart: unless-stopped
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true

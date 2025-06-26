@@ -1,0 +1,23 @@
+version: 2
+
+extras:
+  backup: &backup
+    exclude-file: {{ restic_excludes_list_files }}
+  forget: &forget
+    keep-last:
+      - 10
+    forgetoption: prune
+  complete_options: &complete_options
+    backup:
+      <<: *backup
+  cron: '0 */2 * * *'
+
+global:
+  forget:
+    {{ restic_global_forget | to_nice_yaml(indent=4, sort_keys=false) | trim | indent(4, false) }}
+
+locations:
+  {{ restic_node_vars.locations | to_nice_yaml(indent=2, sort_keys=false) | replace(fillers.yaml + ': ', '<<: *') | regex_replace(fillers.yaml_remove_single_quotes + '(?:\_)?([A-Za-z\_\-]+)\:(?:\s)?([A-Za-z\*\_\-\.]+)', '\\1: \"{{ \\2 }}\"') | trim | indent(2, false) }}
+
+backends:
+  {{ restic_node_vars.remotes | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}

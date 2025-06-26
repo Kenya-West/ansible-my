@@ -1,0 +1,6 @@
+#! /usr/bin/env bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+. "$SCRIPT_DIR/rclone-pass.sh"
+
+autorestic exec -c {{ dest_project_fullpath }}/config/.autorestic.yaml -av -- forget --tag ar:location:home_user --keep-last 0 --unsafe-allow-remove-all

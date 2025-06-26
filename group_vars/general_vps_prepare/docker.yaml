@@ -1,0 +1,14 @@
+---
+docker_config_file: "/etc/docker/daemon.json"
+docker_features:
+  containerd-snapshotter: true
+docker_mirrors_ru:
+  - "https://dockerhub.timeweb.cloud"
+  - "https://mirror.gcr.io"
+  - "https://daocloud.io"
+  - "https://c.163.com"
+  - "https://registry.docker-cn.com"
+docker_mirror_country_code: "RU"
+docker_metrics_addr_host: "172.17.0.1"
+docker_metrics_addr_port: 9323
+docker_metrics_addr: "{{ docker_metrics_addr_host }}:{{ docker_metrics_addr_port }}"

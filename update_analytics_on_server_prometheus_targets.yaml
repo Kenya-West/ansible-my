@@ -1,0 +1,37 @@
+---
+
+- name: Template files locally
+  hosts: analytics_server
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: prometheus
+    project_name: prometheus
+    project_root_dir: "{{ analytics_server_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+  tasks:
+    - block:
+        - name: Run local templating tasks for files
+          include_role:
+            name: ./roles/kwtoolset/copy_files_templating
+          vars:
+            copy_files_templating_dir_list:
+              - src: "{{ source_asset_fullpath_common }}/file_sd"
+                dest: "{{ dest_project_fullpath }}"
+                default_mode: "0775"
+              - src: "{{ source_asset_fullpath_project }}/file_sd"
+                dest: "{{ dest_project_fullpath }}"
+                default_mode: "0775"
+              - src: "{{ source_asset_fullpath_common }}/alerts"
+                dest: "{{ dest_project_fullpath }}"
+                default_mode: "0775"
+              - src: "{{ source_asset_fullpath_project }}/alerts"
+                dest: "{{ dest_project_fullpath }}"
+                default_mode: "0775"
+      delegate_to: localhost
+

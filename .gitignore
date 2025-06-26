@@ -1,3 +1,58 @@
 logs/
-vars/
 .vault_password.txt
+.env*
+!.env.example
+!.env.j2
+.*rc
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
+
+# Group_vars
+group_vars/all/z_common_hosts_secrets/*
+!group_vars/all/z_common_hosts_secrets/.gitkeep
+
+# Host vars
+host_vars/*
+!host_vars/example/
+!host_vars/example_for_analytics_server.yaml
+!host_vars/example_for_backup_node.yaml
+!host_vars/example_for_backup_server_backrest.yaml
+!host_vars/example_for_backup_server.yaml
+!host_vars/example_for_vpn_xui_first.yaml
+!host_vars/example_for_vpn.yaml
+!host_vars/example_for_proxy_client.yaml
+
+# Inventory
+inventory/*
+!inventory/production_example.ini
+!inventory/staging_example.ini
+
+# Assets only common and example
+assets/*
+!assets/hosts-list/
+assets/hosts-list/*
+!assets/hosts-list/common/
+!assets/hosts-list/common/**/*
+!assets/hosts-list/example/
+!assets/hosts-list/example/**/*
+
+# Do not include SSH keys
+group_vars/all/user.yaml
+group_vars/general_vps_prepare/ssh_keys.yaml
+group_vars/general_vps_prepare/api_tokens.yaml
+
+# Python cache
+/**/__pycache__/
+
+# Temporary files
+temp/*
+!temp/
+temp/**/*
+!temp/**/
+!temp/**/.gitkeep

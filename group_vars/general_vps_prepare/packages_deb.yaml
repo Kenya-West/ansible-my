@@ -1,0 +1,4 @@
+---
+packages_deb_list:
+  - powershell
+  - zenith

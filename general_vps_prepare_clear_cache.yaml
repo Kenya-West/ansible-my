@@ -1,0 +1,8 @@
+---
+- name: Clear cache
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/clear_cache

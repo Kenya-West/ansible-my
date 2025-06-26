@@ -1,0 +1,6 @@
+---
+backup_restic_node_project_structure_root: backup-restic-node
+backup_restic_node_project_structure_end_dirs__base:
+  restic_node: "{{ backup_restic_node_project_structure_root }}/restic-node"
+backup_restic_node_project_structure_end_dirs: "{{ backup_restic_node_project_structure_end_dirs__base }}"
+backup_restic_node_project_structure_end_dirs_list: "{{ backup_restic_node_project_structure_end_dirs.values() | list }}"

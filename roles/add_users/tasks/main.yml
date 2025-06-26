@@ -1,0 +1,24 @@
+---
+# tasks file for roles/add_users
+- name: Add or remove user based on state
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    state: "{{ 'present' if item.state == 'present' else 'absent' }}"
+  loop: "{{ users_to_set }}"
+- name: Set password expiration for users to infinite
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    password_expire_max: -1
+    password_expire_min: -1
+    password_expire_warn: -1
+  loop: "{{ users_to_set }}"
+  when: item.state == 'present'
+- name: Add user to sudoers if role is super
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    line: "{{ item.name }} ALL=(ALL) NOPASSWD: ALL"
+    state: present
+  loop: "{{ users_to_set }}"
+  when: "'super' in item.role"
+  ignore_errors: true
+

@@ -1,0 +1,47 @@
+---
+# tasks file for roles/install_bash_profile
+- name: Read content line-by-line from local file
+  ansible.builtin.set_fact:
+    lines_from_file_source_file_content: "{{ lookup('file', lines_from_file_source_file_path, errors='ignore').splitlines() | default([]) }}"
+  failed_when: lines_from_file_source_file_content == ['']
+  ignore_errors: true
+
+- name: Append lines from lines_from_file_append_lines variable if it exists
+  ansible.builtin.set_fact:
+    lines_from_file_source_file_content: "{{ (lines_from_file_source_file_content + lines_from_file_append_lines) | default([]) }}"
+  when: lines_from_file_append_lines is defined
+
+- name: Ensure destination file exists on target machine
+  ansible.builtin.file:
+    path: "{{ lines_from_file_dest_file_path }}"
+    state: touch
+    mode: "{{ lines_from_file_dest_file_path_mode | default('0644') }}"
+  when:
+    - lines_from_file_source_file_content is defined
+    - lines_from_file_source_file_content != ['']
+  ignore_errors: true
+
+- name: Remove lines by regex {{ item }} if any
+  ansible.builtin.lineinfile:
+    path: "{{ lines_from_file_dest_file_path }}"
+    regexp: "{{ item }}"
+    state: absent
+  with_items: "{{ lines_from_file_remove_lines_regex | default([]) }}"
+  when:
+    - item != ''
+    - lines_from_file_remove_lines_regex is defined
+    - lines_from_file_remove_lines_regex != ['']
+
+- name: Add lines that are not present
+  ansible.builtin.lineinfile:
+    path: "{{ lines_from_file_dest_file_path }}"
+    line: "{{ item }}"
+    state: present
+    create: true
+    insertafter: EOF
+  with_items: "{{ lines_from_file_source_file_content | default([]) }}"
+  when:
+    - item != ''
+    - lines_from_file_source_file_content is defined
+    - lines_from_file_source_file_content != ['']
+  ignore_errors: true

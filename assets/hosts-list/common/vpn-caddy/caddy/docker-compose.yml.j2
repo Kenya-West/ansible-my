@@ -1,0 +1,46 @@
+---
+
+services:
+  caddy:
+    image: homeall/caddy-reverse-proxy-cloudflare:latest
+    container_name: caddy
+    cpus: 0.5
+    mem_limit: 200m
+    ports:
+{% for port in caddy_external_ports_allowlist %}
+      - "{{port}}"
+{% endfor %}
+
+    environment:
+      - CADDY_INGRESS_NETWORKS=caddy
+      - CADDY_DOCKER_CADDYFILE_PATH=/config/base/Caddyfile
+    env_file:
+      - .env
+    networks:
+      - {{ docker_vpn_network }}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/base:/config/base:ro
+      - ./logs:/var/log/caddy
+      - ./static:/var/www/public
+      - caddy-data:/data
+      - caddy-certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      caddy_0:
+      caddy_0.metrics:
+      caddy_1: "${DOMAIN}:2020"
+      caddy_1.metrics: "/metrics"
+      caddy_1.metrics.disable_openmetrics:
+      caddy_1.basic_auth.prometheus: "${METRICS_PROMETHEUS_USER_PASSWORD}"
+      caddy_1.basic_auth.client: "${METRICS_CLIENT_USER_PASSWORD}"
+    restart: unless-stopped
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true
+
+volumes:
+  caddy-data: {}
+  caddy-certs: {}

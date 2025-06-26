@@ -1,0 +1,11 @@
+# The commented vars should be set in host_vars or in playbook
+# The `prometheus_server_scrape_configs` and `prometheus_server_remote_write_list` are examples
+# of how to configure Prometheus to scrape and push metrics from other services
+# You should set these vars, too, in host_vars or in playbook
+
+prometheus_server_external_port: 443
+prometheus_server_port: 9090
+prometheus_server_tls_cert_file: "/etc/ssl/{{ cert_location_path_section.prometheus_crt | default(cert_location_path_section.main_crt) }}"
+prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.prometheus_key | default(cert_location_path_section.main_key) }}"
+prometheus_server_scrape_interval: 15s
+prometheus_server_scrape_timeout: 10s

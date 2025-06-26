@@ -1,0 +1,27 @@
+---
+- name: Remove VPN directories and project (WARNING - This will remove data files, too!)
+  hosts: all
+  become: true
+  become_user: analytics_node
+
+  roles:
+    - name: ./roles/remove_project_dirs
+      vars:
+        remove_project_dirs: "{{ remove_project_dirs_remapped }}"
+    - name: ./roles/remove_analytics_node
+
+  pre_tasks:
+    - name: Remap remove_project_dirs variable to contain complete paths - add /home/{{ standard_user }} prefix
+      ansible.builtin.set_fact:
+        remove_project_dirs_remapped: "{{ analytics_node_project_structure_end_dirs_list | map('regex_replace', '^(.*)$', '/home/{{ standard_user }}/\\1') | list }}"
+    - name: Add root directory to remove_project_dirs variable
+      ansible.builtin.set_fact:
+        remove_project_dirs_remapped: "{{ remove_project_dirs_remapped + ['/home/{{ standard_user }}/{{ analytics_node_project_structure_root }}'] }}"
+
+  post_tasks:
+    - name: Remove prometheus node_exporter service
+      ansible.builtin.systemd:
+        name: node_exporter.service
+        state: stopped
+        enabled: false
+      ignore_errors: true

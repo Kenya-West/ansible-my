@@ -1,0 +1,7 @@
+---
+# tasks file for roles/kwtoolset/sanitize_dotenv
+- name: Remove comments, empty line and trailing spaces from .env file
+  # noqa: command-instead-of-module
+  ansible.builtin.command: sed -i -e 's/[[:space:]]*#.*//' -e 's/[[:space:]]*$//' -e '/^$/d' .env
+  args:
+    chdir: "{{ sanitize_dotenv_dir }}/"

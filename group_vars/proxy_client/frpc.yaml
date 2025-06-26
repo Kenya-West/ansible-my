@@ -1,0 +1,5 @@
+proxy_client_frpc_server_address: sub.example.tld
+proxy_client_frpc_server_port: 7000
+proxy_client_frpc_client_dashboard_port: 7400
+proxy_client_frpc_client_dashboard_user: username
+proxy_client_frpc_client_auth_method: token

@@ -1,0 +1,50 @@
+#!/bin/bash
+echo "Starting copy.sh script"
+
+#!/bin/bash
+
+TARGET_DIR="{{ cert_location_root_path }}"
+
+# Ensure the base target directory exists
+mkdir -p "$TARGET_DIR"
+chmod -R {{ cert_location_root_permissions | default('0755') }} "$TARGET_DIR"
+
+docker cp caddy:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/ {{ cert_location_root_path }}/
+if [ -d {{ cert_location_root_path }}/acme* ]; then
+    rsync -a --remove-source-files {{ cert_location_root_path }}/acme*/* {{ cert_location_root_path }}/
+    rm -rf {{ cert_location_root_path }}/acme*/
+fi
+find {{ cert_location_root_path }}/ -type d -exec chmod {{ cert_location_root_permissions | default('0755') }} {} +
+find {{ cert_location_root_path }}/ -type f -exec chmod {{ cert_location_files_permissions | default('0755') }} {} +
+
+# Directory containing the exported certificates
+TARGET_DIR="/etc/ssl/shared"
+
+# Iterate over each subdirectory in the source directory
+for DOMAIN_DIR in "$TARGET_DIR"/*; do
+    if [ -d "$DOMAIN_DIR" ]; then
+        # Extract the domain name from the directory name
+        DOMAIN_NAME=$(basename "$DOMAIN_DIR")
+
+        # Paths to the original files
+        CRT_FILE="$DOMAIN_DIR/$DOMAIN_NAME.crt"
+        KEY_FILE="$DOMAIN_DIR/$DOMAIN_NAME.key"
+
+        # Paths for the new certbot-style files
+        FULLCHAIN_FILE="$DOMAIN_DIR/fullchain.pem"
+        PRIVKEY_FILE="$DOMAIN_DIR/privkey.pem"
+
+        # Check if the original files exist
+        if [ -f "$CRT_FILE" ] && [ -f "$KEY_FILE" ]; then
+            # Copy and rename files
+            cp "$CRT_FILE" "$FULLCHAIN_FILE"
+            cp "$KEY_FILE" "$PRIVKEY_FILE"
+
+            echo "Processed $DOMAIN_NAME: fullchain.pem and privkey.pem created."
+        else
+            echo "Skipping $DOMAIN_NAME: Missing .crt or .key file."
+        fi
+    fi
+done
+
+echo "Completed copy.sh script"

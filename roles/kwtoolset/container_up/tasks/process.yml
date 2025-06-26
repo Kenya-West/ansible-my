@@ -1,0 +1,34 @@
+- name: Get list of services defined in docker-compose.yml
+  command: yq eval '.services | keys | .[]' docker-compose.yml
+  register: container_up_services_list
+  when: container_up_yq_installed is not failed and container_up_yq_installed.stdout != ""
+  failed_when:
+    - container_stop_down_services_list.rc != 0
+    - container_stop_down_services_list.rc != 1
+
+- name: Docker Compose project - container up
+  community.docker.docker_compose_v2:
+    project_src: "{{ item.path }}"
+    project_name: "{{ item.name }}"
+    files:
+      - docker-compose.yml
+    state: present
+  register: container_up_running
+  ignore_errors: "{{ item.ignore_errors | default(false) }}"
+
+- name: Show results
+  ansible.builtin.debug:
+    var: container_up_running
+
+- name: Verify that list of services is running
+  shell: docker compose ps --format {% raw %}'{{.Names}}'{% endraw %} | grep -E "{{ container_up_services_service }}"
+  args:
+    chdir: "{{ item }}"
+  register: container_up_services_running
+  loop: "{{ container_up_services_list.stdout_lines }}"
+  loop_control:
+    loop_var: container_up_services_service
+  when:
+    - container_up_running is not failed and container_up_running.changed
+    - container_up_yq_installed is not failed and container_up_yq_installed.stdout != ""
+  failed_when: container_up_services_running.stdout == ""

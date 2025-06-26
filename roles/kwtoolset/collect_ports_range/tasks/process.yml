@@ -1,0 +1,67 @@
+- name: Extract port values beginning from file {{ item.path }} by pattern {{ substring_pattern_begin }}
+  ansible.builtin.shell: "grep -E '^^([A-Za-z_]*{{ substring_pattern_begin }}|{{ substring_pattern_begin }})[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
+  register: collect_ports_range_begin_raw
+  when: collect_ports_range_files_path_stat.stat.exists == true
+- name: Extract port values ending from .env file {{ item.path }} by pattern {{ substring_pattern_end }}
+  ansible.builtin.shell: "grep -E '^^([A-Za-z_]*{{ substring_pattern_end }}|{{ substring_pattern_end }})[[:space:]]*=[[:space:]]*[0-9]+' {{ item.path }} | awk -F '=' '{print $2}' | sed 's/[^0-9]*//g'"
+  register: collect_ports_range_end_raw
+  when: collect_ports_range_files_path_stat.stat.exists == true
+
+- name: Debug the output of begin
+  ansible.builtin.debug:
+    msg: "{{ collect_ports_range_begin_raw.stdout_lines }}"
+  when: collect_ports_range_files_path_stat.stat.exists == true
+- name: Debug the output of end
+  ansible.builtin.debug:
+    msg: "{{ collect_ports_range_end_raw.stdout_lines }}"
+  when: collect_ports_range_files_path_stat.stat.exists == true
+
+- name: Map begin ports to a list
+  ansible.builtin.set_fact:
+    collect_ports_range_begin_mapped: "{{ collect_ports_range_begin_raw.stdout_lines | map('int') | unique }}"
+  when:
+    - collect_ports_range_files_path_stat.stat.exists == true
+    - collect_ports_range_begin_raw.stdout_lines is defined
+    - collect_ports_range_begin_raw.stdout_lines | length > 0
+- name: Map end ports to a list
+  ansible.builtin.set_fact:
+    collect_ports_range_end_mapped: "{{ collect_ports_range_end_raw.stdout_lines | map('int') | unique }}"
+  when:
+    - collect_ports_range_files_path_stat.stat.exists == true
+    - collect_ports_range_end_raw.stdout_lines is defined
+    - collect_ports_range_end_raw.stdout_lines | length > 0
+
+- name: Fail if their lengths are not equal
+  ansible.builtin.fail:
+    msg: "Lengths of collect_ports_range_begin_mapped and collect_ports_range_end_mapped are not equal"
+  when: (collect_ports_range_begin_mapped | default([])) | length != (collect_ports_range_end_mapped | default([])) | length
+
+- name: Create a collected_ports_range fact if it does not exist
+  ansible.builtin.set_fact:
+    collected_ports_range: []
+  when:
+    - collected_ports_range is not defined
+    - collect_ports_range_files_path_stat.stat.exists == true
+
+- name: Add begin and end props to collected_ports_range entry
+  ansible.builtin.set_fact:
+    collected_ports_range: "{{ collected_ports_range + [{'begin': collect_ports_range_begin_mapped[item_index], 'end': (collect_ports_range_end_mapped[item_index] | default(collect_ports_range_begin_mapped[item_index]))}] }}"
+  loop: "{{ collect_ports_range_begin_mapped }}"
+  loop_control:
+    loop_var: item_mapped
+    index_var: item_index
+  when:
+    - collect_ports_range_begin_mapped is defined
+    - collect_ports_range_end_mapped is defined
+    - collected_ports_range is defined
+    - collect_ports_range_files_path_stat.stat.exists == true
+  failed_when:
+    - collect_ports_range_begin_mapped[item_index] >= collect_ports_range_end_mapped[item_index]
+
+- name: Remove all facts that are not needed
+  ansible.builtin.set_fact:
+    collect_ports_range_begin_raw: null
+    collect_ports_range_end_raw: null
+    collect_ports_range_begin_mapped: []
+    collect_ports_range_end_mapped: []
+  when: collect_ports_range_files_path_stat.stat.exists == true

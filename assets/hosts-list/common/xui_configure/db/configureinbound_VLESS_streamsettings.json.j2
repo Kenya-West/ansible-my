@@ -1,0 +1,33 @@
+{
+  "network": "tcp",
+  "security": "tls",
+  "externalProxy": [],
+  "tcpSettings": {
+    "acceptProxyProtocol": false,
+    "header": {
+      "type": "none"
+    }
+  },
+  "tlsSettings": {
+    "serverName": "",
+    "minVersion": "1.2",
+    "maxVersion": "1.3",
+    "cipherSuites": "",
+    "rejectUnknownSni": true,
+    "certificates": [
+      {
+        "certificateFile": "/etc/letsencrypt/{{ cert_location_path_section.main_crt }}",
+        "keyFile": "/etc/letsencrypt/{{ cert_location_path_section.main_key }}",
+        "ocspStapling": 3600
+      }
+    ],
+    "alpn": [
+      "h2",
+      "http/1.1"
+    ],
+    "settings": {
+      "allowInsecure": false,
+      "fingerprint": "chrome"
+    }
+  }
+}

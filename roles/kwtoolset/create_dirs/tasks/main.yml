@@ -1,0 +1,11 @@
+---
+# tasks file for roles/kwtoolset/create_dirs
+
+- name: Create directories if they don't exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0775') }}"
+  loop: "{{ dir_list }}"

@@ -1,0 +1,6 @@
+---
+# tasks file for roles/install_bash_default
+- name: Change user shell to Bash
+  ansible.builtin.user:
+    name: "{{ standard_user }}"
+    shell: /bin/bash

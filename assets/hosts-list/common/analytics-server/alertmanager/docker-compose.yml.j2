@@ -1,0 +1,18 @@
+---
+services:
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    cpus: 0.5
+    mem_limit: 200m
+    networks:
+      - caddy
+    volumes:
+      - ./config/config.yml:/etc/alertmanager/config.yml
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+    restart: unless-stopped
+
+networks:
+  caddy:
+    external: true

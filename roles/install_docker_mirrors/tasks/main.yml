@@ -1,0 +1,63 @@
+---
+# tasks file for roles/install_docker_mirrors
+- name: Get the public IP of the host
+  ansible.builtin.command: curl -s ifconfig.me
+  register: public_ip
+  changed_when: false
+
+- name: Query IPInfo for geolocation information
+  ansible.builtin.uri:
+    url: "https://ipinfo.io/{{ public_ip.stdout }}/json"
+    method: GET
+    return_content: true
+  register: ipinfo_response
+
+- name: Parse the country from IPInfo response
+  ansible.builtin.set_fact:
+    country: "{{ ipinfo_response.json.country }}"
+
+- name: Debug country information
+  ansible.builtin.debug:
+    msg: "The country for IP {{ public_ip.stdout }} is {{ country }}"
+
+- name: Ensure Docker configuration file exists
+  ansible.builtin.file:
+    path: "{{ docker_config_file }}"
+    state: touch
+    mode: "0644"
+  when: country == docker_mirror_country_code
+
+- name: Read existing Docker configuration
+  ansible.builtin.slurp:
+    path: "{{ docker_config_file }}"
+  register: docker_config_file_content
+  when: country == docker_mirror_country_code
+
+- name: Parse existing Docker configuration
+  ansible.builtin.set_fact:
+    docker_config: "{{ docker_config_file_content.content | b64decode | from_json | default({}) }}"
+  when: (country == docker_mirror_country_code) and (docker_config_file_content.content | b64decode | length > 0)
+
+- name: Set Docker Hub mirrors
+  ansible.builtin.set_fact:
+    docker_config: "{{ docker_config | combine({'registry-mirrors': docker_mirrors_ru}) }}"
+  when: country == docker_mirror_country_code
+
+- name: Set Docker features
+  ansible.builtin.set_fact:
+    docker_config: "{{ docker_config | combine({'features': docker_features}) }}"
+  when: country == docker_mirror_country_code
+
+- name: Write updated Docker configuration
+  ansible.builtin.copy:
+    content: "{{ docker_config | to_nice_json }}"
+    dest: "{{ docker_config_file }}"
+    mode: "0644"
+    backup: true
+  when: country == docker_mirror_country_code
+
+- name: Restart Docker
+  ansible.builtin.service:
+    name: docker
+    state: restarted
+  when: country == docker_mirror_country_code

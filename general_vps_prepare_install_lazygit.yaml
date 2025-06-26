@@ -1,0 +1,7 @@
+---
+- name: Install LazyGit
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - name: ./roles/install_lazygit

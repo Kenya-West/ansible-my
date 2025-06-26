@@ -1,0 +1,15 @@
+server {
+    server_name {{ domains_keys.main }};
+    
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/{{ cert_location_path_section.main_crt }};
+    ssl_certificate_key /etc/letsencrypt/{{ cert_location_path_section.main_key }};
+
+    location / {
+        proxy_pass http://wg-easy:{{ wg_dashboard_port }}/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+    }
+}

@@ -1,0 +1,89 @@
+---
+- name: Install web features - currently includes certcopy only
+  hosts: vpn_caddy:vpn_remna:vpn_remna_server_caddy:analytics_node
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: certcopy
+    project_name: certcopy
+    project_root_dir: "{{ webfeatures_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+
+    cronjob_script_path_without_analytics: "{{ dest_project_fullpath }}/scripts/copy.sh"
+    cronjob_script_path_with_analytics: "{{ cronjob_script_path_without_analytics }}"
+
+  roles:
+    - name: ./roles/kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+
+  post_tasks:
+    - name: Change cron job path to monitoring if it is in analytics_node group
+      set_fact:
+        cronjob_script_path_with_analytics: "{{ cron_wrapped_task_prefix }} --job-name copy_certs -- {{ cronjob_script_path_without_analytics }} {{ cron_wrapped_task_suffix }}"
+      when: "'analytics_node' in group_names"
+
+    # GROUP, SSL DIRECTORY AND PERMISSIONS
+    - name: Create {{ cert_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.group:
+        name: "{{ cert_access_group }}"
+        state: present
+
+    - name: Add users to {{ cert_access_group }} group
+      become: true
+      become_user: root
+      ansible.builtin.user:
+        name: "{{ item }}"
+        groups: "{{ cert_access_group }}"
+        append: true
+      with_items: "{{ cert_access_group_users }}"
+
+    - name: Create {{ cert_location_root_path }} directory
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "{{ cert_location_root_path }}"
+        state: directory
+        owner: "{{ cert_location_root_owner }}"
+        group: "{{ cert_access_group }}"
+        mode: "{{ cert_location_root_permissions }}"
+
+    # CERTCOPY SCRIPT
+    - name: Verify if copy.sh exists
+      ansible.builtin.stat:
+        path: "{{ dest_project_fullpath }}/scripts/copy.sh"
+      register: update_script_exists
+
+    - name: Fail if copy.sh does not exist
+      ansible.builtin.fail:
+        msg: "The copy.sh script does not exist at {{ dest_project_fullpath }}/scripts/copy.sh"
+      when: update_script_exists.stat.exists == false
+
+    - name: Add cron job for certcopy
+      become: true
+      become_user: root
+      ansible.builtin.cron:
+        name: "Copy certs"
+        minute: "{{ copy_certs_auto_renew_minute }}"
+        hour: "{{ copy_certs_auto_renew_hour }}"
+        job: "{{ cronjob_script_path_with_analytics }}"
+      when: update_script_exists.stat.exists == true
+
+    - name: Run certcopy job now
+      become: true
+      become_user: root
+      ansible.builtin.shell: "{{ cronjob_script_path_with_analytics }}"
+      when: update_script_exists.stat.exists == true

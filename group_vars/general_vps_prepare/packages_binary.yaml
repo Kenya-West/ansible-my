@@ -1,0 +1,70 @@
+---
+# eget_skip_installed_packages: true
+
+packages_binary_list:
+  # full schema is:
+  # - repo: "tstack/lnav"         # repo name on github
+  #   assets:                     # Optional. Asset filter to download. ^ to negative filter.
+  #     - "lnav"                  # Usually, a package name
+  #     - "^musl"                 # and/or a negative filter to exclude unsupported architecture
+  #     - "tar.gz"                # and/or a file extension
+  #   dest_loc: "/usr/local/bin"  # Optional. Location to put bin file
+  #   bin_name: "lnav"            # Optional. Name of command that will be available in shell
+  #   file: "lnav"                # Optional. Name of file to extract (glob)
+  #   post_install: "lnav -h"     # Optional. Command to run after installation
+  - repo: "eza-community/eza"
+    assets:
+      - "gnu"
+      - "tar.gz"
+  - repo: "junegunn/fzf"
+  - repo: "jesseduffield/lazydocker"
+  - repo: "jesseduffield/lazygit"
+  - repo: "tstack/lnav"
+    assets:
+      - "lnav"
+  - repo: "koenbollen/jl"
+  - repo: "mikefarah/yq"
+    assets:
+      - "yq_linux_amd64"
+  - repo: "ducaale/xh"
+  - repo: "orf/gping"
+    assets:
+      - "musl"
+  - repo: "jkfran/killport"
+  - repo: "Lifailon/lazyjournal"
+  - repo: "bensadeh/tailspin"
+    bin_name: "tspin"
+  - repo: "tomnomnom/gron"
+  - repo: "PaulJuliusMartinez/jless"
+  - repo: "https://dystroy.org/broot/download/x86_64-linux/broot"
+    post_install: "broot --install"
+  - repo: "extrawurst/gitui"
+  - repo: "solidiquis/erdtree"
+    assets:
+      - "^gnu"
+    file: "erd"
+  - repo: "fioncat/otree"
+  - repo: "ajeetdsouza/zoxide"
+  - repo: "veeso/termscp"
+    assets:
+      - "gnu"
+  - repo: "cupcakearmy/autorestic"
+  - repo: "mr-karan/doggo"
+    assets:
+      - "^web"
+  - repo: "babarot/gomi"
+  - repo: "Byron/dua-cli"
+  - repo: "peltho/tufw"
+    assets:
+      - "tar.gz"
+  - repo: "rgwood/systemctl-tui"
+  - repo: "aurc/loggo"
+    assets:
+      - "tar.gz"
+  - repo: "wait4x/wait4x"
+  - repo: "medialab/xan"
+  - repo: "walles/riff"
+  - repo: "isd-project/isd"
+  - repo: "wzv5/pping"
+  - repo: "https://downloads.rclone.org/rclone-current-linux-amd64.zip"
+    bin_name: "rclone"

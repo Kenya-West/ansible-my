@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# This script downloads specific asset that may be not included in the latest release
+# but could be found in some other tag (version).
+# You can set DEBUG=true ./download_asset.sh comnmand to enable debug messages.
+# Requires curl, jq and head installed.
+# You can set GitHub Personal Access token in $GITHUB_TOKEN to avoid API rate limiting. Look below.
+
+# Constants (replace with your repo details)
+OWNER="{{ download_github_asset_owner }}"        # GitHub username or organization
+REPO="{{ download_github_asset_repo }}"                  # Repository name
+ASSET_NAME="{{ download_github_asset_filename }}"           # Exact asset name in Releases page
+GITHUB_TOKEN="{{ download_github_asset_github_token }}"                   # Look at https://github.com/settings/tokens if you need to set GitHub PAT
+
+# GitHub API URL
+GITHUB_API_URL="https://api.github.com"
+
+# Enable debug mode if DEBUG is set
+DEBUG=${DEBUG:-false}
+
+# Debug log function
+log_debug() {
+    if [ "$DEBUG" = true ]; then
+        echo "[DEBUG] $1"
+    fi
+}
+
+# Error log function
+log_error() {
+    echo "[ERROR] $1"
+}
+
+# Info log function
+log_info() {
+    echo "[INFO] $1"
+}
+
+# Fetch release information
+log_info "Fetching release information for $OWNER/$REPO..."
+if [ -n "$GITHUB_TOKEN" ]; then
+    response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                     -H "Accept: application/vnd.github.v3+json" \
+                     "$GITHUB_API_URL/repos/$OWNER/$REPO/releases")
+else
+    response=$(curl -s -H "Accept: application/vnd.github.v3+json" \
+                     "$GITHUB_API_URL/repos/$OWNER/$REPO/releases")
+fi
+
+if [[ $? -ne 0 ]]; then
+    log_error "Failed to fetch release information from GitHub API."
+    exit 1
+fi
+
+if [[ -z "$response" ]]; then
+    log_error "Empty response from GitHub API."
+    exit 1
+fi
+
+# Write raw API response to a file for debugging
+if [ "$DEBUG" = true ]; then
+    echo "$response" > api_response_debug.json
+    log_debug "API response saved to 'api_response_debug.json' for debugging."
+fi
+
+# Parse the JSON response to find the asset URL for the specified asset name
+log_debug "Parsing JSON response to find asset URL..."
+asset_url=$(echo "$response" | jq -r \
+    --arg ASSET_NAME "$ASSET_NAME" \
+    '.[] | .assets[]? | select(.name == $ASSET_NAME) | .browser_download_url' | head -n 1)
+
+if [[ -z "$asset_url" || "$asset_url" == "null" ]]; then
+    log_error "Asset '$ASSET_NAME' not found in any release for $OWNER/$REPO."
+    log_debug "Inspect the API response in 'api_response_debug.json' for more details."
+    exit 1
+fi
+
+log_info "Found asset URL: $asset_url"
+
+# Download the asset
+log_info "Downloading asset..."
+curl -L -H "Authorization: token $GITHUB_TOKEN" \
+     -H "Accept: application/octet-stream" \
+     -o "$ASSET_NAME" "$asset_url"
+
+if [[ $? -ne 0 ]]; then
+    log_error "Failed to download the asset."
+    exit 1
+fi
+
+log_info "Asset '$ASSET_NAME' downloaded successfully."
+
+exit 0

@@ -1,0 +1,7 @@
+- import_playbook: ./install_analytics_on_node_node_exporter.yaml
+- import_playbook: ./install_analytics_on_node_fail2ban_exporter.yaml
+# disable due to: https://github.com/google/cadvisor/issues/3408#issuecomment-2639608387
+# - import_playbook: ./install_analytics_on_node_cadvisor.yaml
+- import_playbook: ./install_analytics_on_node_docker_exporter.yaml
+- import_playbook: ./install_analytics_on_node_vector.yaml
+- import_playbook: ./install_analytics_on_node_pushgateway.yaml

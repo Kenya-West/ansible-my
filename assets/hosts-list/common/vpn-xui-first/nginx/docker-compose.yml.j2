@@ -1,0 +1,20 @@
+---
+
+services:
+  proxy:
+    image: nginx:latest
+    container_name: proxy
+    cpus: 0.5
+    mem_limit: 200m
+    env_file:
+      - .env
+    networks:
+      - {{ docker_vpn_network }}
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true

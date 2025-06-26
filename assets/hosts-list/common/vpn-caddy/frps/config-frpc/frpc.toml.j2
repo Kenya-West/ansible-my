@@ -1,0 +1,13 @@
+webServer.addr = "0.0.0.0"
+webServer.port = {{ frp_client_dashboard_port }}
+webServer.user = "{{ frp_client_dashboard_user }}"
+webServer.password = "{{ frp_client_dashboard_password }}"
+auth.method = "{{ frp_auth_method }}"
+auth.token = "{{ frp_auth_token }}"
+
+[[proxies]]
+name = "ssh"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 22
+remotePort = {{ frp_range_ports_1_start }}

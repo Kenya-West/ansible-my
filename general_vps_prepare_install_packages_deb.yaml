@@ -1,0 +1,20 @@
+---
+- name: Install packages by deb-get
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - name: ./roles/install_packages_deb
+
+  pre_tasks:
+    - name: Run deb-get with GitHub API token if available
+      command: echo $DEBGET_TOKEN
+      environment:
+        DEBGET_TOKEN: "{{ github_api_token_debget }}"
+      when: github_api_token_debget is defined and github_api_token_debget != ""
+
+  post_tasks:
+    - name: Empty $DEBGET_TOKEN
+      command: echo $DEBGET_TOKEN
+      environment:
+        DEBGET_TOKEN: ""

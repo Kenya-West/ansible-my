@@ -1,0 +1,15 @@
+#! /usr/bin/env bash
+
+# Настройка переменных
+CONTAINER_ID="remnawave-db"
+DB_USER="postgres"
+BACKUP_DIR="{{ pgdump_backup_location_root_path }}"
+BACKUP_FILE_DB="dump_remna_server.sql"
+
+# Создание директории резервного копирования, если она не существует
+mkdir -p "$BACKUP_DIR"
+
+echo "[INFO] Creating PostgreSQL dump directly to disk..."
+docker exec -t "$CONTAINER_ID" pg_dumpall -c -U "$DB_USER" > "$BACKUP_DIR/$BACKUP_FILE_DB"
+
+echo "[INFO] Backup completed successfully: $BACKUP_DIR/$BACKUP_FILE_DB"

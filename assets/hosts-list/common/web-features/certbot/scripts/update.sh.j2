@@ -1,0 +1,6 @@
+#!/bin/bash
+PATH="/usr/local/bin:/usr/bin:/bin"
+
+echo "Starting update.sh script"
+certbot certonly --expand --redirect --standalone --agree-tos --email {{ emails.domain }} {% for domain in domains | unique %}-d {{ domain }} {% endfor %} --pre-hook '{{ dest_project_fullpath }}/hooks/pre-hook.sh' --deploy-hook '{{ dest_project_fullpath }}/hooks/deploy-hook.sh' --post-hook '{{ dest_project_fullpath }}/hooks/post-hook.sh' --non-interactive
+echo "Completed update.sh script"

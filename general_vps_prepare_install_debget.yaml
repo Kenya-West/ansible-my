@@ -1,0 +1,7 @@
+---
+- name: Install deb-get
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - name: ./roles/install_debget

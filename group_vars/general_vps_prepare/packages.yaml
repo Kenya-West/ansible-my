@@ -1,0 +1,51 @@
+---
+packages_list:
+  uninstall:
+    apt:
+      - fzf
+  install:
+    apt:
+      # Base packages
+      - bash
+      - curl
+      - wget
+      - unzip
+      - ncdu
+      - tree
+      - gpg
+      - gettext-base
+      - snapd
+      - locales
+      - rsync
+      - bc
+      - lsof
+      - net-tools
+      - acl
+      # TermSCP dependencies
+      - libdbus-1-dev
+      - pkg-config
+      - libsmbclient
+      # Extra packages
+      - moreutils
+      - neofetch
+      - bat # Ensure this is available or add a task to include its repository
+      - fd-find # Use 'fd' for Ubuntu/Debian, might need a PPA
+      - httpie
+      - cron
+      - hstr
+      - duf
+      - jq
+      - whois
+      - ripgrep
+      - micro
+      - btop
+      - sqlite3
+      - nala
+      - doas
+      # Service packages
+      - python3-docker # Needed for Ansible Docker modules
+      - python3-passlib # Needed for Ansible htpasswd module
+      - python3-bcrypt # Needed for Ansible htpasswd module
+    snap:
+      - procs
+      - trippy

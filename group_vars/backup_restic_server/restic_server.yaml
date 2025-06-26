@@ -1,0 +1,2 @@
+restic_server_port: 8010
+restic_server_network: restic_backup

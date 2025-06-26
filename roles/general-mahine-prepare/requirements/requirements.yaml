@@ -1,6 +1,0 @@
-# ANSIBLE GALAXY
-# node_exporter
-- src: geerlingguy.node_exporter
-- src: cloudalchemy.node_exporter
-# Docker
-- src: geerlingguy.docker

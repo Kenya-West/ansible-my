@@ -1,0 +1,82 @@
+#!/bin/bash
+set -e
+
+# Log output to a file
+exec > /var/log/install_mongotools.log 2>&1
+
+# Fetch the latest version number from the MongoDB download page.
+latest=$(curl -s "https://www.mongodb.com/try/download/database-tools" \
+  | grep -oP 'mongodb-database-tools-ubuntu2204-x86_64-\K[0-9\.]+(?=\.tgz)' \
+  | head -n1)
+
+if [ -z "$latest" ]; then
+  latest="100.11.0"
+  echo "Set hard-coded version: $latest, because the download page looks different"
+fi
+
+echo "Latest version: $latest"
+
+# Determine the host Ubuntu codename.
+host_codename=$(lsb_release -sc)
+echo "Host codename: $host_codename"
+
+# Map host codename to a supported LTS codename.
+case "$host_codename" in
+  noble|bionic|focal|jammy)
+    lts_codename="$host_codename"
+    ;;
+  kinetic|lunar|mantic)
+    lts_codename="jammy"  # nearest LTS for non-LTS 22.x releases
+    ;;
+  groovy)
+    lts_codename="focal"  # for groovy (20.10), use focal (20.04 LTS)
+    ;;
+  *)
+    lts_codename="jammy"
+    ;;
+esac
+echo "Using LTS codename: $lts_codename"
+
+# Map the chosen LTS codename to the version suffix used in the download URL.
+case "$lts_codename" in
+  noble)
+    ubuntu_suffix="2404"
+    ;;
+  jammy)
+    ubuntu_suffix="2204"
+    ;;
+  focal)
+    ubuntu_suffix="2004"
+    ;;
+  bionic)
+    ubuntu_suffix="1804"
+    ;;
+  *)
+    ubuntu_suffix="2204"
+    ;;
+esac
+echo "Ubuntu download suffix: $ubuntu_suffix"
+
+# Determine the host architecture.
+arch=$(uname -m)
+echo "Detected architecture: $arch"
+case "$arch" in
+  x86_64)
+    arch_str="x86_64"
+    ;;
+  aarch64)
+    arch_str="arm64"
+    ;;
+  *)
+    echo "Unknown architecture; defaulting to x86_64"
+    arch_str="x86_64"
+    ;;
+esac
+echo "Architecture string for URL: $arch_str"
+
+# Build the download URL dynamically.
+filename="mongodb-database-tools-ubuntu${ubuntu_suffix}-${arch_str}-${latest}.tgz"
+URL="https://fastdl.mongodb.org/tools/db/${filename}"
+echo "Download URL: $URL"
+
+eget --all $URL --to "/usr/local/bin"

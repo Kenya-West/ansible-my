@@ -1,0 +1,13 @@
+---
+- name: Install PowerShell modules
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/install_powershell_modules
+
+  pre_tasks:
+    - name: Check if PowerShell works correctly
+      ansible.builtin.shell: pwsh -c "Write-Host 'PowerShell works correctly'"
+      register: pwsh_check

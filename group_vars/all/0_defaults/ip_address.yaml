@@ -1,0 +1,1 @@
+host_ip_address: "{{ ansible_host }}"

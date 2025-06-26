@@ -1,0 +1,8 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  {{ alertmanager_route | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}
+
+receivers:
+  {{ alertmanager_receivers_list | to_nice_yaml(indent=2, sort_keys=false) | trim | indent(2, false) }}

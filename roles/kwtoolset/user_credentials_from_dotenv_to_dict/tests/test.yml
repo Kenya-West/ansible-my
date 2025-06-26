@@ -1,0 +1,5 @@
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - roles/kwtoolset/user_credentials_from_dotenv_to_dict

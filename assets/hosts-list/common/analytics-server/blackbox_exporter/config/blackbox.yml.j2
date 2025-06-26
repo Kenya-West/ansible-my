@@ -1,0 +1,39 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1", "HTTP/1.0", "HTTP/1.1", "HTTP/1.2", "HTTP/2", "HTTP/2.0"]
+      valid_status_codes: [200, 201, 202, 203, 204, 205, 300, 301, 302, 400, 401, 402, 403, 404]
+      method: GET
+      compression: gzip
+      headers:
+        Accept-Encoding: gzip
+      follow_redirects: true
+      fail_if_not_ssl: true
+      tls_config:
+        insecure_skip_verify: false
+      preferred_ip_protocol: "ip4"
+      ip_protocol_fallback: false
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+
+  tcp_tls_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      tls: true
+
+  icmp_ipv4:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip4"
+
+  icmp_ipv6:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip6"

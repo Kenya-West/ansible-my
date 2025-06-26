@@ -1,0 +1,43 @@
+---
+- name: Remove VPN directories and project (WARNING - This will remove data files, too!)
+  hosts: vpn_caddy:vpn_xui_first
+  become: true
+
+  roles:
+    - name: ./roles/kwtoolset/collect_ports
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern: "PORT"
+        files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+        skip_if_not_found: true
+    - name: ./roles/remove_ufw_rules
+      become: true
+      become_user: root
+      vars:
+        ufw_ports: "{{ collected_ports }}"
+        ufw_protos: ["tcp", "udp"]
+    # VPN project - range of ports
+    - name: ./roles/kwtoolset/collect_ports_range
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern_begin: "PORTS_[0-9]{1,3}_START"
+        substring_pattern_end: "PORTS_[0-9]{1,3}_END"
+        files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+    - name: ./roles/remove_ufw_rules
+      become: true
+      become_user: root
+      vars:
+        ufw_ports_range: "{{ collected_ports_range }}"
+        ufw_protos: ["tcp", "udp"]
+
+    - name: ./roles/remove_project_dirs
+      vars:
+        remove_project_dirs: "{{ remove_project_dirs_remapped }}"
+
+  pre_tasks:
+    - name: Remap remove_project_dirs variable to contain complete paths - add /home/{{ standard_user }} prefix
+      ansible.builtin.set_fact:
+        remove_project_dirs_remapped: "{{ vpn_project_structure_end_dirs_list | map('regex_replace', '^(.*)$', '/home/{{ standard_user }}/\\1') | list }}"
+    - name: Add root directory to remove_project_dirs variable
+      ansible.builtin.set_fact:
+        remove_project_dirs_remapped: "{{ remove_project_dirs_remapped + ['/home/{{ standard_user }}/{{ vpn_project_structure_root }}'] }}"

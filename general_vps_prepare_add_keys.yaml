@@ -1,0 +1,8 @@
+---
+- name: Add keys
+  hosts: general_vps_prepare
+  become: false
+  become_user: "{{ standard_user }}"
+
+  roles:
+    - name: ./roles/add_keys

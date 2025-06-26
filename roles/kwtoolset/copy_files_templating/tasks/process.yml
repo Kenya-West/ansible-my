@@ -1,0 +1,47 @@
+- name: Create temporary directory
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: copy_files_templating_
+  register: copy_files_templating_temp_dir
+
+- name: Copy files recuresively with templating {{ item.src }}
+  template_tree:
+    src: "{{ item.src }}"
+    dest: "{{ copy_files_templating_temp_dir.path }}"
+  delegate_to: localhost
+
+- name: Find all files that are less/more or equal to {{ copy_files_templating_remove_files_size_less_or_equal_than }} bytes
+  ansible.builtin.find:
+    paths: "{{ copy_files_templating_temp_dir.path }}"
+    size: "{{ copy_files_templating_remove_files_size_less_or_equal_than }}"
+    recurse: true
+  register: copy_files_templating_files_to_remove
+  when:
+    - copy_files_templating_remove_files_size_less_or_equal_than is defined
+  delegate_to: localhost
+
+- name: Remove files
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ copy_files_templating_files_to_remove.files }}"
+  when:
+    - copy_files_templating_files_to_remove.files | default([]) | length > 0
+  delegate_to: localhost
+
+- name: Synchronize templated files to remote host {{ item.dest }}
+  ansible.builtin.synchronize:
+    mode: push
+    src: "{{ copy_files_templating_temp_dir.path }}/"
+    dest: "{{ item.dest }}/"
+    rsync_opts:
+      - "--chmod=F{{ (item.default_mode | int) | default(755) }}"
+      - "--chmod=D{{ (item.default_mode | int) | default(755) }}"
+  delegate_to: localhost
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ copy_files_templating_temp_dir.path }}"
+    state: absent
+  when:
+    - copy_files_templating_temp_dir.path is defined

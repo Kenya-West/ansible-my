@@ -1,0 +1,25 @@
+---
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    cpus: 0.5
+    mem_limit: 400m
+    networks:
+      - caddy
+    labels:
+      caddy: "${DOMAIN}"
+      caddy.import: "logging ${DOMAIN}"
+      {% raw %}caddy.0_reverse_proxy: "{{ upstreams 8428 }}"{% endraw %}
+
+    volumes:
+      - ./data:/storage
+    command:
+      - '--retentionPeriod=12'
+      - '--storageDataPath=/storage'
+      - '--httpAuth.username=${HTTPAUTH_USERNAME}'
+      - '--httpAuth.password=${HTTPAUTH_PASSWORD}'
+
+networks:
+  caddy:
+    external: true
