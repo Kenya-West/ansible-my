@@ -8,8 +8,3 @@ remna_server_caddy_webhook_enabled: true
 remna_server_caddy_webhook_url_path: api/webhook
 
 remna_server_caddy_subscription_path: api/sub
-
-remna_server_caddy_external_port: 48560
-
-caddy_external_ports_allowlist__remna_server:
-  - '{{ remna_server_caddy_external_port }}:{{ remna_server_caddy_external_port }}'
