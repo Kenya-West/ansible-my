@@ -8,10 +8,10 @@ restic_server_users:
 # restic_server_proxy_server_list:
 #   - hostname: sub-frps.example.tld              # Domain with FRP server
 #     url_port: 443                               # Port of FRP server defined in config
-#     url_path: "/frps/proxy/web/22010/metrics"   # Path to access the node_exporter metrics from Internet (by Prometheus)
+#     url_path: "/{{ path_to_internal_services_predefined_full }}/frps/proxy/web/22010/metrics"   # Path to access the node_exporter metrics from Internet (by Prometheus)
 #   - hostname: sub-frps.example.tld
 #     url_port: 443
-#     url_path: "/frps/proxy/web/22011/metrics"
+#     url_path: "/{{ path_to_internal_services_predefined_full }}/frps/proxy/web/22011/metrics"
 #   - hostname: sub-frps.example.tld
 #     url_port: 443
-#     url_path: "/frps/proxy/web/22012/metrics"
+#     url_path: "/{{ path_to_internal_services_predefined_full }}/frps/proxy/web/22012/metrics"
