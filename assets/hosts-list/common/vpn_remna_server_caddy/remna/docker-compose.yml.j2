@@ -46,9 +46,20 @@ services:
       remnawave-redis:
         condition: service_healthy
     labels:
-      caddy: "${FRONT_END_DOMAIN}:${EXTERNAL_PORT}"
-      caddy.import: "logging ${FRONT_END_DOMAIN}-remna-server-caddy"
-      {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${APP_PORT} }}"{% endraw %}
+      caddy_0: "${FRONT_END_DOMAIN}{% if remna_server_caddy_external_port is defined and remna_server_caddy_external_port %}:${EXTERNAL_PORT}{% endif %}"
+      caddy_0.import: "logging ${FRONT_END_DOMAIN}-remna-server-caddy"
+      {% raw %}caddy_0.reverse_proxy: "{{ upstreams ${APP_PORT} }}"{% endraw %}
+
+{% if vpn_remna_server_caddy_domains.subscription is defined %}
+      caddy_1: "*.${DOMAIN_REMNA_SERVER_CADDY_SUBSCRIPTION}, ${DOMAIN_REMNA_SERVER_CADDY_SUBSCRIPTION}"
+      caddy_1.tls: ""
+      caddy_1.tls.dns: "cloudflare ${CLOUDFLARE_API_TOKEN}"
+{% endif %}
+{% if vpn_remna_server_caddy_domains.node is defined %}
+      caddy_2: "*.${DOMAIN_REMNA_SERVER_CADDY_NODE}, ${DOMAIN_REMNA_SERVER_CADDY_NODE}"
+      caddy_2.tls: ""
+      caddy_2.tls.dns: "cloudflare ${CLOUDFLARE_API_TOKEN}"
+{% endif %}
 
   remnawave-redis:
     image: valkey/valkey:8.0.2-alpine
