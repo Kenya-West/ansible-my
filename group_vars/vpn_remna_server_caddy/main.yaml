@@ -4,5 +4,4 @@ remna_server_caddy_telegram_oauth_enabled: false
 
 remna_server_caddy_metrics_user: prometheus
 
-
-remna_server_caddy_subscription_path: api/sub
+remna_server_caddy_subscription_path: "{{ path_to_internal_services_predefined_full }}/sub"

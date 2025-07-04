@@ -1,0 +1,26 @@
+# Pulled from https://remna.st/docs/install/remnawave-subscription-page
+
+services:
+  remnawave-subscription-page:
+    image: remnawave/subscription-page:latest
+    container_name: remnawave-subscription-page
+    hostname: remnawave-subscription-page
+    env_file:
+      - .env
+    ports:
+      - '127.0.0.1:3010:3010'
+    labels:
+      caddy: "${DOMAIN_FOR_CADDY}{% if remna_sub_caddy_external_port is defined and remna_sub_caddy_external_port %}:${EXTERNAL_PORT}{% endif %}"
+      caddy.import: "logging ${DOMAIN_FOR_CADDY}-remna-subscription-page"
+      {% raw %}caddy.reverse_proxy: "{{ upstreams ${APP_PORT} }}"{% endraw %}
+
+    networks:
+      - {{ docker_remna_server_caddy_network }}
+      - {{ docker_vpn_network }}
+    restart: always
+
+networks:
+  {{ docker_remna_server_caddy_network }}:
+    external: true
+  {{ docker_vpn_network }}:
+    external: true

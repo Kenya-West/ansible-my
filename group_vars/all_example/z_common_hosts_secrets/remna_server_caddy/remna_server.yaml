@@ -20,4 +20,4 @@ remna_server_caddy_webhook_secret_header: <token> # This secret is used to sign 
 
 remna_server_caddy_postgres_password: <postgres_password>
 
-remna_server_caddy_subscription_path: api/sub
+remna_server_caddy_subscription_path: "{{ path_to_internal_services_predefined_full }}/sub"
