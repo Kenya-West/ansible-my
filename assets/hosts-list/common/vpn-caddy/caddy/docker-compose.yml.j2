@@ -10,6 +10,9 @@ services:
 {% for port in caddy_external_ports_allowlist %}
       - "{{port}}"
 {% endfor %}
+{% if caddy_occupy_HTTPS is defined and caddy_occupy_HTTPS == true %}
+      - "443:443"
+{% endif %}
 
     environment:
       - CADDY_INGRESS_NETWORKS=caddy

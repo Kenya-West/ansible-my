@@ -9,7 +9,9 @@ services:
     volumes:
       - ./logs:/var/log/remnanode
     ports:
+{% if caddy_occupy_HTTPS is not defined or caddy_occupy_HTTPS == false %}
       - "443:443"
+{% endif %}
       - "${EXTERNAL_PORT}:${APP_PORT}"
     labels:
       caddy: "${SERVICE_DOMAIN}"
