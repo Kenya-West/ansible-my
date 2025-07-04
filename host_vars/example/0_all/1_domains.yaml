@@ -6,4 +6,5 @@ domains_keys:
   victorialogs: sub-victorialogs.example.tld
   pushgateway: sub-pushgateway.example.tld
   remnawave: sub-rw.example.tld
+  xray_under_dns_balancer: sub-europe-1.example.tld
 domains: "{{ domains_keys.values() | list | unique }}"
