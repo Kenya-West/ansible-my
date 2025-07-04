@@ -5,4 +5,5 @@ domains_keys:
   victoriametrics: sub-victoriametrics.example.tld
   victorialogs: sub-victorialogs.example.tld
   pushgateway: sub-pushgateway.example.tld
+  remnawave: sub-rw.example.tld
 domains: "{{ domains_keys.values() | list | unique }}"
