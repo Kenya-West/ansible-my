@@ -48,7 +48,7 @@ services:
     labels:
       caddy_0: "${FRONT_END_DOMAIN}{% if remna_server_caddy_external_port is defined and remna_server_caddy_external_port %}:${EXTERNAL_PORT}{% endif %}"
       caddy_0.import: "logging ${FRONT_END_DOMAIN}-remna-server-caddy"
-      {% raw %}caddy_0.reverse_proxy: "{{ upstreams ${APP_PORT} }}"{% endraw %}ы
+      {% raw %}caddy_0.reverse_proxy: "{{ upstreams ${APP_PORT} }}"{% endraw %}
 
   remnawave-redis:
     image: valkey/valkey:8.0.2-alpine
