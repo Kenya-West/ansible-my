@@ -1,20 +1,10 @@
 domains_keys:
   main: sub.example.tld
-  remna_server: sub-remna.example.tld
-  xui: sub-xui.example.tld
-  frps: sub-frps.example.tld
-  wg: sub-wg.example.tld
-  xray: sub-xray.example.tld
-  restic: sub-restic.example.tld
-  docker_exporter: sub-docker_exporter.example.tld
-  node_exporter: sub-node_exporter.example.tld
-  cadvisor: sub-cadvisor.example.tld
-  fail2ban_exporter: sub-fail2ban_exporter.example.tld
-  vector_exporter: sub-vector_exporter.example.tld
   prometheus: sub-prometheus.example.tld
   grafana: sub-grafana.example.tld
   victoriametrics: sub-victoriametrics.example.tld
   victorialogs: sub-victorialogs.example.tld
   pushgateway: sub-pushgateway.example.tld
-  backrest: sub-backrest.example.tld
+  remnawave: sub-rw.example.tld
+  xray_under_dns_balancer: sub-europe-1.example.tld
 domains: "{{ domains_keys.values() | list | unique }}"

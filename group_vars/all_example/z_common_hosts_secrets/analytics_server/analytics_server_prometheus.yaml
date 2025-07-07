@@ -88,7 +88,7 @@ prometheus_server_scrape_configs:
       username: metrics
       password: <password>
     scheme: https
-    metrics_path: /frps/proxy/web/22002/metrics
+    metrics_path: /{{ path_to_internal_services_predefined_full }}/frps/proxy/web/22002/metrics
 
   - job_name: MongoDB
     file_sd_configs:
@@ -182,5 +182,5 @@ prometheus_server_remote_write_list:
       max_backoff: 100ms
 
 restic_rest_server_targets:
-  - "https://sub.example.tld/frps/proxy/web/22001/metrics"
+  - "https://sub.example.tld/{{ path_to_internal_services_predefined_full }}/frps/proxy/web/22001/metrics"
   - "https://sub.example2.tld/metrics"

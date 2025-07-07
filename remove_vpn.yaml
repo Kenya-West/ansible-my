@@ -1,6 +1,6 @@
 ---
 - name: Remove VPN directories and project (WARNING - This will remove data files, too!)
-  hosts: vpn_caddy:vpn_xui_first
+  hosts: vpn_caddy
   become: true
 
   roles:

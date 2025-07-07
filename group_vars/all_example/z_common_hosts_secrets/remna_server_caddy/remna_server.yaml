@@ -15,9 +15,14 @@ remna_server_caddy_telegram_notify_nodes_thread_id: # empty if you do not use th
 remna_server_caddy_metrics_user: prometheus
 remna_server_caddy_metrics_pass: <password>
 
-remna_server_caddy_webhook_enabled: false
-remna_server_caddy_webhook_secret_header: <token>
+remna_server_caddy_webhook_url: "" # Only https:// is allowed
+remna_server_caddy_webhook_secret_header: <token> # This secret is used to sign the webhook payload, must be exact 64 characters. Only a-z, 0-9, A-Z are allowed.
 
 remna_server_caddy_postgres_password: <postgres_password>
 
-remna_server_caddy_subscription_path: api/sub
+remna_server_caddy_subscription_path: "{{ path_to_internal_services_predefined_full }}/sub"
+
+remna_server_caddy_custom_login_route_route: <custom_login_route> # This is a random string, which is used to access the login page. It is recommended to use a long random string, for example: my_custom_login_route
+remna_server_caddy_custom_login_route_user: <custom_login_route>
+remna_server_caddy_custom_login_route_email: <custom_login_route>
+remna_server_caddy_custom_login_route_password: <custom_login_route>

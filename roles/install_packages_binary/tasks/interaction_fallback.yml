@@ -44,12 +44,13 @@
 #   when:
 #     - bin_download_option_selected is not defined
 
-- name: Include interaction_fallback_no_options if interaction required
-  ansible.builtin.include_tasks: interaction_fallback_no_options.yml
-  when:
-    - bin_download_result_interaction is not defined
-
 - name: Run download command with selected asset
   ansible.builtin.command: "{{ download_cmd }} --asset {{ bin_download_option_selected }}"
   when:
     - bin_download_option_selected is defined
+
+- name: Include interaction_fallback_no_options if interaction required
+  ansible.builtin.include_tasks: interaction_fallback_no_options.yml
+  when:
+    - bin_download_option_selected is not defined
+    - bin_download_result_interaction is not defined

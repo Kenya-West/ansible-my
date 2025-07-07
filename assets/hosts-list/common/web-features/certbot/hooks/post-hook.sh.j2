@@ -1,9 +1,0 @@
-#!/bin/bash
-
-# Check if the docker-compose.yml file exists
-if [ -f /home/{{ standard_user }}/{{ main_webserver.dir_path }}/docker-compose.yml ]; then
-    # Start the main_webserver Docker container using Docker Compose
-    docker compose -f /home/{{ standard_user }}/{{ main_webserver.dir_path }}/docker-compose.yml up -d {{ main_webserver.container_name }}
-else
-    echo "docker-compose.yml file not found! Doing nothing."
-fi

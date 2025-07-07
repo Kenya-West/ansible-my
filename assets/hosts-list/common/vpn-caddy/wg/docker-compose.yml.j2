@@ -20,7 +20,7 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
     labels:
-      caddy: "${SERVICE_DOMAIN}:${EXTERNAL_PORT:-443}"
+      caddy: "${SERVICE_DOMAIN}{% if wg_web_external_port is defined and wg_web_external_port %}:${EXTERNAL_PORT}{% endif %}"
       caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
       caddy.handle_path.import: "logging ${SERVICE_DOMAIN}-wg"
       {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
