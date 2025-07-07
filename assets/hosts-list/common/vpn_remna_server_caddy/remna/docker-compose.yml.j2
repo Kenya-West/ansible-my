@@ -39,16 +39,31 @@ services:
       - certs:/etc/remna/certs
     networks:
       - {{ docker_remna_server_caddy_network }}
-      - {{ docker_vpn_network }}
     depends_on:
       remnawave-db:
         condition: service_healthy
       remnawave-redis:
         condition: service_healthy
+
+  remnawave-caddy:
+    image: remnawave/caddy-with-auth:latest
+    container_name: 'remnawave-caddy'
+    hostname: remnawave-caddy
+    restart: always
+    env_file:
+      - .env.remnawave-caddy
+    networks:
+      - {{ docker_remna_server_caddy_network }}
+      - {{ docker_vpn_network }}
+    volumes:
+      - ./users:/data/.local/caddy/
+      - ./logs:/var/log/caddy
+      - ./config/Caddyfile:/etc/caddy/Caddyfile
+      - certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
     labels:
-      caddy_0: "${FRONT_END_DOMAIN}{% if remna_server_caddy_external_port is defined and remna_server_caddy_external_port %}:${EXTERNAL_PORT}{% endif %}"
-      caddy_0.import: "logging ${FRONT_END_DOMAIN}-remna-server-caddy"
-      {% raw %}caddy_0.reverse_proxy: "{{ upstreams ${APP_PORT} }}"{% endraw %}
+      caddy: "${FRONT_END_DOMAIN}{% if remna_server_caddy_custom_login_route_external_port is defined and remna_server_caddy_custom_login_route_external_port %}:${EXTERNAL_PORT}{% endif %}"
+      caddy.import: "logging ${FRONT_END_DOMAIN}-remna-server-caddy-custom-login-route"
+      {% raw %}caddy.reverse_proxy: "{{ upstreams 80 }}"{% endraw %}
 
   remnawave-redis:
     image: valkey/valkey:8.0.2-alpine
