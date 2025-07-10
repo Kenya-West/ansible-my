@@ -2,7 +2,7 @@
 {%- for host in groups['analytics_node'] -%}
   {%- set hv = hostvars[host] -%}
 
-  {%- if (hv.domains_keys|default({})).docker_exporter is defined-%}
+  {%- if (hv.analytics_node_project_structure_end_dirs|default({})).docker_exporter is defined-%}
 
     {# Skip adding the host if domains_keys.main contains example.tld #}
     {%- set skip_host = False -%}
@@ -20,7 +20,7 @@
       {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
 
       {# 3. Metrics path logic #}
-      {%- set metrics_path = hv.get('docker_exporter_proxy_server_url_path', hv.docker_exporter_web_telemetry_path) -%}
+      {%- set metrics_path = (hv.docker_exporter_proxy_server_url_path | default(hv.docker_exporter_web_telemetry_path) | default('/metrics')) -%}
       {%- if not metrics_path -%}
         {%- set metrics_path = '/metrics' -%}
       {%- endif -%}

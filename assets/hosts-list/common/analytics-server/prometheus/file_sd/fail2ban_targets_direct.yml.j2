@@ -20,7 +20,7 @@
       {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
 
       {# 3. Metrics path logic #}
-      {%- set metrics_path = hv.get('fail2ban_exporter_proxy_server_url_path', hv.fail2ban_exporter_web_telemetry_path) -%}
+      {%- set metrics_path = (hv.fail2ban_exporter_proxy_server_url_path | default(hv.fail2ban_exporter_web_telemetry_path) | default('/metrics')) -%}
       {%- if not metrics_path -%}
         {%- set metrics_path = '/metrics' -%}
       {%- endif -%}

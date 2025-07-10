@@ -12,7 +12,7 @@ frp_range_ports_2_start: 22501
 frp_range_ports_2_end: 22589
 frp_client_dashboard_port: 7400
 frp_client_dashboard_user: "{{ common_username }}"
-frps_web_telemetry_path: /metrics
+frps_web_telemetry_path: "/{{ path_to_internal_services_predefined_full }}/frps_exporter/metrics"
 
 caddy_external_ports_allowlist__frp:
   - '{{ frp_web_external_port }}:{{ frp_web_external_port }}'

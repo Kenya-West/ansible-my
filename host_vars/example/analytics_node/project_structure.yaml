@@ -1,10 +1,14 @@
 ---
 analytics_node_project_structure_end_dirs__host:
+  caddy_exporter: "{{ analytics_node_project_structure_root }}/caddy_exporter"
+  docker_exporter: "{{ analytics_node_project_structure_root }}/docker_exporter"
+  frps_exporter: "{{ analytics_node_project_structure_root }}/frps_exporter"
+  node_exporter: "{{ analytics_node_project_structure_root }}/node_exporter"
+  fail2ban_exporter: "{{ analytics_node_project_structure_root }}/fail2ban_exporter"
+  pushgateway: "{{ analytics_node_project_structure_root }}/pushgateway"
   cadvisor: "{{ analytics_node_project_structure_root }}/cadvisor"
   vector_exporter: "{{ analytics_node_project_structure_root }}/vector"
   wg_exporter: "{{ analytics_node_project_structure_root }}/wg_exporter"
-  frps_exporter: "{{ analytics_node_project_structure_root }}/frps_exporter"
-  caddy_exporter: "{{ analytics_node_project_structure_root }}/caddy_exporter"
   any_subdirectory_name: "{{ analytics_node_project_structure_root }}/any_subdirectory_name"
 
 analytics_node_project_structure_end_dirs: >-

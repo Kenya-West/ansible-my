@@ -26,6 +26,10 @@ services:
       caddy.{{ loop.index }}_handle_path.reverse_proxy: {% raw %}"{{ upstreams {% endraw %}{{port}}{% raw %} }}"{% endraw %}
       {% endfor %}
 
+      caddy.9999_handle_path: "/{{ path_to_internal_services_predefined_full }}/frps_exporter/*"
+      {% raw %}caddy.9999_handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+
+
     restart: unless-stopped
 
 networks:

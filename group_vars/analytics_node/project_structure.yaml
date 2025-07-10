@@ -1,9 +1,12 @@
 ---
 analytics_node_project_structure_root: analytics-node
 analytics_node_project_structure_end_dirs__base:
+  caddy_exporter: "{{ analytics_node_project_structure_root }}/caddy_exporter"
   docker_exporter: "{{ analytics_node_project_structure_root }}/docker_exporter"
+  frps_exporter: "{{ analytics_node_project_structure_root }}/frps_exporter"
   node_exporter: "{{ analytics_node_project_structure_root }}/node_exporter"
   fail2ban_exporter: "{{ analytics_node_project_structure_root }}/fail2ban_exporter"
+  vector_exporter: "{{ analytics_node_project_structure_root }}/vector_exporter"
   pushgateway: "{{ analytics_node_project_structure_root }}/pushgateway"
 analytics_node_project_structure_end_dirs: "{{ analytics_node_project_structure_end_dirs__base }}"
 analytics_node_project_structure_end_dirs_list: "{{ analytics_node_project_structure_end_dirs.values() | list }}"

@@ -31,13 +31,11 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     labels:
-      caddy_0:
-      caddy_0.metrics:
-      caddy_1: "${DOMAIN}:2020"
-      caddy_1.metrics: "/metrics"
-      caddy_1.metrics.disable_openmetrics:
-      caddy_1.basic_auth.prometheus: "${METRICS_PROMETHEUS_USER_PASSWORD}"
-      caddy_1.basic_auth.client: "${METRICS_CLIENT_USER_PASSWORD}"
+      caddy: "${DOMAIN}"
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/caddy_exporter/metrics/*"
+      caddy.handle_path.basic_auth.prometheus: "${METRICS_PROMETHEUS_USER_PASSWORD}"
+      caddy.handle_path.basic_auth.client: "${METRICS_CLIENT_USER_PASSWORD}"
+      caddy.handle_path.metrics: ""
     restart: unless-stopped
 
 networks:

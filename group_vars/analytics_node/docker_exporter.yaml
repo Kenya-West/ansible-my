@@ -1,1 +1,1 @@
-docker_exporter_web_telemetry_path: /metrics
+docker_exporter_web_telemetry_path: "/{{ path_to_internal_services_predefined_full }}/docker_exporter/metrics"
