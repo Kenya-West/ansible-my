@@ -1,0 +1,30 @@
+---
+# tasks file for roles/install_mohomo_host_proxy
+- name: Get the public IP of the host
+  ansible.builtin.command: curl -s ifconfig.me
+  register: public_ip
+  changed_when: false
+
+- name: Query IPInfo for geolocation information
+  ansible.builtin.uri:
+    url: "https://ipinfo.io/{{ public_ip.stdout }}/json"
+    method: GET
+    return_content: true
+  register: ipinfo_response
+
+- name: Parse the country from IPInfo response
+  ansible.builtin.set_fact:
+    country: "{{ ipinfo_response.json.country }}"
+
+- name: Debug country information
+  ansible.builtin.debug:
+    msg: "The country for IP {{ public_ip.stdout }} is {{ country }}"
+
+- name: Check if the country is in the blocked resources list
+  ansible.builtin.set_fact:
+    is_blocked_country: "{{ country in countries_blocked_resources | map(attribute='country_code') | list }}"
+
+- name: Include install.yml if country is in list
+  ansible.builtin.include_tasks: install.yml
+  when:
+    - is_blocked_country
