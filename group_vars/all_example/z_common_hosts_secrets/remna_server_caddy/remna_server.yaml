@@ -27,3 +27,7 @@ remna_server_caddy_custom_login_route_user: <custom_login_route>
 remna_server_caddy_custom_login_route_email: <custom_login_route>
 remna_server_caddy_custom_login_route_password: <custom_login_route>
 remna_server_caddy_custom_login_route_api_token: <custom_login_route>
+
+remna_server_caddy_tg_miniapp_api_token: <tg_miniapp_api_token>
+remna_server_caddy_tg_miniapp_buy_link: <tg://user?id=ID or https://t.me/username>
+remna_server_caddy_tg_miniapp_x_api_key: <caddy with security api key>
