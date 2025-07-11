@@ -1,9 +1,22 @@
 ---
 # tasks file for roles/install_mohomo_host_proxy
 - name: Get the public IP of the host
-  ansible.builtin.command: curl -s ifconfig.me
-  register: public_ip
-  changed_when: false
+  block:
+    - name: using ifconfig.me
+      ansible.builtin.command: curl -s ifconfig.me
+      register: public_ip
+      changed_when: false
+  rescue:
+    - name: using ifconfig.co
+      ansible.builtin.command: curl -s ifconfig.co
+      register: public_ip
+      changed_when: false
+  ignore_errors: true
+
+- name: Fallback to Ansible facts for public IP
+  ansible.builtin.set_fact:
+    public_ip: "{{ ansible_default_ipv4.address }}"
+  when: public_ip is not defined or (public_ip.stdout is defined and public_ip.stdout == "")
 
 - name: Query IPInfo for geolocation information
   ansible.builtin.uri:
