@@ -16,7 +16,7 @@
       {%- set target_hostname = hv.domains_keys.main -%}
 
       {# 2. Port #}
-      {%- set port = hv.frps_web_listen_address_port -%}
+      {%- set port = hv.frp_web_external_port -%}
       {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
 
       {# 3. Metrics path #}

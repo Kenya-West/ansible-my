@@ -87,7 +87,7 @@
             {{user.name}} {{ user.password | ansible.builtin.password_hash(user.hash_scheme) }}
 {% endfor %}
         }
-        reverse_proxy host.docker.internal:{{ node_exporter_web_listen_address_port }}
+        reverse_proxy host.docker.internal:{{ node_exporter_web_listen_address_port_internal }}
     }
 
     handle_path /{{ path_to_internal_services_predefined_full }}/docker_exporter/* {
@@ -110,6 +110,10 @@
             roll_keep 20
             roll_keep_for 3d
         }
+    }
+
+    metrics {
+        per_host
     }
 }
 

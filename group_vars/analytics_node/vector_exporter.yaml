@@ -1,1 +1,1 @@
-vector_exporter_web_telemetry_path: /metrics
+vector_exporter_web_telemetry_path: "/{{ path_to_internal_services_predefined_full }}/vector_exporter/metrics"

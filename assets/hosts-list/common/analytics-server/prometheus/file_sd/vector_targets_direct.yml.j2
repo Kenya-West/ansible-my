@@ -4,23 +4,23 @@
 
   {%- if (hv.analytics_node_project_structure_end_dirs|default({})).vector_exporter is defined-%}
 
-    {# Skip adding the host if domains_keys.vector_exporter contains example.tld #}
+    {# Skip adding the host if domains_keys.main contains example.tld #}
     {%- set skip_host = False -%}
-    {%- if hv.domains_keys is defined and hv.domains_keys.vector_exporter is defined and 'example.tld' in hv.domains_keys.vector_exporter -%}
+    {%- if hv.domains_keys is defined and hv.domains_keys.main is defined and 'example.tld' in hv.domains_keys.main -%}
       {%- set skip_host = True -%}
     {%- endif -%}
 
     {%- if not skip_host -%}
 
       {# 1. Hostname logic #}
-      {%- set target_hostname = hv.domains_keys.vector_exporter -%}
+      {%- set target_hostname = hv.domains_keys.main -%}
 
       {# 2. Port #}
       {%- set port = hv.vector_exporter_external_port -%}
       {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
 
       {# 3. Metrics path logic #}
-      {%- set metrics_path = hv.get('vector_exporter_proxy_server_url_path', hv.vector_exporter_web_telemetry_path) -%}
+      {%- set metrics_path = (hv.vector_exporter_proxy_server_url_path | default(hv.vector_exporter_web_telemetry_path) | default('/metrics')) -%}
       {%- if not metrics_path -%}
         {%- set metrics_path = '/metrics' -%}
       {%- endif -%}
