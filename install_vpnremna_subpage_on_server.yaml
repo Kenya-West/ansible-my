@@ -5,7 +5,7 @@
   become_user: "{{ standard_user }}"
   vars:
     project_dir: "{{ remna_server_caddy_project_structure_end_dirs.remnasubpage | ansible.builtin.basename }}"
-    project_name: remnawave
+    project_name: remna-subscription-page
     project_root_dir: "{{ remna_server_caddy_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
