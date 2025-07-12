@@ -9,3 +9,5 @@ path_to_internal_services_predefined: predefined
 path_to_internal_services_autodiscovery_full: "{{ path_to_internal_services_base }}/{{ path_to_internal_services_autodiscovery }}"
 path_to_internal_services_autodiscovery_searchparams_prefix_base: "{{ path_to_internal_services_autodiscovery }}-options"
 path_to_internal_services_predefined_full: "{{ path_to_internal_services_base }}/{{ path_to_internal_services_predefined }}"
+
+caddy_fake_static_files_template_name: 503 error page v2

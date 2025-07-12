@@ -1,0 +1,75 @@
+---
+# tasks file for roles/kwtoolset/unzip
+- name: Set fact supported file extensions
+  ansible.builtin.set_fact:
+    supported_file_extensions_tar: ['.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz']
+    supported_file_extensions_zip: ['.zip']
+- name: Set combined supported file extensions
+  ansible.builtin.set_fact:
+    supported_file_extensions: "{{ (supported_file_extensions_tar + supported_file_extensions_zip) | unique }}"
+
+# Find the longest matching supported extension from the filename
+- name: Detect file extension (supports double extensions)
+  set_fact:
+    unzip_file_extension: ""
+
+- name: Find the longest matching supported extension
+  set_fact:
+    unzip_file_extension: "{{ item }}"
+  loop: "{{ supported_file_extensions }}"
+  when: unzip_source | basename | regex_search(item + '$')
+  until: unzip_file_extension != ""
+  vars:
+    ansible_loop_var: item
+
+- name: Show debug information
+  ansible.builtin.debug:
+    msg: "File extension: {{ unzip_file_extension }}"
+
+- name: Fail if no supported file extension is provided
+  ansible.builtin.fail:
+    msg: "Unsupported file extension: {{ unzip_file_extension }}. Supported extensions are: {{ supported_file_extensions | join(', ') }}"
+  when: unzip_file_extension not in supported_file_extensions
+
+- name: Ensure tar is installed
+  become: true
+  become_user: root
+  ansible.builtin.package:
+    name: tar
+    state: present
+
+- name: Ensure unzip is installed
+  become: true
+  become_user: root
+  ansible.builtin.package:
+    name: unzip
+    state: present
+
+- name: Ensure destination directory exists
+  ansible.builtin.file:
+    path: "{{ unzip_dest }}"
+    state: directory
+    owner: "{{ unzip_dest_owner | default(standard_user) }}"
+    group: "{{ unzip_dest_group | default(standard_user) }}"
+    mode: "{{ unzip_dest_mode | default('0775') }}"
+
+- name: Unzip file(s) by two ways
+  block:
+    - name: Unzip a file by built-in unarchive module
+      ansible.builtin.unarchive:
+        src: "{{ unzip_source }}"
+        dest: "{{ unzip_dest }}"
+        remote_src: true
+  rescue:
+    - name: Include unzip task based on file extension
+      ansible.builtin.include_tasks: unzip.yml
+      when: unzip_file_extension in supported_file_extensions_zip
+    - name: Include tar task based on file extension
+      ansible.builtin.include_tasks: untar.yml
+      when: unzip_file_extension in supported_file_extensions_tar
+
+- name: Remove source file if specified
+  ansible.builtin.file:
+    path: "{{ unzip_source }}"
+    state: absent
+  when: unzip_remove_source | default(false) | bool
