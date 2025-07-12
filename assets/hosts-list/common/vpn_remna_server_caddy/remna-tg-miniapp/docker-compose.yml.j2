@@ -7,6 +7,8 @@ services:
     hostname: remnawave-telegram-mini-app
     env_file:
         - .env
+    volumes:
+      - ./config/app-config.json:/app/public/assets/app-config.json
     ports:
         - '127.0.0.1:3020:3020'
     labels:
