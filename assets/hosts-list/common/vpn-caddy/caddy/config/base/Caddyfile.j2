@@ -124,6 +124,7 @@
     import observability
 {% endif %}
     @not_internal not path /{$INTERNAL_PATH_BASE}*
-    root @not_internal /var/www/public
+    root @not_internal "/var/www/public{% if caddy_fake_static_files_template_name is defined and caddy_fake_static_files_template_name %}/sni-templates/sni-templates-main/{{caddy_fake_static_files_template_name}}{% endif %}"
+
     file_server @not_internal
 }
