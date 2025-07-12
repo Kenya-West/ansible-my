@@ -1,0 +1,2 @@
+- name: Untar file
+  ansible.builtin.command: "tar -xf {{ unzip_source }} -C {{ unzip_dest }}"
