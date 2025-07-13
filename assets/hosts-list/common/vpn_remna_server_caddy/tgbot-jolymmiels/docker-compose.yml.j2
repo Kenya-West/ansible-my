@@ -1,0 +1,51 @@
+services:
+  bot:
+    image: ghcr.io/jolymmiels/remnawave-telegram-shop-bot:latest
+    env_file:
+      - .env
+    networks:
+      - {{ docker_vpn_network }}
+    labels:
+      caddy: "${DOMAIN_FOR_CADDY}{% if remna_server_caddy_tg_bot_jolymmiels_external_port is defined and remna_server_caddy_tg_bot_jolymmiels_external_port %}:${EXTERNAL_PORT}{% endif %}"
+      caddy.import: "logging ${DOMAIN_FOR_CADDY}-remna-tg-bot-jolymmiels"
+      {% raw %}caddy.reverse_proxy: "{{ upstreams ${HEALTH_CHECK_PORT} }}"{% endraw %}
+
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./config/translations:/translations
+
+  db:
+    image: postgres:17
+    container_name: 'remnawave-telegram-shop-db'
+    hostname: remnawave-telegram-shop-db
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TZ=UTC
+    networks:
+      - {{ docker_vpn_network }}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - remnawave-telegram-shop-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ 'CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}' ]
+      interval: 3s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  remnawave-telegram-shop-db-data:
+    driver: local
+    external: false
+    name: remnawave-telegram-shop-db-data
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true
