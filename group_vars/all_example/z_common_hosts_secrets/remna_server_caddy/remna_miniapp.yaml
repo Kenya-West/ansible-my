@@ -1,0 +1,3 @@
+remna_server_caddy_tg_miniapp_api_token: <tg_miniapp_api_token>
+remna_server_caddy_tg_miniapp_buy_link: <tg://user?id=ID or https://t.me/username>
+remna_server_caddy_tg_miniapp_x_api_key: <caddy with security api key>
