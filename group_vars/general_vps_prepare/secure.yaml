@@ -3,7 +3,7 @@ ssh_permit_root_login: "without-password"
 ssh_client_password_login: false
 sshd_authenticationmethods: "publickey"
 ssh_server_password_login: false
-ssh_allow_users: "{{ (users_to_set | map(attribute='name') + [standard_user, ansible_user]) | unique | join(' ') }}"
+ssh_allow_users: "{{ (users_to_set | map(attribute='name') + [standard_user, ansible_user, 'root']) | unique | join(' ') }}"
 
 # devsec.hardening.os_hardening
 os_filesystem_whitelist: squashfs # Needed for Snaps, taken from https://github.com/robpomeroy/BrightOS/blob/b7cf9a61214a9156191abd03fb2998af222a69d2/main.yml#L44
