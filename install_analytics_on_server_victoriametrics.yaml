@@ -4,7 +4,7 @@
   become: false
   become_user: "{{ standard_user }}"
   vars:
-    project_dir: victoriametrics
+    project_dir: "{{ analytics_server_project_structure_end_dirs.victoriametrics | ansible.builtin.basename }}"
     docker_compose_project_name: victoriametrics
     project_root_dir: "{{ analytics_server_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
