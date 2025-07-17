@@ -21,6 +21,6 @@
     state: absent
   register: container_stop_down_stopped
   when:
-    - container_stop_down_stopped.rc == 0
+    - container_stop_down_stopped is failed
     - "'No resource found to remove for project' in container_stop_down_stopped.msg"
   ignore_errors: true
