@@ -6,7 +6,6 @@
 
   vars:
     project_dir: doas
-    project_name: doas
     project_root_dir: "{{ general_vps_prepare_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"

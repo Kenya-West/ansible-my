@@ -4,8 +4,8 @@
   become: false
   become_user: "{{ standard_user }}"
   vars:
-    project_dir: prometheus
-    project_name: prometheus
+    project_dir: "{{ analytics_server_project_structure_end_dirs.prometheus | ansible.builtin.basename }}"
+    docker_compose_project_name: prometheus
     project_root_dir: "{{ analytics_server_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
@@ -19,6 +19,8 @@
       vars:
         container_stop_down_list:
           - "{{ dest_project_fullpath }}"
+        docker_compose_project_name_list:
+          - "{{ docker_compose_project_name }}"
     - name: ./roles/kwtoolset/copy_files_templating
       vars:
         copy_files_templating_dir_list:
@@ -32,11 +34,11 @@
       vars:
         container_pull_list:
           - path: "{{ dest_project_fullpath }}"
-            name: "{{ project_name }}"
+            name: "{{ docker_compose_project_name }}"
             policy: "policy"
     - name: ./roles/kwtoolset/container_up
       vars:
         container_up_list:
           - path: "{{ dest_project_fullpath }}"
-            name: "{{ project_name }}"
+            name: "{{ docker_compose_project_name }}"
             ignore_errors: false
