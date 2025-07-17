@@ -1,10 +1,10 @@
 - name: Check if path exists
   ansible.builtin.stat:
-    path: "{{ item }}"
+    path: "{{ item.path }}"
   register: container_up_path_stat
 - name: Check if docker-compose.yml exists in the path
   ansible.builtin.stat:
-    path: "{{ item }}/docker-compose.yml"
+    path: "{{ item.path }}/docker-compose.yml"
   register: container_up_compose_stat
   when: container_up_path_stat.stat.exists
 - name: Add valid path to the filtered list
