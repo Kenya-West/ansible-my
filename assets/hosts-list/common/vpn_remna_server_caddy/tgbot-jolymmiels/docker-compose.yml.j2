@@ -4,8 +4,8 @@
 services:
   remnawave-telegram-tgbot-jolymmiels-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}-bot:
     image: ghcr.io/jolymmiels/remnawave-telegram-shop-bot:latest
-    container_name: '${SERVICE_NAME}'
-    hostname: 'bot'
+    container_name: '${SERVICE_NAME}-bot'
+    hostname: '${SERVICE_NAME}'
     env_file:
       - .env
     networks:
