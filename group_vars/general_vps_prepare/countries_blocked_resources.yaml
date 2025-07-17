@@ -1,0 +1,19 @@
+# This file contains a list of countries that are blocked from / had blocked the access to certain resources.
+# The list is used to configure, for example, the Mihomo host proxy for these countries.
+# There are only the countries that are recognized by the United Nations due to technical reasons (country codes and stuff).
+
+countries_blocked_resources:
+  - country_code: "RU"
+    country_name: "Russia"
+  - country_code: "IR"
+    country_name: "Iran"
+  - country_code: "KP"
+    country_name: "North Korea"
+  - country_code: "SY"
+    country_name: "Syria"
+  - country_code: "CU"
+    country_name: "Cuba"
+  - country_code: "VE"
+    country_name: "Venezuela"
+  - country_code: "CN"
+    country_name: "China"

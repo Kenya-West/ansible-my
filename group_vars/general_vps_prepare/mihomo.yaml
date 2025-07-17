@@ -1,0 +1,62 @@
+mihomo_config:
+  # === core =====================================================================
+  mixed-port: 7890        # optional plain-text local proxy if you still want it
+  mode: rule              # use the RULES section, not global proxy
+  ipv6: true              # keep v6 working
+  log-level: info
+
+  # === listener – TUN ===========================================================
+  listeners:
+    - name: tun-in
+      type: tun
+      stack: system        # userspace works too, but system = lower overhead
+      inet4-address:
+        - 198.19.0.1/30    # RFC 5737 TEST-NET-2, safe private range
+      inet6-address:
+        - fdfe:dcba:9877::1/126
+      auto-route: true      # add 0.0.0.0/0 → tun0 automatically
+      strict-route: false   # let kernel keep existing routes
+
+  # === proxy to your remote VPS =================================================
+  proxies:
+    - name: github-proxy
+      type: vless           # change to vmess/trojan/etc. if needed
+      server: "{{ mihomo_host_proxy_server_address | default('') }}"
+      port: "{{ mihomo_host_proxy_server_port | default('443') }}"
+      uuid: "{{ mihomo_host_proxy_user | default('') }}"
+      cipher: none
+      tls: true
+      udp: true
+      servername: "ru-server"    # SNI for TLS
+
+  # === simple selector group (not strictly required) ============================
+  proxy-groups:
+    - name: GitHub
+      type: select
+      proxies:
+        - github-proxy
+        - DIRECT
+
+  # === routing rules ============================================================
+  rules:
+    # GitHub family → proxy
+    - DOMAIN-SUFFIX,github.com,GitHub
+    - DOMAIN-SUFFIX,githubusercontent.com,GitHub
+    - DOMAIN-SUFFIX,githubassets.com,GitHub
+    - DOMAIN-SUFFIX,github.io,GitHub
+    # everything else goes out un-tunnelled
+    - MATCH,DIRECT
+  # === DNS ======================================================================
+  dns:
+    enable: true
+    listen: 0.0.0.0:53        # let systemd-resolved reach it
+    enhanced-mode: fake-ip    # required for per-domain rules with TUN
+    ipv6: true
+    fake-ip-range: 198.19.0.0/16   # keeps addresses inside your /30
+    default-nameserver:
+      - 8.8.8.8
+      - 1.1.1.1
+    nameserver:                      # the queries that must go through the proxy
+      - https://dns.google/dns-query
+    proxy-server-nameserver:
+      - https://dns.google/dns-query  # ensures DoH itself is proxied
