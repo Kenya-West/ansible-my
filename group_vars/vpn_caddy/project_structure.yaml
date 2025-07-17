@@ -2,7 +2,7 @@
 
 vpn_project_structure_root: vpn-caddy
 vpn_project_structure_end_dirs__base:
-  frp: "{{ vpn_project_structure_root }}/frp"
+  frp: "{{ vpn_project_structure_root }}/frps"
   remna: "{{ vpn_project_structure_root }}/remna"
   wg: "{{ vpn_project_structure_root }}/wg"
   caddy: "{{ vpn_project_structure_root }}/caddy"

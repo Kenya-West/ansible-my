@@ -5,7 +5,6 @@
   become_user: "{{ standard_user }}"
   vars:
     project_dir: rclone
-    project_name: rclone
     project_root_dir: "{{ backup_restic_node_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"

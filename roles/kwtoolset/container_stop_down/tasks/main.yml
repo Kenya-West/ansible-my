@@ -22,9 +22,26 @@
   debug:
     var: container_stop_down_list_filtered
 
-- name: Process each of project
-  ansible.builtin.include_tasks: process.yml
+- name: Process each of project (dirname)
+  ansible.builtin.include_tasks: down-by-dirname.yml
   loop: "{{ container_stop_down_list_filtered }}"
   loop_control:
     loop_var: item
+  when: container_stop_down_list_filtered | length > 0
+- name: Process each of project (servicename)
+  ansible.builtin.include_tasks: down-by-servicename.yml
+  loop: "{{ container_stop_down_list_filtered }}"
+  loop_control:
+    loop_var: item
+  when: container_stop_down_list_filtered | length > 0
+- name: Process each of project (projectname)
+  ansible.builtin.include_tasks: down-by-projectname.yml
+  loop: "{{ container_stop_down_list_filtered }}"
+  loop_control:
+    loop_var: item
+  when: container_stop_down_list_filtered | length > 0
+
+- name: Show that all project should be stopped and downed
+  debug:
+    msg: "All projects should be stopped and downed: {{ container_stop_down_list_filtered }}"
   when: container_stop_down_list_filtered | length > 0

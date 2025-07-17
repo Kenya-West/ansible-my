@@ -1,0 +1,17 @@
+- name: Stop and down Docker Compose project for each
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    project_name: "{{ docker_compose_project_name_item }}"
+    files:
+      - docker-compose.yml
+    state: absent
+  register: container_stop_down_stopped
+  loop: "{{ docker_compose_project_name_list }}"
+  loop_control:
+    loop_var: docker_compose_project_name_item
+  ignore_errors: true
+  when: 
+    - container_stop_down_yq_installed is not failed
+    - container_stop_down_yq_installed.stdout != ""
+    - docker_compose_project_name_list is defined
+    - docker_compose_project_name_list | length > 0

@@ -1,0 +1,26 @@
+- name: Stop and down Docker Compose project
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    files:
+      - docker-compose.yml
+    state: absent
+  register: container_stop_down_stopped
+  ignore_errors: true
+
+- name: Get dirname of the project
+  set_fact:
+    container_stop_down_service_dirname: "{{ item | basename }}"
+
+# If error "No resource found to remove for project" happened
+- name: Stop and down Docker Compose project for dirname
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    project_name: "{{ container_stop_down_service_dirname }}"
+    files:
+      - docker-compose.yml
+    state: absent
+  register: container_stop_down_stopped
+  when:
+    - container_stop_down_stopped.rc == 0
+    - "'No resource found to remove for project' in container_stop_down_stopped.msg"
+  ignore_errors: true
