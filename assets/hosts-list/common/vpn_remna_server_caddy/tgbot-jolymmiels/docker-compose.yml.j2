@@ -1,25 +1,33 @@
+{% set bot = remna_server_caddy_tg_bot_settings[remna_server_caddy_tg_bot_jolymmiels_current_index] %}
+{% set network_name = 'tgbot-jolymmiels-' + (remna_server_caddy_tg_bot_jolymmiels_current_index | string) %}
+
 services:
-  bot:
+  remnawave-telegram-tgbot-jolymmiels-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}-bot:
     image: ghcr.io/jolymmiels/remnawave-telegram-shop-bot:latest
+    container_name: '${SERVICE_NAME}-bot'
+    hostname: '${SERVICE_NAME}'
     env_file:
       - .env
     networks:
+      - {{ network_name }}
       - {{ docker_vpn_network }}
     labels:
       caddy: "${DOMAIN_FOR_CADDY}{% if remna_server_caddy_tg_bot_jolymmiels_external_port is defined and remna_server_caddy_tg_bot_jolymmiels_external_port %}:${EXTERNAL_PORT}{% endif %}"
-      caddy.import: "logging ${DOMAIN_FOR_CADDY}-remna-tg-bot-jolymmiels"
-      {% raw %}caddy.reverse_proxy: "{{ upstreams ${HEALTH_CHECK_PORT} }}"{% endraw %}
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
+      caddy.handle_path.import: "logging ${DOMAIN_FOR_CADDY}-remna-tg-bot-jolymmiels-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}"
+      caddy.handle_path.basic_auth:
+      {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${HEALTH_CHECK_PORT} }}"{% endraw %}
 
     depends_on:
-      db:
+      remnawave-telegram-tgbot-jolymmiels-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}-db:
         condition: service_healthy
     volumes:
       - ./config/translations:/translations
 
-  db:
+  remnawave-telegram-tgbot-jolymmiels-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}-db:
     image: postgres:17
-    container_name: 'remnawave-telegram-shop-db'
-    hostname: remnawave-telegram-shop-db
+    container_name: '${SERVICE_NAME}-db'
+    hostname: 'db'
     restart: always
     env_file:
       - .env
@@ -29,11 +37,9 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - TZ=UTC
     networks:
-      - {{ docker_vpn_network }}
-    ports:
-      - '127.0.0.1:5432:5432'
+      - {{ network_name }}
     volumes:
-      - remnawave-telegram-shop-db-data:/var/lib/postgresql/data
+      - remnawave-telegram-shop-db-data-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}:/var/lib/postgresql/data
     healthcheck:
       test: [ 'CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}' ]
       interval: 3s
@@ -41,11 +47,12 @@ services:
       retries: 3
 
 volumes:
-  remnawave-telegram-shop-db-data:
+  remnawave-telegram-shop-db-data-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}:
     driver: local
     external: false
-    name: remnawave-telegram-shop-db-data
+    name: remnawave-telegram-shop-db-data-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}
 
 networks:
+  {{ network_name }}:
   {{ docker_vpn_network }}:
     external: true
