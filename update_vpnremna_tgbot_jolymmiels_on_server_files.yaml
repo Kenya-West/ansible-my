@@ -1,0 +1,35 @@
+---
+
+- name: Validate bot settings list length
+  hosts: vpn_remna_server_caddy
+  gather_facts: false
+  tasks:
+    - name: Fail if settings list length exceeds instance count
+      ansible.builtin.assert:
+        that:
+          - remna_server_caddy_tg_bot_settings | length <= remna_server_caddy_tg_bot_instance_count
+        fail_msg: "Bot settings list length exceeds instance count!"
+
+- name: Update files for each Telegram bot instance from Jolymmiels for Remnawave
+  hosts: vpn_remna_server_caddy
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_root_dir: "{{ remna_server_caddy_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+  tasks:
+    - name: Deploy each bot instance sequentially
+      ansible.builtin.include_tasks: update_vpnremna_tgbot_jolymmiels_on_server_files_deploy_instance.yaml
+      loop: "{{ range(0, remna_server_caddy_tg_bot_settings | length) | list }}"
+      loop_control:
+        loop_var: instance_index
+      vars:
+        remna_server_caddy_tg_bot_jolymmiels_current_index: "{{ instance_index }}"
+        project_dir: "{{ remna_server_caddy_project_structure_end_dirs.tgbot_jolymmiels | ansible.builtin.basename }}"
+        project_name: "remnawave-telegram-tgbot-jolymmiels-{{ instance_index }}"
+        source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+        source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/{{ instance_index }}"
+        dest_project_fullpath_noindex: "{{ dest_project_rootpath }}/{{ project_dir }}"
+        dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}/{{ instance_index }}"

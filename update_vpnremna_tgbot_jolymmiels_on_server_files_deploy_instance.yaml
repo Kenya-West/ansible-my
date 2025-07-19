@@ -1,0 +1,20 @@
+---
+
+- name: Copy templated files for this bot instance
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_asset_fullpath_project }}"
+        dest: "{{ dest_project_fullpath_noindex }}"
+        default_mode: "0775"
+
+- name: Restart containers for this bot instance
+  ansible.builtin.include_role:
+    name: kwtoolset/container_restart
+  vars:
+    container_restart_list:
+      - path: "{{ dest_project_fullpath }}"
+        name: "{{ project_name }}"
+        ignore_errors: false
+
