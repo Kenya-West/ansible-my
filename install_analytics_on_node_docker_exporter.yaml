@@ -24,18 +24,6 @@
           - src: "{{ source_asset_fullpath_project }}"
             dest: "{{ dest_project_rootpath }}"
             default_mode: "0775"
-    - name: ./roles/kwtoolset/container_pull
-      vars:
-        container_pull_list:
-          - path: "{{ dest_project_fullpath }}"
-            name: "{{ docker_compose_project_name }}"
-            policy: "policy"
-    - name: ./roles/kwtoolset/container_up
-      vars:
-        container_up_list:
-          - path: "{{ dest_project_fullpath }}"
-            name: "{{ docker_compose_project_name }}"
-            ignore_errors: false
 
   post_tasks:
     - name: Add port {{ docker_metrics_addr_port }} to UFW from Docker network
