@@ -28,7 +28,7 @@
       become_user: root
 
   post_tasks:
-    - name: Add port {{ node_exporter_web_listen_address_port | default('') }} to UFW from Docker network
+    - name: Add port {{ node_exporter_web_listen_address_port_internal | default('') }} to UFW from Docker network
       become: true
       become_user: root
       community.general.ufw:
@@ -36,8 +36,8 @@
         direction: in
         proto: tcp
         from_ip: 172.16.0.0/12
-        to_port: "{{ node_exporter_web_listen_address_port | default(omit) }}"
+        to_port: "{{ node_exporter_web_listen_address_port_internal | default(omit) }}"
       when:
         - node_exporter_web_listen_address_host is defined
         - node_exporter_web_listen_address_host | regex_search('^172')
-        - node_exporter_web_listen_address_port is defined
+        - node_exporter_web_listen_address_port_internal is defined
