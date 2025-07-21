@@ -20,10 +20,7 @@
       {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
 
       {# 3. Metrics path logic #}
-      {%- set metrics_path = (hv.cadvisor_proxy_server_url_path | default(hv.cadvisor_web_telemetry_path) | default('/metrics')) -%}
-      {%- if not metrics_path -%}
-        {%- set metrics_path = '/metrics' -%}
-      {%- endif -%}
+      {%- set metrics_path = (hv.cadvisor_proxy_server_url_path | default(hv.cadvisor_web_telemetry_path) | default('/metrics', true)) -%}
 
       {# 4. Hostname logic #}
       {%- set hostname = hv.get('cadvisor_proxy_server_label', hv.inventory_hostname) -%}
