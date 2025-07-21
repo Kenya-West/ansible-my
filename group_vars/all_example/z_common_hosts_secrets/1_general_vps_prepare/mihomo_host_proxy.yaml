@@ -1,0 +1,5 @@
+# XRay server you connect
+mihomo_host_proxy_server_address: <domain>
+# List of UUIDs
+mihomo_host_proxy_users:
+  - <uuid>

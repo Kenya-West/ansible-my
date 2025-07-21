@@ -1,0 +1,63 @@
+- name: Ensure the file mihomo exists in local temp directory
+  ansible.builtin.stat:
+    path: temp/mihomo
+  register: mihomo_file
+  delegate_to: localhost
+
+- name: Fail if mihomo file does not exist
+  ansible.builtin.fail:
+    msg: "The mihomo file does not exist in the temp directory. Please download it from: https://github.com/MetaCubeX/mihomo/releases/latest or by running command: eget MetaCubeX/mihomo --to ./temp/ --asset ^compatible --asset ^go --asset amd64 --asset gz"
+  when: not mihomo_file.stat.exists
+
+- name: Copy the mihomo file to the remote host
+  become: true
+  become_user: root
+  ansible.builtin.copy:
+    src: temp/mihomo
+    dest: /usr/local/bin/mihomo
+    mode: '0755'
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+
+- name: Template and copy the config file
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/copy_files_templating
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_asset_fullpath_common }}/config"
+        dest: "{{ dest_project_fullpath }}"
+        default_mode: "0775"
+      - src: "{{ source_asset_fullpath_project }}/config"
+        dest: "{{ dest_project_fullpath }}"
+        default_mode: "0775"
+
+- name: Stop mihomo service if it exists
+  become: true
+  become_user: root
+  ansible.builtin.systemd:
+    name: mihomo.service
+    state: stopped
+  ignore_errors: true
+
+- name: Create mihomo systemd unit
+  become: true
+  become_user: root
+  ansible.builtin.template:
+    src: "{{ source_asset_fullpath_common }}/systemd/service.j2"
+    dest: /etc/systemd/system/mihomo.service
+    mode: '0644'
+
+- name: Reload systemd to recognize the new mihomo service
+  become: true
+  become_user: root
+  ansible.builtin.systemd:
+    daemon_reload: true
+  ignore_errors: true
+
+- name: Start and enable mihomo service
+  become: true
+  become_user: root
+  ansible.builtin.systemd:
+    name: mihomo.service
+    state: started
+    enabled: true
