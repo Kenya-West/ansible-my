@@ -1,0 +1,7 @@
+micro_settings:
+  colorscheme: kwtheme
+  mkparents: true
+  scrollbar: true
+
+micro_plugins:
+  - name: filemanager
