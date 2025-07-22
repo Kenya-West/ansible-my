@@ -1,0 +1,19 @@
+- name: Get list of services defined in docker-compose.yml
+  command: yq eval '.services | keys | .[]' docker-compose.yml
+  register: __container_stop_down_services_list
+  when: container_stop_down_yq_installed is not failed and container_stop_down_yq_installed.stdout != ""
+  failed_when:
+    - __container_stop_down_services_list.rc != 0
+    - __container_stop_down_services_list.rc != 1
+
+- name: Stop and down Docker Compose project for each service
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    project_name: "{{ container_stop_down_service }}"
+    files:
+      - docker-compose.yml
+    state: absent
+  loop: "{{ __container_stop_down_services_list.stdout_lines }}"
+  loop_control:
+    loop_var: container_stop_down_service
+  ignore_errors: true

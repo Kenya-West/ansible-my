@@ -20,10 +20,7 @@
       {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
 
       {# 3. Metrics path #}
-      {%- set metrics_path = (hv.blackbox_web_telemetry_path|default('')) -%}
-      {%- if not metrics_path -%}
-        {%- set metrics_path = '' -%}
-      {%- endif -%}
+      {%- set metrics_path = (hv.blackbox_web_telemetry_path  | default('/metrics', true)) -%}
 
       {# 4. Hostname logic #}
       {%- set hostname = hv.inventory_hostname -%}

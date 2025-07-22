@@ -27,4 +27,4 @@
   loop: "{{ container_up_list_filtered }}"
   loop_control:
     loop_var: item
-  when: container_stop_down_list_filtered | length > 0
+  when: container_up_list_filtered | length > 0

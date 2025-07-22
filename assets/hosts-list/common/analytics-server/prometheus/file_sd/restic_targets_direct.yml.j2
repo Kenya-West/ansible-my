@@ -20,10 +20,7 @@
       {%- set final_target = target_hostname ~ (':' ~ port if port is defined else '') -%}
 
       {# 3. Metrics path #}
-      {%- set metrics_path = hv.restic_web_telemetry_path -%}
-      {%- if not metrics_path -%}
-        {%- set metrics_path = '/metrics' -%}
-      {%- endif -%}
+      {%- set metrics_path = hv.restic_web_telemetry_path | default('/metrics', true) -%}
 
       {# 4. Hostname logic #}
       {%- set hostname = hv.inventory_hostname -%}

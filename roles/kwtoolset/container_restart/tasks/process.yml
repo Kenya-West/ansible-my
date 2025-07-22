@@ -1,0 +1,33 @@
+- name: Get dirname of the project
+  set_fact:
+    container_restart_service_dirname: "{{ item.path | basename }}"
+
+- name: Get list of services defined in docker-compose.yml
+  command: yq eval '.services | keys | .[]' docker-compose.yml
+  register: container_restart_services_list
+  when: container_restart_yq_installed is not failed and container_restart_yq_installed.stdout != ""
+  failed_when:
+    - container_restart_services_list.rc != 0
+    - container_restart_services_list.rc != 1
+
+- name: Docker Compose project - container restart
+  community.docker.docker_compose_v2:
+    project_src: "{{ item.path }}"
+    project_name: "{{ item.name | default(container_restart_service_dirname) }}"
+    files:
+      - docker-compose.yml
+    state: restarted
+  register: container_restart_running
+  ignore_errors: "{{ item.ignore_errors | default(false) }}"
+
+- name: Verify that list of services is running
+  shell: docker compose -p "{{ container_restart_service_dirname }}" ps --format {% raw %}'{{.Names}}'{% endraw %} | grep -w "{{ container_restart_services_service }}"
+  args:
+    chdir: "{{ item.path }}"
+  register: container_restart_services_running
+  loop: "{{ container_restart_services_list.stdout_lines }}"
+  loop_control:
+    loop_var: container_restart_services_service
+  when:
+    - container_restart_yq_installed is not failed and container_restart_yq_installed.stdout != ""
+  failed_when: container_restart_services_running.stdout == ""

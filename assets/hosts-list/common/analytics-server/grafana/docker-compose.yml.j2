@@ -4,12 +4,14 @@ services:
     container_name: grafana
     cpus: 0.5
     mem_limit: 200m
+    env_file:
+      - .env
     volumes:
       - ./grafana_data:/var/lib/grafana
     networks:
       - caddy
     labels:
-      caddy: "${DOMAIN}:${EXTERNAL_PORT}"
+      caddy: "${DOMAIN}:{% if grafana_web_external_port is defined and grafana_web_external_port %}:${EXTERNAL_PORT}{% endif %}"
       caddy.import: "logging ${DOMAIN}"
       {% raw %}caddy.0_reverse_proxy: "{{ upstreams 3000 }}"{% endraw %}
 

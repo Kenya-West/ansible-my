@@ -1,0 +1,70 @@
+---
+- name: Configure configs for broot
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  vars:
+    project_dir: "{{ general_vps_prepare_project_structure_end_dirs.broot | ansible.builtin.basename }}"
+    project_root_dir: "{{ general_vps_prepare_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/.config/broot"
+
+  tasks:
+    - name: Ensure broot directory exists
+      ansible.builtin.file:
+        path: "{{ dest_project_rootpath }}"
+        state: directory
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+
+    - name: Check if broot is installed
+      ansible.builtin.shell: command -v broot
+      register: broot_path
+      failed_when: broot_path.stdout == ''
+
+    - name: Launch broot to install in shell
+      ansible.builtin.shell: broot --install
+
+    - name: Copy config for broot from common assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_common }}/conf.hjson.j2"
+        dest: "{{ dest_project_rootpath }}/conf.hjson"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+    - name: Copy config for broot from project assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_project }}/conf.hjson.j2"
+        dest: "{{ dest_project_rootpath }}/conf.hjson"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+      ignore_errors: true
+    
+    - name: Create skins directory
+      ansible.builtin.file:
+        path: "{{ dest_project_rootpath }}/skins"
+        state: directory
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0700"
+    - name: Copy colorscheme for broot from common assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_common }}/skins/kwtheme.hjson.j2"
+        dest: "{{ dest_project_rootpath }}/skins/kwtheme.hjson"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+    - name: Copy colorscheme for broot from project assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_project }}/skins/kwtheme.hjson.j2"
+        dest: "{{ dest_project_rootpath }}/skins/kwtheme.hjson"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+      ignore_errors: true

@@ -1,0 +1,26 @@
+---
+services:
+  xray-checker:
+    image: kutovoys/xray-checker
+    cpus: 0.5
+    mem_limit: 200m
+    container_name: "${SERVICE_NAME}"
+    env_file:
+      - .env
+    networks:
+      - {{ docker_vpn_network }}
+    labels:
+      caddy: "${SERVICE_DOMAIN}"
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
+      caddy.handle_path.import: "logging ${SERVICE_DOMAIN}-xray-checker"
+      caddy.handle_path.basic_auth:
+{% for user in xray_checker_server_users %}
+      caddy.handle_path.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
+{% endfor %}
+      {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+
+    restart: unless-stopped
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true

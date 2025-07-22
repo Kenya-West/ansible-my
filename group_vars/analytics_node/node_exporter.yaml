@@ -1,10 +1,13 @@
 # The commented vars should be set in host_vars or in playbook
+# Custom vars
+node_exporter_web_telemetry_path_external: "/{{ path_to_internal_services_predefined_full }}/node_exporter/metrics"
+node_exporter_web_telemetry_path_internal: /metrics
 
+# Node exporter role vars
 node_exporter_system_group: node-exp
 node_exporter_system_user: node-exp
 node_exporter_binary_install_dir: /usr/local/bin
-node_exporter_web_telemetry_path: "/{{ path_to_internal_services_predefined_full }}/node_exporter/metrics"
-node_exporter_web_telemetry_path_internal: /metrics
+node_exporter_web_telemetry_path: "{{ node_exporter_web_telemetry_path_internal }}"
 node_exporter_web_listen_address_host: 172.17.0.1
 node_exporter_web_listen_address_port_internal: 9100
 node_exporter_web_listen_address: "{{ node_exporter_web_listen_address_host }}:{{ node_exporter_web_listen_address_port_internal }}"

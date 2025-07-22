@@ -1,0 +1,71 @@
+---
+- name: Configure configs for micro
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  vars:
+    project_dir: "{{ general_vps_prepare_project_structure_end_dirs.micro | ansible.builtin.basename }}"
+    project_root_dir: "{{ general_vps_prepare_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/.config/micro"
+
+  tasks:
+    - name: Ensure micro directory exists
+      ansible.builtin.file:
+        path: "{{ dest_project_rootpath }}"
+        state: directory
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0770"
+
+    - name: Check if micro editor is installed
+      ansible.builtin.shell: command -v micro
+      register: micro_path
+      failed_when: micro_path.stdout == ''
+
+    - name: Launch micro to install plugins
+      ansible.builtin.shell: micro -plugin install {{ item.name }}
+      with_items: "{{ micro_plugins }}"
+
+    - name: Copy config for micro from common assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_common }}/settings.json.j2"
+        dest: "{{ dest_project_rootpath }}/settings.json"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0600"
+    - name: Copy config for micro from project assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_project }}/settings.json.j2"
+        dest: "{{ dest_project_rootpath }}/settings.json"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0600"
+      ignore_errors: true
+    
+    - name: Create colorschemes directory
+      ansible.builtin.file:
+        path: "{{ dest_project_rootpath }}/colorschemes"
+        state: directory
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0700"
+    - name: Copy colorscheme for micro from common assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_common }}/colorschemes/kwtheme.micro.j2"
+        dest: "{{ dest_project_rootpath }}/colorschemes/kwtheme.micro"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0600"
+    - name: Copy colorscheme for micro from project assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_project }}/colorschemes/kwtheme.micro.j2"
+        dest: "{{ dest_project_rootpath }}/colorschemes/kwtheme.micro"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0600"
+      ignore_errors: true
