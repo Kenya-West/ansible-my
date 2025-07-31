@@ -5,18 +5,82 @@
 [![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=Prometheus&logoColor=white)](https://prometheus.io/)
 [![Grafana](https://img.shields.io/badge/grafana-%23F46800.svg?style=for-the-badge&logo=grafana&logoColor=white)](https://grafana.com/)
 
-A comprehensive Ansible automation suite for managing VPS/server infrastructure, focusing on VPN services, monitoring, backups, and security hardening.
+An opinionated and comprehensive Ansible automation suite for managing VPS infrastructure, focusing on VPN services, monitoring, backups, and security hardening.
+
+## 📖 Terms agreements
+
+- **VPS** = server = (control) node;
+- **Central server**: a server where `analytics_server` group is deployed;
+- **(Control) Node server**: a server where no `*_server` group is deployed, and where `vpn_caddy`, `analytics_node`, and `backup_restic_node` groups are deployed;
+- **VPN** ≈ proxy. Sorry for this, but most of the time clients for proxies are called VPN clients and do work using TUN, mostly. So we refer to VPNs as a proxies in this project.
+
+## 💭 Built with key concepts in mind
+
+- VPS should be as autonomous as possible. That means:
+   - No unnecessary connection should link your server;
+   - Each server acts on its own, responsible for only business that runs inside the server;
+   - Failure of one server should not affect others;
+   - Servers should not know each other;
+   - There is no central server unless it is necessary (for example, `analytics_server` group centralizes metrics gathering and only this). If necessary, it should be used only for one-direction link type, no bi-directional links allowed.
+
+- Rely on cloud/SaaS/hosted services - popular ones, industrial standards, baked by corporations, or at least having long-term support. No unnecessary custom solutions;
+
+- No SaaS or custom entities that cause VPS to depend on each other. That is why there is no, for example, a private CA that issues certificates - we use community's standard Let's Encrypt;
+
+- Every VPS should be served as multi-purpose server that:
+   - Has full set of necessary CLI and TUI apps for any data manipulation;
+   - Is a ready-to-go platform to run Docker images;
+   - Has fully-featured webserver (for our stack, it is [Caddy](https://github.com/homeall/caddy-reverse-proxy-cloudflare) based on [Lucas Lorentz' project](https://github.com/lucaslorentz/caddy-docker-proxy)) to run your apps;
+   - Can act as proxy ([Remnawave](https://github.com/remnawave/panel), [FRP](https://github.com/fatedier/frp) ([dockerized](https://github.com/snowdreamtech/frp))) and a VPN ([Wireguard](https://github.com/wg-easy/wg-easy));
+   - Could be able to backup itself (via [Autorestic](https://github.com/cupcakearmy/autorestic) to cloud storages or Restic server);
+   - Gives you a full-picture telemetry (setup `analytics_server` first, then deploy `analytics_node`) by metrics and maybe some logs (did not test logs much);
+
+- Every role is a modular [Ansible group](https://docs.ansible.com/ansible/2.9/modules/group_module.html), that means that you can omit or add server capabilities simply by editing your inventory files.
+
+## 🅰️ Key style decisions for this Ansible project
+
+- Playbooks are organized in a way that allows you to run them in any order, but they are designed to be run sequentially for a complete setup;
+- All playbooks are in plain list on root of the repository;
+- Roles in `kwtoolset` are designed to be reusable and can be used in any playbook.
+
+## 📃 Requirements
+
+Despite the approach stands for making VPS as autonomous as possible, it still needs some centralization in terms of VPN/proxying management and analytics gathering. Here are hardware requirements for all cases:
+
+1. Central server:
+
+- CPU: 1 core;
+- RAM: 4+ GB;
+- Storage: 30+ GB, SSD/NVMe preferred;
+- Location: any country that is not under heavy United states sanctions provided by SDN list from OFAC. That means correct work is not guaranteed in Russia, Belarus, Iran, North Korea, Syria, Cuba, Venezuela, and other countries that are under heavy sanction pressure.
+
+2. Node server (fully-featured: VPN, analytics, backup):
+
+- CPU: 1 core;
+- RAM: 2+ GB;
+- Storage: 20+ GB;
+- Location: possibly any.
+
+## ❔ Where do I get a VPS?
+
+Good question! I usually go with the cheapest ones that meet the requirements above. Here are some options:
+
+- [PureServers](https://pureservers.org)
+- [Rifty](https://rifty.org)
+
+      ℹ️ The developer is not affiliated with any of these services, and you should do your own research before choosing a VPS provider. It is not an offer.
 
 ## 🎯 Overview
 
 This repository provides a complete infrastructure-as-code solution for setting up and managing:
 
-- **🔧 VPS/Server Preparation**: Automated server setup with security hardening
-- **🌐 VPN Infrastructure**: Complete VPN solutions with Caddy, WireGuard, and Remnawave
-- **📊 Monitoring & Analytics**: Full observability stack with Prometheus, Grafana, and exporters
-- **💾 Backup Solutions**: Automated backup systems using Restic and Backrest
-- **🔒 Security**: UFW firewall, fail2ban, and SSH hardening
-- **🛠️ Custom Toolset**: Reusable Ansible roles for common tasks
+- **🔧 VPS/Server Preparation**: Automated server setup with package installation and security hardening;
+- **🌐 Web server**: Done with Caddy, can run or proxy anything;
+- **🌐 VPN Infrastructure**: Complete VPN solutions with WireGuard, FRP, and Remnawave;
+- **📊 Monitoring & Analytics**: Full observability stack with Prometheus, VictoriaMetrics, VictoriaLogs, Grafana, and exporters;
+- **💾 Backup Solutions**: Automated backup systems using Autorestic and Backrest;
+- **🔒 Security**: UFW firewall, fail2ban, and SSH hardening;
+- **🛠️ Custom Toolset**: Reusable Ansible roles for common tasks.
 
 ## ✨ Features
 
@@ -26,9 +90,10 @@ This repository provides a complete infrastructure-as-code solution for setting 
 - **User Management**: Automated user creation and permission management
 - **Package Management**: Support for apt, snap, and custom binary installations
 
-### 🌍 VPN & Networking
-- **VPN Servers**: WireGuard setup with Caddy as frontend reverse proxy
-- **Remnawave Panel**: VPN management interface with subscription handling
+### 🌍 VPN/proxy & Networking
+- **Caddy Web Server**: Reverse proxy with automatic HTTPS
+- **VPN Servers**: `wg-easy` setup
+- **Remnawave Panel**: VPN/proxy management interface with subscription handling
 - **FRP (Fast Reverse Proxy)**: Secure tunneling and port forwarding
 - **Network Security**: UFW firewall rules and fail2ban protection
 
@@ -41,7 +106,7 @@ This repository provides a complete infrastructure-as-code solution for setting 
 - **Alertmanager**: Intelligent alerting and notification routing
 
 ### 💾 Backup & Recovery
-- **Restic**: Encrypted, deduplicated backups with automation
+- **Autorestic**: Encrypted, deduplicated backups with automation
 - **Backrest**: PostgreSQL backup solution
 - **rclone**: Cloud storage synchronization
 - **Automated Scheduling**: Cron-based backup execution with monitoring
@@ -56,25 +121,19 @@ A collection of reusable Ansible roles for common tasks:
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Ansible Control Node                        │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │
-    ┌─────────────────────┼─────────────────────┐
-    │                     │                     │
-    ▼                     ▼                     ▼
-┌─────────┐        ┌─────────────┐        ┌─────────────┐
-│VPN Node │        │Analytics    │        │Backup Node  │
-│         │        │Server       │        │             │
-│• Caddy  │        │             │        │• Restic     │
-│• WG     │◄──────►│• Prometheus │◄──────►│• Backrest   │
-│• Remna  │        │• Grafana    │        │• rclone     │
-│• FRP    │        │• Victoria*  │        │• Autorestic │
-└─────────┘        └─────────────┘        └─────────────┘
-```
+The complete infrastructure should be as follows:
+
+![Complete infrastructe diagram](<docs/Images/Ansible-my scheme.drawio.svg>)
+
+This includes:
+- **Central Server** (blue) with Prometheus, Grafana, VictoriaMetrics, VictoriaLogs, and Pushgateway. Designed to be a single instance for entire infrastructure;
+- **Node Servers** (on the right) with VPN, Remnawave, FRP, monitoring exporters, and backup solutions. For the simplicity sake, there is only one node server on diagram above, but you can have as many as you want;
+- Outer web with you and user on the left and right sides, respectively, accessing the central server and node servers via VPN/proxy;
+- Outer web services like cloud storages, used for backups.
 
 ## 🚀 Quick Start
+
+      ℹ️ This project is aimed to work on Linux. For the sake of simplicity, it is assumed that distributive is Ubuntu 24.04+.
 
 ### Prerequisites
 
@@ -84,6 +143,10 @@ A collection of reusable Ansible roles for common tasks:
 - **sudo privileges** on target servers
 
 ### Installation
+
+Below is a short overview of the installation process.
+
+Dive into [wiki](https://github.com/Kenya-West/ansible-my/wiki/Configuration/Preparing-Ansible-environment.md) for detailed configuration steps. Here is a quick overview of what you need to do:
 
 1. **Clone the repository**:
    ```bash
@@ -106,100 +169,82 @@ A collection of reusable Ansible roles for common tasks:
 
 ### Configuration
 
-1. **Create inventory file**:
-   ```bash
-   cp inventory/production_example.ini inventory/production.ini
-   # Edit inventory/production.ini with your server details
-   ```
+The configuration of this Ansible project is quite complex. It requires hundreds of variables to be set.
 
-2. **Configure host variables**:
-   ```bash
-   # Edit files in host_vars/ and group_vars/ directories
-   ```
+Luckily, [there are playbooks](https://github.com/Kenya-West/ansible-my/wiki/Configuration/Initial-Configuration.md) that help you to set up the project the quick and simple way. Look for wiki to start with.
 
-3. **Set up SSH keys**:
-   ```bash
-   # Ensure your SSH key is added to target servers
-   ssh-copy-id user@your-server
-   ```
+Dive into wiki for detailed configuration steps.
 
 ## 📖 Usage
 
-### Complete Server Setup
+The usage process of this Ansible project is quite complex, and because it is designed for modularity, there are several ways to run it.
 
-Run the main setup playbook to prepare a server with all components:
+Look for wiki to start with.
 
-```bash
-ansible-playbook -i inventory/production.ini 0_start.yaml
-```
+### General server preparation
 
-### Targeted Operations
+You need to run the playbooks split in 3 steps to prepare a server with all components. [Look for wiki](https://github.com/Kenya-West/ansible-my/wiki/Configuration/Run-VPS-prepare.md) to start with.
 
-#### VPS Preparation
-```bash
-ansible-playbook -i inventory/production.ini general_vps_prepare_update.yaml
-ansible-playbook -i inventory/production.ini general_vps_prepare_install_packages.yaml
-```
+### Analytics node setup
 
-#### VPN Setup
-```bash
-ansible-playbook -i inventory/production.ini install_vpn_caddy.yaml
-ansible-playbook -i inventory/production.ini install_vpnremna_on_server.yaml
-```
+TBD
 
-#### Monitoring Setup
-```bash
-ansible-playbook -i inventory/production.ini install_analytics_on_server.yaml
-ansible-playbook -i inventory/production.ini install_analytics_on_node.yaml
-```
+### VPN/proxy setup on node server
 
-#### Backup Configuration
-```bash
-ansible-playbook -i inventory/production.ini install_backup_restic_on_node.yaml
-ansible-playbook -i inventory/production.ini install_backup_restic_on_server.yaml
-```
+TBD
 
-### Limiting to Specific Hosts
+### Backup node setup
 
-```bash
-ansible-playbook -i inventory/production.ini playbook.yaml --limit hostname
-```
+TBD
 
-## 📋 Inventory Configuration
+### Central server setup
 
-The inventory system supports multiple environments and server roles:
+TBD
 
-### Required Groups
+## 🎯 Project structure
 
-- **`general_vps_prepare`**: All servers requiring basic setup
-- **`vpn_caddy`**: VPN servers with Caddy frontend
-- **`analytics_node`**: Servers with monitoring exporters
-- **`analytics_server`**: Central monitoring server
-- **`backup_restic_node`**: Servers with backup clients
-- **`backup_restic_server`**: Backup storage servers
+Playbooks:
+- In root of repo, there is a list of playbooks, dedicated to specific groups of servers:
+    - `0_start_step_*.yaml`: contains automated steps to run `general_vps_prepare_*` playbooks, decomposed to smaller steps to make it easier to debug and run;
+    - `general_vps_prepare_*.yaml`: the basic setup of the node, like installing packages, configuring SSH, etc. Without this playbook, you will not be able to run any other playbooks;
+    - `install_vpn_caddy*.yaml`, `install_vpnremna_on_server_*.yaml`, `install_analytics_on_node*.yaml`, `install_analytics_on_server*.yaml`, `install_backup_on_node*.yaml`: playbooks that install specific services on the node and server, like VPN, analytics, and backup;
 
-### Example Inventory
+`group_vars`:
+- `all/`: Variables applied to all hosts
+- `all_example/`: Example global variables template
+- `analytics_node/`: Variables for the analytics_node group
+- `analytics_server/`: Variables for the analytics_server group
+- `backup_backrest_server/`: Variables for the backup_backrest_server group
+- `backup_restic_node/`: Variables for the backup_restic_node group
+- `backup_restic_server/`: Variables for the backup_restic_server group
+- `general_vps_prepare/`: Variables for the general_vps_prepare group
+- `proxy_client/`: Variables for the proxy_client group
+- `servers_with_domains/`: Variables for the servers_with_domains group
+- `vpn_caddy/`: Variables for the vpn_caddy group
+- `vpn_remna_server_caddy/`: Variables for the vpn_remna_server_caddy group
 
-```ini
-[all:vars]
-ansible_user='{{ standard_user }}'
-ansible_become=yes
-ansible_become_method=sudo
-ansible_become_pass='{{ root_password }}'
+The `all/z_common_hosts_secrets/` contains shared variables with for all roles that are considered secrets but should be shared to every host.
 
-[general_vps_prepare]
-vpn-server-1 ansible_host=192.168.1.100
-monitoring-server ansible_host=192.168.1.101
+`host_vars`:
+- `hostname-1`: Any variables that are specific to `hostname-1` a single host can be placed in `host_vars/` directory. This allows you to define host-specific configurations without cluttering the main playbooks. `hostname-1` is a placeholder for any hostname you want to configure.
 
-[vpn_caddy]
-vpn-server-1 ansible_host=192.168.1.100
+      ℹ️ The directories with hostnames are ignored by git, so you can place your secrets there without worrying about them being committed to the repository.
 
-[analytics_server]
-monitoring-server ansible_host=192.168.1.101
+`assets`:
+Contains static files and templates that are used by the playbooks. This includes:
+- `hosts-list/common` - a list of files that can be used in playbooks/roles for templating or configuration purposes. Contains files for roles:
+   - `analytics_node`: directory name `analytics-node`;
+   - `analytics_server`: directory name `analytics-server`;
+   - `backup_restic_node`: directory name `backup-restic-node`;
+   - `backup_restic_server`: directory name `backup-restic-server`;
+   - `general_vps_prepare`: directory name `general-machine-prepare`;
+   - `vpn_caddy`: directory name `vpn-caddy` and `web-features-caddy`;
+   - `vpn_remna_server_caddy`: directory name `vpn_remna_server_caddy`;
+   - `proxy_client`: directory name `proxy-client`.
 
-[analytics_node]
-vpn-server-1 ansible_host=192.168.1.100
-```
+You can create your own directories here and use them in your playbooks/roles in this path: `assets/hosts-list/<your-hostname>/`, e.g. `assets/hosts-list/hostname-1/`. All playbooks will pick files up automatically and template them like a `common` ones.
+
+      ℹ️ The directories with hostnames are ignored by git, so you can place your secrets there without worrying about them being committed to the repository.
 
 ## 🎯 Playbook Organization
 
@@ -258,65 +303,20 @@ The `roles/kwtoolset/` directory contains reusable utility roles:
 ### Archive Operations
 - **`unzip`**: File extraction utilities
 
-## 🔧 Common Workflows
-
-### Setting Up a New VPN Server
-
-1. **Add server to inventory**:
-   ```ini
-   [general_vps_prepare]
-   new-vpn-server ansible_host=YOUR_SERVER_IP
-   
-   [vpn_caddy]
-   new-vpn-server ansible_host=YOUR_SERVER_IP
-   ```
-
-2. **Configure host variables**:
-   ```bash
-   # Create host_vars/new-vpn-server.yml with server-specific settings
-   ```
-
-3. **Run setup playbooks**:
-   ```bash
-   ansible-playbook -i inventory/production.ini 0_start.yaml --limit new-vpn-server
-   ansible-playbook -i inventory/production.ini install_vpn_caddy.yaml --limit new-vpn-server
-   ```
-
-### Adding Monitoring to Existing Server
-
-1. **Update inventory**:
-   ```ini
-   [analytics_node]
-   existing-server ansible_host=YOUR_SERVER_IP
-   ```
-
-2. **Deploy monitoring**:
-   ```bash
-   ansible-playbook -i inventory/production.ini install_analytics_on_node.yaml --limit existing-server
-   ```
-
-### Setting Up Backups
-
-1. **Configure backup variables** in `group_vars/backup_restic_node.yml`
-2. **Deploy backup solution**:
-   ```bash
-   ansible-playbook -i inventory/production.ini install_backup_restic_on_node.yaml
-   ```
-
 ## 📁 Directory Structure
+
+It is a standard Ansible project structure with a few customizations to fit the project's needs. Here is an overview of the directory structure:
 
 ```
 ansible-my/
-├── 0_start*.yaml                 # Main orchestration playbooks
-├── general_vps_prepare_*.yaml    # Server preparation playbooks
-├── install_*.yaml                # Service installation playbooks
-├── remove_*.yaml                 # Service removal playbooks
+├── *.yaml                        # Playbooks
+├── action_plugins/               # Python action plugins
 ├── inventory/                    # Inventory files
 │   ├── production_example.ini
 │   └── staging_example.ini
 ├── group_vars/                   # Group-specific variables
 ├── host_vars/                    # Host-specific variables
-├── roles/                        # Ansible roles
+├── roles/                        # Ansible custom roles
 │   ├── kwtoolset/               # Custom utility roles
 │   ├── install_*/               # Installation roles
 │   └── requirements.yaml        # Role dependencies
@@ -389,6 +389,13 @@ ansible-my/
 - **Test on multiple environments**
 - **Update documentation**
 
+## 📚 Roadmap
+
+- **Make roles idempotent**: Ensure all roles can be run multiple times without side effects. For example, there are multiple `ansible.builtin.shell` tasks that do not really check if teh action needs to be performed or not;
+- **Publish reusable roles**: Extract common functionality into reusable roles for the Ansible Galaxy;
+- **Improve documentation**: Add more examples and usage scenarios;
+- **Avoid naming conflicts**: Ensure that role names and variable names do not conflict with existing Ansible Galaxy roles and own codebase. That means to add prefixes to roles and variables, e.g. `kwtoolset_` for custom roles.
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -398,6 +405,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Ansible Community**: For the amazing automation platform
 - **Role Contributors**: Authors of Galaxy roles used in this project
 - **Open Source Projects**: All the tools and services integrated
+
+Especiially:
+- Author of [template_tree](https://github.com/geluk/template_tree) script that is heavily used in this project to template and copy files.
+- TBD
 
 ---
 
