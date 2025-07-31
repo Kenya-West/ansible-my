@@ -146,7 +146,7 @@ This includes:
 
 Below is a short overview of the installation process.
 
-Dive into [wiki](https://github.com/Kenya-West/ansible-my/wiki/Configuration/Preparing-Ansible-environment.md) for detailed configuration steps. Here is a quick overview of what you need to do:
+Dive into [wiki](https://github.com/Kenya-West/ansible-my/wiki/Preparing-Ansible-environment.md) for detailed configuration steps. Here is a quick overview of what you need to do:
 
 1. **Clone the repository**:
    ```bash
@@ -171,7 +171,7 @@ Dive into [wiki](https://github.com/Kenya-West/ansible-my/wiki/Configuration/Pre
 
 The configuration of this Ansible project is quite complex. It requires hundreds of variables to be set.
 
-Luckily, [there are playbooks](https://github.com/Kenya-West/ansible-my/wiki/Configuration/Initial-Configuration.md) that help you to set up the project the quick and simple way. Look for wiki to start with.
+Luckily, [there are playbooks](https://github.com/Kenya-West/ansible-my/wiki/Initial-Configuration.md) that help you to set up the project the quick and simple way. Look for wiki to start with.
 
 Dive into wiki for detailed configuration steps.
 
@@ -183,7 +183,7 @@ Look for wiki to start with.
 
 ### General server preparation
 
-You need to run the playbooks split in 3 steps to prepare a server with all components. [Look for wiki](https://github.com/Kenya-West/ansible-my/wiki/Configuration/Run-VPS-prepare.md) to start with.
+You need to run the playbooks split in 3 steps to prepare a server with all components. [Look for wiki](https://github.com/Kenya-West/ansible-my/wiki/Run-VPS-prepare.md) to start with.
 
 ### Analytics node setup
 
