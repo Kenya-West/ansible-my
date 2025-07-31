@@ -1,0 +1,21 @@
+proxy_client_frpc_client_dashboard_password: "{{ initial_configure_generated_password_proxy_client_frpc_client_dashboard }}"
+proxy_client_frpc_client_auth_token: <sometoken>
+proxy_client_frpc_proxies:
+  - name: {%- raw -%}"{{ inventory_hostname }}"{%- endraw -%}
+    local_port: 23001
+    remote_port: 22501
+  - name: {%- raw -%}"{{ inventory_hostname }}_restic_server"{%- endraw -%}
+    type: tcp
+    local_ip: 127.0.0.1
+    local_port: {%- raw -%}"{{ restic_server_docker_vars.port }}"{%- endraw -%}
+    remote_port: 22001
+  - name: {%- raw -%}"{{ inventory_hostname }}_node_exporter"{%- endraw -%}
+    type: tcp
+    local_ip: 127.0.0.1
+    local_port: {%- raw -%}"{{ node_exporter_web_listen_address_port }}"{%- endraw -%}
+    remote_port: 22002
+  - name: {%- raw -%}"{{ inventory_hostname }}_vector_exporter"{%- endraw -%}
+    type: tcp
+    local_ip: 127.0.0.1
+    local_port: {%- raw -%}"{{ vector_exporter_external_port }}"{%- endraw -%}
+    remote_port: 22003

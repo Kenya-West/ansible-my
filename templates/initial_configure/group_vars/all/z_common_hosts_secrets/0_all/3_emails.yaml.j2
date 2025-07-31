@@ -1,0 +1,5 @@
+# Set up this only if values are different from the default, defined by you in group_vars/all/z_common_hosts_secrets directory
+
+emails:
+  main: {{ initial_configure_user_input_user_email.main | default('') }}
+  domain: {{ initial_configure_user_input_user_email.domain | default('') }}

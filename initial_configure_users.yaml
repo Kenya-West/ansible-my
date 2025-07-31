@@ -1,0 +1,39 @@
+---
+- name: Prompt for the standard username
+  ansible.builtin.pause:
+    prompt: "Enter the standard username. It will be used to update the first and default user"
+    echo: true
+  register: standard_user_variable
+  failed_when: standard_user_variable.user_input | length == 0
+
+- name: Set standard user fact
+  set_fact:
+    standard_user: "{{ standard_user_variable.user_input }}"
+
+- name: Update first user in users_to_set in group_vars/general_vps_prepare/users.yaml
+  ansible.builtin.slurp:
+    src: ./group_vars/general_vps_prepare/users.yaml
+  register: users_yaml
+
+- name: Merge new username into users_to_set and save YAML
+  ansible.builtin.set_fact:
+    merged_users_yaml: |
+      {% set data = users_yaml.content | b64decode | from_yaml %}
+      {% set _ = data.users_to_set.__setitem__(0, (data.users_to_set[0] | combine({'name': standard_user_variable.user_input}))) %}
+      {{ data }}
+  when: standard_user_variable is defined and standard_user_variable.user_input | length > 0
+
+- name: Save merged YAML in group_vars/general_vps_prepare/users.yaml
+  ansible.builtin.copy:
+    dest: ./group_vars/general_vps_prepare/users.yaml
+    content: "{{ merged_users_yaml | to_nice_yaml }}"
+    backup: yes
+
+- name: Copy templated files from group_vars_initial/all/z_common_hosts_secrets
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ playbook_dir }}/templates/initial_configure/group_vars_initial/all/z_common_hosts_secrets"
+        dest: "{{ playbook_dir }}/group_vars/all"
+        default_mode: "0775"

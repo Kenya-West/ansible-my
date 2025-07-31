@@ -1,0 +1,12 @@
+mongodb_exporter_endpoints:
+  - name: <your-name-just-for-description-purpose>
+    schema: mongodb # or mongodb+srv
+    user: <username>
+    password: "{{ initial_configure_generated_password_analytics_server_mongodb_exporter }}"
+    host: localhost
+    port: 27017
+    database: admin
+    searchParams:
+      authSource: admin
+      retryWrites: "true" # Needed to preserve string value
+      w: majority

@@ -1,0 +1,14 @@
+# Here you put any access tokens needed for General VPS Prepare to run
+# These tokens are completely optional
+# but they are rising up rate limits for GitHub API for eget and deb-get
+# from 60 to 5000 requests per hour.
+# So it is recommended to put them here. To create them go to: https://github.com/settings/tokens
+
+github_api_token_eget: {{ initial_configure_user_input_gh_token.eget | default('') }}
+github_api_token_debget: {{ initial_configure_user_input_gh_token.debget | default('') }}
+
+# This one you create on Cloudflare
+# the access token should have permissions to manage DNS records
+
+acme_email: {{ initial_configure_user_input_acme_email if (initial_configure_user_input_acme_email is defined and initial_configure_user_input_acme_email | length > 0) else initial_configure_user_input_user_email.domain }}
+cloudflare_api_token_dns: {{ initial_configure_user_input_cloudflare_api_token_dns | default('') }}

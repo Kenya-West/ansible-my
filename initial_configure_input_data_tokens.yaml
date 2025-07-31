@@ -1,0 +1,57 @@
+---
+- name: Create initial_configure_user_input_gh_token fact
+  ansible.builtin.set_fact:
+    initial_configure_user_input_gh_token: {}
+
+- name: Prompt for the eget token
+  ansible.builtin.pause:
+    prompt: "Enter the GitHub API token for eget. It will be used for downloading binary packages. Leave empty and press enter if you have none."
+    echo: true
+  register: __initial_configure_user_input_gh_token_eget
+  failed_when:
+    - (__initial_configure_user_input_gh_token_eget.user_input | length > 0) and (__initial_configure_user_input_gh_token_eget.user_input | length < 35)
+    - (__initial_configure_user_input_gh_token_eget.user_input | length > 0) and ("ghp_" not in __initial_configure_user_input_gh_token_eget.user_input)
+
+- name: Prompt for the debget token
+  ansible.builtin.pause:
+    prompt: "Enter the GitHub API token for debget. Leave empty and press enter if you want to use the same token as for eget."
+    echo: true
+  register: __initial_configure_user_input_gh_token_debget
+  failed_when:
+    - (__initial_configure_user_input_gh_token_debget.user_input | length > 0) and (__initial_configure_user_input_gh_token_debget.user_input | length < 35)
+    - (__initial_configure_user_input_gh_token_debget.user_input | length > 0) and ("ghp_" not in __initial_configure_user_input_gh_token_debget.user_input)
+
+- name: Set debget token fact
+  ansible.builtin.set_fact:
+    initial_configure_user_input_gh_token:
+      eget: "{{ __initial_configure_user_input_gh_token_eget.user_input }}"
+      debget: >-
+        {{ __initial_configure_user_input_gh_token_debget.user_input
+            if (__initial_configure_user_input_gh_token_debget.user_input is defined and __initial_configure_user_input_gh_token_debget.user_input | length > 0)
+            else __initial_configure_user_input_gh_token_eget.user_input }}
+
+- name: Prompt for the ACME email for domains
+  ansible.builtin.pause:
+    prompt: "Enter the email for domains you used in your domain registar. Leave empty and press enter if you have none."
+    echo: true
+  register: __initial_configure_user_input_acme_email
+  failed_when:
+    - (__initial_configure_user_input_acme_email.user_input | length > 0) and (__initial_configure_user_input_acme_email.user_input | length < 5)
+    - (__initial_configure_user_input_acme_email.user_input | length > 0) and ("@" not in __initial_configure_user_input_acme_email.user_input or "." not in __initial_configure_user_input_acme_email.user_input)
+
+- name: Set ACME email fact
+  ansible.builtin.set_fact:
+    initial_configure_user_input_acme_email: "{{ __initial_configure_user_input_acme_email.user_input }}"
+
+- name: Prompt for Cloudflare API token for DNS management
+  ansible.builtin.pause:
+    prompt: "Enter the Cloudflare API token for DNS management. Leave empty and press enter if you have none."
+    echo: true
+  register: __initial_configure_user_input_cf_token
+  failed_when:
+    - (__initial_configure_user_input_cf_token.user_input | length > 0) and (__initial_configure_user_input_cf_token.user_input | length < 35)
+    - (__initial_configure_user_input_cf_token.user_input | length > 0) and ("-" not in __initial_configure_user_input_cf_token.user_input)
+
+- name: Set Cloudflare API token fact
+  ansible.builtin.set_fact:
+    initial_configure_user_input_cloudflare_api_token_dns: "{{ __initial_configure_user_input_cf_token.user_input }}"

@@ -1,0 +1,7 @@
+frps_exporter_server_users:
+  - name: client
+    password: "{{ initial_configure_generated_password_analytics_node_frps_exporter_client }}"
+    hash_scheme: bcrypt
+  - name: prometheus
+    password: "{{ initial_configure_generated_password_analytics_node_frps_exporter_prometheus }}"
+    hash_scheme: bcrypt

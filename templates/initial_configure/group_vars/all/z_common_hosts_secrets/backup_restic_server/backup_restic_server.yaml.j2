@@ -1,0 +1,19 @@
+restic_server_users:
+  - name: vps
+    password: "{{ initial_configure_generated_password_backup_restic_server }}"
+    hash_scheme: bcrypt
+
+{% raw %}
+# If you are using a proxy server to expose some of host ports the Internet, set the following vars
+# restic_server_proxy_server_label: "{{ inventory_hostname }}" # also optional but if you want other label than hostname in Prometheus, set it there
+# restic_server_proxy_server_list:
+#   - hostname: sub-frps.example.tld              # Domain with FRP server
+#     url_port: 443                               # Port of FRP server defined in config
+#     url_path: "/{{ path_to_internal_services_predefined_full }}/frps/proxy/web/22010/metrics"   # Path to access the node_exporter metrics from Internet (by Prometheus)
+#   - hostname: sub-frps.example.tld
+#     url_port: 443
+#     url_path: "/{{ path_to_internal_services_predefined_full }}/frps/proxy/web/22011/metrics"
+#   - hostname: sub-frps.example.tld
+#     url_port: 443
+#     url_path: "/{{ path_to_internal_services_predefined_full }}/frps/proxy/web/22012/metrics"
+{% endraw %}

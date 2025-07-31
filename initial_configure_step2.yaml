@@ -1,0 +1,16 @@
+---
+
+- name: Run initial configuration tasks
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Include initial configuration user input emails playbook
+      include_tasks: initial_configure_input_data_emails.yaml
+    - name: Include initial configuration user input tokens playbook
+      include_tasks: initial_configure_input_data_tokens.yaml
+    - name: Include initial configuration secrets playbook
+      include_tasks: initial_configure_secrets.yaml
+    - name: Include initial configuration populate common secrets playbook
+      include_tasks: initial_configure_populate_common_secrets.yaml
+

@@ -1,0 +1,25 @@
+backup_restic_node_locations:
+  home_user:
+    from: "/home/{{ standard_user }}"
+    to:
+      - <your_location_name>
+      - <your_location2_name>
+    cron: "0 */2 * * *"
+    options:
+      tobereplacedwith: "complete_options"
+  shared_ssl:
+    from: "{{ cert_location_root_path }}"
+    to:
+      - <your_location_name>
+      - <your_location2_name>
+    cron: "0 0 * * FRI"
+    options:
+      tobereplacedwith: "complete_options"
+
+backup_restic_node_remotes:
+    your_location_name:
+      type: rclone
+      path: "your_location_name:/somepath/{{ inventory_hostname }}/"
+    your_location_name2:
+      type: rclone
+      path: "your_location_name2:/somepath/{{ inventory_hostname }}/"
