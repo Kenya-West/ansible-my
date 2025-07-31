@@ -1,0 +1,4 @@
+domains_keys:
+  main: {{ initial_configure_host_domain_name | default('') }}
+  xray_under_dns_balancer: {{ initial_configure_host_xray_domain_name | default('') }}
+domains: {% raw %}"{{ domains_keys.values() | list | unique }}"{% endraw %}

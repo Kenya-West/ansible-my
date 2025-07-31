@@ -1,0 +1,93 @@
+---
+
+- name: Create basic host configuration
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Prompt for the hostname
+      ansible.builtin.pause:
+        prompt: "Enter the hostname. It will be used to update the first and default user"
+        echo: true
+      register: __hostname_variable
+      failed_when: __hostname_variable.user_input | length == 0
+
+    - name: Set hostname fact
+      set_fact:
+        initial_configure_host_hostname: "{{ __hostname_variable.user_input }}"
+    
+    - name: Check if hosname directory exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}"
+      register: __hostname_dir_stat
+    
+    - name: Fail if hostname directory already exists
+      ansible.builtin.fail:
+        msg: "The host directory {{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }} already exists. Aborting."
+      when: __hostname_dir_stat.stat.exists
+
+    - name: Prompt for the IP address
+      ansible.builtin.pause:
+        prompt: "Enter the IP address. It will be used to update the first and default user"
+        echo: true
+      register: __ip_address_variable
+      failed_when: (__ip_address_variable.user_input | length == 0) or (__ip_address_variable.user_input | length > 15)
+
+    - name: Set IP address fact
+      set_fact:
+        initial_configure_host_ip_address: "{{ __ip_address_variable.user_input }}"
+
+    - name: Prompt for the domain name
+      ansible.builtin.pause:
+        prompt: "Enter the domain name. Usually, it is a subdomain, like sub.example.tld. It will be used to update the first and default user. You can leave it empty if you do not need it."
+        echo: true
+      register: __domain_name_variable
+
+    - name: Set domain name fact
+      set_fact:
+        initial_configure_host_domain_name: "{{ __domain_name_variable.user_input }}"
+
+    - name: Prompt for the domain name of XRay load balancer
+      ansible.builtin.pause:
+        prompt: "Enter the domain name if your host takes a part in DNS load balancing. Usually, it is a subdomain, like sub.example.tld. It will be used to update the first and default user. You can leave it empty if you do not need it."
+        echo: true
+      register: __xray_domain_name_variable
+
+    - name: Set domain name fact
+      set_fact:
+        initial_configure_host_xray_domain_name: "{{ __xray_domain_name_variable.user_input }}"
+
+    - name: Copy templated files from group_vars_initial/all/z_common_hosts_secrets
+      ansible.builtin.include_role:
+        name: kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ playbook_dir }}/templates/initial_configure/host/"
+            dest: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}"
+            default_mode: "0775"
+
+    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[general_vps_prepare]" in inventory/production.ini
+      community.general.ini_file:
+        path: "{{ playbook_dir }}/inventory/production.ini"
+        section: general_vps_prepare
+        option: "{{ initial_configure_host_hostname }} ansible_host"
+        value: "{{ initial_configure_host_ip_address }}"
+        backup: true
+    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[vpn_caddy]" in inventory/production.ini
+      community.general.ini_file:
+        path: "{{ playbook_dir }}/inventory/production.ini"
+        section: vpn_caddy
+        option: "{{ initial_configure_host_hostname }} ansible_host"
+        value: "{{ initial_configure_host_ip_address }}"
+    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[analytics_node]" in inventory/production.ini
+      community.general.ini_file:
+        path: "{{ playbook_dir }}/inventory/production.ini"
+        section: analytics_node
+        option: "; {{ initial_configure_host_hostname }} ansible_host"
+        value: "{{ initial_configure_host_ip_address }}"
+    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[backup_restic_node]" in inventory/production.ini
+      community.general.ini_file:
+        path: "{{ playbook_dir }}/inventory/production.ini"
+        section: backup_restic_node
+        option: "; {{ initial_configure_host_hostname }} ansible_host"
+        value: "{{ initial_configure_host_ip_address }}"

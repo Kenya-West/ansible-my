@@ -1,0 +1,80 @@
+[all:vars]
+ansible_user={% raw %}'{{ standard_user }}'{% endraw %}
+ansible_become=yes
+ansible_become_method=sudo
+ansible_become_pass={% raw %}'{{ root_password }}'{% endraw %}
+ansible_python_interpreter='/usr/bin/env python3'
+
+# Your node hosts should be in the following sections:
+# 1. general_vps_prepare - for all hosts
+# 2. vpn_caddy - for all hosts that will be used as VPN hosts (with Remnawave node as frontier web server, caddy in behind)
+# 3. analytics_node - for all hosts that will be used as analytics nodes
+# 4. backup_restic_node - for all hosts that will be used as backup Restic nodes
+# 5. servers_vpn - for all hosts that will be used as VPN servers
+# 6. servers_with_domains - for all hosts that will be used with domains
+
+# Your server hosts should be in the following sections:
+# 1. general_vps_prepare - for all hosts
+# 2. vpn_caddy - with variable caddy_occupy_HTTPS == true to use Caddy as frontier web server
+# 3. analytics_server - for the host that will be used as analytics server
+
+# These are hosts that are configured with opinionated setup, including:
+# SSH keys, shell configuration, certain packages, package managers, Docker Compose
+[general_vps_prepare]
+localhost ansible_connection=local
+; host-analytics-server ansible_host=111.222.333.448 # Host for analytics server
+; host-vpn-1 ansible_host=111.222.333.444 # Host for VPN
+; host-vpn-2 ansible_host=111.222.333.445 # Host for VPN 2
+; host-proxy-client-1 ansible_host=111.222.333.449 # Host for proxy client
+
+# Hosts that are used as both web servers and VPN servers
+[vpn_caddy]
+localhost ansible_connection=local
+; host-vpn-1 ansible_host=111.222.333.444 # Host for VPN
+; host-vpn-2 ansible_host=111.222.333.445 # Host for VPN 2
+
+
+# These are servers that will be used as nodes hosting node_exporter
+[analytics_node]
+localhost ansible_connection=local
+; host-vpn-1 ansible_host=111.222.333.444 # Host for VPN
+; host-vpn-2 ansible_host=111.222.333.445 # Host for VPN 2
+
+# There may be one server in this section that hosts Prometheus
+# It receives analytics data from all hosts defined in analytics_node
+[analytics_server]
+localhost ansible_connection=local
+; host-analytics-server ansible_host=111.222.333.448 # Host for analytics server
+
+# These are server that are connected via proxy to other servers
+[proxy_client]
+localhost ansible_connection=local
+; host-proxy-client-1 ansible_host=111.222.333.449 # Host for proxy client
+
+[backup_restic_server]
+localhost ansible_connection=local
+; host-backup-restic-server ansible_host=111.222.333.449 # Host for backup Restic server
+
+[backup_backrest_server]
+localhost ansible_connection=local
+; host-backup-backrest-server ansible_host=111.222.333.450 # Host for backup Backrest server
+
+[backup_restic_node]
+localhost ansible_connection=local
+; host-backup-restic-node ansible_host=111.222.333.450 # Host for backup Restic server
+
+# These are groups of servers that are utilized as...
+# ... VPN servers with Caddy as frontier web server
+[servers_vpn:children]
+general_vps_prepare
+vpn_caddy
+analytics_node
+
+[servers_with_domains:children]
+vpn_caddy
+analytics_node
+
+# The above two groups are used when you run the playbook with --limit option, passing hostname of the server in value
+
+# You are free to create other groups but the defined ones are necessary.
+# Happy populating! 

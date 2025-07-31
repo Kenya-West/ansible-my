@@ -1,0 +1,77 @@
+---
+- name: Check if inventory exists
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/inventory"
+  register: initial_configure_groupvars_all_secrets_dir
+  delegate_to: localhost
+
+- name: Create inventory if it does not exist
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/inventory"
+    state: directory
+  when: not initial_configure_groupvars_all_secrets_dir.stat.exists
+  delegate_to: localhost
+
+- name: Check if inventory/production.ini exists
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+  register: initial_configure_inventory_production_ini
+  delegate_to: localhost
+
+- name: Template inventory file if it does not exist
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/initial_configure/inventory/production.ini.j2"
+    dest: "{{ playbook_dir }}/inventory/production.ini"
+    mode: "0644"
+  when: not initial_configure_inventory_production_ini.stat.exists
+  delegate_to: localhost
+
+- name: Ensure "localhost ansible_connection=local is in section "[general_vps_prepare]" in inventory/production.ini
+  community.general.ini_file:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    section: general_vps_prepare
+    option: localhost ansible_connection
+    value: local
+    backup: true
+- name: Ensure "localhost ansible_connection=local is in section "[vpn_caddy]" in inventory/production.ini
+  community.general.ini_file:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    section: vpn_caddy
+    option: localhost ansible_connection
+    value: local
+- name: Ensure "localhost ansible_connection=local is in section "[analytics_node]" in inventory/production.ini
+  community.general.ini_file:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    section: analytics_node
+    option: localhost ansible_connection
+    value: local
+- name: Ensure "localhost ansible_connection=local is in section "[analytics_server]" in inventory/production.ini
+  community.general.ini_file:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    section: analytics_server
+    option: localhost ansible_connection
+    value: local
+- name: Ensure "localhost ansible_connection=local is in section "[proxy_client]" in inventory/production.ini
+  community.general.ini_file:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    section: proxy_client
+    option: localhost ansible_connection
+    value: local
+- name: Ensure "localhost ansible_connection=local is in section "[backup_restic_server]" in inventory/production.ini
+  community.general.ini_file:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    section: backup_restic_server
+    option: localhost ansible_connection
+    value: local
+- name: Ensure "localhost ansible_connection=local is in section "[backup_backrest_server]" in inventory/production.ini
+  community.general.ini_file:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    section: backup_backrest_server
+    option: localhost ansible_connection
+    value: local
+- name: Ensure "localhost ansible_connection=local is in section "[backup_restic_node]" in inventory/production.ini
+  community.general.ini_file:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    section: backup_restic_node
+    option: localhost ansible_connection
+    value: local

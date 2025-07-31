@@ -1,0 +1,31 @@
+---
+- name: Create initial_configure_user_input_user_email fact
+  ansible.builtin.set_fact:
+    initial_configure_user_input_user_email: {}
+
+- name: Prompt for the main email address
+  ansible.builtin.pause:
+    prompt: "Enter the main email address. Currently, it is not used but you can type here the email linked to domain registar for convenience."
+    echo: true
+  register: __initial_configure_user_input_user_email
+  failed_when:
+    - __initial_configure_user_input_user_email.user_input | length < 5
+    - "'@' not in __initial_configure_user_input_user_email.user_input or '.' not in __initial_configure_user_input_user_email.user_input"
+
+- name: Prompt for the domain email address
+  ansible.builtin.pause:
+    prompt: "Enter the domain email address. If it is the same, you can just press enter and then previous email will be used."
+    echo: true
+  register: __initial_configure_user_input_user_email_domain
+  failed_when:
+    - (__initial_configure_user_input_user_email_domain.user_input | length > 0) and (__initial_configure_user_input_user_email_domain.user_input | length < 5)
+    - (__initial_configure_user_input_user_email_domain.user_input | length > 0) and ("@" not in __initial_configure_user_input_user_email_domain.user_input or "." not in __initial_configure_user_input_user_email_domain.user_input)
+
+- name: Set domain email fact
+  ansible.builtin.set_fact:
+    initial_configure_user_input_user_email:
+      main: "{{ __initial_configure_user_input_user_email.user_input }}"
+      domain: >-
+        {{ __initial_configure_user_input_user_email_domain.user_input
+            if (__initial_configure_user_input_user_email_domain.user_input is defined and __initial_configure_user_input_user_email_domain.user_input | length > 0)
+            else __initial_configure_user_input_user_email.user_input }}

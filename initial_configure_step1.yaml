@@ -1,0 +1,12 @@
+---
+
+- name: Run initial configuration tasks (step 1)
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Include initial configuration for inventory
+      include_tasks: initial_configure_create_inventory_for_localhost.yaml
+    - name: Include initial configuration users playbook
+      include_tasks: initial_configure_users.yaml
+

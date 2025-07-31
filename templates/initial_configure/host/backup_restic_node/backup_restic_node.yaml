@@ -1,0 +1,28 @@
+backup_restic_node_locations_additional:
+  postgres:
+    from: "{{ pgdump_backup_location_root_path }}"
+    to:
+      - mailru
+      - yandex
+    cron: "0 0 * * FRI"
+    options:
+      tobereplacedwith: "complete_options"
+
+restic_node_vars:
+  locations: >-
+    {{ lookup('vars','backup_restic_node_locations')
+       | combine(backup_restic_node_locations_additional|default({}), recursive=True) }}
+  remotes: >-
+    {{ lookup('vars','backup_restic_node_remotes')
+      | combine(
+          { 
+            'mailru': {
+              'key': ''
+            },
+            'yandex': {
+              'key': ''
+            }
+          },
+          recursive=True
+        )
+    }}
