@@ -4,8 +4,35 @@
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=Prometheus&logoColor=white)](https://prometheus.io/)
 [![Grafana](https://img.shields.io/badge/grafana-%23F46800.svg?style=for-the-badge&logo=grafana&logoColor=white)](https://grafana.com/)
+[![VictoriaMetrics](https://img.shields.io/badge/VictoriaMetrics-442650?style=for-the-badge&logo=VictoriaMetrics&logoColor=white)](https://victoriametrics.com/)
+[![VictoriaLogs](https://img.shields.io/badge/VictoriaLogs-562A65?style=for-the-badge&logo=VictoriaLogs&logoColor=white)](https://victorialogs.com/)
+[![WireGuard](https://img.shields.io/badge/WireGuard-88171A?style=for-the-badge&logo=WireGuard&logoColor=white)](https://www.wireguard.com/)
+[![Restic](https://img.shields.io/badge/Restic-FF5722?style=for-the-badge&logo=Restic&logoColor=white)](https://restic.net/)
+[![Autorestic](https://img.shields.io/badge/Autorestic-4CAF50?style=for-the-badge&logo=Autorestic&logoColor=white)](https://autorestic.vercel.app/)
+[![Caddy](https://img.shields.io/badge/Caddy-2E7D32?style=for-the-badge&logo=Caddy&logoColor=white)](https://caddyserver.com/)
+[![FRP](https://img.shields.io/badge/FRP-FF5722?style=for-the-badge&logo=FRP&logoColor=white)](https://github.com/fatedier/frp)
+[![Remnawave](https://img.shields.io/badge/Remnawave-3BC9DB?style=for-the-badge&logo=Remnawave&logoColor=white)](https://remna.st/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
 An opinionated and comprehensive Ansible automation suite for managing VPS infrastructure, focusing on VPN services, monitoring, backups, and security hardening.
+
+## 🖼️ Screenshots
+
+<details>
+  <summary>Click to expand</summary>
+  <div align="center">
+
+   ![Prometheus](<docs/Images/screenshot-prometheus-1.png>)
+   ![Remnawave](<docs/Images/screenshot-remnawave-1.png>)
+   ![VictoriaLogs](<docs/Images/screenshot-victorialogs-1.png>)
+   ![Caddy](<docs/Images/screenshot-caddy-1.png>)
+   ![Caddy](<docs/Images/screenshot-caddy-2.png>)
+   ![Grafana](<docs/Images/screenshot-grafana-1.png>)
+   ![Grafana](<docs/Images/screenshot-grafana-2.png>)
+   ![Wireguard](<docs/Images/screenshot-wireguard-1.png>)
+
+  </div>
+</details>
 
 ## 📖 Terms agreements
 
@@ -67,8 +94,10 @@ Good question! I usually go with the cheapest ones that meet the requirements ab
 
 - [PureServers](https://pureservers.org)
 - [Rifty](https://rifty.org)
+- [RHC](https://rhc.su/)
 
-      ℹ️ The developer is not affiliated with any of these services, and you should do your own research before choosing a VPS provider. It is not an offer.
+> [!NOTE]
+> The developer is not affiliated with any of these services, and you should do your own research before choosing a VPS provider. It is not an offer.
 
 ## 🎯 Overview
 
@@ -133,7 +162,8 @@ This includes:
 
 ## 🚀 Quick Start
 
-      ℹ️ This project is aimed to work on Linux. For the sake of simplicity, it is assumed that distributive is Ubuntu 24.04+.
+> [!NOTE]
+> This project is aimed to work on Linux. For the sake of simplicity, it is assumed that distributive is Ubuntu 24.04+.
 
 ### Prerequisites
 
@@ -228,7 +258,8 @@ The `all/z_common_hosts_secrets/` contains shared variables with for all roles t
 `host_vars`:
 - `hostname-1`: Any variables that are specific to `hostname-1` a single host can be placed in `host_vars/` directory. This allows you to define host-specific configurations without cluttering the main playbooks. `hostname-1` is a placeholder for any hostname you want to configure.
 
-      ℹ️ The directories with hostnames are ignored by git, so you can place your secrets there without worrying about them being committed to the repository.
+> [!NOTE]
+> The directories with hostnames are ignored by git, so you can place your secrets there without worrying about them being committed to the repository.
 
 `assets`:
 Contains static files and templates that are used by the playbooks. This includes:
@@ -244,7 +275,8 @@ Contains static files and templates that are used by the playbooks. This include
 
 You can create your own directories here and use them in your playbooks/roles in this path: `assets/hosts-list/<your-hostname>/`, e.g. `assets/hosts-list/hostname-1/`. All playbooks will pick files up automatically and template them like a `common` ones.
 
-      ℹ️ The directories with hostnames are ignored by git, so you can place your secrets there without worrying about them being committed to the repository.
+> [!NOTE]
+> The directories with hostnames are ignored by git, so you can place your secrets there without worrying about them being committed to the repository.
 
 ## 🎯 Playbook Organization
 
@@ -406,9 +438,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Role Contributors**: Authors of Galaxy roles used in this project
 - **Open Source Projects**: All the tools and services integrated
 
-Especiially:
-- Author of [template_tree](https://github.com/geluk/template_tree) script that is heavily used in this project to template and copy files.
-- TBD
+Especially:
+- [geerlingguy](https://github.com/geerlingguy) for his multiple Ansible for DevOps repos;
+- [darkwizard242](https://github.com/darkwizard242) for making dense Ansible roles that are used in this project;
+- [devsec](https://github.com/dev-sec) for his [Ansible Security Hardening](https://github.com/dev-sec/ansible-collection-hardening);
+- [Oefenweb](https://github.com/Oefenweb) for [ansible-fail2ban](https://github.com/Oefenweb/ansible-fail2ban);
+- Author of [template_tree](https://github.com/geluk/template_tree) script that is heavily used in this project to template and copy files;
+- [fatedier](https://github.com/fatedier) for his work on [FRP](https://github.com/fatedier/frp), which is used for proxying and tunneling in this project, and [snowdreamtech](https://github.com/snowdreamtech) for [dockerized FRP](https://github.com/snowdreamtech/frp);
+- Maintainers of [wg-easy](https://github.com/wg-easy/wg-easy), one of the simplest and most user-friendly WireGuard VPN solutions available, which is used in this project for VPN management;
+- Authors of [Caddy](https://github.com/caddyserver/caddy), a powerful, enterprise-ready, open-source web server with automatic HTTPS written in Go. [Lucas Lorentz' project](https://github.com/lucaslorentz/caddy-docker-proxy) and [him](https://github.com/lucaslorentz) for his work on Caddy reverse proxy with Docker support. [HomeAll](https://github.com/homeall/caddy-reverse-proxy-cloudflare) for their work on Caddy reverse proxy with Cloudflare support and making it the most powerful Caddy setup across GitHub!
+- [Remnawave](https://github.com/Remnawave) maintainer for [the best VPN/proxy management panel](https://github.com/Remnawave/panel) available designed for scalability. Their [community](https://remna.st/docs/awesome-remnawave/) is very active and helpful, so you can always ask for help if you have any issues with the panel. Also [Jolymmiels](https://github.com/Jolymmiels) for his [Telegram shop bot](https://github.com/Jolymmiels/remnawave-telegram-shop), [maposia](https://github.com/maposia) for his [Telegram miniapp](https://github.com/maposia/remnawave-telegram-sub-mini-app) to view susbcription in the messenger, [legiz](https://github.com/legiz-ru) for [custom pages templates](https://github.com/legiz-ru/my-remnawave), [SmallPoppa](https://github.com/SmallPoppa) for design of [HTML fallback static pages](https://github.com/SmallPoppa/sni-templates);
+- And many more contributors and maintainers of open source projects that make this project possible! Open PR to add your name here if you think you deserve it!
 
 ---
 
