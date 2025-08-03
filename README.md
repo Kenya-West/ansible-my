@@ -62,7 +62,11 @@ An opinionated and comprehensive Ansible automation suite for managing VPS infra
    - Could be able to backup itself (via [Autorestic](https://github.com/cupcakearmy/autorestic) to cloud storages or Restic server);
    - Gives you a full-picture telemetry (setup `analytics_server` first, then deploy `analytics_node`) by metrics and maybe some logs (did not test logs much);
 
-- Every role is a modular [Ansible group](https://docs.ansible.com/ansible/2.9/modules/group_module.html), that means that you can omit or add server capabilities simply by editing your inventory files.
+- Every role is a modular [Ansible group](https://docs.ansible.com/ansible/2.9/modules/group_module.html), that means that you can omit or add server capabilities simply by editing your inventory files;
+
+- Containerize everything. If you need to run something, run it in a container. Only host-level execution if it is necessary or inevitable;
+
+- Everything should be proxied from web server. That's why even if node exporter and Docker exporter run in host, they are exposed on `172.17.0.1` IP address, which is the default Docker bridge network IP address, and then proxied by Caddy. It is a single point to control access to your services.
 
 ## 🅰️ Key style decisions for this Ansible project
 
