@@ -68,3 +68,6 @@ packages_binary_list:
   - repo: "wzv5/pping"
   - repo: "https://downloads.rclone.org/rclone-current-linux-amd64.zip"
     bin_name: "rclone"
+  - repo: "vet-run/vet"
+    assets:
+      - "vet"
