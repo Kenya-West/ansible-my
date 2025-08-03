@@ -1,3 +1,5 @@
+export LANG=en_US.UTF-8
+
 alias ls='eza --icons'
 alias l='ls -l'
 alias la='ls -a'
