@@ -75,3 +75,9 @@
     section: backup_restic_node
     option: localhost ansible_connection
     value: local
+
+- name: Remove spaces between equal sign and value in inventory/production.ini for "localhost ansible_connection = local" value
+  ansible.builtin.replace:
+    path: "{{ playbook_dir }}/inventory/production.ini"
+    regexp: 'localhost ansible_connection\s*=\s*local'
+    replace: 'localhost ansible_connection=local'
