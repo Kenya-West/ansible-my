@@ -4,13 +4,15 @@ remna_server_caddy_jwt_api_tokens_secret: <jwt_api_tokens_secret>
 remna_server_caddy_is_telegram_notifications_enabled: false
 remna_server_caddy_telegram_bot_token: <telegram_bot_token>
 remna_server_caddy_telegram_notify_users_chat_id: <telegram_notify_users_chat_id>
+remna_server_caddy_telegram_notify_users_thread_id: # empty if you do not use threads
 remna_server_caddy_telegram_notify_nodes_chat_id: <telegram_notify_nodes_chat_id>
+remna_server_caddy_telegram_notify_nodes_thread_id: # empty if you do not use threads
+remna_server_caddy_telegram_notify_crm_chat_id: <telegram_notify_crm_chat_id>
+remna_server_caddy_telegram_notify_crm_thread_id: # empty if you do not use threads
 
 remna_server_caddy_telegram_oauth_enabled: false
 remna_server_caddy_telegram_oauth_admin_ids: "[123, 321]"
 
-remna_server_caddy_telegram_notify_users_thread_id: # empty if you do not use threads
-remna_server_caddy_telegram_notify_nodes_thread_id: # empty if you do not use threads
 
 remna_server_caddy_metrics_user: prometheus
 remna_server_caddy_metrics_pass: "{{ initial_configure_generated_password_remna_server_caddy_metrics }}"
