@@ -1,6 +1,6 @@
 prometheus_server_basic_auth_users:
-  <username>: "{{ initial_configure_generated_password_analytics_server_prometheus }}"
-  <username2>: <password2>
+  grafana: "{{ initial_configure_generated_password_analytics_server_prometheus_grafana | password_hash('bcrypt') }}" # Raw password: {{ initial_configure_generated_password_analytics_server_prometheus_grafana }}
+  {{ standard_user }}: "{{ initial_configure_generated_password_analytics_server_prometheus_user | password_hash('bcrypt') }}" # Raw password: {{ initial_configure_generated_password_analytics_server_prometheus_user }}
 prometheus_server_scrape_configs:
   - job_name: PushGateway
     honor_labels: true

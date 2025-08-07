@@ -1,2 +1,2 @@
-wg_password: "{{ initial_configure_generated_password_wg }}" # bcrypt hash
-wg_prometheus_metrics_password: "{{ initial_configure_generated_password_wg_prometheus_metrics }}" # bcrypt hash
+wg_password: "{{ initial_configure_generated_password_wg | password_hash('bcrypt') }}" # Raw password: {{ initial_configure_generated_password_wg }}
+wg_prometheus_metrics_password: "{{ initial_configure_generated_password_wg_prometheus_metrics | password_hash('bcrypt') }}" # Raw password: {{ initial_configure_generated_password_wg_prometheus_metrics }}

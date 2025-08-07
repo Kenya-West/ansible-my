@@ -1,2 +1,2 @@
-vpn_caddy_caddy_metrics_client_user_password: "{{ initial_configure_generated_password_vpn_caddy_metrics_client_user }}" # bcrypt hash for user 'client'
-vpn_caddy_caddy_metrics_prometheus_user_password: "{{ initial_configure_generated_password_vpn_caddy_metrics_prometheus_user }}" # bcrypt hash for user 'prometheus'
+vpn_caddy_caddy_metrics_client_user_password: "{{ initial_configure_generated_password_vpn_caddy_metrics_client_user | password_hash('bcrypt') }}" # Raw password: {{ initial_configure_generated_password_vpn_caddy_metrics_client_user }}
+vpn_caddy_caddy_metrics_prometheus_user_password: "{{ initial_configure_generated_password_vpn_caddy_metrics_prometheus_user | password_hash('bcrypt') }}" # Raw password: {{ initial_configure_generated_password_vpn_caddy_metrics_prometheus_user }}
