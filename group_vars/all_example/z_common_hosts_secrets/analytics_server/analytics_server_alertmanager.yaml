@@ -14,3 +14,4 @@ alertmanager_receivers_list:
       - bot_token: <token>
         api_url: https://api.telegram.org
         chat_id: <chatId_digits>
+        message_thread_id: '<topic_id>' # Optional, if you want to use topic_id
