@@ -91,3 +91,9 @@
         section: backup_restic_node
         option: "; {{ initial_configure_host_hostname }} ansible_host"
         value: "{{ initial_configure_host_ip_address }}"
+
+    - name: Remove spaces between equal sign and value in inventory/production.ini for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host_ip_address }}" value
+      ansible.builtin.replace:
+        path: "{{ playbook_dir }}/inventory/production.ini"
+        regexp: '{{ initial_configure_host_hostname }} ansible_host\s*=\s*{{ initial_configure_host_ip_address }}'
+        replace: '{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }}'
