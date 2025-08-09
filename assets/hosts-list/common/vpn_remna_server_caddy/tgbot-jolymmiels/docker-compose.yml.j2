@@ -15,7 +15,6 @@ services:
       caddy: "${DOMAIN_FOR_CADDY}{% if remna_server_caddy_tg_bot_jolymmiels_external_port is defined and remna_server_caddy_tg_bot_jolymmiels_external_port %}:${EXTERNAL_PORT}{% endif %}"
       caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
       caddy.handle_path.import: "logging ${DOMAIN_FOR_CADDY}-remna-tg-bot-jolymmiels-{{ remna_server_caddy_tg_bot_jolymmiels_current_index | string }}"
-      caddy.handle_path.basic_auth:
       {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${HEALTH_CHECK_PORT} }}"{% endraw %}
 
     depends_on:
