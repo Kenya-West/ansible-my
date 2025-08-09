@@ -35,5 +35,6 @@
   "stars_button": " ⭐Telegram Stars",
   "share_referral_button": "Share!",
   "web_app_button_text": "Connect",
-  "tribute_button": "Tribute"
+  "tribute_button" : "Tribute",
+  "tribute_cancelled" : "Tribute cancelled"
 }
