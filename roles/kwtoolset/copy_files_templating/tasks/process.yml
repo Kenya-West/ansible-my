@@ -35,8 +35,8 @@
     src: "{{ copy_files_templating_temp_dir.path }}/"
     dest: "{{ item.dest }}/"
     rsync_opts:
-      - "--chmod=F{{ (item.default_mode | int) | default(755) }}"
-      - "--chmod=D{{ (item.default_mode | int) | default(755) }}"
+      - "--chmod=F{{ (item.default_mode_file | default(item.default_mode | int) | default(755)) }}"
+      - "--chmod=D{{ (item.default_mode_directory | default(item.default_mode | int) | default(755)) }}"
   delegate_to: localhost
 
 - name: Remove temporary directory

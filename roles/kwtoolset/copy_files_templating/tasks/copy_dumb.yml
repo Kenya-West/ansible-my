@@ -3,15 +3,16 @@
     path: "{{ item.dest }}"
   register: copy_files_templating_remote_stat
 
-- name: Copy files recuresively (no templating) {{ item.src }}
+- name: Copy files recursively (no templating) {{ item.src }}
   become: true
   ansible.builtin.copy:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
-    owner: "{{ item.default_owner | default(copy_files_templating_remote_stat.stat.pw_name) | default(standard_user) }}"
-    group: "{{ item.default_group | default(copy_files_templating_remote_stat.stat.gr_name) | default(standard_user) }}"
     mode: "{{ item.default_mode | default(copy_files_templating_remote_stat.stat.mode) | default('0775') }}"
     directory_mode: "{{ item.default_mode | default(copy_files_templating_remote_stat.stat.mode) | default('0775') }}"
+    # Only set owner/group for remote hosts
+    owner: "{{ (inventory_hostname not in ['localhost', '127.0.0.1']) | ternary(item.default_owner | default(copy_files_templating_remote_stat.stat.pw_name) | default(standard_user), omit) }}"
+    group: "{{ (inventory_hostname not in ['localhost', '127.0.0.1']) | ternary(item.default_group | default(copy_files_templating_remote_stat.stat.gr_name) | default(standard_user), omit) }}"
 
 - name: Empty variables
   ansible.builtin.set_fact:
