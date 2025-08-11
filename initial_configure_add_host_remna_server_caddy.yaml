@@ -1,0 +1,55 @@
+---
+
+- name: Add vpn_remna_server_caddy group to host
+  hosts: localhost
+  gather_facts: no
+
+  tasks:
+    - name: Prompt for the hostname
+      ansible.builtin.pause:
+        prompt: "Enter the hostname. It must already exist"
+        echo: true
+      register: __hostname_variable
+      failed_when: __hostname_variable.user_input | length == 0
+
+    - name: Set hostname fact
+      set_fact:
+        initial_configure_host_hostname: "{{ __hostname_variable.user_input }}"
+
+    - name: Fail if host does not exist
+      ansible.builtin.fail:
+        msg: "The host {{ initial_configure_host_hostname }} does not exist."
+      when: hostvars[initial_configure_host_hostname] is not defined
+
+    - name: Get host object from Ansible
+      ansible.builtin.set_fact:
+        initial_configure_host: "{{ hostvars[initial_configure_host_hostname] }}"
+
+    - name: Check if hostname directory exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}"
+        get_checksum: false
+      register: __hostname_dir_stat
+      failed_when: not __hostname_dir_stat.stat.exists
+
+    - name: Check if hostname in the general_vps_prepare group
+      ansible.builtin.assert:
+        that:
+          - initial_configure_host_hostname in groups['general_vps_prepare']
+          - initial_configure_host_hostname in groups['vpn_caddy']
+        fail_msg: "The hostname {{ initial_configure_host_hostname }} is not in the general_vps_prepare and/or vpn_caddy group. Run initial_configure_add_host_initial.yaml to create host and/or initial_configure_add_host_vpn_caddy.yaml to add it to the group(s)."
+
+    - name: Copy templated files from group_vars_initial/all/z_common_hosts_secrets
+      ansible.builtin.include_role:
+        name: kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ playbook_dir }}/templates/initial_configure/host/vpn_remna_server_caddy/"
+            dest: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}/vpn_remna_server_caddy"
+            default_mode: "0775"
+
+    - name: Remove spaces between equal sign and value in inventory/production.ini for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host.ansible_host }}" value
+      ansible.builtin.replace:
+        path: "{{ playbook_dir }}/inventory/production.ini"
+        regexp: '{{ initial_configure_host_hostname }} ansible_host\s*=\s*{{ initial_configure_host.ansible_host }}'
+        replace: '{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host.ansible_host }}'
