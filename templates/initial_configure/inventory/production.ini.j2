@@ -63,6 +63,9 @@ localhost ansible_connection=local
 localhost ansible_connection=local
 ; host-backup-restic-node ansible_host=111.222.333.450 # Host for backup Restic server
 
+[vpn_remna_server_caddy]
+; host-remna-server-caddy ansible_host=111.222.333.451 # Host for Remnawave server with Caddy
+
 # These are groups of servers that are utilized as...
 # ... VPN servers with Caddy as frontier web server
 [servers_vpn:children]
