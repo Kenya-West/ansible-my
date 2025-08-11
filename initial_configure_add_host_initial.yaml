@@ -19,6 +19,7 @@
     - name: Check if hosname directory exists
       ansible.builtin.stat:
         path: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}"
+        get_checksum: false
       register: __hostname_dir_stat
     
     - name: Fail if hostname directory already exists
@@ -62,8 +63,8 @@
         name: kwtoolset/copy_files_templating
       vars:
         copy_files_templating_dir_list:
-          - src: "{{ playbook_dir }}/templates/initial_configure/host/"
-            dest: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}"
+          - src: "{{ playbook_dir }}/templates/initial_configure/host/0_all/"
+            dest: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}/0_all"
             default_mode: "0775"
 
     - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[general_vps_prepare]" in inventory/production.ini
@@ -73,24 +74,6 @@
         option: "{{ initial_configure_host_hostname }} ansible_host"
         value: "{{ initial_configure_host_ip_address }}"
         backup: true
-    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[vpn_caddy]" in inventory/production.ini
-      community.general.ini_file:
-        path: "{{ playbook_dir }}/inventory/production.ini"
-        section: vpn_caddy
-        option: "{{ initial_configure_host_hostname }} ansible_host"
-        value: "{{ initial_configure_host_ip_address }}"
-    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[analytics_node]" in inventory/production.ini
-      community.general.ini_file:
-        path: "{{ playbook_dir }}/inventory/production.ini"
-        section: analytics_node
-        option: "; {{ initial_configure_host_hostname }} ansible_host"
-        value: "{{ initial_configure_host_ip_address }}"
-    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[backup_restic_node]" in inventory/production.ini
-      community.general.ini_file:
-        path: "{{ playbook_dir }}/inventory/production.ini"
-        section: backup_restic_node
-        option: "; {{ initial_configure_host_hostname }} ansible_host"
-        value: "{{ initial_configure_host_ip_address }}"
 
     - name: Remove spaces between equal sign and value in inventory/production.ini for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host_ip_address }}" value
       ansible.builtin.replace:
