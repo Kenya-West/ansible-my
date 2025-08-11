@@ -1,7 +1,7 @@
 remna_server_caddy_tg_bot_instance_count: 1
 remna_server_caddy_tg_bot_settings:
   - name: ""
-    remna_server_caddy_tg_bot_jolymmiels_bot_token: <123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11>
+    remna_server_caddy_tg_bot_jolymmiels_bot_token: <123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11> # Telegram bot token that you create in https://t.me/BotFather
 
     remna_server_caddy_tg_bot_jolymmiels_pricing:
       fiat:
