@@ -2,6 +2,7 @@
 
 - name: Run initial configuration tasks (step 1)
   hosts: localhost
+  become: false
   gather_facts: no
 
   tasks:
