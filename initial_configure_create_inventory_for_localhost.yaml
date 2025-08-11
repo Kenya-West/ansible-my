@@ -2,6 +2,7 @@
 - name: Check if inventory exists
   ansible.builtin.stat:
     path: "{{ playbook_dir }}/inventory"
+    get_checksum: false
   register: initial_configure_groupvars_all_secrets_dir
   delegate_to: localhost
 
@@ -15,6 +16,7 @@
 - name: Check if inventory/production.ini exists
   ansible.builtin.stat:
     path: "{{ playbook_dir }}/inventory/production.ini"
+    get_checksum: false
   register: initial_configure_inventory_production_ini
   delegate_to: localhost
 
@@ -80,4 +82,4 @@
   ansible.builtin.replace:
     path: "{{ playbook_dir }}/inventory/production.ini"
     regexp: 'localhost ansible_connection\s*=\s*local'
-    replace: 'localhost ansible_connection=local'
+    replace: 'localhost ansible_connection=local ansible_become=false'
