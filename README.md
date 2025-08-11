@@ -1,20 +1,36 @@
 # 🚀 Ansible Infrastructure Automation
 
-[![Ansible](https://img.shields.io/badge/ansible-%231A1918.svg?style=for-the-badge&logo=ansible&logoColor=white)](https://www.ansible.com/)
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=Prometheus&logoColor=white)](https://prometheus.io/)
-[![Grafana](https://img.shields.io/badge/grafana-%23F46800.svg?style=for-the-badge&logo=grafana&logoColor=white)](https://grafana.com/)
-[![VictoriaMetrics](https://img.shields.io/badge/VictoriaMetrics-442650?style=for-the-badge&logo=VictoriaMetrics&logoColor=white)](https://victoriametrics.com/)
-[![VictoriaLogs](https://img.shields.io/badge/VictoriaLogs-562A65?style=for-the-badge&logo=VictoriaLogs&logoColor=white)](https://victorialogs.com/)
-[![WireGuard](https://img.shields.io/badge/WireGuard-88171A?style=for-the-badge&logo=WireGuard&logoColor=white)](https://www.wireguard.com/)
-[![Restic](https://img.shields.io/badge/Restic-FF5722?style=for-the-badge&logo=Restic&logoColor=white)](https://restic.net/)
-[![Autorestic](https://img.shields.io/badge/Autorestic-4CAF50?style=for-the-badge&logo=Autorestic&logoColor=white)](https://autorestic.vercel.app/)
-[![Caddy](https://img.shields.io/badge/Caddy-2E7D32?style=for-the-badge&logo=Caddy&logoColor=white)](https://caddyserver.com/)
-[![FRP](https://img.shields.io/badge/FRP-FF5722?style=for-the-badge&logo=FRP&logoColor=white)](https://github.com/fatedier/frp)
-[![Remnawave](https://img.shields.io/badge/Remnawave-3BC9DB?style=for-the-badge&logo=Remnawave&logoColor=white)](https://remna.st/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-
 An opinionated and comprehensive Ansible automation suite for managing VPS infrastructure, focusing on VPN services, monitoring, backups, and security hardening.
+
+
+<div align="center">
+
+Project stack:
+
+[![Ansible](https://img.shields.io/badge/ansible-black?style=flat&logo=ansible&logoColor=white)](https://www.ansible.com/)
+[![Python](https://img.shields.io/badge/python-black?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![PowerShell](https://img.shields.io/badge/powershell-black?style=flat&logo=powershell&logoColor=white)](https://github.com/PowerShell/PowerShell)
+
+Deploy stack:
+
+[![Docker](https://img.shields.io/badge/docker-black?style=flat&logo=docker&logoColor=0DB7ED)](https://www.docker.com/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-black?style=flat&logo=Prometheus&logoColor=E6522C)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/grafana-black?style=flat&logo=grafana&logoColor=F46800)](https://grafana.com/)
+[![VictoriaMetrics](https://img.shields.io/badge/VictoriaMetrics-black?style=flat&logo=VictoriaMetrics&logoColor=442650)](https://victoriametrics.com/)
+[![VictoriaLogs](https://img.shields.io/badge/VictoriaLogs-black?style=flat&logo=VictoriaLogs&logoColor=562A65)](https://victorialogs.com/)
+[![WireGuard](https://img.shields.io/badge/WireGuard-black?style=flat&logo=WireGuard&logoColor=88171A)](https://www.wireguard.com/)
+[![Restic](https://img.shields.io/badge/Restic-black?style=flat&logo=Restic&logoColor=FF5722)](https://restic.net/)
+[![Autorestic](https://img.shields.io/badge/Autorestic-black?style=flat&logo=Autorestic&logoColor=4CAF50)](https://autorestic.vercel.app/)
+[![Caddy](https://img.shields.io/badge/Caddy-black?style=flat&logo=Caddy&logoColor=2E7D32)](https://caddyserver.com/)
+[![FRP](https://img.shields.io/badge/FRP-black?style=flat&logo=FRP&logoColor=FF5722)](https://github.com/fatedier/frp)
+[![Remnawave](https://img.shields.io/badge/Remnawave-black?style=flat&logo=Remnawave&logoColor=3BC9DB)](https://remna.st/)
+
+Other links:
+
+[![Telegram](https://img.shields.io/badge/Telegram-black?style=flat&logo=Telegram&logoColor=26A5E4)](https://t.me/kenyawestdev/4)
+[![License](https://img.shields.io/badge/license-MIT-black?style=flat)](https://opensource.org/licenses/MIT)
+
+</div>
 
 ## 🖼️ Screenshots
 
