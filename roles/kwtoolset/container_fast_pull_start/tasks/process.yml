@@ -1,0 +1,26 @@
+- name: Docker Compose project - container pull
+  community.docker.docker_compose_v2_pull:
+    project_src: "{{ item.path }}"
+    project_name: "{{ item.name | default(omit) }}"
+    files:
+      - docker-compose.yml
+  ignore_errors: "{{ item.ignore_errors | default(false) }}"
+
+- name: Docker Compose project - container start
+  community.docker.docker_compose_v2:
+    project_src: "{{ item.path }}"
+    project_name: "{{ item.name | default(omit) }}"
+    files:
+      - docker-compose.yml
+    state: present
+  ignore_errors: "{{ item.ignore_errors | default(false) }}"
+
+- name: Prune unused Docker images
+  community.docker.docker_prune:
+    containers: true
+    images: true
+    networks: true
+    volumes: true
+    builder_cache: true
+  ignore_errors: "{{ item.ignore_errors | default(false) }}"
+  when: item.prune_unused | default(false)

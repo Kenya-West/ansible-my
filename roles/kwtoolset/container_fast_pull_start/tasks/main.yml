@@ -1,0 +1,9 @@
+---
+# tasks file for roles/kwtoolset/container_fast_pull_start
+
+- name: Process each of project
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ container_fast_pull_start_list }}"
+  loop_control:
+    loop_var: item
+  when: container_fast_pull_start_list | length > 0
