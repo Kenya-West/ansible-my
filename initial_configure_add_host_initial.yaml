@@ -58,6 +58,12 @@
       set_fact:
         initial_configure_host_xray_domain_name: "{{ __xray_domain_name_variable.user_input }}"
 
+    - name: Create hostname directory
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}"
+        state: directory
+        mode: "0755"
+
     - name: Copy templated files from group_vars_initial/all/z_common_hosts_secrets
       ansible.builtin.include_role:
         name: kwtoolset/copy_files_templating
