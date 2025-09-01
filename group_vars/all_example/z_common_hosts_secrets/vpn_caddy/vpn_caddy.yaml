@@ -1,2 +1,0 @@
-vpn_caddy_caddy_metrics_client_user_password: <$2a$> # bcrypt hash for user 'client'
-vpn_caddy_caddy_metrics_prometheus_user_password: <$2a$> # bcrypt hash for user 'prometheus'

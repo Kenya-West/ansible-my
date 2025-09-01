@@ -1,4 +1,0 @@
-ssh_ports_to_add:
-  - line: "Port 23001"
-    description: "SSH port for frpc"
-    insert_after: "^Port "

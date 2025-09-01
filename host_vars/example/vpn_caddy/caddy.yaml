@@ -1,1 +1,0 @@
-caddy_occupy_HTTPS: false # Sets Caddy to occupy port 443 for HTTPS traffic, instead of Remna node

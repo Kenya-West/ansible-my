@@ -1,2 +1,0 @@
-wg_password: <pass> # bcrypt hash
-wg_prometheus_metrics_password: <pass> # bcrypt hash
