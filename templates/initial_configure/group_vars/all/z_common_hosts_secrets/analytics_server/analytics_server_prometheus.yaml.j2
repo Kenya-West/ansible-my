@@ -15,12 +15,14 @@ prometheus_server_scrape_configs:
     relabel_configs:
       - source_labels: [hostname]
 
-  - job_name: cAdvisor
+  - job_name: LogPorter
     file_sd_configs:
       - files:
+          - /etc/file_sd/logporter_targets_*.yml
+        refresh_interval: 30s
     basic_auth:
       username: prometheus
-      password: "{{ initial_configure_generated_password_analytics_node_cadvisor_prometheus }}"
+      password: "{{ initial_configure_generated_password_analytics_node_logporter_prometheus }}"
     scheme: https
     metrics_path: /metrics
     tls_config:

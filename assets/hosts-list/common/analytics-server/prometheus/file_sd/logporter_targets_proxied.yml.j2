@@ -3,7 +3,7 @@
   {%- set hv = hostvars[host] -%}
 
   {# Grab the list of proxy items, defaulting to an empty list if missing #}
-  {%- set proxy_list = hv.get('cadvisor_proxy_server_list', []) -%}
+  {%- set proxy_list = hv.get('logporter_proxy_server_list', []) -%}
 
   {%- if proxy_list | length > 0 -%}
     {# We have multiple proxy entries to process #}
@@ -15,7 +15,7 @@
       {%- set metrics_path = entry.url_path if entry.url_path else '/metrics' -%}
 
       {# 3. Hostname fallback logic #}
-      {%- set hostname = hv.get('cadvisor_proxy_server_label', hv.inventory_hostname) -%}
+      {%- set hostname = hv.get('logporter_proxy_server_label', hv.inventory_hostname) -%}
 
       {# 4. Build the item to append #}
       {%- set item = {
