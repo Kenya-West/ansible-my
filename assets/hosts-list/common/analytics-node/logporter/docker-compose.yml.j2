@@ -1,28 +1,25 @@
 ---
 
 services:
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.51.0
-    cpus: 0.5
-    mem_limit: 200m
-    container_name: "${SERVICE_NAME}"
+  logporter:
+    image: lifailon/logporter:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: logporter
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     env_file:
       - .env
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
     networks:
       - {{ analytics_node_network_name }}
       - {{ docker_vpn_network }}
     labels:
       caddy: "${SERVICE_DOMAIN}"
       caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
-      caddy.handle_path.import: "logging ${SERVICE_DOMAIN}-cadvisor"
+      caddy.handle_path.import: "logging ${SERVICE_DOMAIN}-logporter"
       caddy.handle_path.basic_auth:
-{% for user in cadvisor_server_users %}
+{% for user in logporter_server_users %}
       caddy.handle_path.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
 {% endfor %}
       {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}

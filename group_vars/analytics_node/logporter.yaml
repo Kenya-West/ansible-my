@@ -1,0 +1,1 @@
+logporter_web_telemetry_path: "/{{ path_to_internal_services_predefined_full }}/logporter/metrics"

@@ -1,11 +1,11 @@
 ---
-- name: Install and configure cadvisor with dependencies
+- name: Install and configure LogPorter
   hosts: analytics_node
   become: false
   become_user: "{{ standard_user }}"
   vars:
-    project_dir: "{{ analytics_node_project_structure_end_dirs.cadvisor | ansible.builtin.basename }}"
-    docker_compose_project_name: cadvisor
+    project_dir: "{{ analytics_node_project_structure_end_dirs.logporter | ansible.builtin.basename }}"
+    docker_compose_project_name: logporter
     project_root_dir: "{{ analytics_node_project_structure_root }}"
     source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
     source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
@@ -42,6 +42,7 @@
           - path: "{{ dest_project_fullpath }}"
             name: "{{ docker_compose_project_name }}"
             ignore_errors: false
+
   pre_tasks:
     # Docker network
     - name: Ensure Docker network {{ analytics_node_network_name }} exists with specific settings
@@ -51,15 +52,21 @@
         state: present
 
   post_tasks:
-    - name: Add port {{ cadvisor_external_port }} to UFW
+    - name: Add port {{ logporter_exporter_external_port }} to UFW
       become: true
       become_user: root
       community.general.ufw:
         rule: allow
-        port: "{{ cadvisor_external_port }}"
+        port: "{{ logporter_exporter_external_port }}"
         proto: tcp
+      when:
+        - logporter_exporter_external_port is defined
+        - logporter_exporter_external_port | length > 0
     - name: Reminder to run install_ufw.yaml playbook
       ansible.builtin.debug:
         msg: |
           Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
           Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}
+      when:
+        - logporter_exporter_external_port is defined
+        - logporter_exporter_external_port | length > 0

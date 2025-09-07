@@ -1,0 +1,7 @@
+logporter_server_users:
+  - name: {{ standard_user }}
+    password: "{{ initial_configure_generated_password_analytics_node_logporter_standard_user }}"
+    hash_scheme: bcrypt
+  - name: prometheus
+    password: "{{ initial_configure_generated_password_analytics_node_logporter_prometheus }}"
+    hash_scheme: bcrypt
