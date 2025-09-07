@@ -71,3 +71,7 @@ packages_binary_list:
   - repo: "vet-run/vet"
     assets:
       - "vet"
+  - repo: "matheus-git/systemd-manager-tui"
+    assets:
+      - "systemd-manager-tui"
+  - repo: "tokuhirom/dcv"
