@@ -1,0 +1,19 @@
+---
+
+- name: Update Remnawave node
+  hosts: vpn_caddy
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: "{{ vpn_project_structure_end_dirs.remna | ansible.builtin.basename }}"
+    docker_compose_project_name: remna
+    project_root_dir: "{{ vpn_project_structure_root }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+  roles:
+    - name: ./roles/kwtoolset/container_fast_pull_start
+      vars:
+        container_fast_pull_start_list:
+          - path: "{{ dest_project_fullpath }}"
+            name: "{{ docker_compose_project_name }}"
+            prune_unused: true

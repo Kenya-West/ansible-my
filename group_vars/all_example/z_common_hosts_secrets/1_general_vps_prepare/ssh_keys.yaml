@@ -1,7 +1,0 @@
----
-ssh_keys_list_example:
-  # There you set public SSH key like so:
-  - "ssh-rsa AAAAB3dfkljlkfdjlkfdj some-description"
-
-# Do not use this file! It is only for example purposes.
-# Use ssh_keys.yaml instead.

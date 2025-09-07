@@ -25,3 +25,10 @@
       ansible.builtin.cron:
         name: "{{ restic_node_cron_job_name }}"
         state: absent
+    - name: Remove Autorestic forget cron job
+      become: true
+      become_user: root
+      ansible.builtin.cron:
+        name: "{{ restic_node_cron_job_name_forget }}"
+        state: absent
+      when: "'analytics_node' in group_names"

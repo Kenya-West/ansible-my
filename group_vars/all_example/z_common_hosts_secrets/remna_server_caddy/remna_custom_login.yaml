@@ -1,5 +1,0 @@
-remna_server_caddy_custom_login_route_route: <custom_login_route> # This is a random string, which is used to access the login page. It is recommended to use a long random string, for example: my_custom_login_route
-remna_server_caddy_custom_login_route_user: <custom_login_route>
-remna_server_caddy_custom_login_route_email: <custom_login_route>
-remna_server_caddy_custom_login_route_password: <custom_login_route>
-remna_server_caddy_custom_login_route_api_token: <custom_login_route>
