@@ -2,6 +2,8 @@
 
 - name: Add vpn_caddy group to host
   hosts: localhost
+  become: true
+  become_user: "{{ standard_user }}"
   gather_facts: no
 
   tasks:
