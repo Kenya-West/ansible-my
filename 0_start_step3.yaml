@@ -20,4 +20,5 @@
 - import_playbook: ./general_vps_prepare_clear_cache.yaml
 - import_playbook: ./general_vps_prepare_configure_journals.yaml
 - import_playbook: ./general_vps_prepare_configure_locale.yaml
+- import_playbook: ./general_vps_prepare_configure_logs.yaml
 - import_playbook: ./general_vps_prepare_configure_configs.yaml

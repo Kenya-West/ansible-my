@@ -1,0 +1,63 @@
+---
+- name: Configure logs for rotation in user space
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  vars:
+    project_dir: "{{ general_vps_prepare_project_structure_end_dirs.logrotate | ansible.builtin.basename }}"
+    project_root_dir: "{{ general_vps_prepare_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/etc/logrotate.d"
+
+  tasks:
+    - name: Ensure logrotate directory exists
+      ansible.builtin.file:
+        path: "{{ dest_project_rootpath }}"
+        state: directory
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+
+    - name: Check if logrotate is enabled in systemd
+      ansible.builtin.service:
+        name: logrotate
+        enabled: true
+      register: general_vps_prepare_logrotate_service
+      failed_when: general_vps_prepare_logrotate_service is failed
+    
+    - name: Check if logrotate timer is enabled and is executed on daily basis
+      ansible.builtin.command:
+        cmd: systemctl list-timers logrotate.timer --no-pager --no-legend --all
+      register: general_vps_prepare_logrotate_timer
+      changed_when: false
+      failed_when: >
+        (general_vps_prepare_logrotate_timer.stdout is defined and general_vps_prepare_logrotate_timer.stdout | trim == '') or
+        (general_vps_prepare_logrotate_timer.stdout_lines is defined and general_vps_prepare_logrotate_timer.stdout_lines | length == 0)
+    - name: Copy config for logrotate from common assets
+      ansible.builtin.include_role:
+        name: kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}/configs/"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0644"
+          - src: "{{ source_asset_fullpath_project }}/configs/"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0644"
+    
+    - name: Rename config to have username in the filename
+      ansible.builtin.command:
+        cmd: mv "{{ dest_project_rootpath }}/user-logs" "{{ dest_project_rootpath }}/user-logs-{{ standard_user }}"
+      args:
+        removes: "{{ dest_project_rootpath }}/user-logs"
+    - name: Change owner and permissions of config file to 0644
+      ansible.builtin.file:
+        path: "{{ dest_project_rootpath }}/user-logs-{{ standard_user }}"
+        state: file
+        mode: "0644"
+        owner: "root"
+        group: "root"

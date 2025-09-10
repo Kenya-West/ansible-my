@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./logs:/var/log/remnanode
+      - /home/{{ standard_user }}/logs/remnanode:/var/log/remnanode
     ports:
 {% if caddy_occupy_HTTPS is not defined or caddy_occupy_HTTPS == false %}
       - "443:443"

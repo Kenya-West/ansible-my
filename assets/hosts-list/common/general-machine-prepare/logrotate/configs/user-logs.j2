@@ -1,0 +1,10 @@
+/home/{{ standard_user }}/logs/*/*.log {
+    daily
+    rotate 7
+    size 10M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
