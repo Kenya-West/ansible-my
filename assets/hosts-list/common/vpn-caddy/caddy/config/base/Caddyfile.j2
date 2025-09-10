@@ -9,11 +9,7 @@
 
 (logging) {
     log {
-        output file /var/log/caddy/{args[0]}.access.log {
-            roll_size 10mb
-            roll_keep 20
-            roll_keep_for 3d
-        }
+        output file /var/log/caddy/{args[0]}.access.log
     }
 }
 
@@ -104,13 +100,7 @@
 {
     order log after handle_path
 
-    log {
-        output file /var/log/caddy/common.access.log {
-            roll_size 10mb
-            roll_keep 20
-            roll_keep_for 3d
-        }
-    }
+    import logging common
 
     metrics {
         per_host

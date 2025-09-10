@@ -24,7 +24,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/base:/config/base:ro
-      - ./logs:/var/log/caddy
+      - /home/{{ standard_user }}/logs/caddy:/var/log/caddy
       - ./static:/var/www/public
       - caddy-data:/data
       - caddy-certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory

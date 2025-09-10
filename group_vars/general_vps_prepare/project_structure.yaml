@@ -6,5 +6,6 @@ general_vps_prepare_project_structure_end_dirs__base:
   doas: "{{ general_vps_prepare_project_structure_root }}/doas"
   micro: "{{ general_vps_prepare_project_structure_root }}/micro"
   broot: "{{ general_vps_prepare_project_structure_root }}/broot"
+  logrotate: "{{ general_vps_prepare_project_structure_root }}/logrotate"
 general_vps_prepare_project_structure_end_dirs: "{{ general_vps_prepare_project_structure_end_dirs__base }}"
 general_vps_prepare_project_structure_end_dirs_list: "{{ general_vps_prepare_project_structure_end_dirs.values() | list }}"

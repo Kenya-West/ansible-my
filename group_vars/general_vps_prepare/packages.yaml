@@ -16,6 +16,7 @@ packages_list:
       - gettext-base
       - snapd
       - locales
+      - logrotate
       - rsync
       - bc
       - lsof
