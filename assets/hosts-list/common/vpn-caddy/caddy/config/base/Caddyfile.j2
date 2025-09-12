@@ -98,9 +98,9 @@
 {% endif %}
 
 {
-    order log after handle_path
-
-    import logging common
+    log {
+        output file /var/log/caddy/common.access.log
+    }
 
     metrics {
         per_host
