@@ -18,7 +18,6 @@ services:
       - {{ docker_vpn_network }}
     labels:
       caddy: "${SERVICE_DOMAIN}{% if frp_web_external_port is defined and frp_web_external_port %}:${EXTERNAL_PORT}{% endif %}"
-      caddy.import: "logging ${SERVICE_DOMAIN}-frps"
       {% raw %}caddy.0_reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
       {% for port in range(frp_range_ports_1_start, frp_range_ports_1_end + 1) %}
 
