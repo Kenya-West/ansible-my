@@ -1,0 +1,13 @@
+[Unit]
+Description=XRay Torrent Blocker Service
+Documentation=https://github.com/kutovoys/xray-torrent-blocker
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/tblocker -c /home/{{ standard_user }}/{{ vpn_project_structure_end_dirs.tblocker }}/config/config.yaml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target 

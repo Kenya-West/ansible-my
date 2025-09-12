@@ -22,6 +22,7 @@ packages_list:
       - lsof
       - net-tools
       - acl
+      - conntrack
       # TermSCP dependencies
       - libdbus-1-dev
       - pkg-config
