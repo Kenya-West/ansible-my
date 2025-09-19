@@ -1,0 +1,16 @@
+# Log file to monitor
+LogFile: "/home/{{ standard_user }}/logs/remnanode/access.log"
+
+# Block duration in minutes
+BlockDuration: 10
+
+# Tag used to identify torrent traffic in logs
+TorrentTag: "TORRENT"
+
+# Firewall to use for blocking (iptables, nft)
+BlockMode: "iptables"
+
+{% if tblocker_webhook is defined %}
+# Webhook settings (populated from group var `tblocker_webhook_list`)
+{{ tblocker_webhook | to_nice_yaml(indent=2) }}
+{% endif %}
