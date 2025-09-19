@@ -75,3 +75,7 @@ packages_binary_list:
     assets:
       - "systemd-manager-tui"
   - repo: "tokuhirom/dcv"
+  - repo: "savannahostrowski/gruyere"
+  - repo: "ynqa/jnv"
+    assets:
+      - "^musl"
