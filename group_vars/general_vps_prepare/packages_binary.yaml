@@ -1,6 +1,7 @@
 ---
 # eget_skip_installed_packages: true
 
+packages_binary_timeout: 30s
 packages_binary_list:
   # full schema is:
   # - repo: "tstack/lnav"         # repo name on github
