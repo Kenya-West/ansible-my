@@ -1,0 +1,11 @@
+- name: restart dnscrypt socket
+  ansible.builtin.systemd:
+    name: dnscrypt-proxy.socket
+    state: restarted
+    daemon_reload: true
+- name: disable service unit
+  ansible.builtin.systemd:
+    name: dnscrypt-proxy.service
+    enabled: false
+    state: stopped
+  ignore_errors: true

@@ -1,0 +1,37 @@
+# Ensure hostname is set and resolvable locally
+- name: Ensure hostname matches desired value (optional, if you manage it)
+  ansible.builtin.command: "hostnamectl set-hostname {{ dnscrypt.hostname | default(ansible_hostname) }}"
+  changed_when: false
+
+- name: Ensure /etc/hosts has localhost line
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^\s*127\.0\.0\.1\s+'
+    line: '127.0.0.1 localhost'
+    state: present
+    create: yes
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure /etc/hosts maps hostname to 127.0.1.1
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^\s*127\.0\.1\.1\s+{{ ansible_hostname }}(\s|$)'
+    line: "127.0.1.1 {{ ansible_hostname }}"
+    state: present
+
+- name: Ensure IPv6 localhost entries exist (safe even if you don't use IPv6)
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^\s*::1\s+'
+    line: '::1 localhost ip6-localhost ip6-loopback'
+    state: present
+
+- name: Prevent cloud-init from changing hostname
+  ansible.builtin.copy:
+    dest: /etc/cloud/cloud.cfg.d/99-preserve-hostname.cfg
+    content: "preserve_hostname: true\n"
+    owner: root
+    group: root
+    mode: '0644'

@@ -1,0 +1,18 @@
+---
+# handlers file for roles/dns_stack
+- name: restart dnscrypt
+  ansible.builtin.include_tasks: restart_dnscrypt.yml
+  when: dnscrypt.use_socket_activation | default(true)
+
+- name: restart dnscrypt service
+  ansible.builtin.include_tasks: restart_dnscrypt_service.yml
+  when: not (dnscrypt.use_socket_activation | default(true))
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: refresh docker dns
+  when: dnscrypt.refresh_docker_dns | default(false)
+  ansible.builtin.shell: |
+    systemctl reload docker || systemctl restart docker

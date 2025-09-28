@@ -1,0 +1,263 @@
+
+---
+# dnscrypt_stack :: recover.yml
+# Safe, idempotent DNS recovery when dnscrypt-proxy isn't healthy or hostname resolution breaks.
+
+# --- Defaults (can be overridden in group_vars) ---
+- name: Set recovery defaults
+  set_fact:
+    _dns_recover_external_resolvers: "{{ dnscrypt.recover_external_resolvers | default(['1.1.1.1:53','9.9.9.9:53','8.8.8.8:53','77.88.8.8:53']) }}"
+    _dns_recover_write_static_resolv: "{{ dnscrypt.recover_write_static_resolv | default(true) }}"
+    _dns_recover_fix_hosts: "{{ dnscrypt.recover_fix_hosts | default(true) }}"
+    _dns_recover_touch_nm: "{{ dnscrypt.recover_touch_nm | default(true) }}"
+    _dns_recover_touch_cloudinit: "{{ dnscrypt.recover_touch_cloudinit | default(true) }}"
+    _dns_recover_touch_resolved_stub: "{{ dnscrypt.recover_touch_resolved_stub | default(true) }}"
+    _dns_recover_touch_ufw: "{{ dnscrypt.recover_touch_ufw | default(true) }}"
+
+# --- Gather quick state ---
+
+- name: Check dnscrypt-proxy service status
+  ansible.builtin.command: systemctl is-active dnscrypt-proxy
+  register: _svc_dnscrypt
+  failed_when: false
+  changed_when: false
+
+- name: Check who listens on :53
+  ansible.builtin.command: bash -lc "ss -lnut '( sport = :53 )' || true"
+  register: _ss_53
+  changed_when: false
+  failed_when: false
+
+- name: Read current resolv.conf
+  ansible.builtin.slurp:
+    path: /etc/resolv.conf
+  register: _resolv_raw
+  ignore_errors: true
+
+- name: Test a quick hostname resolution (non-fatal)
+  command: getent hosts debian.org
+  register: _getent_test
+  failed_when: false
+  changed_when: false
+
+- name: Check UFW status (non-fatal)
+  when: _dns_recover_touch_ufw
+  ansible.builtin.command: ufw status
+  register: _ufw_status
+  failed_when: false
+  changed_when: false
+
+# --- Decide if we must recover ---
+# Recover if:
+#  - dnscrypt is not 'active'
+#  - AND resolv.conf points to 127.0.0.1 (or empty/unreadable)
+#  - OR hostname lookup failed (exit != 0)
+
+- name: Decide recovery necessity
+  set_fact:
+    _need_recover: >-
+      {{
+        (_svc_dnscrypt.rc != 0 or _svc_dnscrypt.stdout | default('') != 'active') and
+        (
+          (_resolv_raw is not failed and
+           ( _resolv_raw.content | b64decode | regex_search('(?m)^\\s*nameserver\\s+127\\.0\\.0\\.1') or
+             _resolv_raw.content | b64decode | regex_search('(?m)^\\s*nameserver\\s+127\\.0\\.1\\.1')
+           )
+          )
+          or (_resolv_raw is failed)
+        )
+      }}
+    _need_recover_due_to_hostname: "{{ _getent_test.rc != 0 }}"
+
+- name: Clear dnscrypt recovery flag when not required
+  when: not (_need_recover or _need_recover_due_to_hostname)
+  set_fact:
+    dnscrypt_recovery_mode: false
+
+- name: Flag dnscrypt recovery mode when remediation needed
+  when: _need_recover or _need_recover_due_to_hostname
+  set_fact:
+    dnscrypt_recovery_mode: true
+
+- name: Show recovery decision
+  debug:
+    msg:
+      need_recover_dns: "{{ _need_recover }}"
+      need_recover_due_to_hostname: "{{ _need_recover_due_to_hostname }}"
+      dnscrypt_status: "{{ _svc_dnscrypt.stdout | default('n/a') }}"
+      port53_listeners: "{{ _ss_53.stdout_lines }}"
+  when: _need_recover or _need_recover_due_to_hostname
+
+# --- Recovery steps (run only when required) ---
+
+- name: Ensure /etc/hosts contains hostname -> 127.0.1.1 (prevents sudo hang)
+  when: (_need_recover or _need_recover_due_to_hostname) and _dns_recover_fix_hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    create: yes
+    regexp: '^\s*127\.0\.1\.1\s+{{ ansible_hostname }}(\s|$)'
+    line: "127.0.1.1 {{ ansible_hostname }}"
+    state: present
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Stop and disable dnscrypt-proxy (don’t remove yet)
+  when: _need_recover or _need_recover_due_to_hostname
+  ansible.builtin.systemd:
+    name: dnscrypt-proxy
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
+- name: Stop and disable dnscrypt-proxy.socket (free :53)
+  when: _need_recover or _need_recover_due_to_hostname
+  ansible.builtin.systemd:
+    name: dnscrypt-proxy.socket
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
+- name: Ensure systemd-resolved stub listener drop-in is removed
+  when: (_need_recover or _need_recover_due_to_hostname) and _dns_recover_touch_resolved_stub
+  ansible.builtin.file:
+    path: /etc/systemd/resolved.conf.d/disable-stub.conf
+    state: absent
+
+- name: Ensure systemd-resolved drop-in directory exists
+  when: (_need_recover or _need_recover_due_to_hostname) and _dns_recover_touch_resolved_stub
+  ansible.builtin.file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+# Preferred path: restore systemd-resolved + stub resolv.conf symlink
+- name: Unmask and start systemd-resolved (when recovering *to* resolved)
+  when: _need_recover or _need_recover_due_to_hostname
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    masked: false
+    enabled: true
+    state: started
+  register: _resolved_restore
+  ignore_errors: true
+
+# If you’re recovering *away* from resolved back to dnscrypt, stop both:
+- name: Stop systemd-resolved socket if we need dnscrypt on :53
+  when: _need_recover or _need_recover_due_to_hostname
+  ansible.builtin.systemd:
+    name: systemd-resolved.socket
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
+- name: Point /etc/resolv.conf to systemd-resolved stub (if available)
+  when: (_need_recover or _need_recover_due_to_hostname) and (_resolved_restore is not failed)
+  ansible.builtin.file:
+    src: /run/systemd/resolve/stub-resolv.conf
+    dest: /etc/resolv.conf
+    state: link
+    force: true
+
+# Fallback path: write a static resolv.conf with external resolvers
+- name: Write static /etc/resolv.conf with external resolvers (fallback)
+  when: (_need_recover or _need_recover_due_to_hostname) and (_resolved_restore is failed) and _dns_recover_write_static_resolv
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      {% for ip in _dns_recover_external_resolvers %}
+      nameserver {{ ip.split(':')[0] }}
+      {% endfor %}
+
+# Clean up vendor tweaks that might re-break DNS on reboot
+- name: Remove NetworkManager dns=none override (if present)
+  when: (_need_recover or _need_recover_due_to_hostname) and _dns_recover_touch_nm
+  ansible.builtin.file:
+    path: /etc/NetworkManager/conf.d/10-dns-none.conf
+    state: absent
+
+- name: Restart NetworkManager if installed
+  when: (_need_recover or _need_recover_due_to_hostname) and _dns_recover_touch_nm
+  ansible.builtin.systemd:
+    name: NetworkManager
+    state: restarted
+  ignore_errors: true
+
+- name: Ensure UFW inbound DNS blocks are removed
+  when:
+    - _need_recover or _need_recover_due_to_hostname
+    - _dns_recover_touch_ufw
+    - _ufw_status is defined and _ufw_status.rc == 0
+  community.general.ufw:
+    rule: deny
+    port: '53'
+    proto: any
+    delete: true
+  register: _ufw_dns_in_removed
+
+- name: Ensure UFW outbound UDP DNS blocks are removed
+  when:
+    - _need_recover or _need_recover_due_to_hostname
+    - _dns_recover_touch_ufw
+    - _ufw_status is defined and _ufw_status.rc == 0
+  community.general.ufw:
+    rule: deny
+    direction: out
+    port: '53'
+    proto: udp
+    delete: true
+  register: _ufw_dns_out_udp_removed
+
+- name: Ensure UFW outbound TCP DNS blocks are removed
+  when:
+    - _need_recover or _need_recover_due_to_hostname
+    - _dns_recover_touch_ufw
+    - _ufw_status is defined and _ufw_status.rc == 0
+  community.general.ufw:
+    rule: deny
+    direction: out
+    port: '53'
+    proto: tcp
+    delete: true
+  register: _ufw_dns_out_tcp_removed
+
+- name: Reload UFW if DNS rules changed
+  when:
+    - _need_recover or _need_recover_due_to_hostname
+    - _dns_recover_touch_ufw
+    - _ufw_status is defined and _ufw_status.rc == 0
+    - (
+        (_ufw_dns_in_removed is defined and _ufw_dns_in_removed.changed) or
+        (_ufw_dns_out_udp_removed is defined and _ufw_dns_out_udp_removed.changed) or
+        (_ufw_dns_out_tcp_removed is defined and _ufw_dns_out_tcp_removed.changed)
+      )
+  community.general.ufw:
+    state: reloaded
+
+- name: Remove cloud-init DNS override (if present)
+  when: (_need_recover or _need_recover_due_to_hostname) and _dns_recover_touch_cloudinit
+  ansible.builtin.file:
+    path: /etc/cloud/cloud.cfg.d/99-dns.cfg
+    state: absent
+  ignore_errors: true
+
+# Final sanity checks
+- name: Sanity - can we resolve debian.org now?
+  when: _need_recover or _need_recover_due_to_hostname
+  ansible.builtin.command: getent hosts debian.org
+  register: _getent_post
+  failed_when: false
+  changed_when: false
+
+- name: Report recovery result
+  when: _need_recover or _need_recover_due_to_hostname
+  ansible.builtin.debug:
+    msg:
+      resolv_conf: "{{ (_resolv_raw.content | default('') ) and (_resolv_raw.content | b64decode | regex_replace('\n',' ')) or 'n/a' }}"
+      recovery_ok: "{{ _getent_post.rc == 0 }}"
+      post_getent: "{{ _getent_post.stdout | default('') }}"

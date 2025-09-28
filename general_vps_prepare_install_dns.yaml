@@ -1,0 +1,11 @@
+---
+- name: Install DNS by DNSCrypto-proxy
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - name: ./roles/dns_stack
+      vars:
+        docker_users:
+          - "{{ standard_user }}"
+        docker_package_state: present
