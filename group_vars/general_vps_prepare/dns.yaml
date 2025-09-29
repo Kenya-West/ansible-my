@@ -37,6 +37,9 @@ dnscrypt:
 
   # UFW (allow SSH, deny inbound DNS from outside)
   ufw_enable: true
+  ufw_target_port: 53
+  # Which actions to remove; add ALLOW if you also want to wipe allows.
+  ufw_actions_regex: "(deny|reject|limit)"   # "(allow|deny|reject|limit)" to nuke all
 
   # Recover
   enable_auto_recover: true

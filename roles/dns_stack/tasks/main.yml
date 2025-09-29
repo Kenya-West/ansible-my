@@ -3,6 +3,9 @@
   when: dnscrypt.set_hostname | default(false)
   tags: ['dns:resolve']
 
+- import_tasks: ufw_rules.yml
+  tags: ['dns:ufw-remove']
+
 - import_tasks: recover.yml
   when: dnscrypt.enable_auto_recover | default(true)
   tags: ['dns:recover']
