@@ -46,7 +46,7 @@ ignore_system_dns = true
 cert_refresh_delay = 240
 
 [sources]
-{% for s in dnscrypt.doh_servers %}
+{% for s in dnscrypt.sources %}
 
   [sources.'{{ s.id }}']
   {% if s.urls and s.urls|length > 0 %}urls = [{%- for url in s.urls -%}"{{ url }}"{%- if not loop.last -%}, {%- endif -%}{%- endfor -%}]{% endif %}

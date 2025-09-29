@@ -3,7 +3,7 @@ dnscrypt:
   listen_port: 53
   use_socket_activation: true
 
-  doh_servers:
+  sources:
     - id: "public-resolvers"
       urls:
         - https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md
