@@ -1,36 +1,12 @@
 ---
 # handlers file for roles/dns_stack
-- name: manage dnscrypt when using socket activation
-  listen: restart dnscrypt
+- name: restart dnscrypt
+  ansible.builtin.include_tasks: restart_dnscrypt.yml
   when: dnscrypt.use_socket_activation | default(true)
-  block:
-    - name: restart dnscrypt socket
-      ansible.builtin.systemd:
-        name: dnscrypt-proxy.socket
-        state: restarted
-        daemon_reload: true
-    - name: disable service unit
-      ansible.builtin.systemd:
-        name: dnscrypt-proxy.service
-        enabled: false
-        state: stopped
-      ignore_errors: true
 
-- name: manage dnscrypt when using service unit
-  listen: restart dnscrypt (service mode)
+- name: restart dnscrypt service
+  ansible.builtin.include_tasks: restart_dnscrypt_service.yml
   when: not (dnscrypt.use_socket_activation | default(true))
-  block:
-    - name: restart dnscrypt service
-      ansible.builtin.systemd:
-        name: dnscrypt-proxy
-        state: restarted
-        daemon_reload: true
-    - name: disable socket unit
-      ansible.builtin.systemd:
-        name: dnscrypt-proxy.socket
-        enabled: false
-        state: stopped
-      ignore_errors: true
 
 - name: reload systemd
   ansible.builtin.systemd:
