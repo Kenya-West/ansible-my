@@ -12,3 +12,39 @@ groups:
     annotations:
       summary: "Job Last Run Missing on instance {{ $labels.instance }}"
       description: "The job_last_run_timestamp metric was seen within the last 10 days but not in the past 2 days."
+
+  - alert: JobFailed
+    expr: job_status == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Job {{ $labels.job }} on instance {{ $labels.instance }} has failed"
+      description: "The job '{{ $labels.job }}' on instance '{{ $labels.instance }}' has reported a status of 0 (failed) for more than 5 minutes. Investigate immediately."
+
+  - alert: JobDurationTooLong
+    expr: job_duration_seconds > 300
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Job {{ $labels.job }} on instance {{ $labels.instance }} is taking too long"
+      description: "The job '{{ $labels.job }}' on instance '{{ $labels.instance }}' has been running for more than 5 minutes (300 seconds). This might indicate a problem or a performance degradation."
+
+  - alert: JobNotRunRecently
+    expr: time() - job_last_run_timestamp > 86400 * 8
+    for: 1h
+    labels:
+      severity: critical
+    annotations:
+      summary: "Job {{ $labels.job }} on instance {{ $labels.instance }} has not run recently"
+      description: "The job '{{ $labels.job }}' on instance '{{ $labels.instance }}' has not reported a successful run in over 8 days. This could indicate a scheduler failure or a stalled job."
+
+  - alert: JobDurationSpike
+    expr: (job_duration_seconds - avg_over_time(job_duration_seconds[1h])) / avg_over_time(job_duration_seconds[1h]) > 0.5
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Job {{ $labels.job }} on instance {{ $labels.instance }} duration spike detected"
+      description: "The duration of job '{{ $labels.job }}' on instance '{{ $labels.instance }}' has increased by more than 50% compared to its average over the last hour. This could indicate a performance issue."
