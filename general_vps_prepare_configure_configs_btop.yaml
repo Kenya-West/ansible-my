@@ -1,0 +1,98 @@
+---
+- name: Configure configs for btop
+  hosts: general_vps_prepare
+  become: false
+  become_user: "{{ standard_user }}"
+
+  vars:
+    project_dir: "{{ general_vps_prepare_project_structure_end_dirs.btop | ansible.builtin.basename }}"
+    project_root_dir: "{{ general_vps_prepare_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/snap/btop/current/.config/btop"
+    dest_project_rootpath_root_user: "/root/snap/btop/current/.config/btop"
+
+  tasks:
+    - name: Remove btop config files in $HOME if it exists
+      ansible.builtin.file:
+        path: "/home/{{ standard_user }}/.config/btop"
+        state: absent
+      when: btop_remove_home_config | default(false)
+    - name: Remove btop config files in /root if it exists
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "/root/.config/btop"
+        state: absent
+      when: btop_remove_home_config | default(false)
+
+    - name: Check if btop is installed
+      ansible.builtin.shell: command -v btop
+      register: broot_path
+      failed_when: broot_path.stdout == ''
+
+    - name: Launch btop with PTY (user)
+      ansible.builtin.shell: |
+        script -q -c "timeout 5 btop" /dev/null || true
+      when: broot_path.stdout != ''
+      ignore_errors: true
+    - name: Launch btop with PTY (root)
+      become: true
+      become_user: root
+      ansible.builtin.shell: |
+        script -q -c "timeout 5 btop" /dev/null || true
+      when: broot_path.stdout != ''
+      ignore_errors: true
+
+    - name: Wait for snap current directory for user
+      ansible.builtin.wait_for:
+        path: "{{ dest_project_rootpath }}"
+        state: present
+        timeout: 3
+      register: btop_snap_dir_user
+    - name: Wait for snap current directory for root
+      become: true
+      become_user: root
+      ansible.builtin.wait_for:
+        path: "{{ dest_project_rootpath_root_user }}"
+        state: present
+        timeout: 3
+      register: btop_snap_dir_root
+
+    - name: Copy config for btop from common assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_common }}/btop.conf.j2"
+        dest: "{{ dest_project_rootpath }}/btop.conf"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+    - name: Copy config for btop from project assets
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_project }}/btop.conf.j2"
+        dest: "{{ dest_project_rootpath }}/btop.conf"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0775"
+      ignore_errors: true
+
+    - name: Copy config for btop from common assets to root
+      become: true
+      become_user: root
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_common }}/btop.conf.j2"
+        dest: "{{ dest_project_rootpath_root_user }}/btop.conf"
+        owner: "root"
+        group: "root"
+        mode: "0775"
+    - name: Copy config for btop from project assets to root
+      become: true
+      become_user: root
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_project }}/btop.conf.j2"
+        dest: "{{ dest_project_rootpath_root_user }}/btop.conf"
+        owner: "root"
+        group: "root"
+        mode: "0775"
+      ignore_errors: true

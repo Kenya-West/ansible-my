@@ -3,6 +3,7 @@ packages_list:
   uninstall:
     apt:
       - fzf
+      - btop
   install:
     apt:
       # Base packages
@@ -40,7 +41,6 @@ packages_list:
       - whois
       - ripgrep
       - micro
-      - btop
       - sqlite3
       - nala
       - doas
@@ -49,5 +49,6 @@ packages_list:
       - python3-passlib # Needed for Ansible htpasswd module
       - python3-bcrypt # Needed for Ansible htpasswd module
     snap:
+      - btop
       - procs
       - trippy

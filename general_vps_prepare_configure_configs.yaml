@@ -2,3 +2,4 @@
 - import_playbook: ./general_vps_prepare_configure_configs_doas.yaml
 - import_playbook: ./general_vps_prepare_configure_configs_micro.yaml
 - import_playbook: ./general_vps_prepare_configure_configs_broot.yaml
+- import_playbook: ./general_vps_prepare_configure_configs_btop.yaml
