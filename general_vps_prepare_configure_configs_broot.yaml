@@ -1,8 +1,8 @@
 ---
 - name: Configure configs for broot
   hosts: general_vps_prepare
-  become: true
-  become_user: root
+  become: false
+  become_user: "{{ standard_user }}"
 
   vars:
     project_dir: "{{ general_vps_prepare_project_structure_end_dirs.broot | ansible.builtin.basename }}"
@@ -29,6 +29,9 @@
 
     - name: Launch broot to install in shell
       ansible.builtin.shell: broot --install
+
+    - name: Launch broot to populate configuration
+      ansible.builtin.shell: "broot --write-default-conf {{ dest_project_rootpath }}"
 
     - name: Copy config for broot from common assets
       ansible.builtin.template:
