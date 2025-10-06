@@ -1,0 +1,4 @@
+---
+- import_playbook: ./install_vpn_caddy_caddy.yaml
+- import_playbook: ./install_vpn_caddy_remna.yaml
+- import_playbook: ./install_web_features_caddy.yaml
