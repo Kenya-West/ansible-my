@@ -1,0 +1,57 @@
+dnscrypt:
+  listen_addr: "127.0.0.1"
+  listen_port: 53
+  use_socket_activation: true
+  dnscrypt_servers: true
+
+  sources:
+    - id: "public-resolvers"
+      urls:
+        - https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md
+        - https://download.dnscrypt.info/resolvers-list/v3/public-resolvers.md
+        - https://hub.mos.ru/kenya-west/dnscrypt-resolvers/-/raw/master/v3/public-resolvers.md
+        - https://gitverse.ru/api/repos/Kenya-West/dnscrypt-resolvers/raw/branch/master/v3/public-resolvers.md
+        - https://gitflic.ru/project/kenya-west/dnscrypt-resolvers/blob/raw?file=v3%2Fpublic-resolvers.md
+      cache_file: public-resolvers.md
+      minisign_key: RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3
+      refresh_delay: 72
+      prefix: ""
+
+
+  # Which of the above should be used (order = priority; dnscrypt will choose among available)
+  server_names: ["cloudflare", "google", "yandex", "dnscry.pt-moscow-ipv4"]
+
+  # Plain-IP resolvers used *only* for bootstrap and as ultimate fallback by dnscrypt-proxy.
+  # (IPs only; no hostnames. Keep at least two.)
+  fallback_resolvers: ["1.1.1.1:53", "9.9.9.9:53", "8.8.8.8:53", "77.88.8.8:53"]
+
+  require_dnssec: false        # set true if you want DNSSEC validation at the proxy level
+  ipv6: false
+  log_level: 2
+
+  # Networking hardening (after dnscrypt is up)
+  neutralize_cloud_init_dns: true
+  disable_systemd_resolved: true
+  disable_networkmanager_dns: true
+  refresh_docker_dns: true
+
+  # UFW (allow SSH, deny inbound DNS from outside)
+  ufw_enable: true
+  ufw_target_port: 53
+  # Which actions to remove; add ALLOW if you also want to wipe allows.
+  ufw_actions_regex: "(deny|reject|limit)"   # "(allow|deny|reject|limit)" to nuke all
+
+  # Recover
+  enable_auto_recover: true
+  recover_external_resolvers:
+    - "1.1.1.1:53"
+    - "9.9.9.9:53"
+    - "8.8.8.8:53"
+    - "77.88.8.8:53"   # Yandex (optional/regional)
+  recover_write_static_resolv: true
+  recover_fix_hosts: true
+  recover_touch_nm: true
+  recover_touch_cloudinit: true
+
+  # Hostname resovle
+  set_hostname: false

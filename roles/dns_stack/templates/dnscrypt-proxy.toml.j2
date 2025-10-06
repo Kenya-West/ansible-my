@@ -1,0 +1,63 @@
+{# Bind addresses: if running under socket activation, set to empty list to prevent binding #}
+{% if dnscrypt.use_socket_activation | default(true) %}
+# Using systemd socket activation; do not bind here (use inherited sockets)
+listen_addresses = []
+{% else %}
+listen_addresses = ["{{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }}"]
+{% endif %}
+
+ipv4_servers = true
+ipv6_servers = {{ 'true' if dnscrypt.ipv6 else 'false' }}
+dnscrypt_servers = {{ 'true' if dnscrypt.dnscrypt_servers else 'false' }}
+doh_servers = true
+
+require_dnssec = {{ 'true' if dnscrypt.require_dnssec else 'false' }}
+require_nolog = false
+require_nofilter = false
+
+# Plain IP resolvers for initial bootstrap and emergencies (no hostnames here!)
+fallback_resolvers = [
+{%- for ip in dnscrypt.fallback_resolvers -%}
+  "{{ ip }}"{%- if not loop.last -%}, {%- endif -%}
+{%- endfor -%}
+]
+
+log_level = {{ dnscrypt.log_level }}
+{% if dnscrypt.log_file is defined and dnscrypt.log_file %}
+log_file = "{{ dnscrypt.log_file }}"
+{% endif %}
+use_syslog = true
+
+# Which ones to use
+server_names = [{% for n in dnscrypt.server_names %}"{{ n }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+
+# Timeouts (short so we fail over fast if blocked)
+timeout = 3000
+keepalive = 30
+
+# Max clients cache
+cache = true
+cache_size = 512
+cache_min_ttl = 60
+cache_max_ttl = 86400
+
+# Security niceties
+ignore_system_dns = true
+cert_refresh_delay = 240
+
+[sources]
+{% for s in dnscrypt.sources %}
+
+  [sources.'{{ s.id }}']
+  {% if s.urls and s.urls|length > 0 %}urls = [{%- for url in s.urls -%}"{{ url }}"{%- if not loop.last -%}, {%- endif -%}{%- endfor -%}]{% endif %}
+  
+  {% if s.cache_file %}cache_file = "{{ s.cache_file }}"{% endif %}
+
+  {% if s.minisign_key %}minisign_key = "{{ s.minisign_key }}"{% endif %}
+
+  {% if s.refresh_delay %}refresh_delay = {{ s.refresh_delay }}{% endif %}
+
+  {% if s.prefix %}prefix = "{{ s.prefix }}"{% endif %}
+
+{% endfor %}
+

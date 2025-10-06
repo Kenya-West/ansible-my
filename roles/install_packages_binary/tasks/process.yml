@@ -13,7 +13,7 @@
 - name: Construct download command for {{ item.repo }} using eget
   set_fact:
     download_cmd: >-
-      timeout 30s
+      timeout {{ packages_binary_timeout }}
       eget {{ item.repo }}
       {% if item.assets is defined and item.assets | length > 0 %}
       {% for asset in item.assets %} --asset {{ asset }}{% endfor %}
@@ -22,7 +22,7 @@
       {% if item.file is defined and item.file | length > 0 %}--file {{ item.file }}{% endif %}
       --to {{ item.dest_loc | default('/usr/local/bin') }}
     download_cmd_without_assets: >-
-      timeout 30s
+      timeout {{ packages_binary_timeout }}
       eget {{ item.repo }}
       {% if bin_installed.rc == 0 %} --upgrade-only{% endif %}
       {% if item.file is defined and item.file | length > 0 %}--file {{ item.file }}{% endif %}

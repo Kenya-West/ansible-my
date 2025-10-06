@@ -1,0 +1,293 @@
+---
+- import_tasks: hostname-resolve.yml
+  when: dnscrypt.set_hostname | default(false)
+  tags: ['dns:resolve']
+
+- import_tasks: ufw_rules.yml
+  tags: ['dns:ufw-remove']
+
+- import_tasks: recover.yml
+  when: dnscrypt.enable_auto_recover | default(true)
+  tags: ['dns:recover']
+
+# Free port 53 from systemd-resolved stub
+
+- block:
+    - name: Ensure systemd resolved conf.d directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/resolved.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Disable systemd-resolved stub listener
+      ansible.builtin.copy:
+        dest: /etc/systemd/resolved.conf.d/disable-stub.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Resolve]
+          DNSStubListener=no
+      notify: reload systemd
+
+    # tasks file for roles/dns_stack
+    - name: Ensure base packages are installed
+      ansible.builtin.apt:
+        name:
+          - curl
+          - tar
+          - ca-certificates
+          - ufw
+          - dnscrypt-proxy
+        state: present
+        update_cache: true
+
+    # 1) INSTALL & CONFIGURE DNSCRYPT-PROXY (keep vendor DNS alive meanwhile)
+    - name: Ensure config dir exists
+      ansible.builtin.file:
+        path: /etc/dnscrypt-proxy
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Render dnscrypt-proxy config
+      ansible.builtin.template:
+        src: dnscrypt-proxy.toml.j2
+        dest: /etc/dnscrypt-proxy/dnscrypt-proxy.toml
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart dnscrypt
+
+    # Use systemd socket activation for dnscrypt-proxy (conditional)
+    - name: Ensure dnscrypt-proxy.socket drop-in directory exists
+      when: dnscrypt.use_socket_activation | default(true)
+      ansible.builtin.file:
+        path: /etc/systemd/system/dnscrypt-proxy.socket.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Override dnscrypt-proxy.socket listen address
+      when: dnscrypt.use_socket_activation | default(true)
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/dnscrypt-proxy.socket.d/override.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Socket]
+          ListenStream=
+          ListenDatagram=
+          ListenStream={{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }}
+          ListenDatagram={{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }}
+      notify: reload systemd
+
+    - name: Flush handlers to apply socket override
+      when: dnscrypt.use_socket_activation | default(true)
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable and restart dnscrypt-proxy.socket
+      when: dnscrypt.use_socket_activation | default(true)
+      ansible.builtin.systemd:
+        name: dnscrypt-proxy.socket
+        enabled: true
+        state: restarted
+        daemon_reload: true
+      register: _dnscrypt_socket_started
+      ignore_errors: true
+
+    - name: Ensure dnscrypt-proxy service is disabled when using socket activation
+      when: dnscrypt.use_socket_activation | default(true)
+      ansible.builtin.systemd:
+        name: dnscrypt-proxy.service
+        enabled: false
+        state: stopped
+      ignore_errors: true
+
+    - name: Disable socket, enable+restart service (service mode)
+      when: not (dnscrypt.use_socket_activation | default(true))
+      block:
+        - ansible.builtin.systemd:
+            name: dnscrypt-proxy.socket
+            enabled: false
+            state: stopped
+            daemon_reload: true
+          ignore_errors: true
+        - ansible.builtin.systemd:
+            name: dnscrypt-proxy.service
+            enabled: true
+            state: restarted
+            daemon_reload: true
+          register: _dnscrypt_service_started
+          ignore_errors: true
+
+    - name: Wait for dnscrypt-proxy to listen on {{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }} (socket mode)
+      when: dnscrypt.use_socket_activation | default(true)
+      ansible.builtin.wait_for:
+        host: "{{ dnscrypt.listen_addr }}"
+        port: "{{ dnscrypt.listen_port | int }}"
+        state: started
+        delay: 0
+        timeout: 60
+
+    - name: Wait for dnscrypt-proxy to listen on {{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }} (service mode)
+      when: not (dnscrypt.use_socket_activation | default(true))
+      ansible.builtin.wait_for:
+        host: "{{ dnscrypt.listen_addr }}"
+        port: "{{ dnscrypt.listen_port | int }}"
+        state: started
+        delay: 0
+        timeout: 60
+
+    # 2) NOW SWITCH THE HOST TO LOCAL DNS & NEUTRALIZE VENDOR LAYERS
+
+    - name: Replace /etc/resolv.conf (real file -> localhost)
+      block:
+        - name: Remove resolv.conf (symlink if any)
+          ansible.builtin.file:
+            path: /etc/resolv.conf
+            state: absent
+          ignore_errors: true
+
+        - name: Create resolv.conf pointing to localhost
+          ansible.builtin.copy:
+            dest: /etc/resolv.conf
+            mode: '0644'
+            content: |
+              nameserver {{ dnscrypt.listen_addr }}
+      when: dnscrypt.disable_systemd_resolved | default(true)
+
+    - name: Disable & mask systemd-resolved
+      when: dnscrypt.disable_systemd_resolved | default(true)
+      ansible.builtin.systemd:
+        name: systemd-resolved
+        enabled: false
+        state: stopped
+        masked: true
+      ignore_errors: true
+
+    - name: Disable NetworkManager DNS management (if present)
+      when: dnscrypt.disable_networkmanager_dns | default(true)
+      block:
+        - name: Gather service facts (for NetworkManager detection)
+          ansible.builtin.service_facts:
+
+        - name: Ensure conf.d exists
+          ansible.builtin.file:
+            path: /etc/NetworkManager/conf.d
+            state: directory
+            mode: '0755'
+        - name: Write dns-none.conf
+          ansible.builtin.copy:
+            dest: /etc/NetworkManager/conf.d/10-dns-none.conf
+            mode: '0644'
+            content: |
+              [main]
+              dns=none
+            backup: true
+        - name: Restart NetworkManager
+          systemd:
+            name: NetworkManager
+            state: restarted
+          when: "'NetworkManager.service' in ansible_facts.services"
+          ignore_errors: true
+
+    - name: Neutralize cloud-init DNS rewrites
+      when: dnscrypt.neutralize_cloud_init_dns | default(true)
+      ansible.builtin.copy:
+        dest: /etc/cloud/cloud.cfg.d/99-dns.cfg
+        mode: '0644'
+        content: |
+          resolv_conf:
+            manage_resolv_conf: false
+        backup: true
+
+    # 3) NETWORKING GUARDRAILS
+
+    - name: Configure UFW
+      when: dnscrypt.ufw_enable | default(true)
+      block:
+        - community.general.ufw:
+            state: enabled
+            logging: 'off'
+        - community.general.ufw:
+            rule: allow
+            port: '22'
+            proto: tcp
+        - community.general.ufw:
+            rule: deny
+            port: '53'
+            proto: any
+        - community.general.ufw:
+            rule: deny
+            direction: out
+            port: '53'
+            proto: udp
+        - community.general.ufw:
+            rule: deny
+            direction: out
+            port: '53'
+            proto: tcp
+        - community.general.ufw:
+            rule: allow
+            direction: out
+            to: '127.0.0.1'
+            port: '53'
+            proto: udp
+        - community.general.ufw:
+            rule: allow
+            direction: out
+            to: '127.0.0.1'
+            port: '53'
+            proto: tcp
+        - community.general.ufw:
+            state: reloaded
+
+    # 4) QUICK HEALTH CHECK (non-fatal)
+    - name: Check dnscrypt-proxy is listening
+      ansible.builtin.shell: "ss -ltnup | grep ':{{ dnscrypt.listen_port }} ' || true"
+      register: ss_out
+      changed_when: false
+
+    - name: Show listener info
+      debug:
+        var: ss_out.stdout
+
+    - name: Queue Docker DNS refresh
+      when: dnscrypt.refresh_docker_dns | default(false)
+      ansible.builtin.command: /bin/true
+      changed_when: true
+      notify: refresh docker dns
+
+    # 5) FINAL VALIDATION CHECKS (fail if not satisfied)
+    - name: Verify hostname resolution works
+      ansible.builtin.command: getent hosts debian.org
+      register: hostname_resolution
+      failed_when: hostname_resolution.rc != 0
+      changed_when: false
+
+    - name: Verify systemd-resolved is not running
+      ansible.builtin.command: systemctl is-active systemd-resolved
+      register: resolved_status
+      failed_when: resolved_status.stdout != 'inactive' and resolved_status.stdout != 'failed'
+      changed_when: false
+
+    - name: Verify dnscrypt-proxy is running (check process)
+      ansible.builtin.command: pgrep -f dnscrypt-proxy
+      register: dnscrypt_process
+      failed_when: dnscrypt_process.rc != 0
+      changed_when: false
+
+    - name: Stop & disable systemd-resolved socket (post-switch)
+      ansible.builtin.systemd:
+        name: systemd-resolved.socket
+        state: stopped
+        enabled: false
+        masked: true
+      ignore_errors: true
+  when: not (dnscrypt_recovery_mode | default(false))

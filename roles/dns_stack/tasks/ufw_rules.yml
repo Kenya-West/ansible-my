@@ -1,0 +1,54 @@
+---
+# tasks/ufw_rules.yml
+
+- name: Collect UFW rule numbers for the target port (numbered only)
+  become: true
+  shell: |
+    set -eu
+    LC_ALL=C ufw status numbered 2>/dev/null \
+    | awk -v p="{{ dnscrypt.ufw_target_port | default(53) }}" -v act="{{ dnscrypt.ufw_actions_regex | default('(deny|reject|limit)') }}" '
+        BEGIN{IGNORECASE=1}
+        # Examples we want to catch:
+        # [ 1] 53                         DENY        Anywhere
+        # [ 2] 53/udp                     DENY OUT    Anywhere
+        # [ 3] 127.0.0.1 53/tcp           ALLOW OUT   Anywhere
+        # [ 4] Anywhere                    REJECT      53 (v6)
+        # [ 5] 53 (domain)                DENY        Anywhere (v6)
+        {
+          if (!match($0, /^\[[[:space:]]*([0-9]+)\]/, m)) next
+          num=m[1]; line=$0
+          if (line !~ act) next
+          if ( line ~ ("to any port[[:space:]]+" p "\\b") \
+               || line ~ ("(^|[[:space:]])" p "(/(tcp|udp))?([^0-9]|$)") \
+               || line ~ ("\\b" p "[[:space:]]*\\(domain\\)") ) {
+            print num
+          }
+        }' \
+    | sort -rn
+  register: ufw_rule_numbers
+  changed_when: false
+  tags: [firewall, ufw]
+
+- name: Remove UFW rules for the target port (by number, desc)
+  become: true
+  command: "ufw --force delete {{ item }}"
+  loop: "{{ ufw_rule_numbers.stdout_lines }}"
+  when: ufw_rule_numbers.stdout_lines | length > 0
+  register: ufw_delete_by_num
+  changed_when: ufw_delete_by_num is changed
+  tags: [firewall, ufw]
+
+- name: Reload UFW explicitly (optional)
+  become: true
+  command: ufw reload
+  when: ufw_rule_numbers.stdout_lines | length > 0
+  tags: [firewall, ufw]
+
+- name: Summary of removed rules
+  debug:
+    msg: >-
+      Removed {{ (ufw_rule_numbers.stdout_lines | length) | default(0) }}
+      UFW rule(s) for port {{ dnscrypt.ufw_target_port | default(53) }}:
+      {{ ufw_rule_numbers.stdout_lines | join(', ') }}
+  when: ufw_rule_numbers.stdout_lines | length > 0
+  tags: [firewall, ufw]
