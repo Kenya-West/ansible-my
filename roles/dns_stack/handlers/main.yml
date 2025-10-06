@@ -12,7 +12,6 @@
   ansible.builtin.systemd:
     daemon_reload: true
 
-- name: refresh docker dns
+- name: restart docker
+  ansible.builtin.include_tasks: restart_docker.yml
   when: dnscrypt.refresh_docker_dns | default(false)
-  ansible.builtin.shell: |
-    systemctl reload docker || systemctl restart docker

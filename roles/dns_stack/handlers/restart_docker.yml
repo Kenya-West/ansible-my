@@ -1,0 +1,13 @@
+- name: Determine if dnscrypt is running
+  ansible.builtin.command:
+    cmd: systemctl is-active dnscrypt-proxy
+  register: dnscrypt_status
+  failed_when: false
+  changed_when: false
+
+- name: Refresh Docker DNS when dnscrypt is active
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  when:
+    - dnscrypt_status.stdout == "active"

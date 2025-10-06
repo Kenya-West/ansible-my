@@ -262,7 +262,7 @@
       when: dnscrypt.refresh_docker_dns | default(false)
       ansible.builtin.command: /bin/true
       changed_when: true
-      notify: refresh docker dns
+      notify: restart docker
 
     # 5) FINAL VALIDATION CHECKS (fail if not satisfied)
     - name: Verify hostname resolution works
