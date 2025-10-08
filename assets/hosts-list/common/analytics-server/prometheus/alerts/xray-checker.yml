@@ -1,0 +1,29 @@
+groups:
+- name: xray_proxy_alerts
+  rules:
+  - alert: XRayProxyDown
+    expr: xray_proxy_status == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "XRay Proxy {{ $labels.name }} ({{ $labels.address }}) is down"
+      description: "The XRay proxy connection to {{ $labels.name }} ({{ $labels.address }}) is reporting a status of 0 (down)."
+
+  - alert: XRayProxyHighLatency
+    expr: xray_proxy_latency_ms > 3000
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "XRay Proxy {{ $labels.name }} ({{ $labels.address }}) has high latency"
+      description: "The XRay proxy connection to {{ $labels.name }} ({{ $labels.address }}) has a latency exceeding 1000ms."
+
+  - alert: XRayProxyElevatedLatency
+    expr: xray_proxy_latency_ms > 1500
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "XRay Proxy {{ $labels.name }} ({{ $labels.address }}) has elevated latency"
+      description: "The XRay proxy connection to {{ $labels.name }} ({{ $labels.address }}) has a latency exceeding 500ms."
