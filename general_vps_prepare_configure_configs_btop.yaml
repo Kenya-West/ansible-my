@@ -30,20 +30,20 @@
 
     - name: Check if btop is installed
       ansible.builtin.shell: command -v btop
-      register: broot_path
-      failed_when: broot_path.stdout == ''
+      register: btop_path
+      failed_when: btop_path.stdout == ''
 
     - name: Launch btop with PTY (user)
       ansible.builtin.shell: |
         script -q -c "timeout 5 btop" /dev/null || true
-      when: broot_path.stdout != ''
+      when: btop_path.stdout != ''
       ignore_errors: true
     - name: Launch btop with PTY (root)
       become: true
       become_user: root
       ansible.builtin.shell: |
         script -q -c "timeout 5 btop" /dev/null || true
-      when: broot_path.stdout != ''
+      when: btop_path.stdout != ''
       ignore_errors: true
 
     - name: Wait for snap current directory for user
