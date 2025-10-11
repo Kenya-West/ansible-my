@@ -61,6 +61,34 @@
         timeout: 3
       register: btop_snap_dir_root
 
+    - name: Get Snap current revision for btop
+      ansible.builtin.shell: snap list btop | awk 'NR==2 {print $3}'
+      register: btop_snap_revision_raw
+      changed_when: false
+      when: btop_snap_dir_user is succeeded or btop_snap_dir_root is succeeded
+      failed_when: btop_snap_revision_raw.stdout == ''
+    - name: Set Snap current revision for btop
+      ansible.builtin.set_fact:
+        btop_snap_revision: "{{ btop_snap_revision_raw.stdout | int }}"
+      when: btop_snap_revision_raw.stdout != ''
+    
+    - name: Check that btop snap revision directory exists for user, fail if not
+      ansible.builtin.stat:
+        path: "/home/{{ standard_user }}/snap/btop/{{ (btop_snap_revision | default('current')) | string }}"
+      register: btop_snap_revision_dir_user
+      failed_when: not btop_snap_revision_dir_user.stat.exists and (btop_snap_dir_user is succeeded)
+    - name: Check that btop snap revision directory exists for root, fail if not
+      become: true
+      become_user: root
+      ansible.builtin.stat:
+        path: "/root/snap/btop/{{ (btop_snap_revision | default('current')) | string }}"
+      register: btop_snap_revision_dir_root
+      failed_when: not btop_snap_revision_dir_root.stat.exists and (btop_snap_dir_root is succeeded)
+
+    - name: Set fact to use btop theme for user
+      ansible.builtin.set_fact:
+        btop_theme: "{{ btop_theme_user }}"
+      when: btop_theme_user is defined and (btop_snap_dir_user is succeeded)
     - name: Copy config for btop from common assets
       ansible.builtin.template:
         src: "{{ source_asset_fullpath_common }}/btop.conf.j2"
@@ -68,6 +96,10 @@
         owner: "{{ standard_user }}"
         group: "{{ standard_user }}"
         mode: "0775"
+    - name: Set fact to use btop theme for root
+      ansible.builtin.set_fact:
+        btop_theme: "{{ btop_theme_root }}"
+      when: btop_theme_root is defined and (btop_snap_dir_root is succeeded)
     - name: Copy config for btop from project assets
       ansible.builtin.template:
         src: "{{ source_asset_fullpath_project }}/btop.conf.j2"

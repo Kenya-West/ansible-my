@@ -1,1 +1,3 @@
 btop_remove_home_config: true
+btop_theme_user: dracula.theme
+btop_theme_root: adapta.theme
