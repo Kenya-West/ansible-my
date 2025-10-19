@@ -15,6 +15,9 @@ services:
       - "${EXTERNAL_PORT}:${APP_PORT}"
     labels:
       caddy: "${SERVICE_DOMAINS}"
+{% if remna_node_use_dns01_cloudflare is defined and remna_node_use_dns01_cloudflare == true %}
+      caddy.tls.dns: "cloudflare ${CLOUDFLARE_API_TOKEN}"
+{% endif %}
       caddy.import: "logging ${LOG_FILE_NAME}-remna"
       caddy.@not_internal: "not path /{$$INTERNAL_PATH_BASE}*"
       caddy.root: "@not_internal /var/www/public"
