@@ -14,8 +14,8 @@ services:
 {% endif %}
       - "${EXTERNAL_PORT}:${APP_PORT}"
     labels:
-      caddy: "${SERVICE_DOMAIN}"
-      caddy.import: "logging ${SERVICE_DOMAIN}-remna"
+      caddy: "${SERVICE_DOMAINS}"
+      caddy.import: "logging ${LOG_FILE_NAME}-remna"
       caddy.@not_internal: "not path /{$$INTERNAL_PATH_BASE}*"
       caddy.root: "@not_internal /var/www/public"
       caddy.file_server: "@not_internal"
