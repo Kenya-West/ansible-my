@@ -53,6 +53,41 @@
     group: "{{ unzip_dest_group | default(standard_user) }}"
     mode: "{{ unzip_dest_mode | default('0775') }}"
 
+- name: Set file checksum file path and name
+  ansible.builtin.set_fact:
+    unzip_checksum_file: "{{ unzip_dest }}/{{ unzip_source | basename }}.md5"
+
+- name: Check the checksum of source file
+  ansible.builtin.stat:
+    path: "{{ unzip_source }}"
+    checksum_algorithm: md5
+  register: unzip_checksum_stats_source_check
+  failed_when: false
+- name: Set fact for source checksum stats
+  ansible.builtin.set_fact:
+    unzip_checksum_stats_source: "{{ unzip_checksum_stats_source_check.stat.checksum }}"
+- name: Check the destination checksum file exists
+  ansible.builtin.stat:
+    path: "{{ unzip_checksum_file }}"
+  register: unzip_checksum_stats_dest_check
+  failed_when: false
+- name: Check the contents of destination checksum file (if exists)
+  ansible.builtin.slurp:
+    path: "{{ unzip_checksum_file }}"
+  register: unzip_checksum_stats_dest_base64
+  when: unzip_checksum_stats_dest_check.stat.exists
+- name: Set fact for destination checksum
+  ansible.builtin.set_fact:
+    unzip_checksum_stats_dest: "{{ unzip_checksum_stats_dest_base64.content | b64decode }}"
+- name: Set checksum to zero if destination checksum file does not exist
+  ansible.builtin.set_fact:
+    unzip_checksum_stats_dest: "0"
+  when: not unzip_checksum_stats_dest_check.stat.exists
+
+- name: Set fact that allows unzipping
+  ansible.builtin.set_fact:
+    unzip_allowed: "{{ unzip_checksum_stats_source != unzip_checksum_stats_dest }}"
+
 - name: Unzip file(s) by two ways
   block:
     - name: Unzip a file by built-in unarchive module
@@ -67,9 +102,15 @@
     - name: Include tar task based on file extension
       ansible.builtin.include_tasks: untar.yml
       when: unzip_file_extension in supported_file_extensions_tar
+  when: unzip_allowed | bool
 
 - name: Remove source file if specified
   ansible.builtin.file:
     path: "{{ unzip_source }}"
     state: absent
   when: unzip_remove_source | default(false) | bool
+
+- name: Save checksum result with same file name + md5 extension
+  ansible.builtin.copy:
+    content: "{{ unzip_checksum_stats_source }}"
+    dest: "{{ unzip_checksum_file }}"

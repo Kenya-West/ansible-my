@@ -36,6 +36,7 @@
         unzip_source: "{{ dest_project_fullpath }}/static/sni-templates-main.tar.gz"
         unzip_dest: "{{ dest_project_fullpath }}/static/sni-templates"
         unzip_remove_source: true
+        unzip_checksum: true
     - name: ./roles/kwtoolset/container_pull
       vars:
         container_pull_list:
@@ -72,3 +73,12 @@
         masked: true
         enabled: false
       when: "'nginx.service' in ansible_facts.services"
+  
+  post_tasks:
+    - name: Place an original templated Caddyfile as .bak just for debugging
+      ansible.builtin.template:
+        src: "{{ source_asset_fullpath_common }}/config/base/Caddyfile.j2"
+        dest: "{{ dest_project_fullpath }}/config/base/Caddyfile.bak"
+        owner: "{{ standard_user }}"
+        group: "{{ standard_user }}"
+        mode: "0644"
