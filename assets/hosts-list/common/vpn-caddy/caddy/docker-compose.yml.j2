@@ -23,7 +23,7 @@ services:
       - {{ docker_vpn_network }}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./config/base:/config/base:ro
+      - ./config:/config
       - /home/{{ standard_user }}/logs/caddy:/var/log/caddy
       - ./static:/var/www/public
       - caddy-data:/data
