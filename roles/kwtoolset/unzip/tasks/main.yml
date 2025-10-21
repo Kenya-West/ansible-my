@@ -78,7 +78,8 @@
   when: unzip_checksum_stats_dest_check.stat.exists
 - name: Set fact for destination checksum
   ansible.builtin.set_fact:
-    unzip_checksum_stats_dest: "{{ unzip_checksum_stats_dest_base64.content | b64decode }}"
+    unzip_checksum_stats_dest: "{{ (unzip_checksum_stats_dest_base64.content | default('0')) | b64decode }}"
+  when: unzip_checksum_stats_dest_check.stat.exists
 - name: Set checksum to zero if destination checksum file does not exist
   ansible.builtin.set_fact:
     unzip_checksum_stats_dest: "0"
