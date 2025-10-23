@@ -1,0 +1,60 @@
+---
+- name: Install Zapret (Dockerized)
+  hosts: vpn_caddy
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: "{{ vpn_project_structure_end_dirs.zapret | ansible.builtin.basename }}"
+    docker_compose_project_name: zapret
+    project_root_dir: "{{ vpn_project_structure_root }}"
+    source_asset_rootpath_common: "{{ playbook_dir }}/assets/hosts-list/common/{{ project_root_dir }}"
+    source_asset_fullpath_common: "{{ source_asset_rootpath_common }}/{{ project_dir }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}"
+    dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
+    dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
+
+  roles:
+    - name: ./roles/kwtoolset/container_stop_down
+      vars:
+        container_stop_down_list:
+          - "{{ dest_project_fullpath }}"
+        docker_compose_project_name_list:
+          - "{{ docker_compose_project_name }}"
+    - name: ./roles/kwtoolset/copy_files_templating
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_asset_fullpath_common }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+          - src: "{{ source_asset_fullpath_project }}"
+            dest: "{{ dest_project_rootpath }}"
+            default_mode: "0775"
+
+  post_tasks:
+    - name: Launch YouTube region check script
+      ansible.builtin.command: "./scripts/check-youtube-region.sh"
+      args:
+        chdir: "{{ dest_project_fullpath }}"
+      register: youtube_region_result
+      failed_when: youtube_region_result.rc not in [0, 124]
+
+    - name: Container pull Zapret images to ensure up-to-date
+      ansible.builtin.include_role:
+        name: kwtoolset/container_pull
+      vars:
+        container_pull_list:
+          - path: "{{ dest_project_fullpath }}"
+            name: "{{ docker_compose_project_name }}"
+            policy: "policy"
+      when: youtube_region_result.rc == 124
+    
+    - name: Container up Zapret to apply any updates
+      ansible.builtin.include_role:
+        name: kwtoolset/container_up
+      vars:
+        container_up_list:
+          - path: "{{ dest_project_fullpath }}"
+            name: "{{ docker_compose_project_name }}"
+            ignore_errors: false
+      when: youtube_region_result.rc == 124

@@ -5,6 +5,7 @@ vpn_project_structure_end_dirs__base:
   frp: "{{ vpn_project_structure_root }}/frps"
   remna: "{{ vpn_project_structure_root }}/remna"
   tblocker: "{{ vpn_project_structure_root }}/tblocker"
+  zapret: "{{ vpn_project_structure_root }}/zapret"
   wg: "{{ vpn_project_structure_root }}/wg"
   caddy: "{{ vpn_project_structure_root }}/caddy"
 vpn_project_structure_end_dirs: "{{ vpn_project_structure_end_dirs__base }}"
