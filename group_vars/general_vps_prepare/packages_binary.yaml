@@ -80,3 +80,6 @@ packages_binary_list:
   - repo: "ynqa/jnv"
     assets:
       - "^musl"
+  - repo: "amir20/dtop"
+    assets:
+      - "tar.gz"
