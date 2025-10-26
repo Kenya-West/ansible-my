@@ -1,0 +1,33 @@
+services:
+  ss-zapret:
+    image: vernette/ss-zapret:v72.1
+    container_name: ${SERVICE_NAME}
+    cpus: 0.5
+    mem_limit: 200m
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:${SS_PORT}:${SS_PORT}/tcp"
+      - "127.0.0.1:${SS_PORT}:${SS_PORT}/udp"
+      - "127.0.0.1:${SOCKS_PORT}:${SOCKS_PORT}/tcp"
+      - "127.0.0.1:${SOCKS_PORT}:${SOCKS_PORT}/udp"
+    volumes:
+      - ./config:/opt/zapret/config
+    networks:
+      - {{ docker_vpn_network }}
+    healthcheck:
+      test: [
+        "CMD-SHELL",
+        "nc -z localhost ${SS_PORT} && nc -z localhost ${SOCKS_PORT} || exit 1"
+      ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 3s
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true
