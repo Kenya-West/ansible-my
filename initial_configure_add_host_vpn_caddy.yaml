@@ -49,22 +49,25 @@
             dest: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}/vpn_caddy"
             default_mode: "0775"
 
-    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host.ansible_host }} is in section "[general_vps_prepare]" in inventory/production.ini
+    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host.ansible_host }} is in section "[general_vps_prepare]" in each inventory source
       community.general.ini_file:
-        path: "{{ playbook_dir }}/inventory/production.ini"
+        path: "{{ item }}"
         section: general_vps_prepare
         option: "{{ initial_configure_host_hostname }} ansible_host"
         value: "{{ initial_configure_host.ansible_host }}"
         backup: true
-    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host.ansible_host }} is in section "[vpn_caddy]" in inventory/production.ini
+      with_items: "{{ ansible_inventory_sources }}"
+    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host.ansible_host }} is in section "[vpn_caddy]" in each inventory source
       community.general.ini_file:
-        path: "{{ playbook_dir }}/inventory/production.ini"
+        path: "{{ item }}"
         section: vpn_caddy
         option: "{{ initial_configure_host_hostname }} ansible_host"
         value: "{{ initial_configure_host.ansible_host }}"
+      with_items: "{{ ansible_inventory_sources }}"
 
-    - name: Remove spaces between equal sign and value in inventory/production.ini for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host.ansible_host }}" value
+    - name: Remove spaces between equal sign and value in each inventory source for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host.ansible_host }}" value
       ansible.builtin.replace:
-        path: "{{ playbook_dir }}/inventory/production.ini"
+        path: "{{ item }}"
         regexp: '{{ initial_configure_host_hostname }} ansible_host\s*=\s*{{ initial_configure_host.ansible_host }}'
         replace: '{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host.ansible_host }}'
+      with_items: "{{ ansible_inventory_sources }}"

@@ -48,8 +48,9 @@
             dest: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}/vpn_remna_server_caddy"
             default_mode: "0775"
 
-    - name: Remove spaces between equal sign and value in inventory/production.ini for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host.ansible_host }}" value
+    - name: Remove spaces between equal sign and value in each inventory source for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host.ansible_host }}" value
       ansible.builtin.replace:
-        path: "{{ playbook_dir }}/inventory/production.ini"
+        path: "{{ item }}"
         regexp: '{{ initial_configure_host_hostname }} ansible_host\s*=\s*{{ initial_configure_host.ansible_host }}'
         replace: '{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host.ansible_host }}'
+      with_items: "{{ ansible_inventory_sources }}"

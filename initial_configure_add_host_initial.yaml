@@ -75,16 +75,18 @@
             dest: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}/0_all"
             default_mode: "0775"
 
-    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[general_vps_prepare]" in inventory/production.ini
+    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[general_vps_prepare]" in each inventory source
       community.general.ini_file:
-        path: "{{ playbook_dir }}/inventory/production.ini"
+        path: "{{ item }}"
         section: general_vps_prepare
         option: "{{ initial_configure_host_hostname }} ansible_host"
         value: "{{ initial_configure_host_ip_address }}"
         backup: true
+      with_items: "{{ ansible_inventory_sources }}"
 
-    - name: Remove spaces between equal sign and value in inventory/production.ini for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host_ip_address }}" value
+    - name: Remove spaces between equal sign and value in each inventory source for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host_ip_address }}" value
       ansible.builtin.replace:
-        path: "{{ playbook_dir }}/inventory/production.ini"
+        path: "{{ item }}"
         regexp: '{{ initial_configure_host_hostname }} ansible_host\s*=\s*{{ initial_configure_host_ip_address }}'
         replace: '{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }}'
+      with_items: "{{ ansible_inventory_sources }}"
