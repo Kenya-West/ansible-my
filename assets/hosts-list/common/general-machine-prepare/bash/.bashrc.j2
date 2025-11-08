@@ -1,3 +1,4 @@
+{% raw %}
 export LANG=en_US.UTF-8
 
 alias ls='eza --icons'
@@ -29,3 +30,26 @@ export FZF_CTRL_R_OPTS="--preview 'echo {}' --preview-window down:3:hidden:wrap 
 export FZF_CTRL_T_OPTS="--preview '(highlight -O ansi -l {} 2> /dev/null || cat {} || tree -C {}) 2> /dev/null | head -200'"
 
 eval "$(zoxide init bash)"
+{% endraw %}
+
+# --- Configurable newlines between command output and prompt ---
+# Set how many blank lines to print before each new prompt (0 = none)
+PROMPT_NEWLINES={{ bash_profile_newlines_after_commands_count | default(0) }}
+
+{% raw %}
+_first_prompt_done=false
+
+prompt_newline() {
+  if [ "$_first_prompt_done" = true ] && [ "${PROMPT_NEWLINES:-0}" -gt 0 ]; then
+    # Print the desired number of blank lines
+    for ((i=0; i<PROMPT_NEWLINES; i++)); do
+      echo ""
+    done
+  else
+    _first_prompt_done=true
+  fi
+}
+
+# Integrate with existing PROMPT_COMMAND safely
+PROMPT_COMMAND='prompt_newline; '"$PROMPT_COMMAND"
+{% endraw %}

@@ -1,0 +1,38 @@
+- name: Replace {mark} with BEGIN string in marker for grep
+  ansible.builtin.set_fact:
+    bash_profile_marker_templated: "{{ bash_profile_marker.replace('{mark}', 'BEGIN') }}"
+
+- name: Check if managed section exists
+  ansible.builtin.shell: "grep -Fq '{{ bash_profile_marker_templated }}' {{ configure_bash_profile_dest_file_path }}"
+  register: managed_section_check
+  failed_when: managed_section_check.rc >= 2
+
+- name: Check if legacy unmanaged block exists
+  ansible.builtin.shell: "grep -Fq 'alias ls='\\''eza' {{ configure_bash_profile_dest_file_path }}"
+  register: legacy_unmanaged_block_check
+  failed_when: legacy_unmanaged_block_check.rc >= 2
+
+- name: Remove regex matches from destination file for legacy unmanaged block (if any)
+  ansible.builtin.replace:
+    path: "{{ configure_bash_profile_dest_file_path }}"
+    regexp: "{{ item }}"
+    replace: ""
+    backup: "{{ configure_bash_profile_backup | default(false) }}"
+  with_items: "{{ configure_bash_profile_remove_lines_legacy_regex | default([]) }}"
+  failed_when: false
+  when:
+    - configure_bash_profile_remove_lines_legacy_regex is defined
+    - configure_bash_profile_remove_lines_legacy_regex != []
+    - item != ''
+    - managed_section_check.rc == 1
+    - legacy_unmanaged_block_check.rc == 0
+
+- name: Remove everything from marker to EOF (multiline replace)
+  ansible.builtin.replace:
+    path: "{{ configure_bash_profile_dest_file_path }}"
+    regexp: "(?s)alias ls='eza.*\\Z"
+    replace: ""
+    backup: true
+  when:
+    - managed_section_check.rc == 1
+    - legacy_unmanaged_block_check.rc == 0

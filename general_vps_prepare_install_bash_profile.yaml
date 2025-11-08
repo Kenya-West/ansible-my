@@ -3,13 +3,32 @@
   hosts: general_vps_prepare
   become: true
 
-  roles:
-    - name: ./roles/kwtoolset/lines_from_file
+  pre_tasks:
+    - name: Create temporary directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: _bash_profile
+      register: bash_profile_temp_dir
+    - name: Template bash profile files to temporary directory
+      ansible.builtin.template:
+        src: "{{ bash_asset_fullpath }}/.bashrc.j2"
+        dest: "{{ bash_profile_temp_dir.path }}/.bashrc"
+    
+  tasks:
+    - name: Apply configure_bash_profile role
+      ansible.builtin.include_role:
+        name: ./roles/configure_bash_profile
       vars:
-        lines_from_file_source_file_path: "{{ bash_asset_fullpath }}/.bashrc"
-        lines_from_file_dest_file_path: "/home/{{ standard_user }}/.bashrc"
-        lines_from_file_dest_file_path_mode: "0644"
-        lines_from_file_remove_lines_regex:
+        configure_bash_profile_source_file_path: "{{ bash_profile_temp_dir.path }}/.bashrc"
+        configure_bash_profile_dest_file_path: "/home/{{ standard_user }}/.bashrc"
+        configure_bash_profile_dest_file_path_mode: "0644"
+        configure_bash_profile_remove_lines_legacy_regex:
           - "alias\\sbr(\\s)?="
-        lines_from_file_append_lines:
+        configure_bash_profile_append_lines:
           - "eval \"$(oh-my-posh init bash --config {{ ohmyposh_themes_dir }}/{{ ohmyposh_theme }}.omp.json)\""
+  
+  post_tasks:
+    - name: Remove temporary directory
+      ansible.builtin.file:
+        path: "{{ bash_profile_temp_dir.path }}"
+        state: absent
