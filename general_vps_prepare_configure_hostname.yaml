@@ -1,0 +1,10 @@
+---
+- name: Configure hostname
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  tasks:
+    - name: Set system hostname
+      ansible.builtin.hostname:
+        name: "{{ general_vps_prepare_hostname | default(inventory_hostname) }}"
