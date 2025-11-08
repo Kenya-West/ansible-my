@@ -15,7 +15,7 @@ services:
     volumes:
       - ./data:/storage
     command:
-      - '--retentionPeriod=12'
+      - '--retentionPeriod=1'
       - '--storageDataPath=/storage'
       - '--httpAuth.username=${HTTPAUTH_USERNAME}'
       - '--httpAuth.password=${HTTPAUTH_PASSWORD}'
