@@ -19,6 +19,7 @@ services:
       - '--storageDataPath=/storage'
       - '--httpAuth.username=${HTTPAUTH_USERNAME}'
       - '--httpAuth.password=${HTTPAUTH_PASSWORD}'
+    restart: unless-stopped
 
 networks:
   caddy:
