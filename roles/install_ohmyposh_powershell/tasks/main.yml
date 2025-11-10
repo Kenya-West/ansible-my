@@ -58,4 +58,4 @@
 - name: Add oh-my-posh to $PROFILE
   ansible.builtin.lineinfile:
     path: "{{ pwsh_profile.stdout }}"
-    line: "oh-my-posh init pwsh --config {{ ohmyposh_powershell_themes_dir }}/{{ ohmyposh_powershell_theme }}.omp.json | Invoke-Expression"
+    line: "oh-my-posh init pwsh --config {{ ohmyposh_powershell_themes_dir }}/{{ ohmyposh_theme.pwsh | default(ohmyposh_theme.default) }}.omp.json | Invoke-Expression"

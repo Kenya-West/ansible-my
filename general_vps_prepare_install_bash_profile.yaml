@@ -15,17 +15,19 @@
         dest: "{{ bash_profile_temp_dir.path }}/.bashrc"
     
   tasks:
-    - name: Apply configure_bash_profile role
+    - name: Apply text_from_file role
       ansible.builtin.include_role:
-        name: ./roles/configure_bash_profile
+        name: ./roles/kwtoolset/text_from_file
       vars:
-        configure_bash_profile_source_file_path: "{{ bash_profile_temp_dir.path }}/.bashrc"
-        configure_bash_profile_dest_file_path: "/home/{{ standard_user }}/.bashrc"
-        configure_bash_profile_dest_file_path_mode: "0644"
-        configure_bash_profile_remove_lines_legacy_regex:
+        text_from_file_source_file_path: "{{ bash_profile_temp_dir.path }}/.bashrc"
+        text_from_file_dest_file_path: "/home/{{ standard_user }}/.bashrc"
+        text_from_file_dest_file_path_mode: "0644"
+        text_from_file_remove_blocks:
+          - "{{ bash_profile_marker_legacy }}"
+        text_from_file_remove_specific_lines_regex:
           - "alias\\sbr(\\s)?="
-        configure_bash_profile_append_lines:
-          - "eval \"$(oh-my-posh init bash --config {{ ohmyposh_themes_dir }}/{{ ohmyposh_theme }}.omp.json)\""
+        text_from_file_append_lines:
+          - "eval \"$(oh-my-posh init bash --config {{ ohmyposh_themes_dir }}/{{ ohmyposh_theme.bash | default(ohmyposh_theme.default) }}.omp.json)\""
   
   post_tasks:
     - name: Remove temporary directory

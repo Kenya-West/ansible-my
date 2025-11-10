@@ -1,0 +1,100 @@
+---
+# tasks file for roles/kwtoolset/text_from_file
+- name: Set context for source file location
+  ansible.builtin.set_fact:
+    text_from_file_source_file_location: "{{ text_from_file_source_file_location | default('local') }}"
+
+- name: Read full content from file
+  ansible.builtin.slurp:
+    src: "{{ text_from_file_source_file_path }}"
+  register: slurped_file_content
+
+- name: Set fact for source file content from file
+  ansible.builtin.set_fact:
+    text_from_file_source_file_content: "{{ (slurped_file_content.content | b64decode) | default('') }}"
+
+- name: Ensure destination file exists on target machine
+  ansible.builtin.file:
+    path: "{{ text_from_file_dest_file_path }}"
+    state: touch
+    mode: "{{ text_from_file_dest_file_path_mode | default('0644') }}"
+  when:
+    - text_from_file_source_file_content is defined
+    - text_from_file_source_file_content != ''
+  ignore_errors: true
+
+# Only remove unmanaged blocks/lines if managed section does not exist
+# Check for managed section using marker
+
+- name: Replace {mark} with BEGIN string in marker for grep
+  ansible.builtin.set_fact:
+    text_from_file_marker_templated: "{{ text_from_file_marker.replace('{mark}', 'BEGIN') }}"
+
+- name: Check if managed section exists
+  ansible.builtin.shell: "grep -Fq '{{ text_from_file_marker_templated }}' {{ text_from_file_dest_file_path }}"
+  register: text_from_file_managed_section_check
+  failed_when: text_from_file_managed_section_check.rc >= 2
+
+# Remove unmanaged blocks/lines only if managed section does not exist
+
+- name: Process each of unmanaged blocks
+  ansible.builtin.include_tasks: remove_unmanaged_blocks.yml
+  loop: "{{ text_from_file_remove_blocks | default([]) }}"
+  loop_control:
+    loop_var: item
+  when:
+    - text_from_file_managed_section_check.rc == 1
+    - text_from_file_remove_blocks is defined
+    - text_from_file_remove_blocks != []
+    - item != ''
+
+- name: Process each of lines to remove up to EOF
+  ansible.builtin.include_tasks: remove_lines_EOF.yml
+  loop: "{{ text_from_file_remove_lines_to_EOF | default([]) }}"
+  loop_control:
+    loop_var: item
+  when:
+    - text_from_file_managed_section_check.rc == 1
+    - text_from_file_remove_lines_to_EOF is defined
+    - text_from_file_remove_lines_to_EOF != []
+    - item != ''
+
+# This is outside of the managed section check because specific lines
+# may need to be removed even if managed section exists
+
+- name: Remove regex matches from destination file (if any)
+  ansible.builtin.replace:
+    path: "{{ text_from_file_dest_file_path }}"
+    regexp: "{{ item }}"
+    replace: ""
+    backup: "{{ text_from_file_backup | default(false) }}"
+  with_items: "{{ text_from_file_remove_specific_lines_regex | default([]) }}"
+  when:
+    - text_from_file_remove_specific_lines_regex is defined
+    - text_from_file_remove_specific_lines_regex != []
+    - item != ''
+
+- name: Append content from text_from_file_append_lines if defined
+  ansible.builtin.set_fact:
+    text_from_file_source_file_content: >-
+      {{ (
+          (text_from_file_source_file_content | default(''))
+          +
+          (
+            (text_from_file_append_lines | join('\n')) 
+            if (text_from_file_append_lines is iterable) 
+            else (text_from_file_append_lines | default(''))
+          )
+        ) | default('') }}
+  when: text_from_file_append_lines is defined
+
+# Finally, ensure the full content block is present in destination file
+
+- name: Ensure full content block is present in destination
+  ansible.builtin.blockinfile:
+    path: "{{ text_from_file_dest_file_path }}"
+    block: "{{ text_from_file_source_file_content | default('') }}"
+    append_newline: true
+    prepend_newline: true
+    marker: "{{ text_from_file_marker }}"
+  ignore_errors: true

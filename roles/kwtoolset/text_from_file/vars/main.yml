@@ -1,0 +1,4 @@
+---
+# vars file for roles/kwtoolset/text_from_file
+
+text_from_file_marker: '# {mark}: This text block configured by Ansible. Everything between the begin and end markers is managed by Ansible. Do not edit manually.'

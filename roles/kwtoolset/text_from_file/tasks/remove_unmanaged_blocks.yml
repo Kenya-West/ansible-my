@@ -1,0 +1,5 @@
+- name: Remove text block matching unmanaged block (if exists)
+  ansible.builtin.blockinfile:
+    path: "{{ text_from_file_dest_file_path }}"
+    block: ""
+    marker: "{{ item }}"

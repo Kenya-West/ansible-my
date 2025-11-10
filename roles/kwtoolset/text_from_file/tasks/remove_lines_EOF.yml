@@ -1,0 +1,17 @@
+- name: Check if unmanaged block exists
+  ansible.builtin.shell: "grep -q '{{ item }}' {{ text_from_file_dest_file_path }}"
+  register: text_from_file_line_EOF_check
+  failed_when: text_from_file_line_EOF_check.rc >= 2
+
+- name: Remove everything from marker to EOF (multiline replace)
+  ansible.builtin.replace:
+    path: "{{ text_from_file_dest_file_path }}"
+    regexp: "(?s){{ item }}.*$"
+    replace: ""
+    backup: true
+  when:
+    - text_from_file_line_EOF_check.rc == 0
+
+- name: Unregister unmanaged block check result
+  ansible.builtin.set_fact:
+    text_from_file_line_EOF_check: null
