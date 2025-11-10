@@ -1,7 +1,0 @@
----
-- name: Install LazyDocker
-  hosts: general_vps_prepare
-  become: true
-
-  roles:
-    - name: ./roles/install_lazydocker

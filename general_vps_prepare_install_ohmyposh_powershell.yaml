@@ -1,7 +1,0 @@
----
-- name: Install Oh-My-Posh (PowerShell)
-  hosts: general_vps_prepare
-  become: true
-
-  roles:
-    - name: ./roles/install_ohmyposh_powershell
