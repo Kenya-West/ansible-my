@@ -127,7 +127,7 @@ This repository provides a complete infrastructure-as-code solution for setting 
 - **🌐 Web server**: Done with Caddy, can run or proxy anything;
 - **🌐 VPN Infrastructure**: Complete VPN solutions with WireGuard, FRP, and Remnawave;
 - **📊 Monitoring & Analytics**: Full observability stack with Prometheus, VictoriaMetrics, VictoriaLogs, Grafana, and exporters;
-- **💾 Backup Solutions**: Automated backup systems using Autorestic and Backrest;
+- **💾 Backup Solutions**: Automated backup systems using Autorestic;
 - **🔒 Security**: UFW firewall, fail2ban, and SSH hardening;
 - **🛠️ Custom Toolset**: Reusable Ansible roles for common tasks.
 
@@ -156,7 +156,6 @@ This repository provides a complete infrastructure-as-code solution for setting 
 
 ### 💾 Backup & Recovery
 - **Autorestic**: Encrypted, deduplicated backups with automation
-- **Backrest**: PostgreSQL backup solution
 - **rclone**: Cloud storage synchronization
 - **Automated Scheduling**: Cron-based backup execution with monitoring
 
@@ -264,7 +263,6 @@ Playbooks:
 - `all_example/`: Example global variables template
 - `analytics_node/`: Variables for the analytics_node group
 - `analytics_server/`: Variables for the analytics_server group
-- `backup_backrest_server/`: Variables for the backup_backrest_server group
 - `backup_restic_node/`: Variables for the backup_restic_node group
 - `backup_restic_server/`: Variables for the backup_restic_server group
 - `general_vps_prepare/`: Variables for the general_vps_prepare group

@@ -65,12 +65,6 @@
     section: backup_restic_server
     option: localhost ansible_connection
     value: local
-- name: Ensure "localhost ansible_connection=local is in section "[backup_backrest_server]" in inventory/production.ini
-  community.general.ini_file:
-    path: "{{ playbook_dir }}/inventory/production.ini"
-    section: backup_backrest_server
-    option: localhost ansible_connection
-    value: local
 - name: Ensure "localhost ansible_connection=local is in section "[backup_restic_node]" in inventory/production.ini
   community.general.ini_file:
     path: "{{ playbook_dir }}/inventory/production.ini"
