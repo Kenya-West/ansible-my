@@ -1,0 +1,42 @@
+---
+
+services:
+  remna:
+    image: remnawave/node:latest
+    container_name: remna
+    env_file:
+      - .env
+    volumes:
+      - /home/{{ standard_user }}/logs/remnanode:/var/log/remnanode
+{% set sd = domains_keys.xray_under_dns_balancer | default([]) %}
+{% if sd | length > 0 %}
+    ports:
+{% if caddy_occupy_HTTPS is not defined or caddy_occupy_HTTPS == false %}
+      - "443:443"
+{% endif %}
+      - "${EXTERNAL_PORT}:${NODE_PORT}"
+{% if remna_node_external_ports is defined and (remna_node_external_ports | length) > 0 %}
+{% for port in remna_node_external_ports %}
+      - "${EXTERNAL_{{ loop.index }}_PORT}:${EXTERNAL_{{ loop.index }}_PORT}"
+{% endfor %}
+{% endif %}
+    labels:
+      caddy: "${SERVICE_DOMAINS}"
+{% if remna_node_use_dns01_cloudflare is defined and remna_node_use_dns01_cloudflare == true %}
+      caddy.tls.dns: "cloudflare ${CLOUDFLARE_API_TOKEN}"
+{% endif %}
+      caddy.import: "logging ${LOG_FILE_NAME}-remna"
+      caddy.@not_internal: "not path /{$$INTERNAL_PATH_BASE}*"
+      caddy.root: "@not_internal /var/www/public"
+      caddy.file_server: "@not_internal"
+{% endif %}
+
+    networks:
+      - {{ docker_vpn_network }}
+
+    restart: unless-stopped
+
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true

@@ -1,0 +1,124 @@
+# Pulled from mainstream: https://raw.githubusercontent.com/remnawave/backend/refs/heads/main/docker-compose-prod.yml
+---
+
+services:
+  remnawave-db:
+    image: postgres:17.6
+    container_name: remnawave-db
+    hostname: remnawave-db
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TZ=UTC
+    ports:
+      - '127.0.0.1:6767:5432'
+    volumes:
+      - remnawave-db-data:/var/lib/postgresql/data
+    networks:
+      - {{ docker_vpn_server_remnawave_network }}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 3s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: 10
+
+  remnawave:
+    image: remnawave/backend:2
+    container_name: remnawave
+    hostname: remnawave
+    restart: always
+    ports:
+      - '127.0.0.1:3000:${APP_PORT}'
+    env_file:
+      - .env
+    volumes:
+      - certs:/etc/remna/certs
+    networks:
+      - {{ docker_vpn_server_remnawave_network }}
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:${METRICS_PORT:-3001}/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      remnawave-db:
+        condition: service_healthy
+      remnawave-redis:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: 10
+
+  remnawave-caddy:
+    image: remnawave/caddy-with-auth:latest
+    container_name: 'remnawave-caddy'
+    hostname: remnawave-caddy
+    restart: always
+    env_file:
+      - .env.remnawave-caddy
+    networks:
+      - {{ docker_vpn_server_remnawave_network }}
+      - {{ docker_vpn_network }}
+    volumes:
+      - ./users:/data/.local/caddy/
+      - ./logs:/var/log/caddy
+      - ./config/Caddyfile:/etc/caddy/Caddyfile
+      - certs:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory
+    labels:
+      caddy: "${FRONT_END_DOMAIN}{% if vpn_server_remnawave_custom_login_route_external_port is defined and vpn_server_remnawave_custom_login_route_external_port %}:${EXTERNAL_PORT}{% endif %}"
+      caddy.import: "logging ${FRONT_END_DOMAIN}-remna-server-caddy-custom-login-route"
+      {% raw %}caddy.reverse_proxy: "{{ upstreams 80 }}"{% endraw %}
+
+
+  remnawave-redis:
+    image: valkey/valkey:8.1-alpine
+    container_name: remnawave-redis
+    hostname: remnawave-redis
+    restart: always
+    networks:
+      - {{ docker_vpn_server_remnawave_network }}
+    volumes:
+      - remnawave-redis-data:/data
+    healthcheck:
+      test: [ 'CMD', 'valkey-cli', 'ping' ]
+      interval: 3s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 100m
+        max-file: 10
+
+networks:
+  {{ docker_vpn_server_remnawave_network }}:
+    name: {{ docker_vpn_server_remnawave_network }}
+    driver: bridge
+    external: true
+  {{ docker_vpn_network }}:
+    external: true
+
+volumes:
+  remnawave-db-data:
+    driver: local
+    external: false
+    name: remnawave-db-data
+  remnawave-redis-data:
+    driver: local
+    external: false
+    name: remnawave-redis-data
+  certs:
+    external: true
+    name: caddy_caddy-certs

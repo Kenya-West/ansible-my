@@ -1,0 +1,30 @@
+---
+# tasks file for roles/configure_btop
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: Check if btop is installed
+  ansible.builtin.shell: command -v btop
+  register: configure_btop_path
+  failed_when: configure_btop_path.stdout == ""
+
+- name: Process btop configuration for each user
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ configure_btop_template_options }}"
+  loop_control:
+    loop_var: item

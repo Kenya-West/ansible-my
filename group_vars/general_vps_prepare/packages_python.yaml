@@ -1,0 +1,5 @@
+---
+packages_python_list:
+  # full schema is:
+  # - tool: "sot"                 # tool name on github
+  - tool: "sot"

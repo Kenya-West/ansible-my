@@ -7,7 +7,7 @@ analytics_node_project_structure_end_dirs__base:
   frps_exporter: "{{ analytics_node_project_structure_root }}/frps_exporter"
   node_exporter: "{{ analytics_node_project_structure_root }}/node_exporter"
   fail2ban_exporter: "{{ analytics_node_project_structure_root }}/fail2ban_exporter"
-  vector_exporter: "{{ analytics_node_project_structure_root }}/vector_exporter"
+  vector: "{{ analytics_node_project_structure_root }}/vector"
   pushgateway: "{{ analytics_node_project_structure_root }}/pushgateway"
 analytics_node_project_structure_end_dirs: "{{ analytics_node_project_structure_end_dirs__base }}"
 analytics_node_project_structure_end_dirs_list: "{{ analytics_node_project_structure_end_dirs.values() | list }}"

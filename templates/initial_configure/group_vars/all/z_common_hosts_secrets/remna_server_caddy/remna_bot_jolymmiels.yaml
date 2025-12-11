@@ -1,9 +1,9 @@
-remna_server_caddy_tg_bot_instance_count: 1
-remna_server_caddy_tg_bot_settings:
+vpn_server_remnawave_tg_bot_instance_count: 1
+vpn_server_remnawave_tgbot_jolymmiels_settings:
   - name: ""
-    remna_server_caddy_tg_bot_jolymmiels_bot_token: <123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11> # Telegram bot token that you create in https://t.me/BotFather
+    bot_token: <123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11> # Telegram bot token that you create in https://t.me/BotFather
 
-    remna_server_caddy_tg_bot_jolymmiels_pricing:
+    pricing:
       fiat:
         rub:
           months_1: 199
@@ -17,40 +17,40 @@ remna_server_caddy_tg_bot_settings:
         months_6: 499
         months_12: 830
 
-    remna_server_caddy_tg_bot_jolymmiels_tg_stars_enabled: false
+    tg_stars_enabled: false
 
-    remna_server_caddy_tg_bot_jolymmiels_crypto_enabled: false
-    remna_server_caddy_tg_bot_jolymmiels_crypto_token: <tg_bot_jolymmiels_crypto_token>
-    remna_server_caddy_tg_bot_jolymmiels_crypto_pay_url: https://pay.crypt.bot
+    crypto_enabled: false
+    crypto_token: <tg_bot_jolymmiels_crypto_token>
+    crypto_pay_url: https://pay.crypt.bot
 
-    remna_server_caddy_tg_bot_jolymmiels_yookassa_enabled: false
-    remna_server_caddy_tg_bot_jolymmiels_yookassa_token: <tg_bot_jolymmiels_yookassa_token>
-    remna_server_caddy_tg_bot_jolymmiels_yookassa_shop_id: <tg_bot_jolymmiels_yookassa_shop_id>
-    remna_server_caddy_tg_bot_jolymmiels_yookassa_pay_url: https://api.yookassa.ru/v3
-    remna_server_caddy_tg_bot_jolymmiels_yookassa_email: <Your Yookassa email>
+    yookassa_enabled: false
+    yookassa_token: <tg_bot_jolymmiels_yookassa_token>
+    yookassa_shop_id: <tg_bot_jolymmiels_yookassa_shop_id>
+    yookassa_pay_url: https://api.yookassa.ru/v3
+    yookassa_email: <Your Yookassa email>
 
-    remna_server_caddy_tg_bot_jolymmiels_tribute_enabled: false
-    remna_server_caddy_tg_bot_jolymmiels_tribute_webhook: /api/webhook/tribute
-    remna_server_caddy_tg_bot_jolymmiels_tribute_api_key: <tg_bot_jolymmiels_tribute_api_key>
-    remna_server_caddy_tg_bot_jolymmiels_tribute_payment_url: <https://t.me/tribute/app?startapp=id>
+    tribute_enabled: false
+    tribute_webhook: /api/webhook/tribute
+    tribute_api_key: <tg_bot_jolymmiels_tribute_api_key>
+    tribute_payment_url: <https://t.me/tribute/app?startapp=id>
 
-    remna_server_caddy_tg_bot_jolymmiels_referral_days: 7
+    referral_days: 7
 
-    remna_server_caddy_tg_bot_jolymmiels_miniapp_url: <https://sub.example.tld>
+    miniapp_url: <https://sub.example.tld>
 
-    remna_server_caddy_tg_bot_jolymmiels_remnawave_url: <https://sub.example.tld>
-    remna_server_caddy_tg_bot_jolymmiels_remnawave_api_token: <tg_bot_jolymmiels_api_token>
-    remna_server_caddy_tg_bot_jolymmiels_caddy_with_auth_api_token: <tg_bot_jolymmiels_api_token>
+    remnawave_url: <https://sub.example.tld>
+    remnawave_api_token: <tg_bot_jolymmiels_api_token>
+    caddy_with_auth_api_token: <tg_bot_jolymmiels_api_token>
 
-    remna_server_caddy_tg_bot_jolymmiels_trial_traffic_limit: 20
-    remna_server_caddy_tg_bot_jolymmiels_trial_days: 3
-    remna_server_caddy_tg_bot_jolymmiels_paid_traffic_limit: 200
+    trial_traffic_limit: 20
+    trial_days: 3
+    paid_traffic_limit: 200
 
-    remna_server_caddy_tg_bot_jolymmiels_admin_telegram_id: <123456789>
+    admin_telegram_id: <123456789>
 
-    remna_server_caddy_tg_bot_jolymmiels_status_url: <https://sub.example.tld/status>
-    remna_server_caddy_tg_bot_jolymmiels_support_url: <https://sub.example.tld/support>
-    remna_server_caddy_tg_bot_jolymmiels_feedback_url: <https://sub.example.tld/feedback>
-    remna_server_caddy_tg_bot_jolymmiels_channel_url: <https://t.me/examplechannel>
+    status_url: <https://sub.example.tld/status>
+    support_url: <https://sub.example.tld/support>
+    feedback_url: <https://sub.example.tld/feedback>
+    channel_url: <https://t.me/examplechannel>
 
 

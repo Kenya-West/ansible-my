@@ -1,0 +1,19 @@
+---
+# defaults file for roles/configure_logs
+project_dir: "{{ general_vps_prepare_project_structure_end_dirs.logrotate | ansible.builtin.basename }}"
+project_root_dir: "{{ general_vps_prepare_project_structure_root }}"
+source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root_dir }}"
+source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
+
+source_paths_add_role_dirs:
+  - templates
+source_paths_add_repo_dirs:
+  - "{{ source_asset_fullpath_project }}"
+source_paths_add_user_dirs: []
+
+dest_path_root: "/home/{{ standard_user }}/logs"
+dest_path_full: "{{ dest_path_root }}"
+configure_logs_dest_path: "/etc/logrotate.d"
+
+configure_logs_users:
+  - user: "{{ standard_user }}"

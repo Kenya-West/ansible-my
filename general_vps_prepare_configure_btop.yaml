@@ -1,0 +1,9 @@
+---
+- name: Configure configs for btop
+  hosts: general_vps_prepare
+  become: false
+  become_user: "{{ standard_user }}"
+
+  roles:
+    - configure_btop
+

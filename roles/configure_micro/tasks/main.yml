@@ -1,0 +1,63 @@
+---
+# tasks file for roles/configure_micro
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: Ensure micro directory exists
+  ansible.builtin.file:
+    path: "{{ dest_path_root }}"
+    state: directory
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    mode: "0770"
+
+- name: Check if micro editor is installed
+  ansible.builtin.shell: command -v micro
+  register: micro_path
+  failed_when: micro_path.stdout == ''
+
+- name: Launch micro to install plugins
+  ansible.builtin.shell: micro -plugin install {{ item.name }}
+  with_items: "{{ configure_micro_plugins }}"
+
+- name: Copy config for micro from common assets
+  ansible.builtin.template:
+    src: "{{ item }}/settings.json.j2"
+    dest: "{{ dest_path_root }}/settings.json"
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    mode: "0600"
+  with_items: "{{ source_paths }}"
+  failed_when: false
+
+- name: Create colorschemes directory
+  ansible.builtin.file:
+    path: "{{ dest_path_root }}/colorschemes"
+    state: directory
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    mode: "0700"
+- name: Copy colorscheme for micro from common assets
+  ansible.builtin.template:
+    src: "{{ item }}/colorschemes/kwtheme.micro.j2"
+    dest: "{{ dest_path_root }}/colorschemes/kwtheme.micro"
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    mode: "0600"
+  with_items: "{{ source_paths }}"
+  failed_when: false

@@ -83,3 +83,8 @@ packages_binary_list:
   - repo: "amir20/dtop"
     assets:
       - "tar.gz"
+  - repo: "control-theory/gonzo"
+  - repo: "astral-sh/uv"
+    assets:
+      - "musl"
+    post_install: "uv tool update-shell"

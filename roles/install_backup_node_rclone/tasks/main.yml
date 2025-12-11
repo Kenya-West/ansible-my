@@ -1,0 +1,74 @@
+---
+# tasks file for roles/install_backup_node_rclone
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: Ensure rclone is installed
+  environment:
+    EGET_GITHUB_TOKEN: "{{ github_api_token_eget | default(omit) }}"
+  block: 
+    - name: Check if rclone is installed
+      ansible.builtin.shell: "command -v rclone"
+      register: rclone_installed
+    - name: Debug rclone installed
+      ansible.builtin.debug:
+        msg: "{{ rclone_installed }}"
+    - name: Fail if rclone is not installed
+      ansible.builtin.fail:
+        msg: "rclone is not installed. Please install rclone before running this playbook."
+      failed_when: rclone_installed.rc != 0 or rclone_installed.stdout == ""
+  rescue:
+    - name: "Extract rclone package info"
+      ansible.builtin.set_fact:
+        rclone_pkg: "{{ packages_binary_list
+                       | selectattr('repo','search','rclone')
+                       | list
+                       | first }}"
+    - name: "Install rclone using eget"
+      ansible.builtin.include_role:
+        name: ./roles/install_packages_binary
+      vars:
+        # now pass in a one-element list, so we don’t shadow the original
+        packages_binary_list:
+          - "{{ rclone_pkg }}"
+      args:
+        apply:
+          become: true
+          become_user: root
+
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}"
+        dest: "{{ dest_path_full }}"
+        default_mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+
+- name: Check rclone configuration
+  ansible.builtin.shell: |
+    timeout 3s rclone config show
+  register: rclone_config_check
+  failed_when: rclone_config_check.rc != 0
+- name: Fail if rclone configuration lines are fewer than 5
+  ansible.builtin.fail:
+    msg: "rclone configuration is not valid. Please check the configuration file."
+  when: rclone_config_check.stdout_lines | length < 5

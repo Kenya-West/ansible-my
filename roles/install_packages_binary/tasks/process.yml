@@ -74,5 +74,8 @@
   ignore_errors: true
 
 - name: Run post install command
-  ansible.builtin.shell: "{{ item.post_install }}"
+  ansible.builtin.shell: |
+    script -q -c "timeout {{ item.timeout | default('5') | string }} {{ item.post_install }}" /dev/null || true
+  register: post_install_result
   when: item.post_install is defined
+  failed_when: post_install_result.rc != 0 and post_install_result.rc != 124

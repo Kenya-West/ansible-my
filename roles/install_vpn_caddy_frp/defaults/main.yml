@@ -1,0 +1,31 @@
+---
+# defaults file for roles/install_vpn_caddy_frp
+project_dir: "{{ vpn_project_structure_end_dirs.frp | ansible.builtin.basename }}"
+project_root_dir: "{{ vpn_project_structure_root }}"
+source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root_dir }}"
+source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
+
+source_paths_add_role_dirs:
+  - templates
+source_paths_add_repo_dirs:
+  - "{{ source_asset_fullpath_project }}"
+source_paths_add_user_dirs: []
+
+dest_path_root: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
+
+compose_project_name: "{{ project_dir }}"
+
+frp_caddy_path: frp
+frp_server_port: 7000
+frp_vhost_http_port: 8080
+frp_vhost_https_port: 8443
+frp_auth_method: token
+frp_dashboard_port: 7500
+frp_dashboard_user: "{{ common_username }}"
+frp_range_ports_1_start: 22001
+frp_range_ports_1_end: 22089
+frp_range_ports_2_start: 22501
+frp_range_ports_2_end: 22589
+frp_client_dashboard_port: 7400
+frp_client_dashboard_user: "{{ common_username }}"

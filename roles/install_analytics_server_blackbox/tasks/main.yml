@@ -1,0 +1,67 @@
+---
+# tasks file for roles/install_analytics_server_blackbox
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: container_stop_down
+  ansible.builtin.include_role:
+    name: kwtoolset/container_stop_down
+  vars:
+    container_stop_down_list:
+      - "{{ dest_path_full }}"
+    docker_compose_project_name_list:
+      - "{{ compose_project_name }}"
+      - "{{ project_dir }}"
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}"
+        dest: "{{ dest_path_full }}"
+        default_mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+- name: container_pull
+  ansible.builtin.include_role:
+    name: kwtoolset/container_pull
+  vars:
+    container_pull_list:
+      - path: "{{ dest_path_full }}"
+        name: "{{ compose_project_name }}"
+        policy: "policy"
+- name: container_up
+  ansible.builtin.include_role:
+    name: kwtoolset/container_up
+  vars:
+    container_up_list:
+      - path: "{{ dest_path_full }}"
+        name: "{{ compose_project_name }}"
+        ignore_errors: false
+
+- name: Add port {{ blackbox_exporter_external_port }} to UFW
+  become: true
+  become_user: root
+  community.general.ufw:
+    rule: allow
+    port: "{{ blackbox_exporter_external_port }}"
+    proto: tcp
+  when:
+    - blackbox_exporter_external_port is defined
+    - blackbox_exporter_external_port | length > 0

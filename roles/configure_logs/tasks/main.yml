@@ -1,0 +1,65 @@
+---
+# tasks file for roles/configure_logs
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: Ensure logrotate directory exists
+  ansible.builtin.file:
+    path: "{{ configure_logs_dest_path }}"
+    state: directory
+    mode: "0775"
+
+- name: Check if logrotate is enabled in systemd
+  ansible.builtin.service:
+    name: logrotate
+    enabled: true
+  register: configure_logs_logrotate_service
+  failed_when: configure_logs_logrotate_service is failed
+
+- name: Check if logrotate timer is enabled and is executed on daily basis
+  ansible.builtin.command:
+    cmd: systemctl list-timers logrotate.timer --no-pager --no-legend --all
+  register: configure_logs_logrotate_timer_check
+  changed_when: false
+  failed_when: >
+    (configure_logs_logrotate_timer_check.stdout is defined and configure_logs_logrotate_timer_check.stdout | trim == '') or
+    (configure_logs_logrotate_timer_check.stdout_lines is defined and configure_logs_logrotate_timer_check.stdout_lines | length == 0)
+
+- name: Copy logrotate config
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ item }}/templates/configs/"
+        dest: "{{ configure_logs_dest_path }}"
+        default_mode_directory: "0755"
+        default_mode_file: "0644"
+  with_items: "{{ source_paths }}"
+
+- name: Rename config to have username in the filename
+  ansible.builtin.command:
+    cmd: mv "{{ configure_logs_dest_path }}/user-logs" "{{ configure_logs_dest_path }}/user-logs-{{ standard_user }}"
+  args:
+    removes: "{{ configure_logs_dest_path }}/user-logs"
+- name: Change owner and permissions of config file to 0644
+  ansible.builtin.file:
+    path: "{{ configure_logs_dest_path }}/user-logs-{{ standard_user }}"
+    state: file
+    mode: "0644"
+    owner: "root"
+    group: "root"

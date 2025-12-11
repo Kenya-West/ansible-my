@@ -1,65 +1,50 @@
 ---
 # tasks file for roles/configure_bash_profile
-- name: Set context for source file location
+- name: Capture this role's path so nested role can use the parent role_path
   ansible.builtin.set_fact:
-    configure_bash_profile_source_file_location: "{{ configure_bash_profile_source_file_location | default('local') }}"
+    this_role_path: "{{ role_path }}"
 
-- name: Read full content from file
-  ansible.builtin.slurp:
-    src: "{{ configure_bash_profile_source_file_path }}"
-  register: slurped_file_content
-
-- name: Set fact for source file content from file
+- name: Add to source_paths the current role templates directory
   ansible.builtin.set_fact:
-    configure_bash_profile_source_file_content: "{{ (slurped_file_content.content | b64decode) | default('') }}"
-
-- name: Ensure destination file exists on target machine
-  ansible.builtin.file:
-    path: "{{ configure_bash_profile_dest_file_path }}"
-    state: touch
-    mode: "{{ configure_bash_profile_dest_file_path_mode | default('0644') }}"
-  when:
-    - configure_bash_profile_source_file_content is defined
-    - configure_bash_profile_source_file_content != ''
-  ignore_errors: true
-
-- name: Remove legacy unmanaged block
-  ansible.builtin.include_tasks: remove_section.yml
-
-- name: Remove regex matches from destination file (if any)
-  ansible.builtin.replace:
-    path: "{{ configure_bash_profile_dest_file_path }}"
-    regexp: "{{ item }}"
-    replace: ""
-    backup: "{{ configure_bash_profile_backup | default(false) }}"
-  with_items: "{{ configure_bash_profile_remove_lines_regex | default([]) }}"
-  when:
-    - configure_bash_profile_remove_lines_regex is defined
-    - configure_bash_profile_remove_lines_regex != []
-    - item != ''
-
-- name: Append content from configure_bash_profile_append_lines if defined
-  ansible.builtin.set_fact:
-    configure_bash_profile_source_file_content: >-
-      {{ (
-          (configure_bash_profile_source_file_content | default(''))
-          +
-          (
-            (configure_bash_profile_append_lines | join('\n')) 
-            if (configure_bash_profile_append_lines is iterable) 
-            else (configure_bash_profile_append_lines | default(''))
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
           )
-        ) | default('') }}
-  when: configure_bash_profile_append_lines is defined
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
 
-- name: Ensure full content block is present in destination
-  ansible.builtin.blockinfile:
-    path: "{{ configure_bash_profile_dest_file_path }}"
-    block: "{{ configure_bash_profile_source_file_content | default('') }}"
-    append_newline: true
-    prepend_newline: true
-    marker: "{{ bash_profile_marker }}"
-  when:
-    - configure_bash_profile_source_file_content is defined
-    - configure_bash_profile_source_file_content != ''
-  ignore_errors: true
+- name: Create temporary directory
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: _bash_profile
+  register: bash_profile_temp_dir
+- name: Template bash profile files to temporary directory
+  ansible.builtin.template:
+    src: "{{ item }}/{{ bash_profile_filename }}"
+    dest: "{{ bash_profile_temp_dir.path }}/.bashrc"
+  with_items: "{{ source_paths }}"
+  failed_when: false
+
+- name: Apply text_from_file role
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/text_from_file
+  vars:
+    text_from_file_source_file_path: "{{ bash_profile_temp_dir.path }}/.bashrc"
+    text_from_file_dest_file_path: "{{ dest_path_root }}/.bashrc"
+    text_from_file_dest_file_path_mode: "0644"
+    text_from_file_remove_blocks:
+      - "{{ bash_profile_marker_legacy }}"
+    text_from_file_remove_specific_lines_regex:
+      - "alias\\sbr(\\s)?="
+    text_from_file_append_lines:
+      - "eval \"$(oh-my-posh init bash --config {{ ohmyposh_themes_dir }}/{{ ohmyposh_theme.bash | default(ohmyposh_theme.default) }}.omp.json)\""
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ bash_profile_temp_dir.path }}"
+    state: absent

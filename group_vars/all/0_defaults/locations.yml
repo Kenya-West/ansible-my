@@ -1,0 +1,1 @@
+location_custom_files_path: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}"

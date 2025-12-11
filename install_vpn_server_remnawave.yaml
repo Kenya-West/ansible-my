@@ -1,0 +1,15 @@
+---
+- name: Install and configure Remnawave panel
+  hosts: vpn_server_remnawave
+  become: false
+  become_user: "{{ standard_user }}"
+  vars:
+    project_dir: "{{ vpn_server_remnawave_project_structure_end_dirs.panel | ansible.builtin.basename }}"
+    project_root_dir: "{{ vpn_server_remnawave_project_structure_root }}"
+    source_asset_rootpath_project: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}/{{ project_root_dir }}"
+    source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
+    install_vpn_server_remnawave_source_paths__base:
+      - "{{ source_asset_fullpath_project }}"
+
+  roles:
+    - install_vpn_server_remnawave

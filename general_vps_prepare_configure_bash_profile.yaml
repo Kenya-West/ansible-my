@@ -1,0 +1,7 @@
+---
+- name: Setup Bash profile
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - configure_bash_profile

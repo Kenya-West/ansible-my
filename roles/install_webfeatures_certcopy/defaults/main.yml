@@ -1,0 +1,30 @@
+---
+# defaults file for roles/install_webfeatures_certcopy
+project_dir: "{{ webfeatures_project_structure_end_dirs.certcopy | ansible.builtin.basename }}"
+project_root_dir: "{{ webfeatures_project_structure_root }}"
+source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root_dir }}"
+source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
+
+source_paths_add_role_dirs:
+  - templates
+source_paths_add_repo_dirs:
+  - "{{ source_asset_fullpath_project }}"
+source_paths_add_user_dirs: []
+
+dest_path_root: "/home/{{ standard_user }}/{{ webfeatures_project_structure_root }}"
+dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
+
+compose_project_name: "{{ project_dir }}"
+
+cert_access_group: "certaccess"
+cert_access_group_users_initial:
+  - "{{ standard_user }}"
+cert_location_root_owner: "root"
+cert_location_root_permissions: "0755"
+cert_location_files_permissions: "0644"
+# For cron job
+copy_certs_auto_renew_hour: 0
+copy_certs_auto_renew_minute: 0
+
+cronjob_script_path_without_analytics: "{{ dest_path_full }}/scripts/copy.sh"
+cronjob_script_path_with_analytics: "{{ cronjob_script_path_without_analytics }}"
