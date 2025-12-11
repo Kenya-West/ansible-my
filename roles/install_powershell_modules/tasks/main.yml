@@ -14,6 +14,6 @@
 
 - name: Process each of base file names
   ansible.builtin.include_tasks: process.yml
-  loop: "{{ powershell_modules }}"
+  loop: "{{ powershell_profile_modules }}"
   loop_control:
     loop_var: item

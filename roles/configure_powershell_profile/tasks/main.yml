@@ -1,0 +1,57 @@
+---
+# tasks file for roles/configure_powershell_profile
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: Get Powershell executable path
+  ansible.builtin.shell: "command -v pwsh"
+  register: powershell_path
+- name: Get Powershell $PROFILE path
+  become: true
+  become_user: "{{ standard_user }}"
+  ansible.builtin.shell: $PROFILE
+  args:
+    executable: "{{ powershell_path.stdout }}"
+  register: powershell_profile
+- name: Create temporary directory
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: _powershell_profile
+  register: powershell_profile_temp_dir
+- name: Template powershell profile files to temporary directory
+  ansible.builtin.template:
+    src: "{{ item }}/{{ powershell_profile_source_path }}"
+    dest: "{{ powershell_profile_temp_dir.path }}/Microsoft.PowerShell_profile.ps1"
+  with_items: "{{ source_paths }}"
+  failed_when: false
+
+- name: Apply text_from_file role
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/text_from_file
+  vars:
+    text_from_file_source_file_path: "{{ powershell_profile_temp_dir.path }}/Microsoft.PowerShell_profile.ps1"
+    text_from_file_dest_file_path: "{{ powershell_profile.stdout }}"
+    text_from_file_dest_file_path_mode: "0644"
+    text_from_file_remove_lines_to_EOF:
+      - ".*posh-git"
+      - ".*PSReadLine"
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ powershell_profile_temp_dir.path }}"
+    state: absent

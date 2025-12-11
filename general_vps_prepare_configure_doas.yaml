@@ -1,0 +1,8 @@
+---
+- name: Configure configs for doas
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  roles:
+    - configure_doas

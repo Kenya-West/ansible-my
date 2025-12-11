@@ -1,0 +1,90 @@
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: Add to install_vpn_server_remnawave_subpage_source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    install_vpn_server_remnawave_tgbot_jolymmiels_source_paths_currentindex: >-
+      {{
+        (
+            source_paths
+            | map('regex_replace', '$', '/' ~ (current_index | string) ~ '/')
+            | list
+          )
+      }}
+
+- name: container_stop_down
+  ansible.builtin.include_role:
+    name: kwtoolset/container_stop_down
+  vars:
+    container_stop_down_list:
+      - "{{ dest_project_fullpath }}"
+
+- name: Ensure directory {{ dest_project_fullpath }} exists
+  ansible.builtin.file:
+    path: "{{ dest_project_fullpath }}"
+    state: directory
+    mode: "0775"
+
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ item }}"
+        dest: "{{ dest_project_fullpath }}"
+        default_mode: "0775"
+  with_items: "{{ install_vpn_server_remnawave_tgbot_jolymmiels_source_paths_currentindex }}"
+
+- name: Pull container images for this bot instance
+  ansible.builtin.include_role:
+    name: kwtoolset/container_pull
+  vars:
+    container_pull_list:
+      - path: "{{ dest_project_fullpath }}"
+        name: "{{ project_name }}"
+        policy: "policy"
+
+- name: Start containers for this bot instance
+  ansible.builtin.include_role:
+    name: kwtoolset/container_up
+  vars:
+    container_up_list:
+      - path: "{{ dest_project_fullpath }}"
+        name: "{{ project_name }}"
+        ignore_errors: false
+
+- name: Add port {{ vpn_server_remnawave_tgbot_jolymmiels_external_port }} to UFW (if defined)
+  become: true
+  become_user: root
+  community.general.ufw:
+    rule: allow
+    port: "{{ vpn_server_remnawave_tgbot_jolymmiels_external_port }}"
+    proto: tcp
+  when:
+    - vpn_server_remnawave_tgbot_jolymmiels_external_port is defined
+    - vpn_server_remnawave_tgbot_jolymmiels_external_port | length > 0
+
+- name: Reminder to run install_ufw.yaml playbook (if port defined)
+  ansible.builtin.debug:
+    msg: |
+      Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
+      Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}
+  when:
+    - vpn_server_remnawave_tgbot_jolymmiels_external_port is defined
+    - vpn_server_remnawave_tgbot_jolymmiels_external_port | length > 0
+
+- name: Empty the fact install_vpn_server_remnawave_tgbot_jolymmiels_source_paths_currentindex
+  ansible.builtin.set_fact:
+    source_paths: []
+    install_vpn_server_remnawave_tgbot_jolymmiels_source_paths_currentindex: []

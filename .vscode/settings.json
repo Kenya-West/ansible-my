@@ -1,5 +1,5 @@
 {
-    "ansible.python.interpreterPath": "/bin/python3",
+    "ansible.python.interpreterPath": "c:\\Users\\Kenya-West\\AppData\\Local\\Microsoft\\WindowsApps\\python3.9.exe",
     "search.exclude": {
         "**/ansible-log.log": true
     },

@@ -1,6 +1,0 @@
----
-bash_executable_name: bash
-bash_asset_fullpath: "{{ playbook_dir }}/assets/hosts-list/common/general-machine-prepare/{{ bash_executable_name }}"
-bash_profile_newlines_after_commands_count: 1
-
-bash_profile_marker_legacy: '# {mark}: Bash profile configured by Ansible. Everything between the begin and end markers is managed by Ansible. Do not edit manually.'

@@ -52,3 +52,4 @@ packages_list:
       - btop
       - procs
       - trippy
+      - dust

@@ -1,0 +1,194 @@
+---
+# tasks file for roles/install_backup_node_restic
+
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: Add prefix dest_path_full to each of restic_excludes_list_files
+  set_fact:
+    restic_excludes_list_files: "{{ [dest_path_full + '/config/excludes'] | product(restic_excludes_list_files) | map('join', '/') | list }}"
+- name: Check if restic is installed
+  ansible.builtin.shell: restic version
+  register: restic_version
+  ignore_errors: true
+- name: Run autorestic install if restic is not installed
+  become: true
+  become_user: root
+  ansible.builtin.shell: autorestic install
+  when: restic_version.rc != 0
+- name: Check again if restic is installed
+  ansible.builtin.shell: restic version
+  register: restic_version_newly_installed
+  when: restic_version.rc != 0
+
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}"
+        dest: "{{ dest_path_full }}"
+        default_mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+
+- name: Remove invalid locations in Autorestic config file
+  ansible.builtin.include_role:
+    name: remove_invalid_locations_autorestic
+  vars:
+    remove_invalid_locations_autorestic_config_path: "{{ dest_path_full }}/config/.autorestic.yaml"
+
+- name: Make all scripts executable in one go
+  ansible.builtin.shell: |
+    find "{{ dest_path_full }}/scripts" -type f -name '*.sh' -exec chmod 0775 {} +
+# Cron job
+- name: Change cron job path to monitoring if it is in analytics_node group
+  set_fact:
+    cronjob_script_path_with_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix}} {{ cron_wrapped_task_prefix }} --job-name autorestic_backup -- {{ dest_path_full }}/scripts/update-cron.sh {{ cron_wrapped_task_suffix }} {{ restic_node_cron_job_name_suffix }}"
+    cronjob_script_path_with_analytics_autorestic_forget: "{{ cron_wrapped_task_prefix }} --job-name autorestic_forget -- {{ cronjob_script_path_without_analytics_autorestic_forget }} {{ cron_wrapped_task_suffix }}"
+  when: "'analytics_node' in group_names"
+# Check
+- name: Get info about configuration
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./info.sh"
+    chdir: "{{ dest_path_full }}/scripts"
+- name: Check configuration
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./check.sh"
+    chdir: "{{ dest_path_full }}/scripts"
+  ignore_errors: true
+  register: autorestic_check_config
+- name: Debug configuration
+  debug:
+    var: autorestic_check_config
+# Error handling
+- name: Run yq command to fix corrupted config # Look for https://github.com/cupcakearmy/autorestic/issues/315
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/fix.sh"
+    chdir: "{{ dest_path_full }}"
+  when:
+    - autorestic_check_config.rc != 0
+    - "('invalid keys: forgetoption' in autorestic_check_config.stdout) or ('invalid keys: copyoption' in autorestic_check_config.stdout)"
+- name: Check if autorestic is running
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "ps aux | grep autorestic | grep -v grep"
+  failed_when: false
+  when:
+    - autorestic_check_config.rc != 0
+    - "'an instance is already running' in autorestic_check_config.stdout"
+  register: autorestic_processes
+- name: Run unlock.sh script
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/unlock.sh"
+    chdir: "{{ dest_path_full }}"
+  when:
+    - autorestic_check_config.rc != 0
+    - "'an instance is already running' in autorestic_check_config.stdout"
+    - autorestic_processes.stdout == ""
+# Backup: first try
+- name: Make a backup using update.sh script
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/update.sh"
+    chdir: "{{ dest_path_full }}"
+  register: backup_result
+  ignore_errors: true
+- name: Run yq command to fix corrupted config # Look for https://github.com/cupcakearmy/autorestic/issues/315
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/fix.sh"
+    chdir: "{{ dest_path_full }}"
+  when: backup_result.rc != 0
+# Backup: second try
+- name: Make a backup again using update.sh script because of the first failure
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/update.sh"
+    chdir: "{{ dest_path_full }}"
+  register: backup_result
+  when:
+    - backup_result.rc != 0
+    - "('invalid keys: forgetoption' in backup_result.stdout) or ('invalid keys: copyoption' in backup_result.stdout)"
+- name: Display masterkey using key.sh script
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/masterkey.sh"
+    chdir: "{{ dest_path_full }}"
+  register: masterkey
+- name: Debug the masterkey
+  debug:
+    var: masterkey.stdout
+- name: Show keys by running key.sh script
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/key.sh"
+    chdir: "{{ dest_path_full }}"
+  register: keys
+- name: Debug the keys
+  debug:
+    var: keys.stdout
+# Change permissions for config for easier access
+- name: Find config files to change permissions
+  become: true
+  become_user: root
+  ansible.builtin.find:
+    paths: "{{ dest_path_full }}/config/"
+    patterns: ".autorestic.*"
+    hidden: true
+  register: autorestic_config_files_to_change_perms
+- name: Change config files ownership to user and access rights to 775
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    mode: "0775"
+  loop: "{{ autorestic_config_files_to_change_perms.files }}"
+# Cron
+- name: Add cron job for autorestic
+  become: true
+  become_user: root
+  ansible.builtin.cron:
+    name: "{{ restic_node_cron_job_name }}"
+    minute: "*/30"
+    job: "{{ cronjob_script_path_with_analytics_autorestic_backup }}"
+- name: Add cron job for autorestic to forget
+  become: true
+  become_user: root
+  ansible.builtin.cron:
+    name: "{{ restic_node_cron_job_name_forget }}"
+    minute: "16"
+    hour: "0"
+    job: "{{ cronjob_script_path_with_analytics_autorestic_forget }}"

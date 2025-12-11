@@ -1,0 +1,64 @@
+---
+# tasks file for roles/configure_btop
+- name: Remove btop config files in $HOME if it exists
+  become: "{{ item.become | default(false) }}"
+  become_user: "{{ item.become_user | default(omit) }}"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  when: "{{ remove_home_config | default(configure_btop_remove_home_config) }}"
+
+- name: Launch btop with PTY
+  become: "{{ item.become | default(false) }}"
+  become_user: "{{ item.become_user | default(omit) }}"
+  ansible.builtin.shell: |
+    script -q -c "timeout 5 btop" /dev/null || true
+  when: configure_btop_path.stdout != ""
+  ignore_errors: true
+
+- name: Wait for snap current directory
+  become: "{{ item.become | default(false) }}"
+  become_user: "{{ item.become_user | default(omit) }}"
+  ansible.builtin.wait_for:
+    path: "{{ item.path }}"
+    state: present
+    timeout: 3
+  register: configure_btop_snap_dir
+
+- name: Get Snap current revision for btop
+  ansible.builtin.shell: snap list btop | awk 'NR==2 {print $3}'
+  register: configure_btop_snap_revision_raw
+  changed_when: false
+  when: configure_btop_snap_dir is succeeded or configure_btop_snap_dir_root is succeeded
+  failed_when: configure_btop_snap_revision_raw.stdout == ""
+- name: Set Snap current revision for btop
+  ansible.builtin.set_fact:
+    configure_btop_snap_revision: "{{ configure_btop_snap_revision_raw.stdout | int }}"
+  when: configure_btop_snap_revision_raw.stdout != ""
+
+- name: Check that btop snap revision directory exists, fail if not
+  become: "{{ item.become | default(false) }}"
+  become_user: "{{ item.become_user | default(omit) }}"
+  ansible.builtin.stat:
+    path: "/home/{{ standard_user }}/snap/btop/{{ (configure_btop_snap_revision | default('current')) | string }}"
+  register: configure_btop_snap_revision_dir
+  failed_when: not configure_btop_snap_revision_dir.stat.exists and (configure_btop_snap_dir is succeeded)
+
+- name: Set facts for template file
+  ansible.builtin.set_fact:
+    btop_theme: "{{ item.project_vars.theme | default('dracula.theme') }}"
+    btop_snap_revision: "{{ configure_btop_snap_revision | default('current') }}"
+
+- name: Copy config to user
+  become: "{{ item.become | default(false) }}"
+  become_user: "{{ item.become_user | default(omit) }}"
+  ansible.builtin.template:
+    src: "{{ source_path }}/btop.conf.j2"
+    dest: "{{ item.path }}/btop.conf"
+    owner: "{{ item.user }}"
+    group: "{{ item.user }}"
+    mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+  failed_when: false

@@ -1,0 +1,7 @@
+---
+- name: Install and configure backup of Postgres panel
+  hosts: backup_restic_node
+  become: false
+  become_user: "{{ standard_user }}"
+  roles:
+    - install_backup_node_postgres

@@ -1,2 +1,19 @@
 ---
 # defaults file for roles/configure_bash_profile
+project_dir: "{{ general_vps_prepare_project_structure_end_dirs.bash | ansible.builtin.basename }}"
+project_root_dir: "{{ general_vps_prepare_project_structure_root }}"
+source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root_dir }}"
+source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
+
+source_paths_add_role_dirs:
+  - templates
+source_paths_add_repo_dirs:
+  - "{{ source_asset_fullpath_project }}"
+source_paths_add_user_dirs: []
+
+dest_path_root: "/home/{{ standard_user }}"
+dest_path_full: "{{ dest_path_root }}"
+
+bash_profile_filename: .bashrc.j2
+bash_profile_newlines_after_commands_count: 1
+bash_profile_marker_legacy: '# {mark}: Bash profile configured by Ansible. Everything between the begin and end markers is managed by Ansible. Do not edit manually.'

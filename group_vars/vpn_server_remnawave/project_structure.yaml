@@ -1,0 +1,10 @@
+---
+
+vpn_server_remnawave_project_structure_root: vpn-server-remnawave
+vpn_server_remnawave_project_structure_end_dirs__base:
+  panel: "{{ vpn_server_remnawave_project_structure_root }}/panel"
+  subpage: "{{ vpn_server_remnawave_project_structure_root }}/subpage"
+  tg_miniapp: "{{ vpn_server_remnawave_project_structure_root }}/tg-miniapp"
+  tgbot_jolymmiels: "{{ vpn_server_remnawave_project_structure_root }}/tgbot-jolymmiels"
+vpn_server_remnawave_project_structure_end_dirs: "{{ vpn_server_remnawave_project_structure_end_dirs__base }}"
+vpn_server_remnawave_project_structure_end_dirs_list: "{{ vpn_server_remnawave_project_structure_end_dirs.values() | list }}"

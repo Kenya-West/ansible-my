@@ -1,0 +1,43 @@
+---
+# tasks file for roles/configure_doas
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+
+- name: Copy doas.conf from common assets
+  become: true
+  become_user: root
+  ansible.builtin.template:
+    src: "{{ item }}/doas.conf.j2"
+    dest: "{{ configure_doas_dest_path }}/doas.conf"
+    owner: root
+    group: root
+    mode: "0600"
+  with_items: "{{ source_paths }}"
+  failed_when: false
+
+- name: Process btop configuration for each user
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ configure_doas_users }}"
+
+- name: Ensure doas.conf has 0600 permissions
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: /etc/doas.conf
+    mode: "0600"
+    state: file

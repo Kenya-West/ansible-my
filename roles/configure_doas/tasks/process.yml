@@ -1,0 +1,12 @@
+---
+# tasks file for roles/configure_doas
+
+- name: Grant user {{ item.user }} read and write access to a file
+  become: true
+  become_user: root
+  ansible.posix.acl:
+    path: "/etc/doas.conf"
+    entity: "{{ item.user }}"
+    etype: user
+    permissions: rw
+    state: present
