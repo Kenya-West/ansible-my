@@ -3,6 +3,8 @@
 - name: Capture this role's path so nested role can use the parent role_path
   ansible.builtin.set_fact:
     this_role_path: "{{ role_path }}"
+  tags:
+    - always
 
 - name: Ensure destination root path exists
   ansible.builtin.file:
@@ -13,11 +15,16 @@
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - update_config
   vars:
     copy_files_templating_dir_list:
       - src: "{{ this_role_path }}/templates/"
         dest: "{{ dest_path_full }}"
         default_mode: "0775"
+  tags:
+    - update_config
 
 - name: Change cron job path to monitoring if it is in analytics_node group
   set_fact:

@@ -4,12 +4,16 @@
 - name: Capture this role's path so nested role can use the parent role_path
   ansible.builtin.set_fact:
     this_role_path: "{{ role_path }}"
+  tags:
+    - always
 
 - name: Fail if settings list length exceeds instance count
   ansible.builtin.assert:
     that:
       - vpn_server_remnawave_tgbot_jolymmiels_settings | length <= vpn_server_remnawave_tg_bot_instance_count
     fail_msg: "Bot settings list length exceeds instance count!"
+  tags:
+    - always
 
 - name: Deploy each bot instance sequentially
   ansible.builtin.include_tasks: process.yml
@@ -20,3 +24,5 @@
     current_index: "{{ instance_index }}"
     project_name: "{{ compose_project_name }}-{{ instance_index }}"
     dest_project_fullpath: "{{ dest_path_full }}/{{ instance_index }}"
+  tags:
+    - always
