@@ -23,6 +23,19 @@
   tags:
     - always
 
+- name: container_pull
+  ansible.builtin.include_role:
+    name: kwtoolset/container_pull
+    apply:
+      tags:
+        - update_image
+  vars:
+    container_pull_list:
+      - path: "{{ dest_path_full }}"
+        name: "{{ compose_project_name }}"
+        policy: "policy"
+  tags:
+    - update_image
 - name: container_stop_down
   ansible.builtin.include_role:
     name: kwtoolset/container_stop_down
@@ -55,19 +68,6 @@
     loop_var: source_path
   tags:
     - update_config
-- name: container_pull
-  ansible.builtin.include_role:
-    name: kwtoolset/container_pull
-    apply:
-      tags:
-        - update_image
-  vars:
-    container_pull_list:
-      - path: "{{ dest_path_full }}"
-        name: "{{ compose_project_name }}"
-        policy: "policy"
-  tags:
-    - update_image
 - name: container_up
   ansible.builtin.include_role:
     name: kwtoolset/container_up

@@ -49,6 +49,20 @@
     enabled: false
   when: "'nginx.service' in ansible_facts.services"
 
+- name: container_pull
+  ansible.builtin.include_role:
+    name: kwtoolset/container_pull
+    apply:
+      tags:
+        - update_image
+  vars:
+    container_pull_list:
+      - path: "{{ dest_path_full }}"
+        name: "{{ compose_project_name }}"
+        policy: "policy"
+  tags:
+    - update_image
+
 - name: container_stop_down
   ansible.builtin.include_role:
     name: kwtoolset/container_stop_down
@@ -91,20 +105,6 @@
     unzip_dest: "{{ dest_path_full }}/static/sni-templates"
     unzip_remove_source: true
     unzip_checksum: true
-
-- name: container_pull
-  ansible.builtin.include_role:
-    name: kwtoolset/container_pull
-    apply:
-      tags:
-        - update_image
-  vars:
-    container_pull_list:
-      - path: "{{ dest_path_full }}"
-        name: "{{ compose_project_name }}"
-        policy: "policy"
-  tags:
-    - update_image
 
 - name: container_up
   ansible.builtin.include_role:
