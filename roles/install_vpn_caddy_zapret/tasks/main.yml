@@ -3,6 +3,8 @@
 - name: Capture this role's path so nested role can use the parent role_path
   ansible.builtin.set_fact:
     this_role_path: "{{ role_path }}"
+  tags:
+    - always
 
 - name: Add to source_paths the current role templates directory
   ansible.builtin.set_fact:
@@ -17,20 +19,29 @@
         + (source_paths_add_repo_dirs | default([]))
         + (source_paths_add_user_dirs | default([]))
       }}
+  tags:
+    - always
 
-- name: container_stop_down
+- name: compose_down
   ansible.builtin.include_role:
-    name: kwtoolset/container_stop_down
+    name: kwtoolset/compose_down
+    apply:
+      tags:
+        - update_image
+        - update_config
   vars:
-    container_stop_down_list:
+    project_paths:
       - "{{ dest_path_full }}"
-    docker_compose_project_name_list:
-      - "{{ compose_project_name }}"
-      - "{{ project_dir }}"
+  tags:
+    - update_image
+    - update_config
 
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - update_config
   vars:
     copy_files_templating_dir_list:
       - src: "{{ source_path }}"
@@ -39,6 +50,8 @@
   with_items: "{{ source_paths }}"
   loop_control:
     loop_var: source_path
+  tags:
+    - update_config
 
 - name: Launch YouTube region check script
   ansible.builtin.command: "./scripts/check-youtube-region.sh"
@@ -47,22 +60,30 @@
   register: youtube_region_result
   failed_when: youtube_region_result.rc not in [0, 124]
 
-- name: container_pull
+- name: compose_pull
   ansible.builtin.include_role:
-    name: kwtoolset/container_pull
+    name: kwtoolset/compose_pull
+    apply:
+      tags:
+        - update_image
   vars:
-    container_pull_list:
-      - path: "{{ dest_path_full }}"
-        name: "{{ compose_project_name }}"
-        policy: "policy"
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image
   when: youtube_region_result.rc == 124
 
-- name: container_up
+- name: compose_up
   ansible.builtin.include_role:
-    name: kwtoolset/container_up
+    name: kwtoolset/compose_up
+    apply:
+      tags:
+        - update_image
+        - update_config
   vars:
-    container_up_list:
-      - path: "{{ dest_path_full }}"
-        name: "{{ compose_project_name }}"
-        ignore_errors: false
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image
+    - update_config
   when: youtube_region_result.rc == 124
