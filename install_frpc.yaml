@@ -15,9 +15,9 @@
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
   roles:
-    - name: ./roles/kwtoolset/container_stop_down
+    - name: ./roles/kwtoolset/compose_down
       vars:
-        container_stop_down_list:
+        project_paths:
           - "{{ dest_project_fullpath }}"
         docker_compose_project_name_list:
           - "{{ docker_compose_project_name }}"
@@ -30,15 +30,15 @@
           - src: "{{ source_asset_fullpath_project }}"
             dest: "{{ dest_project_rootpath }}"
             default_mode: "0775"
-    - name: ./roles/kwtoolset/container_pull
+    - name: ./roles/kwtoolset/compose_pull
       vars:
-        container_pull_list:
+        project_paths:
           - path: "{{ dest_project_fullpath }}"
             name: "{{ docker_compose_project_name }}"
             policy: "policy"
-    - name: ./roles/kwtoolset/container_up
+    - name: ./roles/kwtoolset/compose_up
       vars:
-        container_up_list:
+        project_paths:
           - path: "{{ dest_project_fullpath }}"
             name: "{{ docker_compose_project_name }}"
             ignore_errors: false

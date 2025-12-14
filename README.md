@@ -328,9 +328,9 @@ The `0_start.yaml` playbook orchestrates the complete setup:
 The `roles/kwtoolset/` directory contains reusable utility roles:
 
 ### Container Management
-- **`container_up`**: Start Docker Compose services
-- **`container_stop_down`**: Stop and remove containers
-- **`container_pull`**: Pull container images
+- **`compose_up`**: Start Docker Compose services
+- **`compose_down`**: Stop and remove containers
+- **`compose_pull`**: Pull container images in Docker Compose projects
 
 ### File Operations
 - **`copy_files`**: Basic file copying

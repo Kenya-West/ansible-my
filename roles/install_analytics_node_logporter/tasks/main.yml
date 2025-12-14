@@ -29,32 +29,27 @@
     driver: bridge
     state: present
 
-- name: container_pull
+- name: compose_pull
   ansible.builtin.include_role:
-    name: kwtoolset/container_pull
+    name: kwtoolset/compose_pull
     apply:
       tags:
         - update_image
   vars:
-    container_pull_list:
-      - path: "{{ dest_path_full }}"
-        name: "{{ compose_project_name }}"
-        policy: "policy"
+    project_paths:
+      - "{{ dest_path_full }}"
   tags:
     - update_image
-- name: container_stop_down
+- name: compose_down
   ansible.builtin.include_role:
-    name: kwtoolset/container_stop_down
+    name: kwtoolset/compose_down
     apply:
       tags:
         - update_image
         - update_config
   vars:
-    container_stop_down_list:
+    project_paths:
       - "{{ dest_path_full }}"
-    docker_compose_project_name_list:
-      - "{{ compose_project_name }}"
-      - "{{ project_dir }}"
   tags:
     - update_image
     - update_config
@@ -74,18 +69,16 @@
     loop_var: source_path
   tags:
     - update_config
-- name: container_up
+- name: compose_up
   ansible.builtin.include_role:
-    name: kwtoolset/container_up
+    name: kwtoolset/compose_up
     apply:
       tags:
         - update_image
         - update_config
   vars:
-    container_up_list:
-      - path: "{{ dest_path_full }}"
-        name: "{{ compose_project_name }}"
-        ignore_errors: false
+    project_paths:
+      - "{{ dest_path_full }}"
   tags:
     - update_image
     - update_config

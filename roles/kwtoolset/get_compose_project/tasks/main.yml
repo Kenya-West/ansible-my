@@ -1,0 +1,16 @@
+---
+# tasks file for roles/kwtoolset/get_compose_project
+- name: Assert get_compose_project_dir is defined
+  ansible.builtin.assert:
+    that:
+      - get_compose_project_dir is defined
+    fail_msg: "get_compose_project_dir is not defined. Cannot proceed."
+- name: Get Docker compose project name
+  ansible.builtin.script: files/script.sh
+  args:
+    chdir: "{{ get_compose_project_dir }}"
+  register: result
+- name: Set compose project name fact
+  ansible.builtin.set_fact:
+    get_compose_project_name: "{{ result.stdout | trim }}"
+    get_compose_project_result: "{{ result }}"

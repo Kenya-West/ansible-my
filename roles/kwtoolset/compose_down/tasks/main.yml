@@ -1,0 +1,14 @@
+---
+- name: Assert project_paths is defined and not empty
+  ansible.builtin.assert:
+    that:
+      - project_paths is defined
+      - project_paths | length > 0
+    fail_msg: "project_paths is not defined or is empty. Cannot proceed."
+
+- name: Process each of project
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ project_paths }}"
+  loop_control:
+    loop_var: item
+  when: project_paths | length > 0

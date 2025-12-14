@@ -29,8 +29,8 @@
       delegate_to: localhost
     - name: Restart Alertmanager container
       include_role:
-        name: ./roles/kwtoolset/container_restart
+        name: ./roles/kwtoolset/compose_restart
       vars:
-        container_restart_list:
+        project_paths:
           - path: "{{ dest_project_fullpath }}"
             ignore_errors: false
