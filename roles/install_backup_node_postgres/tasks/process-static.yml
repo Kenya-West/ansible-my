@@ -1,0 +1,108 @@
+- name: Fail if location type is missing
+  ansible.builtin.fail:
+    msg: "Each location in backup_locations must have a 'type' field defined"
+  when: location.type is not defined
+
+- name: Assert static type and required fields
+  ansible.builtin.assert:
+    that:
+      - location.type == 'static'
+      - location.source_path is defined
+      - location.dest_path is defined
+      - location.cron_job_name is defined
+    fail_msg: "location must be type 'static' and contain source_path, dest_path, and cron_job_name"
+
+- name: Build mapped paths for source_paths
+  ansible.builtin.include_role:
+    name: kwtoolset/add_path_section
+    apply:
+      tags:
+        - update_config
+  vars:
+    add_path_section_mode: list
+    add_path_section_list: "{{ source_paths }}"
+    add_path_section_section: "{{ location.source_path }}"
+  register: source_paths_mapped_result
+  tags:
+    - update_config
+- name: Set fact for source_paths_mapped
+  ansible.builtin.set_fact:
+    source_paths_mapped: "{{ add_path_section_result }}"
+
+- name: Build mapped paths for this location
+  ansible.builtin.include_role:
+    name: kwtoolset/add_path_section
+    apply:
+      tags:
+        - update_config
+  vars:
+    add_path_section_mode: single
+    add_path_section_path: "{{ dest_path_full }}"
+    add_path_section_section: "{{ location.dest_path }}"
+  register: dest_path_full_mapped_result
+  tags:
+    - update_config
+- name: Set fact for dest_path_full_mapped
+  ansible.builtin.set_fact:
+    dest_path_full_mapped: "{{ add_path_section_result }}"
+
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - update_config
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}"
+        dest: "{{ dest_path_full_mapped }}"
+        default_mode: "0775"
+  with_items: "{{ source_paths_mapped }}"
+  loop_control:
+    loop_var: source_path
+  tags:
+    - update_config
+
+# Cron job
+- name: Generate a cronjob without and with analytics paths
+  set_fact:
+    cronjob_script_path_without_analytics: "{{ dest_path_full_mapped }}/{{ location.cronjob_script_path_without_analytics_suffix | default(cronjob_script_path_without_analytics_suffix) }}"
+
+- name: Change cron job path to monitoring if it is in analytics_node group
+  set_fact:
+    cronjob_script_path_with_analytics: "{{ location.cron_job_name_prefix | default(pgdump_backup_cron_job_name_prefix) }} {{ cron_wrapped_task_prefix }} --job-name {{ location.cron_job_name }} -- {{ cronjob_script_path_without_analytics }} {{ cron_wrapped_task_suffix }} {{ location.cron_job_name_suffix | default(pgdump_backup_cron_job_name_suffix) }}"
+  when: "'analytics_node' in group_names"
+
+# RUN SCRIPTS AND SET
+- name: Run backup script
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "{{ dest_path_full_mapped }}/scripts/backup.sh"
+    chdir: "{{ dest_path_full_mapped }}"
+  register: backup_result
+
+- name: Fail if backup script failed
+  ansible.builtin.fail:
+    msg: "Backup script failed with error: {{ backup_result.stderr }}"
+  when: "'Error' in backup_result.stderr"
+
+- name: Add cron job for pgdump (not in analytics_node group)
+  become: true
+  become_user: root
+  ansible.builtin.cron:
+    name: "{{ location.cron_job_name }}"
+    minute: 0
+    hour: 0
+    job: "{{ cronjob_script_path_without_analytics }}"
+  when: "'analytics_node' not in group_names"
+
+- name: Add cron job for pgdump (analytics_node group)
+  become: true
+  become_user: root
+  ansible.builtin.cron:
+    name: "{{ location.cron_job_name }}"
+    minute: 0
+    hour: 0
+    job: "{{ cronjob_script_path_with_analytics }}"
+  when: "'analytics_node' in group_names"

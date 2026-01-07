@@ -49,56 +49,27 @@
     group: "{{ pgdump_backup_access_group }}"
     mode: "{{ pgdump_backup_location_root_permissions }}"
 
-- name: copy_files_templating
-  ansible.builtin.include_role:
-    name: kwtoolset/copy_files_templating
-    apply:
-      tags:
-        - update_config
-  vars:
-    copy_files_templating_dir_list:
-      - src: "{{ source_path }}"
-        dest: "{{ dest_path_full }}"
-        default_mode: "0775"
-  with_items: "{{ source_paths }}"
+- name: Set fact for location types
+  ansible.builtin.set_fact:
+    static_backup_locations: "{{ backup_locations
+      | selectattr('type','defined')
+      | selectattr('type','equalto','static')
+      | list }}"
+    dynamic_backup_locations: "{{ backup_locations
+      | selectattr('type','defined')
+      | selectattr('type','equalto','dynamic_list')
+      | list }}"
+    expanded_dynamic_backup_locations: []
+
+- name: Expand each dynamic backup location
+  ansible.builtin.include_tasks: expand-dynamic.yml
+  loop: "{{ dynamic_backup_locations }}"
   loop_control:
-    loop_var: source_path
-  tags:
-    - update_config
+    loop_var: dynamic_location
 
-# Cron job
-- name: Change cron job path to monitoring if it is in analytics_node group
-  set_fact:
-    cronjob_script_path_with_analytics: "{{ pgdump_backup_cron_job_name_prefix}} {{ cron_wrapped_task_prefix }} --job-name postgres_backup -- {{ cronjob_script_path_without_analytics }} {{ cron_wrapped_task_suffix }} {{ pgdump_backup_cron_job_name_suffix }}"
-  when: "'analytics_node' in group_names"
+- name: Deploy all backup locations
+  ansible.builtin.include_tasks: process-static.yml
+  loop: "{{ static_backup_locations + expanded_dynamic_backup_locations }}"
+  loop_control:
+    loop_var: location
 
-# RUN SCRIPTS AND SET
-- name: Run backup script
-  become: true
-  become_user: root
-  ansible.builtin.shell:
-    cmd: "./scripts/backup.sh"
-    chdir: "{{ dest_path_full }}"
-  register: backup_result
-- name: Fail if backup script failed
-  ansible.builtin.fail:
-    msg: "Backup script failed with error: {{ backup_result.stderr }}"
-  when: "'Error' in backup_result.stderr"
-- name: Add cron job for pgdump (not in analytics_node group)
-  become: true
-  become_user: root
-  ansible.builtin.cron:
-    name: "{{ pgdump_backup_cron_job_name }}"
-    minute: 0
-    hour: 0
-    job: "{{ cronjob_script_path_without_analytics }}"
-  when: "'analytics_node' not in group_names"
-- name: Add cron job for pgdump (analytics_node group)
-  become: true
-  become_user: root
-  ansible.builtin.cron:
-    name: "{{ pgdump_backup_cron_job_name }}"
-    minute: 0
-    hour: 0
-    job: "{{ cronjob_script_path_with_analytics }}"
-  when: "'analytics_node' in group_names"
