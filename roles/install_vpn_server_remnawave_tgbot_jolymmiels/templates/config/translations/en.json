@@ -36,5 +36,6 @@
   "share_referral_button": "Share!",
   "web_app_button_text": "Connect",
   "tribute_button" : "Tribute",
-  "tribute_cancelled" : "Tribute cancelled"
+  "tribute_cancelled" : "Tribute cancelled",
+  "access_denied": "⚠️ Access denied. Please update your profile information."
 }

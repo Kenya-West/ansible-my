@@ -36,5 +36,6 @@
   "share_referral_button": "Поделиться!",
   "web_app_button_text": "🔌 Подключиться",
   "tribute_button" : "Tribute",
-  "tribute_cancelled" : "Подписка через Tribute отменена"
+  "tribute_cancelled" : "Tribute cancelled",
+  "access_denied": "⚠️ Доступ запрещён. Пожалуйста, обновите информацию профиля."
 }
