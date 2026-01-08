@@ -1,0 +1,30 @@
+- name: Fail if location type is missing
+  ansible.builtin.fail:
+    msg: "Each location in backup_locations must have a 'type' field defined"
+  when: dynamic_location.type is not defined
+
+- name: Assert dynamic/dynamic_list type and required fields
+  ansible.builtin.assert:
+    that:
+      - dynamic_location.type in ['dynamic', 'dynamic_list']
+      - dynamic_location.count is defined and dynamic_location.count | int > 0
+      - dynamic_location.source_path is defined
+      - dynamic_location.dest_path is defined
+      - dynamic_location.cron_job_name_template_prefix is defined
+    fail_msg: "location must be type 'dynamic'/'dynamic_list' and contain count, source_path, dest_path, and cron_job_name_template_prefix"
+
+- name: Expand dynamic location into static ones and save to fact
+  ansible.builtin.set_fact:
+    expanded_dynamic_backup_locations: "{{ expanded_dynamic_backup_locations + [
+      dynamic_location | combine({
+        'name': dynamic_location.name ~ '_' ~ loc,
+        'type': 'static',
+        'index': loc,
+        'source_path': dynamic_location.source_path,
+        'dest_path': dynamic_location.dest_path ~ '/' ~ loc,
+        'cron_job_name': dynamic_location.cron_job_name_template_prefix ~ loc
+      }) ] }}"
+  loop: "{{ range(dynamic_location.count | int) | list }}"
+  loop_control:
+    loop_var: loc
+

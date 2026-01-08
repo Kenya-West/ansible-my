@@ -29,6 +29,12 @@
     - copy_files_templating_files_to_remove.files | default([]) | length > 0
   delegate_to: localhost
 
+- name: Create a directory path if it does not exist
+  ansible.builtin.file:
+    path: "{{ item.dest }}"
+    state: directory
+    mode: "{{ (item.default_mode_directory | default(item.default_mode | default(755) | int)) }}"
+
 - name: Synchronize templated files to remote host {{ item.dest }}
   ansible.builtin.synchronize:
     mode: push

@@ -1,0 +1,48 @@
+---
+# tasks file for roles/kwtoolset/add_path_section
+
+- name: Assert for single mode
+  ansible.builtin.assert:
+    that:
+      - add_path_section_path is defined
+      - add_path_section_section is defined
+    fail_msg: "For single mode, both add_path_section_path and add_path_section_section must be defined."
+  when:
+    - add_path_section_mode == 'single'
+
+- name: Add path section to single record
+  ansible.builtin.set_fact:
+    add_path_section_result: >-
+      {%- set base_suffix = (add_path_section_path | regex_search('/+$')) | default('', true) -%}
+      {%- set sub_suffix = (add_path_section_section | regex_search('/+$')) | default('', true) -%}
+      {%- set keep_suffix = base_suffix if (base_suffix | length) > 0 else sub_suffix -%}
+      {{ (add_path_section_path | regex_replace('/+$', '')) ~ '/' ~ ((add_path_section_section | regex_replace('^/+', '')) | regex_replace('/+$', '')) ~ keep_suffix }}
+  when: add_path_section_mode == 'single'
+
+- name: Assert for list mode
+  ansible.builtin.assert:
+    that:
+      - add_path_section_list is defined
+      - add_path_section_list | length > 0
+      - add_path_section_list | map(attribute='path') | list | length == add_path_section_list | length
+      - add_path_section_list | map(attribute='section') | list | length == add_path_section_list | length
+      - add_path_section_section is defined
+    fail_msg: "For list mode, add_path_section_list must be defined and each item must contain 'path' and 'section'."
+  when:
+    - add_path_section_mode == 'list'
+
+- name: Add path sections to list of records
+  ansible.builtin.set_fact:
+    add_path_section_result: >-
+      {%- set out = [] -%}
+      {%- set base_suffix = (add_path_section_section | regex_search('/+$')) | default('', true) -%}
+      {%- set base_sub_clean = (add_path_section_section | regex_replace('^/+', '')) | regex_replace('/+$', '') -%}
+      {%- for p in add_path_section_list -%}
+      {%- set p_suffix = (p | regex_search('/+$')) | default('', true) -%}
+      {%- set keep_suffix = p_suffix if (p_suffix | length) > 0 else base_suffix -%}
+      {%- set base_clean = p | regex_replace('/+$', '') -%}
+      {%- set mapped = base_clean ~ '/' ~ base_sub_clean ~ keep_suffix -%}
+      {%- set _ = out.append(mapped) -%}
+      {%- endfor -%}
+      {{ out }}
+  when: add_path_section_mode == 'list'

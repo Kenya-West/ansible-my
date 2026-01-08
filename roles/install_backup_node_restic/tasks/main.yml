@@ -57,6 +57,25 @@
   tags:
     - update_config
 
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - none
+        - update_scripts
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ (source_path | default('') | regex_replace('/$','')) ~ '/scripts' }}"
+        dest: "{{ dest_path_full }}"
+        default_mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+  tags:
+    - none
+    - update_scripts
+
 - name: Remove invalid locations in Autorestic config file
   ansible.builtin.include_role:
     name: remove_invalid_locations_autorestic
