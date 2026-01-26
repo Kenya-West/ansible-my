@@ -23,6 +23,36 @@
   tags:
     - always
 
+- name: "Extract binary package info"
+  ansible.builtin.set_fact:
+    binary_pkg: "{{ packages_binary_list
+                   | selectattr('repo','search','xray-torrent-blocker')
+                   | list
+                   | first }}"
+  tags:
+    - never
+    - update_image
+    - update_executable
+- name: "Install binary using eget"
+  ansible.builtin.include_role:
+    name: ./roles/install_packages_binary
+    apply:
+      tags:
+        - never
+        - update_image
+        - update_executable
+  vars:
+    packages_binary_list:
+      - "{{ binary_pkg }}"
+  args:
+    apply:
+      become: true
+      become_user: root
+  tags:
+    - never
+    - update_image
+    - update_executable
+
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
@@ -44,7 +74,8 @@
   ansible.builtin.template:
     src: "{{ this_role_path }}/templates/systemd/tblocker.service.j2"
     dest: "{{ dest_path_full_systemd }}/tblocker.service"
-
+  tags:
+    - update_config
 - name: Enable and start tblocker service
   ansible.builtin.systemd:
     name: tblocker
@@ -53,3 +84,7 @@
     daemon_reload: true
   register: tblocker_service_status
   failed_when: tblocker_service_status is failed
+  tags:
+    - update_config
+    - update_image
+    - update_executable

@@ -50,6 +50,10 @@ packages_binary_list:
     assets:
       - "gnu"
   - repo: "cupcakearmy/autorestic"
+  - repo: "kutovoys/xray-torrent-blocker"
+    assets:
+      - "tar.gz"
+    bin_name: "tblocker"
   - repo: "mr-karan/doggo"
     assets:
       - "^web"
