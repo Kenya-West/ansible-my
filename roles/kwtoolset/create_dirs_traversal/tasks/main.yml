@@ -1,0 +1,70 @@
+---
+# tasks file for roles/kwtoolset/create_dirs_traversal
+- name: Validate create_dirs_traversal_path
+  ansible.builtin.assert:
+    that:
+      - create_dirs_traversal_path | length > 0
+    fail_msg: "create_dirs_traversal_path must be set"
+
+- name: Normalize target directory path
+  ansible.builtin.set_fact:
+    create_dirs_traversal_target_dir: >-
+      {{
+        (create_dirs_traversal_path | dirname)
+        if (create_dirs_traversal_strip_leaf | default(true))
+        else create_dirs_traversal_path
+      }}
+
+- name: Split target directory into components
+  ansible.builtin.set_fact:
+    create_dirs_traversal_parts: >-
+      {{
+        create_dirs_traversal_target_dir
+        | regex_replace('^/', '')
+        | split('/')
+        | reject('equalto', '')
+        | list
+      }}
+
+- name: Build cumulative traversal paths
+  ansible.builtin.set_fact:
+    create_dirs_traversal_paths: "{{ create_dirs_traversal_paths | default([]) + [ '/' + (create_dirs_traversal_parts[0:idx] | join('/')) ] }}"
+  loop: "{{ range(1, (create_dirs_traversal_parts | length) + 1) | list }}"
+  loop_control:
+    loop_var: idx
+
+- name: Stat traversal paths
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ create_dirs_traversal_paths }}"
+  register: create_dirs_traversal_stats
+
+# Find the deepest existing directory (nearest parent)
+- name: Detect nearest existing parent directory
+  ansible.builtin.set_fact:
+    create_dirs_traversal_parent_stat: "{{ item.stat }}"
+  when: item.stat.exists
+  loop: "{{ create_dirs_traversal_stats.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Fail if no existing parent directory found
+  ansible.builtin.fail:
+    msg: "No existing parent directory found for {{ create_dirs_traversal_target_dir }}"
+  when:
+    - create_dirs_traversal_fail_if_no_parent | default(true)
+    - create_dirs_traversal_parent_stat is not defined
+
+- name: Create missing directories inheriting parent ownership and mode
+  ansible.builtin.file:
+    path: "{{ item.item }}"
+    state: directory
+    owner: "{{ create_dirs_traversal_parent_stat.pw_name }}"
+    group: "{{ create_dirs_traversal_parent_stat.gr_name }}"
+    mode: "{{ create_dirs_traversal_parent_stat.mode }}"
+  when:
+    - create_dirs_traversal_parent_stat is defined
+    - not item.stat.exists
+  loop: "{{ create_dirs_traversal_stats.results }}"
+  loop_control:
+    label: "{{ item.item }}"

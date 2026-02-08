@@ -34,6 +34,20 @@
     state: directory
     suffix: _powershell_profile
   register: powershell_profile_temp_dir
+
+- name: Create non-existent parent directories for {{ powershell_profile.stdout }}
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/create_dirs_traversal
+  vars:
+    create_dirs_traversal_path: "{{ powershell_profile.stdout }}"
+    create_dirs_traversal_strip_leaf: true
+
+- name: "Fail if some directories do not exist at {{ powershell_profile.stdout }}"
+  ansible.builtin.stat:
+    path: "{{ powershell_profile.stdout | dirname }}"
+  register: powershell_profile_stat
+  failed_when: not powershell_profile_stat.stat.exists
+
 - name: Template powershell profile files to temporary directory
   ansible.builtin.template:
     src: "{{ item }}/{{ powershell_profile_source_path }}"
