@@ -1,5 +1,16 @@
 ---
 # tasks file for roles/add_keys
+- name: "Install binary using eget"
+  ansible.builtin.include_role:
+    name: ./roles/install_packages
+  vars:
+    packages_list:
+      - acl
+  args:
+    apply:
+      become: true
+      become_user: root
+
 - name: Add keys to each user
   ansible.builtin.include_tasks: process.yml
   loop: "{{ users_to_set }}"
