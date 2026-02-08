@@ -28,6 +28,7 @@
   args:
     executable: "{{ powershell_path.stdout }}"
   register: powershell_profile
+  failed_when: (powershell_profile.rc != 0) or (powershell_profile.stdout == "")
 - name: Create temporary directory
   ansible.builtin.tempfile:
     state: directory
