@@ -26,6 +26,11 @@
         | list
       }}
 
+- name: Reset traversal state for this run
+  ansible.builtin.set_fact:
+    create_dirs_traversal_paths: []
+    create_dirs_traversal_parent_stat: null
+
 - name: Build cumulative traversal paths
   ansible.builtin.set_fact:
     create_dirs_traversal_paths: "{{ create_dirs_traversal_paths | default([]) + [ '/' + (create_dirs_traversal_parts[0:idx] | join('/')) ] }}"
@@ -53,15 +58,15 @@
     msg: "No existing parent directory found for {{ create_dirs_traversal_target_dir }}"
   when:
     - create_dirs_traversal_fail_if_no_parent | default(true)
-    - create_dirs_traversal_parent_stat is not defined
+    - create_dirs_traversal_parent_stat is none
 
 - name: Create missing directories inheriting parent ownership and mode
   ansible.builtin.file:
     path: "{{ item.item }}"
     state: directory
-    owner: "{{ create_dirs_traversal_parent_stat.pw_name }}"
-    group: "{{ create_dirs_traversal_parent_stat.gr_name }}"
-    mode: "{{ create_dirs_traversal_parent_stat.mode }}"
+    owner: "{{ create_dirs_force_owner | default(create_dirs_traversal_parent_stat.pw_name, true) }}"
+    group: "{{ create_dirs_force_group | default(create_dirs_traversal_parent_stat.gr_name, true) }}"
+    mode: "{{ create_dirs_force_mode | default(create_dirs_traversal_parent_stat.mode, true) }}"
   when:
     - create_dirs_traversal_parent_stat is defined
     - not item.stat.exists
