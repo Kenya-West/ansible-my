@@ -1,6 +1,10 @@
 ---
 # defaults file for roles/kwtoolset/create_dirs_traversal
 create_dirs_traversal_path: ""
+create_dirs_traversal_paths: []
 # Whether to treat the last path component as a file and strip it
 create_dirs_traversal_strip_leaf: true
 create_dirs_traversal_fail_if_no_parent: true
+create_dirs_force_mode: ""
+create_dirs_force_owner: ""
+create_dirs_force_group: ""
