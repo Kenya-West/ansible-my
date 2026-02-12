@@ -19,6 +19,7 @@ packages_list:
       - locales
       - logrotate
       - rsync
+      - openssh-server
       - bc
       - lsof
       - net-tools
