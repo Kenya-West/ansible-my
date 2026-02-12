@@ -6,11 +6,18 @@
   tags:
     - always
 
-- name: Ensure destination root path exists
-  ansible.builtin.file:
-    path: "{{ dest_path_root }}"
-    state: directory
-    mode: "0755"
+- name: "Create non-existent parent directories for {{ dest_path_full }}"
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/create_dirs_traversal
+    apply:
+      tags:
+        - update_config
+  vars:
+    create_dirs_traversal_path: "{{ dest_path_full }}"
+    create_dirs_traversal_strip_leaf: true
+    create_dirs_force_mode: "0775"
+  tags:
+    - update_config
 
 - name: copy_files_templating
   ansible.builtin.include_role:

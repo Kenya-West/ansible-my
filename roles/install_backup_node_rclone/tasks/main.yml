@@ -55,6 +55,49 @@
           become: true
           become_user: root
 
+- name: "Create non-existent parent directories for {{ dest_path_full }}"
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/create_dirs_traversal
+    apply:
+      tags:
+        - update_config
+  vars:
+    create_dirs_traversal_path: "{{ dest_path_full }}"
+    create_dirs_traversal_strip_leaf: true
+    create_dirs_force_mode: "0775"
+  tags:
+    - update_config
+
+- name: "Create non-existent parent directories for {{ xdg_config_home_path_full }}"
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/create_dirs_traversal
+    apply:
+      tags:
+        - update_config
+  vars:
+    create_dirs_traversal_path: "{{ xdg_config_home_path_full }}"
+    create_dirs_traversal_strip_leaf: true
+    create_dirs_force_mode: "0775"
+  tags:
+    - update_config
+
+- name: "Create non-existent parent directories for {{ xdg_config_root_path_full }} (root)"
+  become: true
+  become_user: root
+  block:
+    - name: create_dirs_traversal
+      ansible.builtin.include_role:
+        name: ./roles/kwtoolset/create_dirs_traversal
+        apply:
+          tags:
+            - update_config
+      vars:
+        create_dirs_traversal_path: "{{ xdg_config_root_path_full }}"
+        create_dirs_traversal_strip_leaf: true
+        create_dirs_force_mode: "0775"
+  tags:
+    - update_config
+
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
@@ -66,9 +109,33 @@
       - src: "{{ source_path }}"
         dest: "{{ dest_path_full }}"
         default_mode: "0775"
+      - src: "{{ source_path }}"
+        dest: "{{ xdg_config_home_path_full }}"
+        default_mode: "0775"
   with_items: "{{ source_paths }}"
   loop_control:
     loop_var: source_path
+  tags:
+    - update_config
+
+- name: copy_files_templating (root)
+  become: true
+  become_user: root
+  block:
+    - name: copy_files_templating
+      ansible.builtin.include_role:
+        name: kwtoolset/copy_files_templating
+        apply:
+          tags:
+            - update_config
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_path }}"
+            dest: "{{ xdg_config_root_path_full }}"
+            default_mode: "0775"
+      with_items: "{{ source_paths }}"
+      loop_control:
+        loop_var: source_path
   tags:
     - update_config
 

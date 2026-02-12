@@ -22,18 +22,17 @@
   tags:
     - always
 
-- name: compose_down
+- name: "Create non-existent parent directories for {{ dest_path_full }}"
   ansible.builtin.include_role:
-    name: kwtoolset/compose_down
+    name: ./roles/kwtoolset/create_dirs_traversal
     apply:
       tags:
-        - update_image
         - update_config
   vars:
-    project_paths:
-      - "{{ dest_path_full }}"
+    create_dirs_traversal_path: "{{ dest_path_full }}"
+    create_dirs_traversal_strip_leaf: true
+    create_dirs_force_mode: "0775"
   tags:
-    - update_image
     - update_config
 
 - name: copy_files_templating
@@ -53,12 +52,26 @@
   tags:
     - update_config
 
+- name: compose_down
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_down
+    apply:
+      tags:
+        - update_image
+        - update_config
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image
+    - update_config
+
 - name: Launch YouTube region check script
   ansible.builtin.command: "./scripts/check-youtube-region.sh"
   args:
     chdir: "{{ dest_path_full }}"
   register: youtube_region_result
-  failed_when: youtube_region_result.rc not in [0, 124]
+  failed_when: youtube_region_result.rc not in [0, 6, 124]
 
 - name: compose_pull
   ansible.builtin.include_role:

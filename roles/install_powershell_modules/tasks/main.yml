@@ -12,6 +12,13 @@
     executable: "{{ pwsh_path.stdout }}"
   register: pwsh_profile
 
+- name: Set PSGallery as trusted repository
+  ansible.builtin.shell: "Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted"
+  args:
+    executable: "{{ pwsh_path.stdout }}"
+  register: set_psgallery_trusted
+  failed_when: set_psgallery_trusted.rc != 0
+
 - name: Process each of base file names
   ansible.builtin.include_tasks: process.yml
   loop: "{{ powershell_profile_modules }}"
