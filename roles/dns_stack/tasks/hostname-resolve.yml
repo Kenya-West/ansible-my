@@ -1,7 +1,7 @@
 # Ensure hostname is set and resolvable locally
 - name: Ensure hostname matches desired value (optional, if you manage it)
-  ansible.builtin.command: "hostnamectl set-hostname {{ dnscrypt.hostname | default(ansible_hostname) }}"
-  changed_when: false
+  ansible.builtin.hostname:
+    name: "{{ dnscrypt.hostname | default(ansible_hostname) }}"
 
 - name: Ensure /etc/hosts has localhost line
   ansible.builtin.lineinfile:

@@ -7,11 +7,11 @@ listen_addresses = ["{{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }}"]
 {% endif %}
 
 ipv4_servers = true
-ipv6_servers = {{ 'true' if dnscrypt.ipv6 else 'false' }}
-dnscrypt_servers = {{ 'true' if dnscrypt.dnscrypt_servers else 'false' }}
+ipv6_servers = {{ 'true' if dnscrypt.ipv6 | default(false) else 'false' }}
+dnscrypt_servers = {{ 'true' if dnscrypt.dnscrypt_servers | default(true) else 'false' }}
 doh_servers = true
 
-require_dnssec = {{ 'true' if dnscrypt.require_dnssec else 'false' }}
+require_dnssec = {{ 'true' if dnscrypt.require_dnssec | default(false) else 'false' }}
 require_nolog = false
 require_nofilter = false
 

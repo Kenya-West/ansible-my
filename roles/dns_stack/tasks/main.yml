@@ -60,7 +60,9 @@
         owner: root
         group: root
         mode: '0644'
-      notify: restart dnscrypt
+      notify:
+        - restart dnscrypt
+        - restart dnscrypt service
 
     # Use systemd socket activation for dnscrypt-proxy (conditional)
     - name: Ensure dnscrypt-proxy.socket drop-in directory exists
@@ -126,17 +128,7 @@
           register: _dnscrypt_service_started
           ignore_errors: true
 
-    - name: Wait for dnscrypt-proxy to listen on {{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }} (socket mode)
-      when: dnscrypt.use_socket_activation | default(true)
-      ansible.builtin.wait_for:
-        host: "{{ dnscrypt.listen_addr }}"
-        port: "{{ dnscrypt.listen_port | int }}"
-        state: started
-        delay: 0
-        timeout: 60
-
-    - name: Wait for dnscrypt-proxy to listen on {{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }} (service mode)
-      when: not (dnscrypt.use_socket_activation | default(true))
+    - name: Wait for dnscrypt-proxy to listen on {{ dnscrypt.listen_addr }}:{{ dnscrypt.listen_port }}
       ansible.builtin.wait_for:
         host: "{{ dnscrypt.listen_addr }}"
         port: "{{ dnscrypt.listen_port | int }}"
@@ -231,18 +223,6 @@
         - community.general.ufw:
             rule: deny
             direction: out
-            port: '53'
-            proto: tcp
-        - community.general.ufw:
-            rule: allow
-            direction: out
-            to: '127.0.0.1'
-            port: '53'
-            proto: udp
-        - community.general.ufw:
-            rule: allow
-            direction: out
-            to: '127.0.0.1'
             port: '53'
             proto: tcp
         - community.general.ufw:

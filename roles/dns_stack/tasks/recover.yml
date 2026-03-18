@@ -144,15 +144,6 @@
   register: _resolved_restore
   ignore_errors: true
 
-# If you’re recovering *away* from resolved back to dnscrypt, stop both:
-- name: Stop systemd-resolved socket if we need dnscrypt on :53
-  when: _need_recover or _need_recover_due_to_hostname
-  ansible.builtin.systemd:
-    name: systemd-resolved.socket
-    state: stopped
-    enabled: false
-  ignore_errors: true
-
 - name: Point /etc/resolv.conf to systemd-resolved stub (if available)
   when: (_need_recover or _need_recover_due_to_hostname) and (_resolved_restore is not failed)
   ansible.builtin.file:
