@@ -1,0 +1,4 @@
+{% for item in packages_binary_list -%}
+{{ item.repo }}{% if item.assets is defined and item.assets | length > 0 %}{% for asset in item.assets %} --asset {{ asset }}{% endfor %}{% endif %}{% if item.file is defined and item.file | length > 0 %} --file {{ item.file }}{% endif %}
+
+{% endfor -%}

@@ -25,6 +25,7 @@ packages_list:
       - net-tools
       - acl
       - conntrack
+      - parallel
       # TermSCP dependencies
       - libdbus-1-dev
       - pkg-config

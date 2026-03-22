@@ -23,6 +23,18 @@
   tags:
     - always
 
+- name: Run backup script if backup is enabled
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    # TODO: Replace it with value from `backup_locations`
+    cmd: "bash {{ vpn_server_remnawave_backup_project_full_dir }}/remnawave-panel/scripts/backup.sh"
+    creates: "{{ pgdump_backup_location_root_path }}/remnawave-panel/dump_remnawave_panel.sql"
+  when: "'backup_restic_node' in group_names"
+  tags:
+    - never
+    - update_image
+
 - name: Ensure Docker network {{ docker_vpn_server_remnawave_network }} exists with specific settings
   community.docker.docker_network:
     name: "{{ docker_vpn_server_remnawave_network }}"

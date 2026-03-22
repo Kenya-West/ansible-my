@@ -1,0 +1,112 @@
+- name: Create temporary directory for parallel command results
+  ansible.builtin.tempfile:
+    state: directory
+  register: parallel_cmds_temp_dir
+  tags:
+    - update_packages
+
+- name: Create passed commands chunk in directory
+  ansible.builtin.copy:
+    dest: "{{ parallel_cmds_temp_dir.path }}/commands.txt"
+    content: "{{ packages_binary_chunk | join('\n') ~ '\n' }}"
+    mode: "0644"
+  tags:
+    - update_packages
+
+# - name: Read the tempfile content for verification
+#   ansible.builtin.slurp:
+#     src: "{{ parallel_cmds_temp_dir.path }}/commands.txt"
+#   register: parallel_cmds_file_raw
+#   tags:
+#     - update_packages
+
+# - name: Debug the content of the commands file
+#   ansible.builtin.debug:
+#     msg: "Commands file content:\n{{ parallel_cmds_file_raw.content | b64decode }}"
+#   tags:
+#     - update_packages
+
+- name: Run commands in parallel for all packages
+  ansible.builtin.command: "{{ dest_path_full }}/scripts/run-parallel-cmds.sh --prepend 'eget' --append '--to /usr/local/bin/' --logs --timeout {{ packages_binary_timeout }} -f {{ parallel_cmds_temp_dir.path }}/commands.txt -o {{ dest_path_full }}/files/results/results_{{ chunk_index }}.json"
+  register: parallel_cmds_result
+  failed_when: false
+  tags:
+    - update_packages
+
+- name: Remove temporary directory
+  ansible.builtin.file:
+    path: "{{ parallel_cmds_temp_dir.path }}"
+    state: absent
+  failed_when: false
+  tags:
+    - update_packages
+
+- name: Fail if results.json is absent
+  ansible.builtin.stat:
+    path: "{{ dest_path_full }}/files/results/results_{{ chunk_index }}.json"
+  register: results_file
+  failed_when: not results_file.stat.exists
+  tags:
+    - update_packages
+
+- name: Fail if results.json is older than 1 minute (meaning the command likely failed to run properly)
+  ansible.builtin.stat:
+    path: "{{ dest_path_full }}/files/results/results_{{ chunk_index }}.json"
+  register: results_file
+  failed_when: results_file.stat.exists and (ansible_date_time.epoch | int) - (results_file.stat.mtime | int) > 60
+  tags:
+    - update_packages
+
+- name: Read results.json
+  ansible.builtin.slurp:
+    src: "{{ dest_path_full }}/files/results/results_{{ chunk_index }}.json"
+  register: results_json_raw
+  tags:
+    - update_packages
+
+- name: Parse results.json
+  ansible.builtin.set_fact:
+    parallel_cmds_results_data: "{{ results_json_raw.content | b64decode | from_json }}"
+  tags:
+    - update_packages
+
+- name: Show results summary
+  ansible.builtin.debug:
+    msg: >-
+      Parallel install results:
+      total={{ parallel_cmds_results_data.summary.total }},
+      succeeded={{ parallel_cmds_results_data.summary.succeeded }},
+      failed={{ parallel_cmds_results_data.summary.failed }},
+      timed_out={{ parallel_cmds_results_data.summary.timed_out | default(0) }},
+      elapsed={{ parallel_cmds_results_data.summary.elapsed | default('n/a') }}
+  tags:
+    - update_packages
+
+- name: Build list of failed commands
+  ansible.builtin.set_fact:
+    parallel_cmds_failed_commands: >-
+      {{ parallel_cmds_results_data.results
+         | rejectattr('exit_code', 'equalto', 0)
+         | list }}
+  tags:
+    - update_packages
+
+- name: Show failed commands
+  ansible.builtin.fail:
+    msg: "exit_code={{ item.exit_code }}{{ ' (timed out)' if item.timed_out | default(false) else '' }}  {{ item.command }}"
+  loop: "{{ parallel_cmds_failed_commands }}"
+  loop_control:
+    label: "{{ item.command }}"
+  when: parallel_cmds_failed_commands | length > 0
+  ignore_errors: true
+  tags:
+    - update_packages
+
+- name: Empty variable to collect installed binary locations
+  set_fact:
+    parallel_cmds_results_data: {}
+    parallel_cmds_failed_commands: []
+  tags:
+    - always
+    - update_packages
+

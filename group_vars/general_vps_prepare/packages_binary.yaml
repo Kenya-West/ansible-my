@@ -1,7 +1,8 @@
 ---
 # eget_skip_installed_packages: true
 
-packages_binary_timeout: 30s
+packages_binary_timeout: 60
+packages_binary_concurrent_batch_size: 25
 packages_binary_list:
   # full schema is:
   # - repo: "tstack/lnav"         # repo name on github
@@ -15,7 +16,7 @@ packages_binary_list:
   #   post_install: "lnav -h"     # Optional. Command to run after installation
   - repo: "eza-community/eza"
     assets:
-      - "gnu"
+      - "musl"
       - "tar.gz"
   - repo: "junegunn/fzf"
   - repo: "jesseduffield/lazydocker"
@@ -42,7 +43,7 @@ packages_binary_list:
   - repo: "extrawurst/gitui"
   - repo: "solidiquis/erdtree"
     assets:
-      - "^gnu"
+      - "musl"
     file: "erd"
   - repo: "fioncat/otree"
   - repo: "ajeetdsouza/zoxide"
@@ -68,6 +69,8 @@ packages_binary_list:
       - "tar.gz"
   - repo: "wait4x/wait4x"
   - repo: "medialab/xan"
+    assets:
+      - "musl"
   - repo: "walles/riff"
   - repo: "isd-project/isd"
   - repo: "wzv5/pping"
@@ -82,7 +85,7 @@ packages_binary_list:
   - repo: "tokuhirom/dcv"
   - repo: "ynqa/jnv"
     assets:
-      - "^musl"
+      - "gnu"
   - repo: "amir20/dtop"
     assets:
       - "tar.gz"

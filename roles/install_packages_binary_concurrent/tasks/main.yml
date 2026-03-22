@@ -1,0 +1,98 @@
+---
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+  tags:
+    - always
+
+- name: Check that GNU parallel is installed
+  ansible.builtin.command: parallel --version
+  register: parallel_cmds_package_check
+  changed_when: false
+  failed_when: parallel_cmds_package_check.rc != 0 or 'GNU parallel' not in parallel_cmds_package_check.stdout
+  tags:
+    - always
+
+- name: Create non-existent parent directories for {{ dest_path_full }}
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/create_dirs_traversal
+    apply:
+      tags:
+        - update_config
+  vars:
+    create_dirs_traversal_path: "{{ dest_path_full }}"
+    create_dirs_traversal_strip_leaf: false
+  tags:
+    - update_config
+
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - update_config
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}"
+        dest: "{{ dest_path_full }}"
+        default_mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+  tags:
+    - update_config
+
+- name: Read the templated file
+  ansible.builtin.slurp:
+    src: "{{ dest_path_full }}/files/commands.txt"
+  register: parallel_cmds_commands_file_raw
+  tags:
+    - update_packages
+
+- name: Split the file content into a list of commands
+  ansible.builtin.set_fact:
+    packages_binary_commands: >-
+      {{
+        (parallel_cmds_commands_file_raw.content | b64decode).splitlines()
+        | map('trim')
+        | reject('equalto', '')
+        | list
+      }}
+  tags:
+    - update_packages
+
+- name: Split packages_binary_commands into chunks of {{ packages_binary_concurrent_batch_size }} items
+  ansible.builtin.set_fact:
+    packages_binary_chunks: "{{ packages_binary_commands | batch(packages_binary_concurrent_batch_size) | list }}"
+  tags:
+    - update_packages
+
+- name: Run commands in parallel per chunk of packages
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ packages_binary_chunks }}"
+  loop_control:
+    loop_var: packages_binary_chunk
+    index_var: chunk_index
+  vars:
+    current_index: "{{ instance_index }}"
+    project_name: "{{ compose_project_name }}-{{ instance_index }}"
+    dest_project_fullpath: "{{ dest_path_full }}/{{ instance_index }}"
+  tags:
+    - always
+    - update_packages

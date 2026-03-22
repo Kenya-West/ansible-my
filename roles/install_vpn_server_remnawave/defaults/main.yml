@@ -15,3 +15,7 @@ dest_path_root: "/home/{{ standard_user }}/{{ vpn_server_remnawave_project_struc
 dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
+
+# For backup script
+vpn_server_remnawave_backup_project_root_dir: "{{ backup_restic_node_project_structure_root | default('') }}"
+vpn_server_remnawave_backup_project_full_dir: "{{ vpn_server_remnawave_backup_project_root_dir + '/' + (backup_restic_node_project_structure_end_dirs.postgres | default('')) }}"
