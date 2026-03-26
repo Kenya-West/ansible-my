@@ -29,36 +29,44 @@
   tags:
     - always
 
-- name: Create non-existent parent directories for {{ dest_path_full }}
-  ansible.builtin.include_role:
-    name: ./roles/kwtoolset/create_dirs_traversal
-    apply:
-      tags:
-        - update_config
-  vars:
-    create_dirs_traversal_path: "{{ dest_path_full }}"
-    create_dirs_traversal_strip_leaf: false
-  tags:
-    - update_config
+- block:
+  - name: Create non-existent parent directories for {{ dest_path_full }}
+    ansible.builtin.include_role:
+      name: ./roles/kwtoolset/create_dirs_traversal
+      apply:
+        tags:
+          - update_config
+    vars:
+      create_dirs_traversal_path: "{{ dest_path_full }}"
+      create_dirs_traversal_strip_leaf: false
+    tags:
+      - update_config
+  become: true
+  become_user: "{{ standard_user }}"
 
-- name: copy_files_templating
-  ansible.builtin.include_role:
-    name: kwtoolset/copy_files_templating
-    apply:
-      tags:
-        - update_config
-  vars:
-    copy_files_templating_dir_list:
-      - src: "{{ source_path }}"
-        dest: "{{ dest_path_full }}"
-        default_mode: "0775"
-  with_items: "{{ source_paths }}"
-  loop_control:
-    loop_var: source_path
-  tags:
-    - update_config
+- block:
+  - name: copy_files_templating
+    ansible.builtin.include_role:
+      name: kwtoolset/copy_files_templating
+      apply:
+        tags:
+          - update_config
+    vars:
+      copy_files_templating_dir_list:
+        - src: "{{ source_path }}"
+          dest: "{{ dest_path_full }}"
+          default_mode: "0775"
+    with_items: "{{ source_paths }}"
+    loop_control:
+      loop_var: source_path
+    tags:
+      - update_config
+  become: true
+  become_user: "{{ standard_user }}"
 
 - name: Read the templated file
+  become: true
+  become_user: "{{ standard_user }}"
   ansible.builtin.slurp:
     src: "{{ dest_path_full }}/files/commands.txt"
   register: parallel_cmds_commands_file_raw
