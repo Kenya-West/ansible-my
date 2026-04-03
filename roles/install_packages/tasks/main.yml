@@ -5,7 +5,9 @@
     name: "{{ item }}"
     state: absent
   loop: "{{ packages_list.uninstall.apt }}"
-  when: packages_list.uninstall.apt is defined
+  when:
+    - packages_list.uninstall.apt is defined
+    - packages_list.uninstall.apt | length > 0
   ignore_errors: true
 
 - name: Uninstall Snap packages
@@ -13,7 +15,9 @@
     name: "{{ item }}"
     state: absent
   loop: "{{ packages_list.uninstall.snap }}"
-  when: packages_list.uninstall.snap is defined
+  when:
+    - packages_list.uninstall.snap is defined
+    - packages_list.uninstall.snap | length > 0
   ignore_errors: true
 
 - name: Install Apt packages
@@ -22,13 +26,19 @@
     name: "{{ item }}"
     state: present
   loop: "{{ packages_list.install.apt }}"
-  when: packages_list.install.apt is defined
+  when:
+    - packages_list.install.apt is defined
+    - packages_list.install.apt | length > 0
   ignore_errors: true
 
 - name: Install Snap packages
   community.general.snap:
     name: "{{ item }}"
   loop: "{{ packages_list.install.snap }}"
+  when:
+    - packages_list.install.snap is defined
+    - packages_list.install.snap | length > 0
+  ignore_errors: true
 
 - name: Install Snap packages (Classic)
   community.general.snap:
