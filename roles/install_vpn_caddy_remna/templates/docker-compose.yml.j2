@@ -4,10 +4,12 @@ services:
   remna:
     image: remnawave/node:latest
     container_name: remna
+{% if ansible_virtualization_type != 'lxc' %}
     ulimits:
       nofile:
         soft: 1048576
         hard: 1048576
+{% endif %}
     env_file:
       - .env
     volumes:
