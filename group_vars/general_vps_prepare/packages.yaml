@@ -55,3 +55,5 @@ packages_list:
       - procs
       - trippy
       - dust
+    snap_classic:
+      - astral-uv

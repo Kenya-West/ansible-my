@@ -29,5 +29,13 @@
   community.general.snap:
     name: "{{ item }}"
   loop: "{{ packages_list.install.snap }}"
-  when: packages_list.install.snap is defined
+
+- name: Install Snap packages (Classic)
+  community.general.snap:
+    name: "{{ item }}"
+    classic: true
+  loop: "{{ packages_list.install.snap_classic }}"
+  when:
+    - packages_list.install.snap_classic is defined
+    - packages_list.install.snap_classic | length > 0
   ignore_errors: true
