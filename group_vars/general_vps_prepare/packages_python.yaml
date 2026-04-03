@@ -1,6 +1,10 @@
 ---
+packages_python_timeout: 30
 packages_python_list:
   # full schema is:
   # - tool: "sot"                 # tool name on github
   - tool: "sot"
   - tool: "gruyere"
+  - tool: "netshow"
+  - tool: "dtop"
+  - tool: "twg"
