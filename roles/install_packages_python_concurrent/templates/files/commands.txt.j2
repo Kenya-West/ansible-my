@@ -1,0 +1,3 @@
+{% for package in packages_python_list -%}
+{{ package.tool | default(omit) }}
+{% endfor -%}
