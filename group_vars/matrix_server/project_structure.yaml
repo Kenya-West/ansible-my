@@ -1,0 +1,6 @@
+---
+matrix_server_project_structure_root: matrix-server
+matrix_server_project_structure_end_dirs__base:
+  synapse: "{{ matrix_server_project_structure_root }}/synapse"
+matrix_server_project_structure_end_dirs: "{{ matrix_server_project_structure_end_dirs__base }}"
+matrix_server_project_structure_end_dirs_list: "{{ matrix_server_project_structure_end_dirs.values() | list }}"

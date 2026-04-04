@@ -1,0 +1,50 @@
+- name: compose_down
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_down
+    apply:
+      tags:
+        - update_config
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_config
+
+- name: Launch synapse_db container in this docker-compose setup
+  community.docker.docker_compose_v2:
+    project_src: "{{ dest_path_full }}"
+    services:
+      - synapse_db
+    state: present
+  register: matrix_server_synapse_up_db_output
+  tags:
+    - update_config
+
+- name: Verify that db service is running and backend is not
+  ansible.builtin.assert:
+    that:
+      - synapse_db.State == 'running'
+  vars:
+    synapse_db: >-
+      {{ matrix_server_synapse_up_db_output.containers | selectattr("Service", "equalto", "synapse_db") | first }}
+  tags:
+    - update_config
+
+- name: Run synapse generate once
+  ansible.builtin.command:
+    cmd: >
+      docker compose run --rm
+      -e SYNAPSE_SERVER_NAME={{ domains_keys.matrix_server }}
+      -e SYNAPSE_REPORT_STATS=yes
+      synapse generate
+    chdir: "{{ dest_path_full }}"
+  register: matrix_server_synapse_run_once_output
+  tags:
+    - update_config
+
+- name: Assert that phrase "config file has been generated" is in the output of synapse generate command
+  ansible.builtin.assert:
+    that:
+      - "'config file has been generated' in matrix_server_synapse_run_once_output.stdout"
+  tags:
+    - update_config

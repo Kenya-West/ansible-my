@@ -1,0 +1,150 @@
+---
+# tasks file for roles/install_matrix_synapse
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+  tags:
+    - always
+
+- name: Create non-existent parent directories for {{ dest_path_full }}
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/create_dirs_traversal
+    apply:
+      tags:
+        - update_config
+  vars:
+    create_dirs_traversal_path: "{{ dest_path_full }}"
+    create_dirs_traversal_strip_leaf: false
+  tags:
+    - update_config
+
+- name: Check if docker-compose.yml exists at {{ dest_path_full }}
+  ansible.builtin.stat:
+    path: "{{ dest_path_full }}/docker-compose.yml"
+  register: matrix_server_synapse_docker_compose_file
+  tags:
+    - update_image
+    - update_config
+
+- name: Ensure Docker network {{ matrix_server_network_name }} exists with specific settings
+  community.docker.docker_network:
+    name: "{{ matrix_server_network_name }}"
+    driver: bridge
+    state: present
+
+- name: compose_pull
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_pull
+    apply:
+      tags:
+        - update_image
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image
+  when: matrix_server_synapse_docker_compose_file.stat.exists
+
+- name: compose_down
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_down
+    apply:
+      tags:
+        - update_image
+        - update_config
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image
+    - update_config
+  when: not matrix_server_synapse_docker_compose_file.stat.exists
+
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - update_config
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}"
+        dest: "{{ dest_path_full }}"
+        default_mode: "0775"
+    copy_files_templating_exclude_list:
+      - "data/"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+  tags:
+    - update_config
+
+- name: Check if data directory exists at {{ dest_path_full }}
+  ansible.builtin.stat:
+    path: "{{ dest_path_full }}/data"
+  register: matrix_server_synapse_data_dir
+  tags:
+    - update_config
+
+- name: Create data directory at {{ dest_path_full }}/data if it does not exist
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}/data"
+    state: directory
+    mode: "0775"
+  when: not matrix_server_synapse_data_dir.stat.exists
+  tags:
+    - update_config
+
+- name: Check if homeserver file exists at {{ dest_path_full }}
+  ansible.builtin.stat:
+    path: "{{ dest_path_full }}/data/homeserver.yaml"
+  register: matrix_server_synapse_config_file
+  tags:
+    - update_config
+
+- name: Since homeserver.yaml does not exist, generate it by running the container once
+  ansible.builtin.include_tasks: create_config.yml
+  when: not matrix_server_synapse_config_file.stat.exists
+  tags:
+    - update_config
+
+- name: compose_up
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_up
+    apply:
+      tags:
+        - update_image
+        - update_config
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image
+    - update_config
+
+- name: Add port {{ matrix_server_external_port }} to UFW
+  become: true
+  become_user: root
+  community.general.ufw:
+    rule: allow
+    port: "{{ matrix_server_external_port }}"
+    proto: tcp
+  when:
+    - matrix_server_external_port is defined
+    - matrix_server_external_port | length > 0

@@ -1,0 +1,53 @@
+services:
+
+  synapse:
+    image: docker.io/matrixdotorg/synapse:latest
+    container_name: synapse
+    cpus: 0.5
+    mem_limit: 600m
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
+    networks:
+      - {{ matrix_server_network_name }}
+      - {{ docker_vpn_network }}
+    depends_on:
+      - synapse_db
+    labels:
+      caddy: "${SERVICE_DOMAIN}"
+      {% raw %}caddy.reverse_proxy_1: "/_matrix/* {{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+
+      {% raw %}caddy.reverse_proxy_2: "/_synapse/client/* {{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+
+{% if matrix_server_root_domain %}
+      caddy_2: "${SERVICE_DOMAIN_ROOT}"
+      caddy_2.handle_1: "/.well-known/matrix/client"
+      caddy_2.handle_1.header: "Access-Control-Allow-Origin *"
+      caddy_2.handle_1.respond: '`{"m.homeserver": {"base_url": "https://${SERVICE_DOMAIN}"}}`'
+      caddy_2.handle_2: "/.well-known/matrix/server"
+      caddy_2.handle_2.respond: '`{"m.server": "${SERVICE_DOMAIN}:443"}`'
+{% endif %}
+    restart: unless-stopped
+
+  synapse_db:
+    image: docker.io/postgres:14-alpine
+    container_name: synapse_db
+    cpus: 0.5
+    mem_limit: 400m
+    env_file:
+      - .env
+    volumes:
+      - synapse_db_data:/var/lib/postgresql/data
+    networks:
+      - {{ matrix_server_network_name }}
+    restart: unless-stopped
+
+volumes:
+  synapse_db_data:
+
+networks:
+  {{ matrix_server_network_name }}:
+    external: true
+  {{ docker_vpn_network }}:
+    external: true
