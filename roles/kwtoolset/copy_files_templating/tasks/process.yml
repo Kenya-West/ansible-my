@@ -35,14 +35,25 @@
     state: directory
     mode: "{{ (item.default_mode_directory | default(item.default_mode | default(755) | int)) }}"
 
+- name: Build rsync_opts list
+  ansible.builtin.set_fact:
+    copy_files_templating_rsync_opts: >-
+      [
+        "--chmod=F{{ (item.default_mode_file | default(item.default_mode | default(755) | int)) }}",
+        "--chmod=D{{ (item.default_mode_directory | default(item.default_mode | default(755) | int)) }}"
+      ]
+
+- name: Add exclusions to rsync_opts list
+  ansible.builtin.set_fact:
+    copy_files_templating_rsync_opts: "{{ copy_files_templating_rsync_opts + ['--exclude=' + (copy_files_templating_exclude_list | join(','))] }}"
+  when: copy_files_templating_exclude_list | length > 0
+
 - name: Synchronize templated files to remote host {{ item.dest }}
   ansible.builtin.synchronize:
     mode: push
     src: "{{ copy_files_templating_temp_dir.path }}/"
     dest: "{{ item.dest }}/"
-    rsync_opts:
-      - "--chmod=F{{ (item.default_mode_file | default(item.default_mode | default(755) | int)) }}"
-      - "--chmod=D{{ (item.default_mode_directory | default(item.default_mode | default(755) | int)) }}"
+    rsync_opts: "{{ copy_files_templating_rsync_opts }}"
   delegate_to: localhost
 
 - name: Remove temporary directory

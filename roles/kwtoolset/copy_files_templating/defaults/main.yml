@@ -1,2 +1,3 @@
 ---
 # defaults file for roles/kwtoolset/copy_files
+copy_files_templating_exclude_list: []
