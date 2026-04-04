@@ -8,7 +8,7 @@
   rescue:
     - name: Show an error if no result
       ansible.builtin.debug:
-        msg: "Could not get compose project name for project at {{ item.path }}. It could be the missing docker-compose.yml file or project directory. Skipping."
+        msg: "Could not get compose project name for project at {{ item }}. It could be the missing docker-compose.yml file or project directory. Skipping."
 
 - name: Docker Compose project - container_stop
   community.docker.docker_compose_v2:
