@@ -1,0 +1,47 @@
+---
+
+- block:
+    - name: Run local templating tasks for files
+      ansible.builtin.include_role:
+        name: kwtoolset/copy_files_templating
+        apply:
+          tags:
+            - update_targets
+      vars:
+        copy_files_templating_dir_list:
+          - src: "{{ source_path }}/file_sd/"
+            dest: "{{ dest_path_full }}/file_sd/"
+            default_mode: "0775"
+          - src: "{{ source_path }}/alerts/"
+            dest: "{{ dest_path_full }}/alerts/"
+            default_mode: "0775"
+      with_items: "{{ source_paths }}"
+      loop_control:
+        loop_var: source_path
+      tags:
+        - update_targets
+  delegate_to: localhost
+
+- name: Discover Prometheus PID in container
+  community.docker.docker_container_exec:
+    container: prometheus
+    command: pgrep -f prometheus
+  register: prometheus_pid
+  changed_when: false
+  tags:
+    - update_targets
+
+- name: Ensure exactly one Prometheus PID was found
+  ansible.builtin.assert:
+    that:
+      - prometheus_pid.stdout_lines | length == 1
+    fail_msg: "Expected exactly one Prometheus PID, got: {{ prometheus_pid.stdout_lines }}"
+  tags:
+    - update_targets
+
+- name: Send HUP to Prometheus process
+  community.docker.docker_container_exec:
+    container: prometheus
+    command: "kill -HUP {{ prometheus_pid.stdout | trim }}"
+  tags:
+    - update_targets

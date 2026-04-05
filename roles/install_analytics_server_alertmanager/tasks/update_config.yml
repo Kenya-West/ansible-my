@@ -1,0 +1,28 @@
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - update_config_fast
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}/config/"
+        dest: "{{ dest_path_full }}/config"
+        default_mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+  tags:
+    - update_config_fast
+
+- name: Restart Alertmanager container
+  include_role:
+    name: ./roles/kwtoolset/compose_restart
+    apply:
+      tags:
+        - update_config_fast
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_config_fast

@@ -23,6 +23,12 @@
   tags:
     - always
 
+- name: Update AlertManager configuration on the server
+  ansible.builtin.include_tasks: update_config.yml
+  tags:
+    - never
+    - update_config_fast
+
 - name: compose_pull
   ansible.builtin.include_role:
     name: kwtoolset/compose_pull

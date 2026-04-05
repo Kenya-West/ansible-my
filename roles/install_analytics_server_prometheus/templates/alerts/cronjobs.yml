@@ -41,10 +41,10 @@ groups:
       description: "The job '{{ $labels.job }}' on instance '{{ $labels.instance }}' has not reported a successful run in over 8 days. This could indicate a scheduler failure or a stalled job."
 
   - alert: JobDurationSpike
-    expr: job_duration_seconds > 2 * avg_over_time(job_duration_seconds[14d])
-    for: 5m
+    expr: job_duration_seconds > 4 * avg_over_time(job_duration_seconds[14d])
+    for: 1d
     labels:
       severity: warning
     annotations:
       summary: "Job {{ $labels.job }} on instance {{ $labels.instance }} duration spike detected"
-      description: "The duration is more than 50% above the 14-day average for this job."
+      description: "The duration is more than 100% above the 14-day average for this job."
