@@ -1,0 +1,7 @@
+---
+- name: Install and configure Telepush with dependencies
+  hosts: analytics_server
+  become: false
+  become_user: "{{ standard_user }}"
+  roles:
+    - install_analytics_server_telepush

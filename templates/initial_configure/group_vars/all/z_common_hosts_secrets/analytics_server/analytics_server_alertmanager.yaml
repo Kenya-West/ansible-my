@@ -9,6 +9,17 @@ alertmanager_receivers_list:
     webhook_configs:
     - url: 'https://telepush.dev/api/inlets/alertmanager/<token>'
     http_config:
+
+  - name: telepush_local
+    webhook_configs:
+    - url: 'https://{{ domains_keys.main }}/{{ path_to_internal_services_predefined_full }}/telepush/api/inlets/alertmanager/<Telepush token like 12345>'
+  - name: telegram
+    telegram_configs:
+      - bot_token: "{{ telepush_bot_token }}"
+        api_url: https://api.telegram.org
+        chat_id: <Telegram chat id like -1001234567890>
+        message_thread_id: <Telegram topic id> # Optional, if you want to use topic_id
+
   - name: telegram
     telegram_configs:
       - bot_token: <token>

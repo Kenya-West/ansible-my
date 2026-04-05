@@ -1,0 +1,5 @@
+{% if telepush_whitelist and telepush_whitelist | length > 0 %}
+{% for chat_id in telepush_whitelist %}
+{{ chat_id }}
+{% endfor %}
+{% endif %}

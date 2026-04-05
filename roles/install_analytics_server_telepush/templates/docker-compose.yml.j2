@@ -1,0 +1,28 @@
+services:
+  telepush:
+    container_name: telepush
+    image: ghcr.io/muety/telepush
+    cpus: 0.5
+    mem_limit: 2GB
+    env_file:
+      - .env
+    volumes:
+      - telepush_data:/srv/data
+      - ./custom-config:/app/custom-config:ro
+    command: -truncateMsgs=true
+    networks:
+      - caddy
+    labels:
+      caddy: "${SERVICE_DOMAIN}"
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
+      {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}
+
+    restart: unless-stopped
+
+volumes:
+  telepush_data:
+
+
+networks:
+  caddy:
+    external: true
