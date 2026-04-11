@@ -32,6 +32,8 @@
     path: "{{ dest_project_fullpath }}"
     state: directory
     mode: "0775"
+  tags:
+    - always
 
 - name: Pull container images for this bot instance
   ansible.builtin.include_role:
