@@ -100,7 +100,25 @@
     path: "{{ dest_path_full }}/data"
   register: matrix_server_synapse_data_dir
   tags:
+    - recreate_config
     - update_config
+
+- name: Remove data directory at {{ dest_path_full }}/data if it exists
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}/data"
+    state: absent
+  when: matrix_server_synapse_data_dir.stat.exists
+  tags:
+    - recreate_config
+
+- name: Check if data directory exists (again) at {{ dest_path_full }}
+  ansible.builtin.stat:
+    path: "{{ dest_path_full }}/data"
+  register: matrix_server_synapse_data_dir
+  tags:
+    - recreate_config
 
 - name: Create data directory at {{ dest_path_full }}/data if it does not exist
   ansible.builtin.file:
@@ -110,6 +128,7 @@
   when: not matrix_server_synapse_data_dir.stat.exists
   tags:
     - update_config
+    - recreate_config
 
 - name: Check if homeserver file exists at {{ dest_path_full }}
   ansible.builtin.stat:
@@ -117,12 +136,14 @@
   register: matrix_server_synapse_config_file
   tags:
     - update_config
+    - recreate_config
 
 - name: Since homeserver.yaml does not exist, generate it by running the container once
   ansible.builtin.include_tasks: create_config.yml
   when: not matrix_server_synapse_config_file.stat.exists
   tags:
     - update_config
+    - recreate_config
 
 - name: compose_up
   ansible.builtin.include_role:
@@ -137,6 +158,7 @@
   tags:
     - update_image
     - update_config
+    - recreate_config
 
 - name: Add port {{ matrix_server_external_port }} to UFW
   become: true

@@ -4,11 +4,13 @@
     apply:
       tags:
         - update_config
+        - recreate_config
   vars:
     project_paths:
       - "{{ dest_path_full }}"
   tags:
     - update_config
+    - recreate_config
 
 - name: Launch synapse_db container in this docker-compose setup
   community.docker.docker_compose_v2:
@@ -19,6 +21,7 @@
   register: matrix_server_synapse_up_db_output
   tags:
     - update_config
+    - recreate_config
 
 - name: Verify that db service is running and backend is not
   ansible.builtin.assert:
@@ -29,6 +32,7 @@
       {{ matrix_server_synapse_up_db_output.containers | selectattr("Service", "equalto", "synapse_db") | first }}
   tags:
     - update_config
+    - recreate_config
 
 - name: Run synapse generate once
   ansible.builtin.command:
@@ -41,6 +45,7 @@
   register: matrix_server_synapse_run_once_output
   tags:
     - update_config
+    - recreate_config
 
 - name: Assert that phrase "config file has been generated" is in the output of synapse generate command
   ansible.builtin.assert:
@@ -48,3 +53,54 @@
       - "'config file has been generated' in matrix_server_synapse_run_once_output.stdout"
   tags:
     - update_config
+    - recreate_config
+
+- name: Slurp the generated config file
+  ansible.builtin.slurp:
+    src: "{{ dest_path_full }}/data/homeserver.yaml"
+  register: matrix_server_synapse_config_file_content
+  when:
+    - matrix_server_root_domain is defined
+    - matrix_server_root_domain != ""
+    - matrix_server_root_domain | length > 2
+  tags:
+    - update_config
+    - recreate_config
+
+- name: Add public_baseurl to the config file content
+  ansible.builtin.set_fact:
+    matrix_server_synapse_config_file_content_updated_public_baseurl: >-
+      {{ matrix_server_synapse_config_file_content.content | b64decode | from_yaml | combine({"public_baseurl": "https://" ~ domains_keys.matrix_server ~ "/"}) }}
+  when:
+    - matrix_server_root_domain is defined
+    - matrix_server_root_domain != ""
+    - matrix_server_root_domain | length > 2
+  tags:
+    - update_config
+    - recreate_config
+
+- name: Change server_name prop to {{ matrix_server_root_domain }}
+  ansible.builtin.set_fact:
+    matrix_server_synapse_config_file_content_updated_server_name: >-
+      {{ matrix_server_synapse_config_file_content_updated_public_baseurl | combine({"server_name": matrix_server_root_domain}) }}
+  when:
+    - matrix_server_root_domain is defined
+    - matrix_server_root_domain != ""
+    - matrix_server_root_domain | length > 2
+  tags:
+    - update_config
+    - recreate_config
+
+- name: Write the updated config file content back to the file
+  become: true
+  become_user: root
+  ansible.builtin.copy:
+    content: "{{ matrix_server_synapse_config_file_content_updated_server_name | to_nice_yaml(indent=2, sort_keys=false) }}"
+    dest: "{{ dest_path_full }}/data/homeserver.yaml"
+  when:
+    - matrix_server_root_domain is defined
+    - matrix_server_root_domain != ""
+    - matrix_server_root_domain | length > 2
+  tags:
+    - update_config
+    - recreate_config
