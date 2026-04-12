@@ -1,0 +1,8 @@
+---
+- name: Update Linux core (Ubuntu 22.04) to version 6.0+
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  roles:
+    - name: ./roles/update_linuxcore_ubuntu2204

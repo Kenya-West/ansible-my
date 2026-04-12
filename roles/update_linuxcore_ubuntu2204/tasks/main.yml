@@ -1,0 +1,41 @@
+---
+# tasks file for roles/update_linuxcore_ubuntu2204
+- name: Get Ubuntu version
+  ansible.builtin.command: lsb_release -rs
+  register: update_linuxcore_ubuntu2204_ubuntu_version
+
+- name: Abort if Ubuntu version is not 22.04
+  ansible.builtin.fail:
+    msg: "This role is only for Ubuntu 22.04. Detected version: {{ update_linuxcore_ubuntu2204_ubuntu_version.stdout }}"
+  when: update_linuxcore_ubuntu2204_ubuntu_version.stdout != "22.04"
+
+- name: Get current Linux kernel version
+  ansible.builtin.command: uname -r
+  register: update_linuxcore_ubuntu2204_current_kernel
+
+- name: Abort if current kernel is already 6.0 or higher
+  ansible.builtin.fail:
+    msg: "Current kernel version is {{ update_linuxcore_ubuntu2204_current_kernel.stdout }}. No update needed."
+  when: update_linuxcore_ubuntu2204_current_kernel.stdout is version('6.0', '>=')
+
+- name: Install required packages for kernel update
+  ansible.builtin.apt:
+    name:
+      - linux-generic-hwe-22.04-edge
+    state: present
+    update_cache: true
+
+- name: Check if a reboot is needed for Debian and Ubuntu boxes
+  register: reboot_required_file
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+
+- name: Reboot the Debian or Ubuntu server
+  ansible.builtin.reboot:
+    msg: "Reboot initiated by Ansible due to kernel updates"
+    connect_timeout: 5
+    reboot_timeout: 300
+    pre_reboot_delay: 0
+    post_reboot_delay: 30
+    test_command: uptime
+  when: reboot_required_file.stat.exists
