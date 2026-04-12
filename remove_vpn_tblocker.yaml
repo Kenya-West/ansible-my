@@ -1,0 +1,44 @@
+---
+- name: Remove TBlocker from VPN node
+  hosts: vpn_caddy
+  become: true
+
+  roles:
+    - name: ./roles/kwtoolset/collect_ports
+      vars:
+        filename_pattern: "*.env"
+        substring_pattern: "PORT"
+        files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_end_dirs.tblocker }}"
+        skip_if_not_found: true
+    - name: ./roles/remove_ufw_rules
+      become: true
+      become_user: root
+      vars:
+        ufw_ports: "{{ collected_ports | default([]) }}"
+        ufw_protos: ["tcp", "udp"]
+    - name: ./roles/remove_project_dirs
+      vars:
+        remove_project_dirs:
+          - "/home/{{ standard_user }}/{{ vpn_project_structure_end_dirs.tblocker }}"
+  
+  pre_tasks:
+    - name: Stop and disable TBlocker SystemD service
+      become: true
+      become_user: root
+      ansible.builtin.systemd:
+        name: tblocker
+        enabled: false
+        state: stopped
+        daemon_reload: true
+    - name: Remove TBlocker systemd service file
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "/etc/systemd/system/tblocker.service"
+        state: absent
+    - name: Remove TBlocker binary
+      become: true
+      become_user: root
+      ansible.builtin.file:
+        path: "/usr/local/bin/tblocker"
+        state: absent
