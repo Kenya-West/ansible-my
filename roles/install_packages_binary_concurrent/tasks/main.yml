@@ -93,7 +93,7 @@
 
 - name: Run commands in parallel per chunk of packages
   ansible.builtin.include_tasks: process.yml
-  loop: "{{ packages_binary_chunks }}"
+  loop: "{{ packages_binary_chunks | default([]) }}"
   loop_control:
     loop_var: packages_binary_chunk
     index_var: chunk_index
@@ -104,3 +104,15 @@
   tags:
     - always
     - update_packages
+
+- name: Grant user {{ standard_user }} read and execute access to a directory
+  become: true
+  become_user: root
+  ansible.posix.acl:
+    path: /usr/local/bin
+    entity: "{{ standard_user }}"
+    etype: user
+    permissions: rx
+    state: present
+  tags:
+    - set_acl
