@@ -102,3 +102,7 @@ packages_binary_list:
   - repo: "legostin/cull"
     assets:
       - "tar.gz"
+  - repo: "DNSCrypt/dnscrypt-proxy"
+    assets:
+      - "^minisig"
+    dest_loc: /usr/sbin

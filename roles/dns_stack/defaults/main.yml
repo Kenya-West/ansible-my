@@ -1,2 +1,4 @@
 ---
 # defaults file for roles/dns_stack
+
+dest_path_full_systemd: "/etc/systemd/system"

@@ -44,6 +44,23 @@
         state: present
         update_cache: true
 
+    - name: Extract dnscrypt-proxy package info
+      ansible.builtin.set_fact:
+        dnscrypt_pkg: "{{ packages_binary_list
+                          | selectattr('repo','search','dnscrypt-proxy')
+                          | list
+                          | first }}"
+    - name: Install DNSCrypt using eget
+      ansible.builtin.include_role:
+        name: ./roles/install_packages_binary
+      vars:
+        packages_binary_list:
+          - "{{ dnscrypt_pkg }}"
+      args:
+        apply:
+          become: true
+          become_user: root
+
     # 1) INSTALL & CONFIGURE DNSCRYPT-PROXY (keep vendor DNS alive meanwhile)
     - name: Ensure config dir exists
       ansible.builtin.file:
@@ -215,6 +232,17 @@
             rule: deny
             port: '53'
             proto: any
+        # Allow outbound DNS to fallback resolvers so dnscrypt-proxy can bootstrap
+        # (resolve source URLs to download resolver lists). These ALLOW rules must
+        # be inserted before the blanket DENY to take effect.
+        - name: Allow outbound DNS to fallback resolver IPs
+          community.general.ufw:
+            rule: allow
+            direction: out
+            port: '53'
+            proto: any
+            to_ip: "{{ item.split(':') | first }}"
+          loop: "{{ dnscrypt.fallback_resolvers }}"
         - community.general.ufw:
             rule: deny
             direction: out
