@@ -50,6 +50,12 @@
                           | selectattr('repo','search','dnscrypt-proxy')
                           | list
                           | first }}"
+
+    - name: Stop SystemD dnscrypt-proxy service if running (pre-switch)
+      ansible.builtin.systemd:
+        name: dnscrypt-proxy.service
+        state: stopped
+
     - name: Install DNSCrypt using eget
       ansible.builtin.include_role:
         name: ./roles/install_packages_binary
@@ -60,6 +66,21 @@
         apply:
           become: true
           become_user: root
+
+    - name: Start dnscrypt-proxy service
+      ansible.builtin.systemd:
+        name: dnscrypt-proxy.service
+        state: started
+      register: _dnscrypt_started
+      ignore_errors: true
+
+    - name: Assert dnscrypt-proxy started successfully
+      ansible.builtin.assert:
+        that:
+          - _dnscrypt_started is defined
+          - _dnscrypt_started.state == 'started'
+        fail_msg: "dnscrypt-proxy failed to start. Check previous tasks for errors."
+        success_msg: "dnscrypt-proxy started successfully."
 
     # 1) INSTALL & CONFIGURE DNSCRYPT-PROXY (keep vendor DNS alive meanwhile)
     - name: Ensure config dir exists
