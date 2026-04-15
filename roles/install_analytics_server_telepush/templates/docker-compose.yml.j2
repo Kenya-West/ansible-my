@@ -9,7 +9,6 @@ services:
     volumes:
       - telepush_data:/srv/data
       - ./custom-config:/app/custom-config:ro
-    command: -truncateMsgs=true
     networks:
       - caddy
     labels:
