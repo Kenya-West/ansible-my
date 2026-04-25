@@ -1,6 +1,6 @@
 services:
-  ss-zapret:
-    image: vernette/ss-zapret:v72.1
+  ss-zapret2:
+    image: vernette/ss-zapret2:latest
     container_name: ${SERVICE_NAME}
     cpus: 0.5
     mem_limit: 200m
@@ -12,7 +12,10 @@ services:
       - "127.0.0.1:${SOCKS_PORT}:${SOCKS_PORT}/tcp"
       - "127.0.0.1:${SOCKS_PORT}:${SOCKS_PORT}/udp"
     volumes:
-      - ./config:/opt/zapret/config
+      - ./config:/opt/zapret2/config
+      - ./lua:/opt/zapret2/lua
+      - ./scripts/examples:/opt/zapret2/init.d/custom.d.examples.linux
+      - ./scripts/custom.d:/opt/zapret2/init.d/sysv/custom.d
     networks:
       - {{ docker_vpn_network }}
     healthcheck:
