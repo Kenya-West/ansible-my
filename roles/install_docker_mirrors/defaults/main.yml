@@ -1,3 +1,13 @@
 ---
 # defaults file for roles/install_docker_mirrors
+docker_features:
+  containerd-snapshotter: true
+docker_mirrors_ru:
+  - "https://dockerhub.timeweb.cloud"
+  - "https://mirror.gcr.io"
+  - "https://daocloud.io"
+  - "https://c.163.com"
+  - "https://registry.docker-cn.com"
+docker_mirrors_country_code_allowlist:
+  - RU
 docker_mirrors_enforce_country_code: ''
