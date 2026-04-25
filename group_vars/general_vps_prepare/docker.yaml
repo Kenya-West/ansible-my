@@ -8,7 +8,8 @@ docker_mirrors_ru:
   - "https://daocloud.io"
   - "https://c.163.com"
   - "https://registry.docker-cn.com"
-docker_mirror_country_code: "RU"
+docker_mirrors_country_code_allowlist:
+  - RU
 docker_metrics_addr_host: "172.17.0.1"
 docker_metrics_addr_port: 9323
 docker_metrics_addr: "{{ docker_metrics_addr_host }}:{{ docker_metrics_addr_port }}"

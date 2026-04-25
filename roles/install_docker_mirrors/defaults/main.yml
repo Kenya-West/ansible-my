@@ -1,2 +1,3 @@
 ---
 # defaults file for roles/install_docker_mirrors
+docker_mirrors_enforce_country_code: ''

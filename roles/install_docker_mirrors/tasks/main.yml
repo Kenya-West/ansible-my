@@ -1,52 +1,105 @@
 ---
 # tasks file for roles/install_docker_mirrors
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Ensure Docker service exists before applying mirrors
+  ansible.builtin.fail:
+    msg: Docker is not installed/running on this host; run docker install playbook first.
+  when:
+    - "'docker.service' not in ansible_facts.services"
+
 - name: Get the public IP of the host
   ansible.builtin.command: curl -s ifconfig.me
   register: public_ip
   changed_when: false
+  when:
+    - docker_mirrors_enforce_country_code | length == 0
 
 - name: Query IPInfo for geolocation information
   ansible.builtin.uri:
     url: "https://ipinfo.io/{{ public_ip.stdout }}/json"
     method: GET
     return_content: true
-  register: ipinfo_response
+  register: docker_mirrors_ipinfo_response
+  when:
+    - docker_mirrors_enforce_country_code | length == 0
 
 - name: Parse the country from IPInfo response
   ansible.builtin.set_fact:
-    country: "{{ ipinfo_response.json.country }}"
+    docker_mirrors_country: "{{ docker_mirrors_ipinfo_response.json.country }}"
+  when:
+    - docker_mirrors_enforce_country_code | length == 0
 
 - name: Debug country information
   ansible.builtin.debug:
-    msg: "The country for IP {{ public_ip.stdout }} is {{ country }}"
+    msg: "The country for IP {{ public_ip.stdout }} is {{ docker_mirrors_country }}"
+  when:
+    - docker_mirrors_enforce_country_code | length == 0
+
+- name: Enforce country fact if docker_mirrors_enforce_country_code is set
+  ansible.builtin.set_fact:
+    docker_mirrors_country: "{{ docker_mirrors_enforce_country_code }}"
+  when:
+    - docker_mirrors_enforce_country_code | length > 0
+
+- name: Normalize country code to uppercase
+  ansible.builtin.set_fact:
+    docker_mirrors_country_normalized: "{{ docker_mirrors_country | upper }}"
+    docker_mirrors_country_code_allowlist_normalized: "{{ docker_mirrors_country_code_allowlist | map('upper') | list }}"
+  when:
+    - docker_mirrors_country is defined
+    - docker_mirrors_country_code_allowlist is defined
+
+
+- name: "Create non-existent parent directories for {{ docker_config_file }} (root)"
+  become: true
+  become_user: root
+  block:
+    - name: create_dirs_traversal
+      ansible.builtin.include_role:
+        name: ./roles/kwtoolset/create_dirs_traversal
+      vars:
+        create_dirs_traversal_path: "{{ docker_config_file }}"
+        create_dirs_traversal_strip_leaf: true
+        create_dirs_force_mode: "0775"
 
 - name: Ensure Docker configuration file exists
   ansible.builtin.file:
     path: "{{ docker_config_file }}"
     state: touch
     mode: "0644"
-  when: country == docker_mirror_country_code
+  when: docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
 
 - name: Read existing Docker configuration
   ansible.builtin.slurp:
     path: "{{ docker_config_file }}"
-  register: docker_config_file_content
-  when: country == docker_mirror_country_code
+  register: docker_mirrors_config_file_content
+  when: docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
 
 - name: Parse existing Docker configuration
   ansible.builtin.set_fact:
-    docker_config: "{{ docker_config_file_content.content | b64decode | from_json | default({}) }}"
-  when: (country == docker_mirror_country_code) and (docker_config_file_content.content | b64decode | length > 0)
+    docker_config: "{{ docker_mirrors_config_file_content.content | b64decode | from_json | default({}) }}"
+  when: 
+    - docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
+    - docker_mirrors_config_file_content.content | b64decode | length > 0
+
+- name: Set as empty JSON config if Docker configuration file is empty
+  ansible.builtin.set_fact:
+    docker_config: {}
+  when: 
+    - docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
+    - docker_mirrors_config_file_content.content | b64decode | length == 0
 
 - name: Set Docker Hub mirrors
   ansible.builtin.set_fact:
     docker_config: "{{ docker_config | combine({'registry-mirrors': docker_mirrors_ru}) }}"
-  when: country == docker_mirror_country_code
+  when: docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
 
 - name: Set Docker features
   ansible.builtin.set_fact:
     docker_config: "{{ docker_config | combine({'features': docker_features}) }}"
-  when: country == docker_mirror_country_code
+  when: docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
 
 - name: Write updated Docker configuration
   ansible.builtin.copy:
@@ -54,10 +107,10 @@
     dest: "{{ docker_config_file }}"
     mode: "0644"
     backup: true
-  when: country == docker_mirror_country_code
+  when: docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
 
 - name: Restart Docker
   ansible.builtin.service:
     name: docker
     state: restarted
-  when: country == docker_mirror_country_code
+  when: docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
