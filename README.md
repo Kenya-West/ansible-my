@@ -112,9 +112,7 @@ Despite the approach stands for making VPS as autonomous as possible, it still n
 
 Good question! I usually go with the cheapest ones that meet the requirements above. Here are some options:
 
-- [PureServers](https://pureservers.org)
-- [Rifty](https://rifty.org)
-- [RHC](https://rhc.su/)
+[DataPasa](https://datapasa.com) • [Rifty](https://rifty.org)
 
 > [!NOTE]
 > The developer is not affiliated with any of these services, and you should do your own research before choosing a VPS provider. It is not an offer.
