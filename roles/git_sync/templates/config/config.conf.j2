@@ -1,0 +1,23 @@
+
+SOURCE_URL="{{ config_item.source_url }}"
+SOURCE_BRANCH="{{ config_item.source_branch | default('master') }}"
+{% if config_item.source_ssh_key is defined %}
+SOURCE_SSH_KEY="{{ config_item.source_ssh_key | default('$HOME/.ssh/id_rsa') }}"
+{% endif %}
+GLOBAL_SSH_KEY="{{ config_item.global_ssh_key | default('$HOME/.ssh/id_rsa') }}"
+WORK_MODE="{{ config_item.work_mode | default('temp') }}"
+{% if config_item.work_mode_persistent_path is defined %}
+WORK_DIR="{{ config_item.work_mode_persistent_path }}"
+{% endif %}
+MIRROR_TAGS="{{ config_item.mirror_tags | default('true') }}"
+PUSH_FORCE="{{ config_item.push_force | default('false') }}"
+DESTINATIONS=(
+{% for dest in config_item.destinations %}
+    {{ dest.name }}
+{% endfor %}
+)
+
+{% for dest in config_item.destinations %}
+DEST_{{ dest.name }}_URL="{{ dest.url }}"
+DEST_{{ dest.name }}_BRANCH="{{ dest.branch | default('master') }}"
+{% endfor %}

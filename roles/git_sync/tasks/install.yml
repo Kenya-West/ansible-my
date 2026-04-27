@@ -1,0 +1,171 @@
+- name: Create non-existent parent directories for {{ dest_path_full }}
+  ansible.builtin.include_role:
+    name: ./roles/kwtoolset/create_dirs_traversal
+    apply:
+      tags:
+        - update_config
+  vars:
+    create_dirs_traversal_path: "{{ dest_path_full }}"
+    create_dirs_traversal_strip_leaf: true
+    create_dirs_force_mode: "0775"
+  tags:
+    - update_config
+
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - update_config
+        - update_scripts
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}/scripts"
+        dest: "{{ dest_path_full }}"
+        default_mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+  tags:
+    - update_config
+    - update_scripts
+
+- name: Find every file inside {{ dest_path_full }}/scripts
+  ansible.builtin.find:
+    paths: "{{ dest_path_full }}/scripts"
+    file_type: file
+    recurse: true
+  register: git_sync_script_files
+  failed_when: false
+  changed_when: false
+  tags:
+    - update_config
+    - update_scripts
+
+- name: Make every script executable by everyone
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    mode: "a+x"
+  loop: "{{ git_sync_script_files.files }}"
+  when: git_sync_script_files.matched | default(0) | int > 0
+  tags:
+    - update_config
+    - update_scripts
+
+- name: Ensure {{ dest_path_full }}/config directory exists
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}/config"
+    state: directory
+    mode: "0775"
+  tags:
+    - update_config
+    - update_sync_configs
+
+- name: Template each of git_sync_configs into own file name
+  ansible.builtin.template:
+    src: config/config.conf.j2
+    dest: "{{ dest_path_full }}/config/{{ config_item.config_file_name }}"
+    mode: "0600"
+  loop: "{{ git_sync_configs }}"
+  loop_control:
+    loop_var: config_item
+  tags:
+    - update_config
+    - update_sync_configs
+
+- name: Ensure git is installed
+  become: true
+  become_user: root
+  ansible.builtin.package:
+    name: git
+    state: present
+  tags:
+    - always
+
+- name: Ensure {{ dest_path_full }}/ssh-keys directory exists
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}/ssh-keys"
+    state: directory
+    mode: "0600"
+  tags:
+    - update_config
+    - update_known_hosts
+
+- name: Create known_hosts file with correct permissions
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}/ssh-keys/known_hosts"
+    state: touch
+    mode: "0600"
+  tags:
+    - update_config
+    - update_known_hosts
+
+- name: Ensure SSH host keys are present in known_hosts
+  become: true
+  become_user: root
+  ansible.builtin.known_hosts:
+    path: "{{ dest_path_full }}/ssh-keys/known_hosts"
+    name: "{{ item }}"
+    key: "{{ lookup('pipe', 'ssh-keyscan -H ' ~ item) }}"
+    hash_host: true
+    state: present
+  loop: "{{ git_sync_hostkey_domains }}"
+  tags:
+    - update_config
+    - update_known_hosts
+
+- name: Create SSH key files from git_sync_ssh_keys
+  become: true
+  become_user: root
+  block:
+    - name: Create private key file for {{ item.name }}
+      ansible.builtin.copy:
+        content: "{{ item.secretBase64 | b64decode }}"
+        dest: "{{ dest_path_full }}/ssh-keys/{{ item.name }}"
+        mode: "0600"
+      loop: "{{ git_sync_ssh_keys }}"
+    - name: Create public key file for {{ item.name }}
+      ansible.builtin.copy:
+        content: "{{ item.public }}"
+        dest: "{{ dest_path_full }}/ssh-keys/{{ item.name }}.pub"
+        mode: "0644"
+      loop: "{{ git_sync_ssh_keys }}"
+  tags:
+    - update_config
+    - update_ssh_keys
+
+- name: Make {{ dest_path_full }}/sources a safe directory for git
+  community.general.git_config:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    scope: global
+  loop:
+    - { key: "safe.directory", value: "{{ dest_path_full }}/sources" }
+  tags:
+    - update_config
+    - update_git_config
+- name: Make {{ dest_path_full }}/sources a safe directory for git (root)
+  become: true
+  become_user: root
+  community.general.git_config:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    scope: global
+  loop:
+    - { key: "safe.directory", value: "{{ dest_path_full }}/sources" }
+  tags:
+    - update_config
+    - update_git_config
+
+- name: Create cron jobs per git_sync_configs items
+  ansible.builtin.include_tasks: install_cron.yml
+  loop: "{{ git_sync_configs }}"
+  loop_control:
+    loop_var: config_item
+  tags:
+    - update_config
+    - update_cron_jobs

@@ -1,0 +1,7 @@
+---
+- name: Setup Git mirroring for repositories
+  hosts: git_sync
+  become: false
+  become_user: "{{ standard_user }}"
+  roles:
+    - git_sync

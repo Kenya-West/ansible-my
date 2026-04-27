@@ -1,0 +1,42 @@
+---
+# tasks file for roles/git_sync
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+  tags:
+    - always
+
+- name: Fail if role_state is not 'present' or 'absent'
+  ansible.builtin.fail:
+    msg: "Invalid role_state '{{ role_state }}'. Must be 'present' or 'absent'."
+  when: role_state not in ['present', 'absent']
+  tags:
+    - always
+
+- name: Run install.yml tasks
+  ansible.builtin.include_tasks: install.yml
+  when: "role_state == 'present'"
+  tags:
+    - always
+
+- name: Run uninstall.yml tasks
+  ansible.builtin.include_tasks: uninstall.yml
+  when: "role_state == 'absent'"
+  tags:
+    - always

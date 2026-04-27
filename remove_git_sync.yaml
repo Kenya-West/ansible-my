@@ -1,0 +1,10 @@
+---
+- name: Remove Git Sync setup
+  hosts: git_sync
+  become: true
+  become_user: root
+  vars:
+    role_state: absent
+
+  roles:
+    - name: ./roles/git_sync

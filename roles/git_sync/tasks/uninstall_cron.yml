@@ -1,0 +1,25 @@
+- name: Strip string to first dot for {{ config_item.config_file_name }} to use as cron job name prefix
+  set_fact:
+    cron_job_name: "{{ config_item.config_file_name.split('.') | first }}"
+  tags:
+    - uninstall
+
+- name: Fail if cron job name is empty for {{ config_item.config_file_name }}
+  fail:
+    msg: "Cron job name is empty for {{ config_item.config_file_name }}. Check the config file name and the splitting logic."
+  when: cron_job_name == ""
+  tags:
+    - uninstall
+
+- name: Remove cron job for autorestic
+  ansible.builtin.cron:
+    name: "{{ cron_job_name_prefix }} {{ cron_job_name }}"
+    state: absent
+  tags:
+    - uninstall
+
+- name: Empty facts
+  set_fact:
+    cron_job_name: ""
+  tags:
+    - uninstall

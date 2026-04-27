@@ -1,0 +1,6 @@
+---
+git_sync_project_structure_root: git-sync
+git_sync_project_structure_end_dirs__base:
+  mirror: "{{ git_sync_project_structure_root }}/mirror"
+git_sync_project_structure_end_dirs: "{{ git_sync_project_structure_end_dirs__base }}"
+git_sync_project_structure_end_dirs_list: "{{ git_sync_project_structure_end_dirs.values() | list }}"

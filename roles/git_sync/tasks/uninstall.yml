@@ -1,0 +1,12 @@
+- name: Create cron jobs per git_sync_configs items
+  ansible.builtin.include_tasks: uninstall_cron.yml
+  loop: "{{ git_sync_configs }}"
+  loop_control:
+    loop_var: config_item
+  tags:
+    - uninstall
+
+- name: Remove {{ dest_path_full }} directory
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}"
+    state: absent

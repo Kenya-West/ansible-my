@@ -1,0 +1,51 @@
+- name: Strip string to first dot for {{ config_item.config_file_name }} to use as cron job name prefix
+  set_fact:
+    cron_job_name: "{{ config_item.config_file_name.split('.') | first }}"
+  tags:
+    - always
+
+- name: Fail if cron job name is empty for {{ config_item.config_file_name }}
+  fail:
+    msg: "Cron job name is empty for {{ config_item.config_file_name }}. Check the config file name and the splitting logic."
+  when: cron_job_name == ""
+  tags:
+    - always
+
+- name: Set cron job name for {{ cron_job_name }}
+  set_fact:
+    cronjob_base_script: "{{ dest_path_full }}/scripts/script.sh --config {{ dest_path_full }}/config/{{ config_item.config_file_name }} --verbose"
+    cronjob_base_script_with_analytics: "{{ cronjob_base_script }}"
+  tags:
+    - always
+
+- name: Set cron job name for {{ cron_job_name }} - update analytics fact
+  set_fact:
+    cronjob_base_script_with_analytics: "{{ cronjob_base_script }}"
+  tags:
+    - always
+
+- name: Change cron job path to monitoring if it is in analytics_node group
+  set_fact:
+    cronjob_script_path_with_analytics: "{{ cron_job_role_prefix }} {{ cron_wrapped_task_prefix }} --job-name '{{ cron_job_name_prefix }} {{ cron_job_name }}' -- {{ cronjob_base_script }} {{ cron_wrapped_task_suffix }}"
+  when: "'analytics_node' in group_names"
+  tags:
+    - always
+
+- name: Add cron job for autorestic
+  become: true
+  become_user: root
+  ansible.builtin.cron:
+    name: "{{ cron_job_name_prefix }} {{ cron_job_name }}"
+    minute: "0"
+    hour: "0"
+    job: "{{ cronjob_script_path_with_analytics }}"
+  tags:
+    - always
+
+- name: Empty facts
+  set_fact:
+    cron_job_name: ""
+    cronjob_base_script: ""
+    cronjob_script_path_with_analytics: ""
+  tags:
+    - always

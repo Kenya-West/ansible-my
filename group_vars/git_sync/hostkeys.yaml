@@ -1,0 +1,8 @@
+git_sync_hostkey_domains:
+  - github.com
+  - gitlab.com
+  - codeberg.org
+  - gitverse.ru
+  - gitflic.ru
+  - hub.mos.ru
+  - ssh.sourcecraft.dev
