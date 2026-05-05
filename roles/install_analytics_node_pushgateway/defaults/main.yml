@@ -6,6 +6,7 @@ source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root
 source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
 
 source_paths_add_role_dirs:
+  - files
   - templates
 source_paths_add_repo_dirs:
   - "{{ source_asset_fullpath_project }}"

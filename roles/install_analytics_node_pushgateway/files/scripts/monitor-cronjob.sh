@@ -11,15 +11,18 @@
 #    - job_duration_seconds (runtime in seconds)
 #    - job_last_run_timestamp (Unix timestamp when the job started)
 #
-#  Environment variables can be loaded from an .env file via the --env-file flag
-#  (or from a default .env if it exists). Values loaded from the env file are used
-#  as defaults, but any flags provided on the command line will override them.
+#  Environment variables can be loaded from a Bash config file via the
+#  --config-file flag (or from a default monitor-cronjob.conf if it exists).
+#  The config file is sourced natively by Bash, so it must use shell syntax
+#  (e.g. KEY=value, with quoting as needed). Values loaded from the config
+#  file are used as defaults, but any flags provided on the command line
+#  will override them.
 #
 #  Usage:
 #    ./monitor-job.sh [options] -- <command>
 #
 #  Options:
-#    -e, --env-file FILE     Path to an env file (default: .env if exists)
+#    -c, --config-file FILE  Path to a Bash config file (default: monitor-cronjob.conf if exists)
 #    -p, --pushgateway URL   Set the PushGateway URL (default: http://localhost:9091)
 #    -u, --user USER         Set the basic auth username (optional)
 #    -w, --pass PASS         Set the basic auth password (optional)
@@ -32,39 +35,37 @@
 
 set -euo pipefail
 
-# --- Function to load environment variables from a file ---
-read_env() {
-  local filePath="${1:-.env}"
+# Resolve the directory of this script so the default config is found
+# next to the script itself, regardless of the current working directory.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+DEFAULT_CONFIG_FILE="${SCRIPT_DIR}/monitor-cronjob.conf"
+
+# --- Function to load variables from a Bash config file ---
+load_config() {
+  local filePath="${1:-$DEFAULT_CONFIG_FILE}"
 
   if [ ! -f "$filePath" ]; then
     echo "Error: missing ${filePath}"
     exit 1
   fi
 
-  echo "Reading ${filePath}"
-  while read -r LINE; do
-    # Remove leading/trailing whitespace and carriage returns
-    CLEANED_LINE=$(echo "$LINE" | awk '{$1=$1};1' | tr -d '\r')
-    # Skip comments and lines without an '=' sign.
-    if [[ $CLEANED_LINE != '#'* ]] && [[ $CLEANED_LINE == *'='* ]]; then
-      export "$CLEANED_LINE"
-    fi
-  done < "$filePath"
+  echo "Sourcing ${filePath}"
+  # shellcheck disable=SC1090
+  source "$filePath"
 }
 
-# --- Manually extract the env-file option ---
-ENV_FILE_ARG=""
+# --- Manually extract the config-file option ---
+CONFIG_FILE_ARG=""
 ARGS=()
 SKIP=0
 for arg in "$@"; do
   if [ $SKIP -eq 1 ]; then
+    CONFIG_FILE_ARG="$arg"
     SKIP=0
     continue
   fi
   case "$arg" in
-    -e|--env-file)
-      # Store the next argument as the env file; skip it.
-      ENV_FILE_ARG="$2"
+    -c|--config-file)
       SKIP=1
       ;;
     *)
@@ -73,14 +74,15 @@ for arg in "$@"; do
   esac
 done
 
-# Load the env file if provided, or use .env if it exists.
-if [ -n "$ENV_FILE_ARG" ]; then
-  read_env "$ENV_FILE_ARG"
-elif [ -f ".env" ]; then
-  read_env ".env"
+# Load the config file if provided, or use the default config next to the
+# script if it exists.
+if [ -n "$CONFIG_FILE_ARG" ]; then
+  load_config "$CONFIG_FILE_ARG"
+elif [ -f "$DEFAULT_CONFIG_FILE" ]; then
+  load_config "$DEFAULT_CONFIG_FILE"
 fi
 
-# Reset positional parameters without the env-file option.
+# Reset positional parameters without the config-file option.
 set -- "${ARGS[@]}"
 
 # --- Set default variables using any values loaded from the env file ---
@@ -125,7 +127,7 @@ while true; do
       cat <<EOF
 Usage: $0 [options] -- <command>
 Options:
-  -e, --env-file FILE     Path to an env file (default: .env if exists)
+  -c, --config-file FILE  Path to a Bash config file (default: monitor-cronjob.conf if exists)
   -p, --pushgateway URL   Set the PushGateway URL (default: ${PUSHGATEWAY_URL})
   -u, --user USER         Set basic auth username for PushGateway (optional)
   -w, --pass PASS         Set basic auth password for PushGateway (optional)
@@ -188,12 +190,29 @@ ${METRIC_PREFIX}_last_run_timestamp{job="${JOB_NAME}",instance="${INSTANCE}"} ${
 EOF
 )
 
+# URL-encode label values so spaces and special characters in JOB_NAME or
+# INSTANCE don't produce a malformed PushGateway URL.
+url_encode() {
+  local s="$1" out="" i c
+  for (( i=0; i<${#s}; i++ )); do
+    c="${s:i:1}"
+    case "$c" in
+      [a-zA-Z0-9.~_-]) out+="$c" ;;
+      *) printf -v c '%%%02X' "'$c"; out+="$c" ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+JOB_NAME_ENC=$(url_encode "$JOB_NAME")
+INSTANCE_ENC=$(url_encode "$INSTANCE")
+PUSH_URL="${PUSHGATEWAY_URL}/metrics/job/${JOB_NAME_ENC}/instance/${INSTANCE_ENC}"
+
 # Optionally, print the metrics for debugging.
-echo "Pushing the following metrics to ${PUSHGATEWAY_URL}/metrics/job/${JOB_NAME}/instance/${INSTANCE}:"
+echo "Pushing the following metrics to ${PUSH_URL}:"
 echo "$METRICS"
 
 # Build the curl command to push metrics.
-CURL_CMD=(curl --silent --show-error --fail --data-binary @- "${PUSHGATEWAY_URL}/metrics/job/${JOB_NAME}/instance/${INSTANCE}")
+CURL_CMD=(curl --silent --show-error --fail --data-binary @- "${PUSH_URL}")
 
 # Add basic auth if provided.
 if [ -n "$PUSHGATEWAY_USER" ] && [ -n "$PUSHGATEWAY_PASS" ]; then
