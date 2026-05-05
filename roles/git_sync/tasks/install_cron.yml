@@ -26,7 +26,7 @@
 
 - name: Change cron job path to monitoring if it is in analytics_node group
   set_fact:
-    cronjob_script_path_with_analytics: "{{ cron_job_role_prefix }} {{ cron_wrapped_task_prefix }} --job-name '{{ cron_job_name_prefix }} {{ cron_job_name }}' -- {{ cronjob_base_script }} {{ cron_wrapped_task_suffix }}"
+    cronjob_script_path_with_analytics: "{{ cron_job_role_prefix }} {{ cron_wrapped_task_prefix }} --job-name '{{ cron_job_name_prefix }}{{ cron_job_name }}' -- {{ cronjob_base_script }} {{ cron_wrapped_task_suffix }}"
   when: "'analytics_node' in group_names"
   tags:
     - always
@@ -35,7 +35,7 @@
   become: true
   become_user: root
   ansible.builtin.cron:
-    name: "{{ cron_job_name_prefix }} {{ cron_job_name }}"
+    name: "{{ cron_job_name_prefix }}{{ cron_job_name }}"
     minute: "0"
     hour: "0"
     job: "{{ cronjob_script_path_with_analytics }}"
