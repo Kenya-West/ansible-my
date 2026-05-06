@@ -27,6 +27,9 @@
     loop_var: item
   register: copy_files_templating_dir_stats
   delegate_to: localhost
+  become: false
+  vars:
+    ansible_become: false
 
 - name: Get only existing items
   ansible.builtin.set_fact:
@@ -53,6 +56,9 @@
     loop_var: item
   register: _jinja_find_results
   delegate_to: localhost
+  become: false
+  vars:
+    ansible_become: false
 
 - name: Combine all found Jinja files into one list
   ansible.builtin.set_fact:
@@ -76,6 +82,9 @@
   failed_when: copy_files_templating_rsync_installed.rc >= 2
   when: copy_files_templating_jinja_files_list | length > 0
   delegate_to: localhost
+  become: false
+  vars:
+    ansible_become: false
 
 - name: Process each of path
   ansible.builtin.include_tasks: process.yml

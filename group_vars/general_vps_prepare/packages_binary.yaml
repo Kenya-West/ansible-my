@@ -6,9 +6,9 @@ packages_binary_concurrent_batch_size: 25
 packages_binary_list:
   # full schema is:
   # - repo: "tstack/lnav"         # repo name on github
-  #   assets:                     # Optional. Asset filter to download. ^ to negative filter.
+  #   assets:                     # Optional. Asset filter to download. ^REG: to negative filter.
   #     - "lnav"                  # Usually, a package name
-  #     - "^musl"                 # and/or a negative filter to exclude unsupported architecture
+  #     - "^REG:musl"                 # and/or a negative filter to exclude unsupported architecture
   #     - "tar.gz"                # and/or a file extension
   #   dest_loc: "/usr/local/bin"  # Optional. Location to put bin file
   #   bin_name: "lnav"            # Optional. Name of command that will be available in shell
@@ -39,7 +39,6 @@ packages_binary_list:
   - repo: "tomnomnom/gron"
   - repo: "PaulJuliusMartinez/jless"
   - repo: "https://dystroy.org/broot/download/x86_64-linux/broot"
-    post_install: "broot --install"
   - repo: "extrawurst/gitui"
   - repo: "solidiquis/erdtree"
     assets:
@@ -57,7 +56,7 @@ packages_binary_list:
     bin_name: "tblocker"
   - repo: "mr-karan/doggo"
     assets:
-      - "^web"
+      - "^REG:web"
   - repo: "babarot/gomi"
   - repo: "Byron/dua-cli"
   - repo: "peltho/tufw"
@@ -104,5 +103,5 @@ packages_binary_list:
       - "tar.gz"
   - repo: "DNSCrypt/dnscrypt-proxy"
     assets:
-      - "^minisig"
+      - "^REG:minisig"
     dest_loc: /usr/sbin

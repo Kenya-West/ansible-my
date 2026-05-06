@@ -4,4 +4,4 @@
   become: true
 
   roles:
-    - name: ./roles/install_eget
+    - name: ./roles/install_eget_inherelab

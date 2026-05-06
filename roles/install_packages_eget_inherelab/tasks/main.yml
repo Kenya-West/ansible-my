@@ -1,0 +1,25 @@
+---
+# tasks file for roles/install_packages_eget_inherelab
+
+- name: Ensure eget is installed
+  ansible.builtin.command: which eget
+  register: eget_installed
+
+- name: Fail if eget is not installed
+  ansible.builtin.fail:
+    msg: "eget is not installed. Please install eget before running this role."
+  when: eget_installed.rc != 0
+
+- name: Ensure eget config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ standard_user }}/.config/eget"
+    state: directory
+    mode: "0755"
+
+- name: Template eget config
+  become: true
+  become_user: "{{ standard_user }}"
+  ansible.builtin.template:
+    src: templates/config/eget.toml.j2
+    dest: "/home/{{ standard_user }}/.config/eget/eget.toml"
+    mode: "0755"
