@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd {{ dest_path_full }} && docker compose -p {{ compose_project_name }} down && docker compose -p {{ compose_project_name }} up -d

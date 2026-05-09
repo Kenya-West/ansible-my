@@ -1,0 +1,13 @@
+- name: Remove cron job
+  ansible.builtin.include_tasks: uninstall_cron.yml
+  tags:
+    - always
+
+- name: compose_down
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_down
+
+- name: Remove {{ dest_path_full }} directory
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}"
+    state: absent

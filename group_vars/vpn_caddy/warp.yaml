@@ -1,0 +1,4 @@
+warp_socks5_port: 1080
+warp_udp_port: 51920
+warp_socks5_user: socks5
+warp_socks5_pass: someverystrongpassword
