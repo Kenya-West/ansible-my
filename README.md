@@ -251,12 +251,12 @@ TBD
 ## 🎯 Project structure
 
 Playbooks:
-- In root of repo, there is a list of playbooks, dedicated to specific groups of servers:
-    - `0_start_step_*.yaml`: contains automated steps to run `general_vps_prepare_*` playbooks, decomposed to smaller steps to make it easier to debug and run;
-    - `general_vps_prepare_*.yaml`: the basic setup of the node, like installing packages, configuring SSH, etc. Without this playbook, you will not be able to run any other playbooks;
+- In `playbooks/` path, there is, unsurprisingly, a list of playbooks, dedicated to specific groups of servers:
+   - `0_start_step_*.yaml`: contains automated steps to run base and bootstrap playbooks, decomposed to smaller steps to make it easier to debug and run;
+   - `base/*.yaml`: concise playbooks for basic node setup, like installing packages, configuring shell/profile, and system hardening;
     - `install_vpn_caddy*.yaml`, `install_vpnremna_on_server_*.yaml`, `install_analytics_on_node*.yaml`, `install_analytics_on_server*.yaml`, `install_backup_on_node*.yaml`: playbooks that install specific services on the node and server, like VPN, analytics, and backup;
 
-`group_vars`:
+`inventory/group_vars`:
 - `all/`: Variables applied to all hosts
 - `all_example/`: Example global variables template
 - `analytics_node/`: Variables for the analytics_node group
@@ -269,9 +269,9 @@ Playbooks:
 - `vpn_caddy/`: Variables for the vpn_caddy group
 - `vpn_remna_server_caddy/`: Variables for the vpn_remna_server_caddy group
 
-The `all/z_common_hosts_secrets/` contains shared variables with for all roles that are considered secrets but should be shared to every host.
+The `inventory/group_vars/all/z_common_hosts_secrets/` contains shared variables with for all roles that are considered secrets but should be shared to every host.
 
-`host_vars`:
+`inventory/host_vars`:
 - `hostname-1`: Any variables that are specific to `hostname-1` a single host can be placed in `host_vars/` directory. This allows you to define host-specific configurations without cluttering the main playbooks. `hostname-1` is a placeholder for any hostname you want to configure.
 
 > [!NOTE]
@@ -301,11 +301,11 @@ You can create your own directories here and use them in your playbooks/roles in
 | Category | Purpose | Examples |
 |----------|---------|----------|
 | **`0_start*`** | Complete server setup orchestration | `0_start.yaml`, `0_start_local.yaml` |
-| **`general_vps_prepare_*`** | Server preparation and hardening | `general_vps_prepare_update.yaml` |
+| **`base/*`** | Server preparation and hardening | `base/packages.yaml`, `base/bash.yaml` |
 | **`install_analytics_*`** | Monitoring and analytics setup | `install_analytics_on_server.yaml` |
-| **`install_backup_*`** | Backup solution deployment | `install_backup_restic_on_node.yaml` |
+| **`install_backup_*`** | Backup solution deployment | `restic.yaml` |
 | **`install_vpn_*`** | VPN infrastructure setup | `install_vpn_caddy.yaml` |
-| **`install_web_*`** | Web services and features | `install_web_features_caddy.yaml` |
+| **`install_web_*`** | Web services and features | `install_/caddy.yaml` |
 | **`remove_*`** | Service removal and cleanup | `remove_vpn.yaml` |
 
 ### Playbook Dependencies
@@ -314,10 +314,10 @@ The `0_start.yaml` playbook orchestrates the complete setup:
 
 ```yaml
 ---
-- import_playbook: maintenance/general_vps_prepare_update.yaml
-- import_playbook: base/general_vps_prepare_install_packages.yaml
-- import_playbook: base/general_vps_prepare_install_eget.yaml
-- import_playbook: base/general_vps_prepare_install_docker.yaml
+- import_playbook: maintenance/update.yaml
+- import_playbook: base/packages.yaml
+- import_playbook: base/eget.yaml
+- import_playbook: base/docker.yaml
 # ... and more
 ```
 

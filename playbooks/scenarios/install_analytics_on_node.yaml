@@ -1,6 +1,6 @@
-- import_playbook: ../observability/node/install_analytics_on_node_node_exporter.yaml
-- import_playbook: ../observability/node/install_analytics_on_node_fail2ban_exporter.yaml
-- import_playbook: ../observability/node/install_analytics_on_node_logporter.yaml
-- import_playbook: ../observability/node/install_analytics_on_node_docker_exporter.yaml
-- import_playbook: ../observability/node/install_analytics_on_node_vector.yaml
-- import_playbook: ../observability/node/install_analytics_on_node_pushgateway.yaml
+- import_playbook: ../observability/node/node_exporter.yaml
+- import_playbook: ../observability/node/fail2ban_exporter.yaml
+- import_playbook: ../observability/node/logporter.yaml
+- import_playbook: ../observability/node/docker_exporter.yaml
+- import_playbook: ../observability/node/vector.yaml
+- import_playbook: ../observability/node/pushgateway.yaml

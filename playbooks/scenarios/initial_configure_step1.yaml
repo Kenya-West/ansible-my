@@ -7,7 +7,7 @@
 
   tasks:
     - name: Include initial configuration for inventory
-      include_tasks: ansible/bootstrap/initial_configure_create_inventory_for_localhost.yaml
+      include_tasks: ansible/bootstrap/create_inventory_for_localhost.yaml
     - name: Include initial configuration users playbook
-      include_tasks: ansible/bootstrap/initial_configure_users.yaml
+      include_tasks: ansible/bootstrap/users.yaml
 

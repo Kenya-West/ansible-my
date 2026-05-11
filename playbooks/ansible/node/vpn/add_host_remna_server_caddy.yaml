@@ -37,7 +37,7 @@
         that:
           - initial_configure_host_hostname in groups['general_vps_prepare']
           - initial_configure_host_hostname in groups['vpn_caddy']
-        fail_msg: "The hostname {{ initial_configure_host_hostname }} is not in the general_vps_prepare and/or vpn_caddy group. Run initial_configure_add_host_initial.yaml to create host and/or initial_configure_add_host_vpn_caddy.yaml to add it to the group(s)."
+        fail_msg: "The hostname {{ initial_configure_host_hostname }} is not in the general_vps_prepare and/or vpn_caddy group. Run add_host_initial.yaml to create host and/or add_host_vpn_caddy.yaml to add it to the group(s)."
 
     - name: Copy templated files from group_vars_initial/all/z_common_hosts_secrets
       ansible.builtin.include_role:

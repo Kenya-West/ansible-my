@@ -38,7 +38,7 @@
       ansible.builtin.assert:
         that:
           - initial_configure_host_hostname in groups['general_vps_prepare']
-        fail_msg: "The hostname {{ initial_configure_host_hostname }} is not in the general_vps_prepare group. Run initial_configure_add_host_initial.yaml to create host and add it to the group."
+        fail_msg: "The hostname {{ initial_configure_host_hostname }} is not in the general_vps_prepare group. Run add_host_initial.yaml to create host and add it to the group."
 
     - name: Copy templated files from group_vars_initial/all/z_common_hosts_secrets
       ansible.builtin.include_role:

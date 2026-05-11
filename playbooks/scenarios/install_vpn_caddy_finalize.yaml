@@ -1,4 +1,4 @@
 ---
-- import_playbook: ../reverse_proxy/install_vpn_caddy_caddy.yaml
-- import_playbook: ../anti_censorship/node/install_vpn_caddy_remna.yaml
-- import_playbook: ../reverse_proxy/install_web_features_certcopy.yaml
+- import_playbook: ../reverse_proxy/caddy.yaml
+- import_playbook: ../anti_censorship/node/remna.yaml
+- import_playbook: ../reverse_proxy/certcopy.yaml
