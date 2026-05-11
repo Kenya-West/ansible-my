@@ -314,10 +314,10 @@ The `0_start.yaml` playbook orchestrates the complete setup:
 
 ```yaml
 ---
-- import_playbook: ./general_vps_prepare_update.yaml
-- import_playbook: ./general_vps_prepare_install_packages.yaml
-- import_playbook: ./general_vps_prepare_install_eget.yaml
-- import_playbook: ./general_vps_prepare_install_docker.yaml
+- import_playbook: maintenance/general_vps_prepare_update.yaml
+- import_playbook: base/general_vps_prepare_install_packages.yaml
+- import_playbook: base/general_vps_prepare_install_eget.yaml
+- import_playbook: base/general_vps_prepare_install_docker.yaml
 # ... and more
 ```
 

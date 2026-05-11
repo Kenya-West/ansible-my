@@ -1,0 +1,90 @@
+---
+# Step 1: Bootstrap VPS preparation
+- import_playbook: ../bootstrap/general_vps_prepare_add_users.yaml
+- import_playbook: ../bootstrap/general_vps_prepare_add_keys.yaml
+- import_playbook: ../bootstrap/general_vps_prepare_add_ssh_ports.yaml
+- import_playbook: ../bootstrap/general_vps_prepare_disable_password_auth.yaml
+- import_playbook: ../bootstrap/general_vps_prepare_fail2ban.yaml
+
+# Step 2: System maintenance
+- import_playbook: ../maintenance/general_vps_prepare_update.yaml
+- import_playbook: ../maintenance/general_vps_prepare_reboot.yaml
+
+# Delay for reconnection
+- hosts: all
+  gather_facts: no
+  tasks:
+    - name: Wait 30 seconds for system to reconnect
+      pause:
+        seconds: 30
+
+# Step 3: Base packages and configuration
+- import_playbook: ../base/general_vps_prepare_install_packages.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_eget.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_packages_binary_concurrent.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_debget.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_packages_deb.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_packages_python_concurrent.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_docker.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_docker_mirrors.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_ohmyposh.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_install_bash_default.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_bash_profile.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_powershell_modules.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_powershell_profile.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_default_editor.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_doas.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_micro.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_broot.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_btop.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_hostname.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_journals.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_locale.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_clear_cache.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/general_vps_prepare_configure_logs.yaml
+  vars:
+    become_user: "{{ standard_user }}"

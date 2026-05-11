@@ -8,7 +8,7 @@
 
 - name: "Create non-existent parent directories for {{ dest_path_full }}"
   ansible.builtin.include_role:
-    name: ./roles/kwtoolset/create_dirs_traversal
+    name: kwtoolset/create_dirs_traversal
     apply:
       tags:
         - update_config

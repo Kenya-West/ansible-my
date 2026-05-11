@@ -58,7 +58,7 @@
   block:
     - name: create_dirs_traversal
       ansible.builtin.include_role:
-        name: ./roles/kwtoolset/create_dirs_traversal
+        name: kwtoolset/create_dirs_traversal
       vars:
         create_dirs_traversal_path: "{{ docker_config_file }}"
         create_dirs_traversal_strip_leaf: true

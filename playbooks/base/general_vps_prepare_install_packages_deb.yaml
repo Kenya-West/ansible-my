@@ -1,0 +1,10 @@
+---
+- name: Install packages by deb-get
+  hosts: general_vps_prepare
+  become: true
+
+  environment:
+    DEBGET_TOKEN: "{{ github_api_token_debget | default(omit) }}"
+
+  roles:
+    - name: install_packages_deb

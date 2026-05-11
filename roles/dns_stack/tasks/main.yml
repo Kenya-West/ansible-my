@@ -58,7 +58,7 @@
 
     - name: Install DNSCrypt using eget
       ansible.builtin.include_role:
-        name: ./roles/install_packages_binary
+        name: install_packages_binary
       vars:
         packages_binary_list:
           - "{{ dnscrypt_pkg }}"

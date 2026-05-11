@@ -1,0 +1,8 @@
+---
+- import_playbook: ../reverse_proxy/install_vpn_caddy_caddy.yaml
+- import_playbook: ../reverse_proxy/install_vpn_caddy_frp.yaml
+- import_playbook: ../vpn/install_vpn_caddy_wg.yaml
+- import_playbook: ../anti_censorship/node/install_vpn_caddy_remna.yaml
+- import_playbook: ../anti_censorship/node/install_vpn_caddy_zapret.yaml
+- import_playbook: ../reverse_proxy/install_web_features_certcopy.yaml
+- import_playbook: ../networking/install_ufw.yaml
