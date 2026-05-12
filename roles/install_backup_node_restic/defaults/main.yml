@@ -16,6 +16,16 @@ dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
 
+role_scenarios_required: false
+role_scenarios_min_length: 1
+role_scenarios_max_length: 999
+role_scenarios_allowed_use_files: false # disable role_scenarios_allowed and use files in scenarios/ directory as allowed scenarios
+role_scenarios_allowed: # white list of scenarios
+  - show_keys
+  - install
+  - uninstall
+role_scenarios: ["install"] # Defaulted to install. Provided as extra var or in inventory or in playbook or by user
+
 restic_node_cron_job_name: "Autorestic backup"
 restic_node_cron_job_name_forget: "Autorestic forget"
 restic_node_cron_job_name_prefix: "/bin/bash -c 'sleep $((RANDOM\\%300))' &&"

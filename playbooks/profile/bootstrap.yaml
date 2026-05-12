@@ -88,3 +88,6 @@
 - import_playbook: ../base/logs.yaml
   vars:
     become_user: "{{ standard_user }}"
+- import_playbook: ../scenarios/show_keys.yaml
+  vars:
+    become_user: "{{ standard_user }}"

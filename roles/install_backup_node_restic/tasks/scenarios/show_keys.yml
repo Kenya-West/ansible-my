@@ -1,0 +1,27 @@
+- name: Display masterkey using key.sh script
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/masterkey.sh"
+    chdir: "{{ dest_path_full }}"
+  register: masterkey
+
+- name: Debug the masterkey
+  debug:
+    var: masterkey.stdout
+
+- name: Show keys by running key.sh script
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "./scripts/key.sh"
+    chdir: "{{ dest_path_full }}"
+  register: keys
+  tags:
+    - show_keys
+
+- name: Debug the keys
+  debug:
+    var: keys.stdout
+  tags:
+    - show_keys
