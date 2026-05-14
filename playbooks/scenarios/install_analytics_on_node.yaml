@@ -1,0 +1,6 @@
+- import_playbook: ../observability/node/node_exporter.yaml
+- import_playbook: ../observability/node/fail2ban_exporter.yaml
+- import_playbook: ../observability/node/logporter.yaml
+- import_playbook: ../observability/node/docker_exporter.yaml
+- import_playbook: ../observability/node/vector.yaml
+- import_playbook: ../observability/node/pushgateway.yaml

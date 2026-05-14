@@ -1,0 +1,93 @@
+---
+# Step 1: Bootstrap VPS preparation
+- import_playbook: ../bootstrap/users.yaml
+- import_playbook: ../bootstrap/keys.yaml
+- import_playbook: ../bootstrap/ssh_ports.yaml
+- import_playbook: ../bootstrap/disable_password_auth.yaml
+- import_playbook: ../bootstrap/fail2ban.yaml
+
+# Step 2: System maintenance
+- import_playbook: ../maintenance/update.yaml
+- import_playbook: ../maintenance/reboot.yaml
+
+# Delay for reconnection
+- hosts: all
+  gather_facts: no
+  tasks:
+    - name: Wait 30 seconds for system to reconnect
+      pause:
+        seconds: 30
+
+# Step 3: Base packages and configuration
+- import_playbook: ../base/packages.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/eget.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/packages_binary_concurrent.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/debget.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/packages_deb.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/packages_python_concurrent.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/docker.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/docker_mirrors.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/ohmyposh.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/bash_default.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/bash.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/powershell_modules.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/powershell_profile.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/editor.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/doas.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/micro.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/broot.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/btop.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/hostname.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/journals.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/locale.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/clear_cache.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../base/logs.yaml
+  vars:
+    become_user: "{{ standard_user }}"
+- import_playbook: ../scenarios/show_keys.yaml
+  vars:
+    become_user: "{{ standard_user }}"

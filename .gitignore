@@ -30,6 +30,16 @@ host_vars/*
 inventory/*
 !inventory/production_example.ini
 !inventory/staging_example.ini
+!inventory/group_vars
+inventory/group_vars/all/z_common_hosts_secrets/*
+!inventory/group_vars/all/z_common_hosts_secrets/.gitkeep
+inventory/host_vars
+!inventory/host_vars/example/
+!inventory/host_vars/example_for_analytics_server.yaml
+!inventory/host_vars/example_for_backup_node.yaml
+!inventory/host_vars/example_for_backup_server.yaml
+!inventory/host_vars/example_for_vpn.yaml
+!inventory/host_vars/example_for_proxy_client.yaml
 
 # Assets only common and example
 assets/*

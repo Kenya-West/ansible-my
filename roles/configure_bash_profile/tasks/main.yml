@@ -32,7 +32,7 @@
 
 - name: Apply text_from_file role
   ansible.builtin.include_role:
-    name: ./roles/kwtoolset/text_from_file
+    name: kwtoolset/text_from_file
   vars:
     text_from_file_source_file_path: "{{ bash_profile_temp_dir.path }}/.bashrc"
     text_from_file_dest_file_path: "{{ dest_path_root }}/.bashrc"

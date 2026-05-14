@@ -1,0 +1,44 @@
+---
+# tasks file for roles/kwtoolset/scenarios
+
+- name: Capture this role's path
+  ansible.builtin.set_fact:
+    _scenarios_this_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Capture parent role's path
+  ansible.builtin.set_fact:
+    _scenarios_parent_role_path: "{{ ansible_parent_role_paths[0] }}"
+  tags:
+    - always
+
+- name: Set role facts for scenarios
+  ansible.builtin.set_fact:
+    _scenarios_dir_name: "{{ scenarios_dir_name | default(_scenarios_internal_dir_name) }}"
+    _scenarios_tasks_dir_name: "{{ scenarios_tasks_dir_name | default(_scenarios_internal_tasks_dir_name) }}"
+    _scenarios_min_length: "{{ scenarios_min_length | default(_scenarios_internal_min_length) }}"
+    _scenarios_max_length: "{{ scenarios_max_length | default(_scenarios_internal_max_length) }}"
+    _scenarios_allowed_use_files: "{{ scenarios_allowed_use_files | default(_scenarios_internal_allowed_use_files) }}"
+    _scenarios_allowed: "{{ scenarios_allowed | default(_scenarios_internal_allowed) }}"
+    _scenarios: "{{ scenarios | default(_scenarios_internal) }}"
+  tags:
+    - always
+
+- name: Assert that this role is included within a parent role
+  ansible.builtin.assert:
+    that:
+      - "ansible_parent_role_paths | length > 0"
+    fail_msg: "The kwtoolset/scenarios role is intended to be included within a parent role and should not be used standalone."
+  tags:
+    - always
+
+- name: Validate scenarios (if provided)
+  ansible.builtin.include_tasks: validate.yml
+  tags:
+    - always
+
+- name: Execute scenarios
+  ansible.builtin.include_tasks: execute.yml
+  tags:
+    - always

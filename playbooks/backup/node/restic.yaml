@@ -1,0 +1,8 @@
+---
+- name: Install and configure an Autorestic backup
+  hosts: backup_restic_node
+  become: false
+  become_user: "{{ standard_user }}"
+
+  roles:
+    - install_backup_node_restic

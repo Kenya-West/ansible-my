@@ -1,3 +1,0 @@
----
-- import_playbook: ./install_backup_rclone.yaml
-- import_playbook: ./install_backup_restic_on_node.yaml

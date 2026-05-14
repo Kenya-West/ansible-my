@@ -1,0 +1,24 @@
+---
+- import_playbook: ../maintenance/update.yaml
+- import_playbook: ../base/packages.yaml
+- import_playbook: ../base/eget.yaml
+- import_playbook: ../base/packages_binary_manual.yaml
+- import_playbook: ../base/debget.yaml
+- import_playbook: ../base/packages_deb.yaml
+- import_playbook: ../base/powershell_modules.yaml
+- import_playbook: ../base/docker.yaml
+- import_playbook: ../base/docker_mirrors.yaml
+- import_playbook: ../base/ohmyposh.yaml
+- import_playbook: ../base/bash_default.yaml
+- import_playbook: ../base/bash.yaml
+- import_playbook: ../base/powershell_profile.yaml
+- import_playbook: ../base/editor.yaml
+- import_playbook: ../base/doas.yaml
+- import_playbook: ../base/micro.yaml
+- import_playbook: ../base/broot.yaml
+- import_playbook: ../base/btop.yaml
+- import_playbook: ../base/hostname.yaml
+- import_playbook: ../base/journals.yaml
+- import_playbook: ../base/locale.yaml
+- import_playbook: ../base/clear_cache.yaml
+- import_playbook: ../base/logs.yaml

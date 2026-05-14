@@ -37,7 +37,7 @@
 
 - name: Create non-existent parent directories for {{ powershell_profile.stdout }}
   ansible.builtin.include_role:
-    name: ./roles/kwtoolset/create_dirs_traversal
+    name: kwtoolset/create_dirs_traversal
   vars:
     create_dirs_traversal_path: "{{ powershell_profile.stdout }}"
     create_dirs_traversal_strip_leaf: true
@@ -57,7 +57,7 @@
 
 - name: Apply text_from_file role
   ansible.builtin.include_role:
-    name: ./roles/kwtoolset/text_from_file
+    name: kwtoolset/text_from_file
   vars:
     text_from_file_source_file_path: "{{ powershell_profile_temp_dir.path }}/Microsoft.PowerShell_profile.ps1"
     text_from_file_dest_file_path: "{{ powershell_profile.stdout }}"

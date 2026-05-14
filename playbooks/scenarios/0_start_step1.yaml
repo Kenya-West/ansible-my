@@ -1,0 +1,8 @@
+---
+- import_playbook: ../bootstrap/users.yaml
+- import_playbook: ../bootstrap/keys.yaml
+- import_playbook: ../bootstrap/ssh_ports.yaml
+- import_playbook: ../bootstrap/disable_password_auth.yaml
+# Takes too much time to run and makes too much changes I do not understand nor want
+# - import_playbook: ../bootstrap/secure.yaml
+- import_playbook: ../bootstrap/fail2ban.yaml
