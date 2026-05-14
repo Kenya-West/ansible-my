@@ -4,9 +4,8 @@
   become: false
   become_user: "{{ standard_user }}"
 
-  vars:
-    role_scenarios:
-      - show_keys
-
   roles:
     - role: install_backup_node_restic
+      vars:
+        scenarios:
+          - show_keys

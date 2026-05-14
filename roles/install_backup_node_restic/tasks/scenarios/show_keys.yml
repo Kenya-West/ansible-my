@@ -1,14 +1,19 @@
-- name: Display masterkey using key.sh script
+- name: Force unlock restic repository
   become: true
   become_user: root
   ansible.builtin.shell:
-    cmd: "./scripts/masterkey.sh"
+    cmd: "./scripts/unlock-force.sh"
     chdir: "{{ dest_path_full }}"
-  register: masterkey
+  register: unlock_result
 
-- name: Debug the masterkey
-  debug:
-    var: masterkey.stdout
+- name: Assert that the unlock was successful
+  ansible.builtin.assert:
+    that:
+      - unlock_result.rc == 0
+      - '"Unlock successful" in unlock_result.stdout'
+    fail_msg: "Failed to unlock the restic repository. Please check the output for details."
+  tags:
+    - show_keys
 
 - name: Show keys by running key.sh script
   become: true
@@ -22,6 +27,15 @@
 
 - name: Debug the keys
   debug:
-    var: keys.stdout
+    msg: "{{ keys.stdout_lines
+        + ['']
+        + ['❗ You must save these keys in a secure location.']
+        + ['📁 Suggested file: '
+           ~ inventory_dir
+           ~ '/host_vars/'
+           ~ inventory_hostname
+           ~ '/backup_restic_node/'
+           ~ 'backup_restic_node.yaml'
+          ] }}"
   tags:
     - show_keys

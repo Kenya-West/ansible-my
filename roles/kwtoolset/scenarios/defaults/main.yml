@@ -1,0 +1,13 @@
+---
+# defaults file for roles/kwtoolset/scenarios
+
+_scenarios_internal_tasks_dir_name: tasks
+_scenarios_internal_dir_name: scenarios
+_scenarios_internal_min_length: 1
+_scenarios_internal_max_length: 999
+_scenarios_internal_allowed_use_files: true # disable _scenarios_internal_allowed and use files in scenarios/ directory as allowed scenarios
+_scenarios_internal_allowed: # white list of scenarios
+  - install
+  - uninstall
+_scenarios_internal: # Defaulted to install. Provided as extra var or in inventory or in playbook or by user
+  - install

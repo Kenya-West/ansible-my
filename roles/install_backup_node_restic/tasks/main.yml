@@ -7,16 +7,8 @@
   tags:
     - always
 
-- name: Validate role scenarios (if provided)
-  ansible.builtin.include_tasks: validate_scenarios.yml
-  tags:
-    - always
-
-- name: Route to scenario tasks when role_scenarios is provided and has entries
-  ansible.builtin.include_tasks: "scenarios/{{ item }}.yml"
-  with_items: "{{ role_scenarios }}"
-  loop_control:
-    loop_var: item
-  when: role_scenarios is defined and (role_scenarios | length) > 0
+- name: Execute scenarios for this role
+  ansible.builtin.include_role:
+    name: kwtoolset/scenarios
   tags:
     - always

@@ -186,7 +186,7 @@
     - "('invalid keys: forgetoption' in backup_result.stdout) or ('invalid keys: copyoption' in backup_result.stdout)"
 
 - name: Include show_keys scenario tasks to show keys after installation
-  ansible.builtin.include_tasks: scenarios/show_keys.yml
+  ansible.builtin.include_tasks: show_keys.yml
 
 # Change permissions for config for easier access
 - name: Find config files to change permissions
