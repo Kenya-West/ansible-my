@@ -1,0 +1,3 @@
+---
+- import_playbook: ../maintenance/update.yaml
+- import_playbook: ../maintenance/reboot.yaml

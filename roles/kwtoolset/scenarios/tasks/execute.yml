@@ -1,0 +1,14 @@
+- name: Debug _scenarios variable
+  ansible.builtin.debug:
+    msg: "These scenarios will be executed: {{ _scenarios | join(', ') }}"
+  tags:
+    - always
+
+- name: Route to scenario tasks when scenarios is provided and has entries
+  ansible.builtin.include_tasks: "{{ _scenarios_parent_role_path }}/{{ _scenarios_tasks_dir_name }}/{{ _scenarios_dir_name }}/{{ item }}.yml"
+  with_items: "{{ _scenarios }}"
+  loop_control:
+    loop_var: item
+  when: _scenarios is defined and (_scenarios | length) > 0
+  tags:
+    - always

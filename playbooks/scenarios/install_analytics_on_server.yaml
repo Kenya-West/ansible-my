@@ -1,0 +1,11 @@
+---
+- import_playbook: ../observability/server/prometheus.yaml
+- import_playbook: ../observability/server/victoriametrics.yaml
+- import_playbook: ../observability/server/blackbox.yaml
+- import_playbook: ../observability/server/xray_checker.yaml
+- import_playbook: ../observability/server/mongodb.yaml
+- import_playbook: ../observability/server/alertmanager.yaml
+- import_playbook: ../observability/server/telepush.yaml
+- import_playbook: ../observability/server/pushgateway.yaml
+- import_playbook: ../observability/server/victorialogs.yaml
+- import_playbook: ../observability/server/grafana.yaml

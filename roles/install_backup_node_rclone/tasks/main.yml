@@ -45,7 +45,7 @@
                        | first }}"
     - name: "Install rclone using eget"
       ansible.builtin.include_role:
-        name: ./roles/install_packages_binary
+        name: install_packages_binary
       vars:
         # now pass in a one-element list, so we don’t shadow the original
         packages_binary_list:
@@ -57,7 +57,7 @@
 
 - name: "Create non-existent parent directories for {{ dest_path_full }}"
   ansible.builtin.include_role:
-    name: ./roles/kwtoolset/create_dirs_traversal
+    name: kwtoolset/create_dirs_traversal
     apply:
       tags:
         - update_config
@@ -70,7 +70,7 @@
 
 - name: "Create non-existent parent directories for {{ xdg_config_home_path_full }}"
   ansible.builtin.include_role:
-    name: ./roles/kwtoolset/create_dirs_traversal
+    name: kwtoolset/create_dirs_traversal
     apply:
       tags:
         - update_config
@@ -87,7 +87,7 @@
   block:
     - name: create_dirs_traversal
       ansible.builtin.include_role:
-        name: ./roles/kwtoolset/create_dirs_traversal
+        name: kwtoolset/create_dirs_traversal
         apply:
           tags:
             - update_config

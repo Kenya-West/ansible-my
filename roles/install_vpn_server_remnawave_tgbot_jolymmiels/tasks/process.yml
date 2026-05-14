@@ -113,11 +113,11 @@
     - vpn_server_remnawave_tgbot_jolymmiels_external_port is defined
     - vpn_server_remnawave_tgbot_jolymmiels_external_port | length > 0
 
-- name: Reminder to run install_ufw.yaml playbook (if port defined)
+- name: Reminder to run ufw.yaml playbook (if port defined)
   ansible.builtin.debug:
     msg: |
-      Reminder: Run the install_ufw.yaml playbook for host {{ inventory_hostname }} and environment.
-      Example command: ansible-playbook -i {{ inventory_file | basename }} install_ufw.yaml --limit {{ inventory_hostname }}
+      Reminder: Run the ufw.yaml playbook for host {{ inventory_hostname }} and environment.
+      Example command: ansible-playbook -i {{ inventory_file | basename }} ufw.yaml --limit {{ inventory_hostname }}
   when:
     - vpn_server_remnawave_tgbot_jolymmiels_external_port is defined
     - vpn_server_remnawave_tgbot_jolymmiels_external_port | length > 0
