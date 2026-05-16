@@ -30,6 +30,12 @@
 {%   if pkg.dest_loc is defined %}
   target = "{{ pkg.dest_loc }}"
 {%   endif %}
+{%   if pkg.bin_name is defined %}
+  name = "{{ pkg.bin_name }}"
+{%   endif %}
+{%   if pkg.file is defined %}
+  file = "{{ pkg.file }}"
+{%   endif %}
 {%   if pkg.assets is defined %}
   asset_filters = [{% for a in pkg.assets %}"{{ a }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 {%   endif %}
