@@ -44,6 +44,7 @@ packages_binary_list:
     assets:
       - musl
     file: erd
+    bin_name: erd
   - repo: fioncat/otree
   - repo: ajeetdsouza/zoxide
   - repo: veeso/termscp
