@@ -18,20 +18,58 @@
   when: eget_installed.rc != 0
 
 - name: Run eget to update itself
-  ansible.builtin.command: eget update inherelab/eget
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: eget update inherelab/eget 2>&1
+    chdir: "/home/{{ standard_user }}"
+  register: eget_update_result
   when: eget_installed.rc == 0
 
+- name: Clean ANSI escape codes from eget update output
+  ansible.builtin.set_fact:
+    eget_update_result_cleaned: >-
+      {{
+        eget_update_result.stdout_lines
+        | map('regex_replace', '\x1B\[[0-9;]*[A-Za-z]', '')
+        | list
+      }}
+  when: eget_installed.rc == 0
+
+- name: Assert that eget update was successful
+  ansible.builtin.assert:
+    that:
+      - eget_update_result.rc == 0
+      - "'Extracted' in (eget_update_result_cleaned | join('\n'))"
+      - "'to eget' in (eget_update_result_cleaned | join('\n'))"
+    fail_msg: "eget update failed to satisfy conditions with rc: {{ eget_update_result.rc }}"
+  when: eget_installed.rc == 0
+
+- name: Display latest 3 lines of eget update output for debugging
+  ansible.builtin.debug:
+    msg: "{{ eget_update_result_cleaned[-3:] }}"
+  when: eget_installed.rc == 0
+
+- name: Check if eget binary exists in user directory
+  ansible.builtin.stat:
+    path: "{{ eget_location_user_dir }}"
+  register: eget_user_dir_stat
+
 - name: Move eget binary to {{ eget_location_bin }}
-  ansible.builtin.command: "mv ./eget {{ eget_location_bin }}/"
-  args:
-    creates: "{{ eget_location_bin }}/eget"
+  become: true
+  become_user: root
+  ansible.builtin.command: "mv -f {{ eget_location_user_dir }} {{ eget_location_bin }}/"
+  when: eget_user_dir_stat.stat.exists
 
 - name: Remove eget.sh from /tmp/
   ansible.builtin.file:
     path: /tmp/eget.sh
     state: absent
+  when: eget_installed.rc != 0
 
 - name: Remove eget binary file in user directory
+  become: true
+  become_user: root
   ansible.builtin.file:
     path: "{{ eget_location_user_dir }}"
     state: absent
