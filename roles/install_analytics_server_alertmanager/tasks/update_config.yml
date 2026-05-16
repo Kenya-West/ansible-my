@@ -17,7 +17,7 @@
 
 - name: Restart Alertmanager container
   include_role:
-    name: ./roles/kwtoolset/compose_restart
+    name: kwtoolset/compose_restart
     apply:
       tags:
         - update_config_fast

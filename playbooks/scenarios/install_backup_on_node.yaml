@@ -1,0 +1,3 @@
+---
+- import_playbook: ../backup/node/rclone.yaml
+- import_playbook: ../backup/node/restic.yaml

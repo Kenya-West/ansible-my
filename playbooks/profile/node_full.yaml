@@ -1,0 +1,24 @@
+---
+# Step 1: Install analytics and monitoring
+- import_playbook: ../observability/node/node_exporter.yaml
+- import_playbook: ../observability/node/fail2ban_exporter.yaml
+- import_playbook: ../observability/node/logporter.yaml
+- import_playbook: ../observability/node/docker_exporter.yaml
+- import_playbook: ../observability/node/vector.yaml
+- import_playbook: ../observability/node/pushgateway.yaml
+
+# Step 2: Install VPN with Caddy
+- import_playbook: ../reverse_proxy/caddy.yaml
+- import_playbook: ../reverse_proxy/frp.yaml
+- import_playbook: ../vpn/wg.yaml
+- import_playbook: ../anti_censorship/node/install_remna.yaml
+- import_playbook: ../anti_censorship/node/install_zapret.yaml
+- import_playbook: ../vpn/warp.yaml
+- import_playbook: ../reverse_proxy/certcopy.yaml
+
+# Step 3: Install backup tools
+- import_playbook: ../backup/node/rclone.yaml
+- import_playbook: ../backup/node/restic.yaml
+
+# Step 4: Final configuration
+- import_playbook: ../networking/ufw.yaml
