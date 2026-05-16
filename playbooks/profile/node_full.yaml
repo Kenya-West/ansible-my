@@ -13,6 +13,7 @@
 - import_playbook: ../vpn/wg.yaml
 - import_playbook: ../anti_censorship/node/install_remna.yaml
 - import_playbook: ../anti_censorship/node/install_zapret.yaml
+- import_playbook: ../vpn/warp.yaml
 - import_playbook: ../reverse_proxy/certcopy.yaml
 
 # Step 3: Install backup tools
