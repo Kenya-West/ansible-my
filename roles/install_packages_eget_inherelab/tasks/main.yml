@@ -12,7 +12,7 @@
 
 - name: Ensure eget config directory exists
   ansible.builtin.file:
-    path: "/home/{{ standard_user }}/.config/eget"
+    path: "{{ eget_config_location | dirname }}"
     state: directory
     mode: "0755"
 
@@ -21,5 +21,26 @@
   become_user: "{{ standard_user }}"
   ansible.builtin.template:
     src: templates/config/eget.toml.j2
-    dest: "/home/{{ standard_user }}/.config/eget/eget.toml"
+    dest: "{{ eget_config_location }}"
     mode: "0755"
+
+- name: Ensure eget config exists
+  ansible.builtin.stat:
+    path: "{{ eget_config_location }}"
+  register: eget_config_stat
+  failed_when: not eget_config_stat.stat.exists
+
+- name: Ensure that EGET_GITHUB_TOKEN is set in the environment for the user {{ standard_user }}
+  ansible.builtin.command: "echo $EGET_GITHUB_TOKEN"
+  register: eget_github_token_check
+  failed_when: eget_github_token_check.rc != 0 or eget_github_token_check.stdout == ""
+
+- name: Execute eget install
+  become: true
+  become_user: root
+  environment: 
+    EGET_CONFIG: "{{ eget_config_location }}"
+    EGET_GITHUB_TOKEN: "{{ eget_github_token_check.stdout }}"
+  ansible.builtin.shell:
+    cmd: eget install --all
+  register: eget_install_result

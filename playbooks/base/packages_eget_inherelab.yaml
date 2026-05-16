@@ -1,7 +1,7 @@
 ---
 - name: Install packages by eget
   hosts: general_vps_prepare
-  become: true
+  become: false
 
   environment:
     EGET_GITHUB_TOKEN: "{{ github_api_token_eget | default(omit) }}"
