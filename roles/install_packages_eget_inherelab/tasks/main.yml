@@ -10,11 +10,44 @@
     msg: "eget is not installed. Please install eget before running this role."
   when: eget_installed.rc != 0
 
+- name: Ensure this is inherelab's fork
+  ansible.builtin.command: eget --help --verbose
+  environment:
+    NO_COLOR: "1"
+  register: eget_help_verbose
+  when: eget_installed.rc == 0
+
+- name: Assert inherelab's fork output is installed
+  ansible.builtin.assert:
+    that:
+      - "'Usage:' in eget_help_verbose.stdout"
+      - "'Global Options:' in eget_help_verbose.stdout"
+      - "'Available Commands:' in eget_help_verbose.stdout"
+    fail_msg: "eget is not the inherelab fork."
+  when:
+    - eget_help_verbose.rc == 0
+    - eget_installed.rc == 0
+
+- name: Ensure that EGET_GITHUB_TOKEN is set in the environment for the user {{ standard_user }}
+  ansible.builtin.command: "echo $EGET_GITHUB_TOKEN"
+  register: eget_github_token_check
+  failed_when: eget_github_token_check.rc != 0 or eget_github_token_check.stdout == ""
+
 - name: Ensure eget config directory exists
   ansible.builtin.file:
     path: "{{ eget_config_location | dirname }}"
     state: directory
     mode: "0755"
+
+- name: Ensure eget config directory ownership and rights are correct (recursively)
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ eget_config_location | dirname }}"
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    mode: "0755"
+    recurse: true
 
 - name: Template eget config
   become: true
@@ -30,17 +63,38 @@
   register: eget_config_stat
   failed_when: not eget_config_stat.stat.exists
 
-- name: Ensure that EGET_GITHUB_TOKEN is set in the environment for the user {{ standard_user }}
-  ansible.builtin.command: "echo $EGET_GITHUB_TOKEN"
-  register: eget_github_token_check
-  failed_when: eget_github_token_check.rc != 0 or eget_github_token_check.stdout == ""
+- name: Ensure eget installed.toml exist for user {{ standard_user }}
+  ansible.builtin.stat:
+    path: "{{ eget_config_location | dirname }}/installed.toml"
+  register: user_eget_installed_stat
 
-- name: Execute eget install
+- name: Try to update packages using eget
+  ansible.builtin.include_tasks: update.yml
+  when:
+    - eget_config_stat.stat.exists
+    - user_eget_installed_stat.stat.exists
+
+- name: Install packages using eget
+  ansible.builtin.include_tasks: install.yml
+  when: eget_should_install is not defined or (eget_should_install is defined and eget_should_install == true)
+
+- name: Ensure root eget installed.toml exists
+  ansible.builtin.stat:
+    path: /root/.config/eget/installed.toml
+  register: root_eget_installed_stat
+
+- name: Move root eget installed.toml to {{ eget_config_location | dirname }}/installed.toml
   become: true
   become_user: root
-  environment: 
-    EGET_CONFIG: "{{ eget_config_location }}"
-    EGET_GITHUB_TOKEN: "{{ eget_github_token_check.stdout }}"
-  ansible.builtin.shell:
-    cmd: eget install --all
-  register: eget_install_result
+  ansible.builtin.command: "mv -f /root/.config/eget/installed.toml {{ eget_config_location | dirname }}/installed.toml"
+  when: root_eget_installed_stat.stat.exists
+
+- name: Change ownership of {{ eget_config_location | dirname }}/installed.toml to {{ standard_user }}
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ eget_config_location | dirname }}/installed.toml"
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    mode: "0644"
+  when: root_eget_installed_stat.stat.exists
