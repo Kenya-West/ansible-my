@@ -1,0 +1,3 @@
+---
+# defaults file for roles/install_eget_inherelab
+eget_inherelab_timeout_seconds: 45

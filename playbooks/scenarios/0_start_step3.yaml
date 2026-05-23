@@ -1,7 +1,7 @@
 ---
 - import_playbook: ../base/packages.yaml
 - import_playbook: ../base/eget.yaml
-- import_playbook: ../base/packages_binary_concurrent.yaml
+- import_playbook: ../base/packages_eget_inherelab.yaml
 - import_playbook: ../base/debget.yaml
 - import_playbook: ../base/packages_deb.yaml
 - import_playbook: ../base/packages_python_concurrent.yaml

@@ -1,0 +1,10 @@
+- name: Execute eget install
+  become: true
+  become_user: root
+  environment: 
+    EGET_CONFIG: "{{ eget_config_location }}"
+    EGET_GITHUB_TOKEN: "{{ eget_github_token_check.stdout }}"
+    NO_COLOR: "1"
+  ansible.builtin.shell:
+    cmd: eget install --all
+  register: eget_install_result
