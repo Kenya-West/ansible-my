@@ -1,0 +1,26 @@
+- name: Check if eget is already installed
+  ansible.builtin.command: which eget
+  register: eget_installed
+  failed_when: false
+
+- name: Ensure this is inherelab's fork
+  ansible.builtin.command: eget --help --verbose
+  environment:
+    NO_COLOR: "1"
+  register: eget_help_verbose
+  failed_when: eget_help_verbose.rc != 0 and eget_help_verbose.rc != 1
+  when: eget_installed.rc == 0
+
+- name: Register condition that this not is inherelab's fork of eget because exit code is 1
+  ansible.builtin.set_fact:
+    eget_installed_inherelab: false
+  when: 
+    - eget_help_verbose.rc == 1
+    - eget_installed.rc == 0
+
+- name: Register condition that this is inherelab's fork of eget because it produced expected output
+  ansible.builtin.set_fact:
+    eget_installed_inherelab: "{{ ('Usage:' in eget_help_verbose.stdout) and ('Global Options:' in eget_help_verbose.stdout) and ('Available Commands:' in eget_help_verbose.stdout) }}"
+  when:
+    - eget_help_verbose.rc == 0
+    - eget_installed.rc == 0
