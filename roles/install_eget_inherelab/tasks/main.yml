@@ -6,49 +6,110 @@
   register: eget_installed
   failed_when: false
 
+- name: Ensure this is inherelab's fork
+  ansible.builtin.command: eget --help --verbose
+  environment:
+    NO_COLOR: "1"
+  register: eget_help_verbose
+  failed_when: eget_help_verbose.rc != 0 and eget_help_verbose.rc != 1
+  when: eget_installed.rc == 0
+
+- name: Register condition that this not is inherelab's fork of eget because exit code is 1
+  ansible.builtin.set_fact:
+    eget_installed_inherelab: false
+  when: 
+    - eget_help_verbose.rc == 1
+    - eget_installed.rc == 0
+
+- name: Register condition that this is inherelab's fork of eget because it produced expected output
+  ansible.builtin.set_fact:
+    eget_installed_inherelab: "{{ ('Usage:' in eget_help_verbose.stdout) and ('Global Options:' in eget_help_verbose.stdout) and ('Available Commands:' in eget_help_verbose.stdout) }}"
+  when:
+    - eget_help_verbose.rc == 0
+    - eget_installed.rc == 0
+
 - name: Copy eget installation script to /tmp/
   ansible.builtin.copy:
     src: files/scripts/install.sh
     dest: /tmp/eget.sh
     mode: "0755"
-  when: eget_installed.rc != 0
+  when: eget_installed.rc != 0 or eget_installed_inherelab == false
 
 - name: Run eget.sh to install eget
   ansible.builtin.command: "bash /tmp/eget.sh"
-  when: eget_installed.rc != 0
+  when: eget_installed.rc != 0 or eget_installed_inherelab == false
 
 - name: Run eget to update itself
   become: true
   become_user: root
   ansible.builtin.shell:
-    cmd: eget update inherelab/eget 2>&1
+    cmd: eget update inherelab/eget
     chdir: "/home/{{ standard_user }}"
+  environment:
+    NO_COLOR: "1"
   register: eget_update_result
-  when: eget_installed.rc == 0
-
-- name: Clean ANSI escape codes from eget update output
-  ansible.builtin.set_fact:
-    eget_update_result_cleaned: >-
-      {{
-        eget_update_result.stdout_lines
-        | map('regex_replace', '\x1B\[[0-9;]*[A-Za-z]', '')
-        | list
-      }}
-  when: eget_installed.rc == 0
+  failed_when: false
+  when:
+    - eget_installed.rc == 0
+    - eget_installed_inherelab
 
 - name: Assert that eget update was successful
   ansible.builtin.assert:
     that:
       - eget_update_result.rc == 0
-      - "'Extracted' in (eget_update_result_cleaned | join('\n'))"
-      - "'to eget' in (eget_update_result_cleaned | join('\n'))"
+      - "'Extracted' in eget_update_result.stdout"
+      - "'to eget' in eget_update_result.stdout"
     fail_msg: "eget update failed to satisfy conditions with rc: {{ eget_update_result.rc }}"
-  when: eget_installed.rc == 0
+  when:
+    - eget_installed.rc == 0
+    - eget_update_result is defined
+    - eget_update_result.rc == 0
+    - eget_update_result.stdout is defined
 
 - name: Display latest 3 lines of eget update output for debugging
   ansible.builtin.debug:
-    msg: "{{ eget_update_result_cleaned[-3:] }}"
-  when: eget_installed.rc == 0
+    msg: "{{ eget_update_result.stdout_lines[-3:] }}"
+  when:
+    - eget_installed.rc == 0
+    - eget_update_result is defined
+    - eget_update_result.rc == 0
+    - eget_update_result.stdout_lines is defined
+
+- name: Install if eget update fails
+  become: true
+  become_user: root
+  ansible.builtin.command: eget install inherelab/eget
+  environment:
+    NO_COLOR: "1"
+  register: eget_install_result
+  when:
+    - eget_installed.rc == 0
+    - eget_installed_inherelab
+    - eget_update_result.rc == 1
+    - eget_update_result.stderr is defined
+    - "'use install first' in eget_update_result.stderr"
+
+- name: Assert that eget install was successful
+  ansible.builtin.assert:
+    that:
+      - eget_install_result.rc == 0
+      - "'Extracted' in eget_install_result.stdout"
+      - "'to eget' in eget_install_result.stdout"
+    fail_msg: "eget install failed to satisfy conditions with rc: {{ eget_install_result.rc }}"
+  when:
+    - eget_installed.rc == 0
+    - eget_install_result is defined
+    - eget_install_result.rc == 0
+    - eget_install_result.stdout is defined
+
+- name: Display latest 3 lines of eget install output for debugging
+  ansible.builtin.debug:
+    msg: "{{ eget_install_result.stdout_lines[-3:] }}"
+  when:
+    - eget_installed.rc == 0
+    - eget_install_result is defined
+    - eget_install_result.rc == 0
+    - eget_install_result.stdout_lines is defined
 
 - name: Check if eget binary exists in user directory
   ansible.builtin.stat:
@@ -65,7 +126,7 @@
   ansible.builtin.file:
     path: /tmp/eget.sh
     state: absent
-  when: eget_installed.rc != 0
+  when: eget_installed.rc != 0 or eget_installed_inherelab == false
 
 - name: Remove eget binary file in user directory
   become: true
