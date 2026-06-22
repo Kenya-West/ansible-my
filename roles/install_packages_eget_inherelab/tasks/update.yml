@@ -1,0 +1,78 @@
+- name: Count eget.toml entries
+  ansible.builtin.command: "yq '.packages | length' {{ eget_config_location }}"
+  register: eget_config_entry_count
+  failed_when: false
+
+- name: Count installed.toml entries
+  ansible.builtin.command: "yq '.installed | length' {{ eget_config_location | dirname }}/installed.toml"
+  register: eget_installed_entry_count
+  failed_when: false
+
+- name: Set condition variable
+  ansible.builtin.set_fact:
+    eget_config_entries_matched: |
+      {{
+        (eget_config_entry_count.stdout | int) > 0 and
+        (eget_installed_entry_count.stdout | int) > 0 and
+        (
+          ((eget_config_entry_count.stdout | int) == (eget_installed_entry_count.stdout | int)) or
+          ((eget_config_entry_count.stdout | int) + 1 == (eget_installed_entry_count.stdout | int))
+        )
+      }}
+
+- name: Execute files/check_packages.sh and collect results
+  become: true
+  become_user: "{{ standard_user }}"
+  ansible.builtin.script: files/check_packages.sh
+  register: eget_config_entries_consistent_check
+  failed_when: eget_config_entries_consistent_check.rc != 0
+  when: eget_config_entries_matched
+
+- name: Display last line of check_packages.sh result
+  ansible.builtin.debug:
+    msg: "{{ eget_config_entries_consistent_check.stdout_lines[-1] }}"
+  when: eget_config_entries_matched
+
+- name: Set condition variable to determine if install should be run
+  ansible.builtin.set_fact:
+    eget_should_update: |
+      {{
+        (eget_config_entries_matched and
+         eget_config_entries_consistent_check is defined and
+         'All packages' in eget_config_entries_consistent_check.stdout and
+         'are present' in eget_config_entries_consistent_check.stdout)
+      }}
+
+- name: Execute eget update
+  become: true
+  become_user: root
+  environment: 
+    EGET_CONFIG: "{{ eget_config_location }}"
+    EGET_GITHUB_TOKEN: "{{ eget_github_token_check.stdout }}"
+    NO_COLOR: "1"
+  ansible.builtin.shell:
+    cmd: eget update --all
+  register: eget_update_result
+  when: eget_should_update
+  failed_when: eget_update_result.rc != 0
+
+- name: Display last 3 lines of eget update result
+  ansible.builtin.debug:
+    msg: "{{ eget_update_result.stdout_lines[-3:] }}"
+  when:
+    - eget_update_result is defined
+    - eget_update_result.stdout_lines is defined
+    - eget_update_result.stdout_lines | length > 2
+
+- name: Set eget_should_install to true since update is not possible
+  ansible.builtin.set_fact:
+    eget_should_install: true
+  when: not eget_config_entries_matched or not eget_should_update
+
+- name: Set eget_update_result to false because update is done
+  ansible.builtin.set_fact:
+    eget_should_install: false
+  when:
+    - eget_update_result is defined
+    - eget_update_result.stdout_lines is defined
+    - eget_update_result.stdout_lines | length > 2

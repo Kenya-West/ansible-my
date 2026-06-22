@@ -4,4 +4,4 @@
   become: true
 
   roles:
-    - name: install_eget
+    - name: install_eget_inherelab

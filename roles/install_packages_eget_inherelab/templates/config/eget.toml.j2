@@ -1,0 +1,42 @@
+[api_cache]
+  cache_time = 300
+  enable = false
+
+[ghproxy]
+  enable = false
+  host_url = ""
+  support_api = true
+
+[global]
+  cache_dir = "~/.cache/eget"
+  proxy_url = ""
+  system = ""
+  target = "/usr/local/bin"
+
+[packages]
+{% for pkg in packages_binary_list %}
+{%   set repo = pkg.repo %}
+{%   if pkg.bin_name is defined %}
+{%     set name = pkg.bin_name %}
+{%   elif pkg.file is defined %}
+{%     set name = pkg.file %}
+{%   else %}
+{%     set basename = repo.split('/') | last %}
+{%     set name = basename.split('.')[0] %}
+{%   endif %}
+
+[packages.{{ name }}]
+  repo = "{{ repo }}"
+{%   if pkg.dest_loc is defined %}
+  target = "{{ pkg.dest_loc }}"
+{%   endif %}
+{%   if pkg.bin_name is defined %}
+  name = "{{ pkg.bin_name }}"
+{%   endif %}
+{%   if pkg.file is defined %}
+  file = "{{ pkg.file }}"
+{%   endif %}
+{%   if pkg.assets is defined %}
+  asset_filters = [{% for a in pkg.assets %}"{{ a }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{%   endif %}
+{% endfor %}
