@@ -1,0 +1,29 @@
+---
+# defaults file for roles/install_vpn_caddy_microwarp
+role_state: present
+
+project_dir: "{{ vpn_project_structure_end_dirs.microwarp | ansible.builtin.basename }}"
+project_root_dir: "{{ vpn_project_structure_root }}"
+source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root_dir }}"
+source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
+
+source_paths_add_role_dirs:
+  - templates
+source_paths_add_repo_dirs:
+  - "{{ source_asset_fullpath_project }}"
+source_paths_add_user_dirs: []
+
+dest_path_root: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
+
+compose_project_name: "{{ project_dir }}"
+
+cron_job_name_prefix: "microwarp:"
+cron_job_name: "rotate"
+cron_job_role_prefix: "su {{ standard_user }} -c \""
+cron_job_role_suffix: "\""
+
+# This is just a template that should be created per config in git_sync_configs list. It should be set in the role.
+cronjob_base_script: "{{ dest_path_full }}/scripts/rotate.sh"
+# fallback. Should be set in role
+cronjob_base_script_with_analytics: "{{ cronjob_base_script }}"

@@ -1,0 +1,8 @@
+- name: Remove cron job
+  ansible.builtin.cron:
+    name: "{{ cron_job_name_prefix }}{{ cron_job_name }}"
+    state: absent
+
+- name: Empty facts
+  set_fact:
+    cron_job_name: ""
