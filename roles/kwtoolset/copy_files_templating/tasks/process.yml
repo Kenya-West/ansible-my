@@ -50,11 +50,9 @@
 
 - name: Build rsync_opts list
   ansible.builtin.set_fact:
-    copy_files_templating_rsync_opts: >-
-      [
-        "--chmod=F{{ (item.default_mode_file | default(item.default_mode | default(755) | int)) }}",
-        "--chmod=D{{ (item.default_mode_directory | default(item.default_mode | default(755) | int)) }}"
-      ]
+    copy_files_templating_rsync_opts:
+      - "--chmod=F{{ (item.default_mode_file | default(item.default_mode | default(755) | int)) }}"
+      - "--chmod=D{{ (item.default_mode_directory | default(item.default_mode | default(755) | int)) }}"
 
 - name: Add exclusions to rsync_opts list
   ansible.builtin.set_fact:
