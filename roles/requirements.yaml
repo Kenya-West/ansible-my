@@ -1,14 +1,15 @@
 ---
-# ANSIBLE GALAXY
-# Docker
-- src: geerlingguy.docker
-- src: darkwizard242.lazydocker
-- src: darkwizard242.lazygit
-# Certbot
-- src: geerlingguy.certbot
-# Logs
-- src: linux-system-roles.journald
-- src: prometheus.prometheus
-# Security
-- src: devsec.hardening
-- src: oefenweb.fail2ban
+roles:
+  - src: geerlingguy.docker
+  - src: linux-system-roles.journald
+  - src: oefenweb.fail2ban
+  - name: o1labs.systemd
+    src: https://github.com/O1labs/ansible-role-systemd
+    scm: git
+    version: master
+
+collections:
+  - name: community.general
+  - name: ansible.posix
+  - name: prometheus.prometheus
+  - name: devsec.hardening
