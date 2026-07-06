@@ -107,3 +107,8 @@
     - update_image
     - update_config
   when: caddy_occupy_HTTPS is defined and caddy_occupy_HTTPS == true
+
+- name: Install SystemD unit
+  ansible.builtin.include_tasks: systemd-install.yml
+  tags:
+    - always

@@ -7,6 +7,10 @@ roles:
     src: https://github.com/O1labs/ansible-role-systemd
     scm: git
     version: master
+  - name: kenyawest.systemd
+    src: https://github.com/kenya-west/ansible-role-systemd
+    scm: git
+    version: feature/user-level
 
 collections:
   - name: community.general

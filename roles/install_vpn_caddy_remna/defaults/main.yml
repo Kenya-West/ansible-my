@@ -20,3 +20,50 @@ remna_node_app_port: 2220
 remna_node_control_port: 48540
 remna_node_external_ports: []
 remna_node_use_dns01_cloudflare: false
+
+systemd_timer_user: "{{ standard_user }}"
+systemd_timer_name: "remnanode-restart"
+systemd_timer_script_path: "{{ dest_path_full }}/scripts/script.sh"
+
+systemd_user_unit_path: "/home/{{ standard_user }}/.config/systemd/user"
+
+systemd_user: "{{ standard_user }}"
+systemd_group: "{{ standard_user }}"
+
+systemd_unit_configs:
+  - name: "{{ systemd_timer_name }}"
+    type: service
+    path: "{{ systemd_user_unit_path }}"
+    Unit:
+      Description: "Run {{ systemd_timer_name }} script"
+      Documentation: "man:systemd.service(5)"
+    Service:
+      Type: oneshot
+      ExecStart: "/usr/bin/bash {{ systemd_timer_script_path }}"
+      WorkingDirectory: "/home/{{ systemd_timer_user }}"
+      Environment:
+        - "TZ=Asia/Yakutsk"
+      TimeoutStartSec: "2m"
+      Nice: "5"
+      IOSchedulingClass: "best-effort"
+      IOSchedulingPriority: "7"
+      NoNewPrivileges: "yes"
+      PrivateTmp: "yes"
+      ProtectSystem: "full"
+
+  - name: "{{ systemd_timer_name }}"
+    type: timer
+    path: "{{ systemd_user_unit_path }}"
+    enabled: true
+    state: started
+    Unit:
+      Description: "Timer for {{ systemd_timer_name }}"
+      Documentation: "man:systemd.timer(5)"
+    Timer:
+      Unit: "{{ systemd_timer_name }}.service"
+      OnCalendar: "*-*-01/3 03:00:00 Asia/Yakutsk"
+      RandomizedDelaySec: "30min"
+      AccuracySec: "1min"
+      Persistent: "true"
+    Install:
+      WantedBy: "timers.target"
