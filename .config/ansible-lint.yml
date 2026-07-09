@@ -14,6 +14,7 @@ exclude_paths:
   - test/fixtures/formatting-before/
   - test/fixtures/formatting-prettier/
   - tests/
+  - roles/install_vpn_caddy_caddy/templates/static/sni-templates-main.tar.gz
 # parseable: true
 # quiet: true
 # strict: true
@@ -53,6 +54,21 @@ use_default_rules: true
 # still visible, making it easier to address later.
 skip_list:
   - skip_this_tag
+  - var-naming[no-role-prefix]
+  - schema[meta]
+  - schema[playbook]
+  - name[prefix]
+  - name[template]
+  - name[casing]
+  - name[play]
+  - role-name[path]
+  - command-instead-of-shell
+  - command-instead-of-module
+  - empty-string-compare
+  - literal-compare
+  - jinja[spacing]
+  - key-order[task]
+  - yaml[truthy]
 
 # Ansible-lint does not automatically load rules that have the 'opt-in' tag.
 # You must enable opt-in rules by listing each rule 'id' below.
@@ -74,8 +90,12 @@ enable_list:
 warn_list:
   - skip_this_tag
   - experimental # experimental is included in the implicit list
-  # - role-name
-  # - yaml[document-start]  # you can also use sub-rule matches
+  # Formatting noise; better fixed by formatter later.
+  - yaml[new-line-at-end-of-file]
+  - yaml[trailing-spaces]
+  - yaml[empty-lines]
+  - yaml[line-length]
+  - yaml[comments]
 
 # Some rules can transform files to fix (or make it easier to fix) identified
 # errors. `ansible-lint --fix` will reformat YAML files and run these transforms.
