@@ -16,6 +16,7 @@
     cmd: "timeout {{ eget_inherelab_timeout_seconds }}s /tmp/eget.sh"
   environment:
     NO_COLOR: "1"
+    EGET_INSTALL_DIR: "{{ eget_location_bin }}"
   register: eget_install_script_result
   when: eget_installed.rc != 0 or eget_installed_inherelab == false
 
