@@ -30,6 +30,35 @@
   ansible.builtin.command: "mv -f {{ eget_location_user_dir }} {{ eget_location_bin }}/"
   when: eget_user_dir_stat.stat.exists
 
+- name: Grant user rx on directory and existing contents
+  become: true
+  ansible.posix.acl:
+    path: /usr/local/bin
+    entity: "{{ standard_user }}"
+    etype: user
+    permissions: rx
+    state: present
+    recursive: true
+
+- name: Grant user rx as default ACL for future files
+  become: true
+  ansible.posix.acl:
+    path: /usr/local/bin
+    entity: "{{ standard_user }}"
+    etype: user
+    permissions: rx
+    state: present
+    default: true
+
+- name: Ensure ACL mask allows rx
+  become: true
+  ansible.posix.acl:
+    path: /usr/local/bin
+    etype: mask
+    permissions: rx
+    state: present
+    recursive: true
+
 - name: Run check_eget.yml again
   ansible.builtin.include_tasks: check_eget.yml
   when:
@@ -48,6 +77,7 @@
   register: eget_update_result
   failed_when: false
   when:
+    - eget_install_script_result is skipped
     - eget_installed is not skipped
     - eget_installed is succeeded
     - eget_installed.rc == 0

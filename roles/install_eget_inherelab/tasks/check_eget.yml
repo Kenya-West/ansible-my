@@ -14,7 +14,10 @@
 - name: Register condition that this not is inherelab's fork of eget because exit code is 1
   ansible.builtin.set_fact:
     eget_installed_inherelab: false
-  when: 
+  when:
+    - eget_help_verbose is defined
+    - eget_help_verbose is not skipped
+    - eget_help_verbose.rc is defined
     - eget_help_verbose.rc == 1
     - eget_installed.rc == 0
 
@@ -22,5 +25,8 @@
   ansible.builtin.set_fact:
     eget_installed_inherelab: "{{ ('Usage:' in eget_help_verbose.stdout) and ('Global Options:' in eget_help_verbose.stdout) and ('Available Commands:' in eget_help_verbose.stdout) }}"
   when:
+    - eget_help_verbose is defined
+    - eget_help_verbose is not skipped
+    - eget_help_verbose.rc is defined
     - eget_help_verbose.rc == 0
     - eget_installed.rc == 0
