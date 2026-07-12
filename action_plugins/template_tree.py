@@ -262,10 +262,14 @@ class ActionModule(ActionBase):
         return template_lookup.run([path], convert_data=False, variables=task_vars)[0]
 
     def _get_local_file_contents(self, path):
+        # Non-template files are copied verbatim, so we read them as raw
+        # bytes instead of decoding them as text. Some files under a
+        # templates/ tree are genuinely binary (e.g. archives), and
+        # round-tripping their bytes through a text codec would fail.
         self._display.vvvv(f"File lookup using '{path}' as file")
         try:
             contents, _ = self._loader._get_file_contents(path)
-            return converters.to_text(contents, errors="surrogate_or_strict")
+            return contents
         except AnsibleParserError:
             raise AnsibleError(f"could not locate file in lookup: {path}")
 
@@ -375,11 +379,14 @@ class ActionModule(ActionBase):
     def _copy_file(self, file, task_vars):
         content = file["content"]
         if content is None:
-            content = ""
-        else:
-            content = converters.to_text(content, errors="surrogate_or_strict")
+            content = b""
+        elif isinstance(content, str):
+            # Templated files are rendered to text.
+            content = converters.to_bytes(content, errors="surrogate_or_strict")
+        # Otherwise, content is already the raw bytes of a non-template
+        # file, which may not be valid text (e.g. binary archives).
 
-        with tempfile.NamedTemporaryFile("w", delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile("wb", delete=False) as temp_file:
             temp_file.write(content)
             temp_file_path = temp_file.name
 
