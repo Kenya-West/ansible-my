@@ -5,6 +5,7 @@ from pathlib import PurePath
 import os
 import os.path as path
 import stat
+import tempfile
 
 import ansible.module_utils.common.text.converters as converters
 
@@ -145,7 +146,12 @@ class ActionModule(ActionBase):
 
         if "warnings" in result:
             for warning in result["warnings"]:
-                self._display.warning(warning)
+                if isinstance(warning, str):
+                    self._display.warning(warning)
+                else:
+                    # ansible-core >= 2.18 returns structured WarningSummary
+                    # objects instead of plain strings.
+                    self._display.warning(warning.event.msg)
 
         # The find module always returns a message, either that all paths have been
         # examined, or that not all paths have been examined. In the second case, more
@@ -367,26 +373,40 @@ class ActionModule(ActionBase):
             yield result
 
     def _copy_file(self, file, task_vars):
-        task = self._task.copy()
-        task.args = dict(
-            content=file["content"],
-            dest=file["dest"],
-            group=file["group"],
-            owner=file["owner"],
-            mode=file["mode"],
-        )
+        content = file["content"]
+        if content is None:
+            content = ""
+        else:
+            content = converters.to_text(content, errors="surrogate_or_strict")
 
-        self._display.vv(f"COPY: {file['dest']}")
-        copy_action = self._shared_loader_obj.action_loader.get(
-            "ansible.builtin.copy",
-            task=task,
-            connection=self._connection,
-            play_context=self._play_context,
-            loader=self._loader,
-            templar=self._templar,
-            shared_loader_obj=self._shared_loader_obj,
-        )
-        return copy_action.run(task_vars=task_vars)
+        with tempfile.NamedTemporaryFile("w", delete=False) as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+
+        try:
+            task = self._task.copy()
+            task.args = dict(
+                src=temp_file_path,
+                dest=file["dest"],
+                group=file["group"],
+                owner=file["owner"],
+                mode=file["mode"],
+            )
+
+            self._display.vv(f"COPY: {file['dest']}")
+            copy_action = self._shared_loader_obj.action_loader.get(
+                "ansible.builtin.copy",
+                task=task,
+                connection=self._connection,
+                play_context=self._play_context,
+                loader=self._loader,
+                templar=self._templar,
+                shared_loader_obj=self._shared_loader_obj,
+            )
+            return copy_action.run(task_vars=task_vars)
+        finally:
+            if path.exists(temp_file_path):
+                os.remove(temp_file_path)
 
     def _create_directory(self, directory, task_vars):
         self._display.vv(f"DIR: {directory['dest']}")
