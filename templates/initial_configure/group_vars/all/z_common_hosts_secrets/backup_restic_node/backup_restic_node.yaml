@@ -1,4 +1,4 @@
-backup_restic_node_locations:
+backup_restic_node_locations_base:
   home_user:
     from: "/home/{{ standard_user }}"
     to:
@@ -16,7 +16,7 @@ backup_restic_node_locations:
     options:
       tobereplacedwith: "complete_options"
 
-backup_restic_node_remotes:
+backup_restic_node_remotes_base:
     your_location_name:
       type: rclone
       path: "your_location_name:/somepath/{{ inventory_hostname }}/"
