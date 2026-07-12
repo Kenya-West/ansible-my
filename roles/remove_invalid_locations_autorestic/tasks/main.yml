@@ -28,7 +28,7 @@
 
 - name: Build dictionary of valid locations
   ansible.builtin.set_fact:
-    valid_locations: "{{ valid_locations | default({}) | combine({ (path.item.key): path.item.value }) }}"
+    valid_locations: "{{ valid_locations | default({}) | combine({ (path.path.key): path.path.value }) }}"
   loop: "{{ location_stats.results }}"
   loop_control:
     loop_var: path
