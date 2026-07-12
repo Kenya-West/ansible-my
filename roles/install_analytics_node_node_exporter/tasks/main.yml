@@ -70,5 +70,5 @@
     to_port: "{{ node_exporter_web_listen_address_port_internal | default(omit) }}"
   when:
     - node_exporter_web_listen_address_host is defined
-    - node_exporter_web_listen_address_host | regex_search('^172')
+    - node_exporter_web_listen_address_host is match('^172')
     - node_exporter_web_listen_address_port_internal is defined
