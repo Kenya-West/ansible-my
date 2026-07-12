@@ -2,12 +2,9 @@
   ansible.builtin.include_role:
     name: kenyawest.systemd
   vars:
-    user_name: "{{ systemd_user }}"
-    user_group: "{{ systemd_group }}"
     unit_config: "{{ systemd_unit_configs }}"
   args:
     apply:
-      become: true
       tags:
         - update_config
         - install_systemd_timer

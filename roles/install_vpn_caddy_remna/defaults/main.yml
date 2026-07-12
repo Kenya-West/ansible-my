@@ -33,6 +33,7 @@ systemd_group: "{{ standard_user }}"
 systemd_unit_configs:
   - name: "{{ systemd_timer_name }}"
     type: service
+    scope: user
     path: "{{ systemd_user_unit_path }}"
     Unit:
       Description: "Run {{ systemd_timer_name }} script"
@@ -53,6 +54,7 @@ systemd_unit_configs:
 
   - name: "{{ systemd_timer_name }}"
     type: timer
+    scope: user
     path: "{{ systemd_user_unit_path }}"
     enabled: true
     state: started
