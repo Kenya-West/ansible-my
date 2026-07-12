@@ -3,7 +3,6 @@ ansible_user={% raw %}'{{ standard_user }}'{% endraw %}
 ansible_become=yes
 ansible_become_method=sudo
 ansible_become_pass={% raw %}'{{ root_password }}'{% endraw %}
-ansible_python_interpreter='/usr/bin/env python3'
 
 # Your node hosts should be in the following sections:
 # 1. general_vps_prepare - for all hosts
