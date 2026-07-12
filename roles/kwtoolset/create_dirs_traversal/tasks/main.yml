@@ -40,18 +40,21 @@
 
 - name: Stat traversal paths
   ansible.builtin.stat:
-    path: "{{ item }}"
+    path: "{{ path }}"
   loop: "{{ create_dirs_traversal_paths }}"
+  loop_control:
+    loop_var: path
   register: create_dirs_traversal_stats
 
 # Find the deepest existing directory (nearest parent)
 - name: Detect nearest existing parent directory
   ansible.builtin.set_fact:
-    create_dirs_traversal_parent_stat: "{{ item.stat }}"
-  when: item.stat.exists
+    create_dirs_traversal_parent_stat: "{{ path.stat }}"
+  when: path.stat.exists
   loop: "{{ create_dirs_traversal_stats.results }}"
   loop_control:
-    label: "{{ item.item }}"
+    loop_var: path
+    label: "{{ path.path }}"
 
 - name: Fail if no existing parent directory found
   ansible.builtin.fail:
@@ -62,14 +65,15 @@
 
 - name: Create missing directories inheriting parent ownership and mode
   ansible.builtin.file:
-    path: "{{ item.item }}"
+    path: "{{ path.path }}"
     state: directory
     owner: "{{ create_dirs_force_owner | default(create_dirs_traversal_parent_stat.pw_name, true) }}"
     group: "{{ create_dirs_force_group | default(create_dirs_traversal_parent_stat.gr_name, true) }}"
     mode: "{{ create_dirs_force_mode | default(create_dirs_traversal_parent_stat.mode, true) }}"
   when:
     - create_dirs_traversal_parent_stat is defined
-    - not item.stat.exists
+    - not path.stat.exists
   loop: "{{ create_dirs_traversal_stats.results }}"
   loop_control:
-    label: "{{ item.item }}"
+    loop_var: path
+    label: "{{ path.path }}"
