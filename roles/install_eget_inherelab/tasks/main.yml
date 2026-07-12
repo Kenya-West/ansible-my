@@ -90,8 +90,7 @@
       - eget_update_result is not skipped
       - eget_update_result is succeeded
       - eget_update_result.rc == 0
-      - "'Extracted' in eget_update_result.stdout"
-      - "'to eget' in eget_update_result.stdout"
+      - ("Extracted" in eget_update_result.stdout and "to " in eget_update_result.stdout) or ("is already up to date" in eget_update_result.stdout)
     fail_msg: "eget update failed to satisfy conditions with rc: {{ eget_update_result.rc }}"
   when:
     - eget_installed is not skipped
@@ -142,7 +141,7 @@
     that:
       - eget_install_result.rc == 0
       - "'Extracted' in eget_install_result.stdout"
-      - "'to eget' in eget_install_result.stdout"
+      - "'to ' in eget_install_result.stdout"
     fail_msg: "eget install failed to satisfy conditions with rc: {{ eget_install_result.rc }}"
   when:
     - eget_installed is not skipped

@@ -23,10 +23,20 @@
 
 - name: Register condition that this is inherelab's fork of eget because it produced expected output
   ansible.builtin.set_fact:
-    eget_installed_inherelab: "{{ ('Usage:' in eget_help_verbose.stdout) and ('Global Options:' in eget_help_verbose.stdout) and ('Available Commands:' in eget_help_verbose.stdout) }}"
+    eget_installed_inherelab: true
   when:
     - eget_help_verbose is defined
     - eget_help_verbose is not skipped
     - eget_help_verbose.rc is defined
     - eget_help_verbose.rc == 0
     - eget_installed.rc == 0
+    - "{{ 'Usage:' in eget_help_verbose.stdout }}"
+    - "{{ 'Global Options:' in eget_help_verbose.stdout }}"
+    - "{{ 'Available Commands:' in eget_help_verbose.stdout }}"
+
+- name: Assert that eget_installed_inherelab has been set to true or false
+  ansible.builtin.assert:
+    that:
+      - eget_installed_inherelab is defined
+      - eget_installed_inherelab is boolean
+    fail_msg: "eget_installed_inherelab was not set to true or false, something went wrong with the check"
