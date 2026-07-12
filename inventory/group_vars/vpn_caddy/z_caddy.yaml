@@ -3,7 +3,7 @@ caddy_external_ports_allowlist: >-
     lookup('community.general.merge_variables',
            '^caddy_external_ports_allowlist__.*',
            wantlist=True,
-           list_merge='append_rp'
+           list_merge='append'
           )
     | flatten
     | unique

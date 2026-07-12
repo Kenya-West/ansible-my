@@ -60,9 +60,10 @@
         (_svc_dnscrypt.rc != 0 or _svc_dnscrypt.stdout | default('') != 'active') and
         (
           (_resolv_raw is not failed and
-           ( _resolv_raw.content | b64decode | regex_search('(?m)^\\s*nameserver\\s+127\\.0\\.0\\.1') or
-             _resolv_raw.content | b64decode | regex_search('(?m)^\\s*nameserver\\s+127\\.0\\.1\\.1')
-           )
+            (_resolv_raw.content | b64decode) is ansible.builtin.search(
+              '^\s*nameserver\s+127\.0\.(?:0\.1|1\.1)(?:\s|$)',
+              multiline=true
+            )
           )
           or (_resolv_raw is failed)
         )
