@@ -23,6 +23,22 @@
   tags:
     - always
 
+- name: "Set cert_location_path_section fact based on {{ ansible_hostname }} variables"
+  ansible.builtin.include_role:
+    name: kwtoolset/remap_caddy_cert_path
+    apply:
+      tags:
+        - always
+  tags:
+    - always
+
+- name: Set dest_path_full for this role
+  ansible.builtin.set_fact:
+    prometheus_server_tls_cert_file: "/etc/ssl/{{ cert_location_path_section.prometheus_crt | default(cert_location_path_section.main_crt) }}"
+    prometheus_server_tls_key_file: "/etc/ssl/{{ cert_location_path_section.prometheus_key | default(cert_location_path_section.main_key) }}"
+  tags:
+    - always
+
 - name: Update Prometheus and AlertManager targets on the server
   ansible.builtin.include_tasks: update_targets.yml
   tags:
