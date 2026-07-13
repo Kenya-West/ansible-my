@@ -1,3 +1,5 @@
 ---
 # defaults file for roles/kwtoolset/copy_files
 copy_files_templating_exclude_list: []
+copy_files_templating_sync_retries: 3
+copy_files_templating_sync_retry_delay: 10
