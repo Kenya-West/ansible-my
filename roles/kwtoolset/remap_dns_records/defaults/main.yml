@@ -35,10 +35,18 @@ _dns_records_raw:
 
 # Each entry in _dns_records_raw.list, with _dns_records_raw.common_settings applied as defaults
 # (entry-specific fields, e.g. ttl, take precedence over common_settings).
-remap_dns_records: >-
+remap_dns_records_domains: >-
   {%- set _dns_records = [] -%}
   {%- for _record in _dns_records_raw.list -%}
     {%- set _ = _dns_records.append(_dns_records_raw.common_settings | combine(_record)) -%}
   {%- endfor -%}
   {{ _dns_records }}
 
+remap_dns_records_root_domains: >-
+  {{
+    remap_dns_records_domains
+    | map(attribute='name')
+    | map('regex_replace', '^[^.]+\\.', '')
+    | list
+    | unique
+  }}

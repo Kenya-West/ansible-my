@@ -1,6 +1,7 @@
 ---
 - name: Check and set DNS records for the domains
   hosts: domain_management
+  gather_facts: false
 
   roles:
     - role: domain_management

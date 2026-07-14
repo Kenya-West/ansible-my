@@ -1,0 +1,47 @@
+---
+# Validates that each record's value matches its record type before the records
+# are written to the DNS provider. Cloudflare rejects a mismatch with an HTTP 400
+# (e.g. "Content for A record must be a valid IPv4 address."), so we fail fast
+# here with a clear message instead of a raw API error.
+#
+#   * type A    -> value must be a valid IPv4 address
+#   * type AAAA -> value must be a valid IPv6 address
+#   * any other type is not IP-checked
+#
+# Expects `cf_set_targets` (the list of community.general.cloudflare_dns argument
+# dicts) to already be built. Included by cloudflare_check_set_records_for_host.yml.
+
+- name: Reset the invalid-records accumulator
+  ansible.builtin.set_fact:
+    invalid_ip_records: []
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Collect records whose value does not match their record type
+  ansible.builtin.set_fact:
+    invalid_ip_records: "{{ invalid_ip_records + [target] }}"
+  loop: "{{ cf_set_targets | default([]) }}"
+  loop_control:
+    loop_var: target
+    label: "{{ target.type }} {{ target.record }} -> {{ target.value }}"
+  when: >-
+    (target.type == 'A' and not (target.value | ansible.utils.ipv4))
+    or (target.type == 'AAAA' and not (target.value | ansible.utils.ipv6))
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Fail when any record value is invalid for its type
+  ansible.builtin.assert:
+    that:
+      - invalid_ip_records | length == 0
+    fail_msg: >-
+      {{ invalid_ip_records | length }} record(s) have a value that is invalid for
+      their type (A needs a valid IPv4 address, AAAA a valid IPv6 address):
+      {{ invalid_ip_records
+         | community.general.json_query('[].{record: record, type: type, value: value, zone: zone}') }}
+    success_msg: "All {{ cf_set_targets | default([]) | length }} record value(s) are valid for their types."
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
