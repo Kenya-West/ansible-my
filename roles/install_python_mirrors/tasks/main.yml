@@ -1,0 +1,124 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/install_python_mirrors
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Get the public IP of the host
+  ansible.builtin.command: curl -s ifconfig.me
+  register: public_ip
+  changed_when: false
+  when:
+    - python_mirrors_enforce_country_code | length == 0
+
+- name: Query IPInfo for geolocation information
+  ansible.builtin.uri:
+    url: "https://ipinfo.io/{{ public_ip.stdout }}/json"
+    method: GET
+    return_content: true
+  register: python_mirrors_ipinfo_response
+  when:
+    - python_mirrors_enforce_country_code | length == 0
+
+- name: Parse the country from IPInfo response
+  ansible.builtin.set_fact:
+    python_mirrors_country: "{{ python_mirrors_ipinfo_response.json.country }}"
+  when:
+    - python_mirrors_enforce_country_code | length == 0
+
+- name: Debug country information
+  ansible.builtin.debug:
+    msg: "The country for IP {{ public_ip.stdout }} is {{ python_mirrors_country }}"
+  when:
+    - python_mirrors_enforce_country_code | length == 0
+
+- name: Enforce country fact if python_mirrors_enforce_country_code is set
+  ansible.builtin.set_fact:
+    python_mirrors_country: "{{ python_mirrors_enforce_country_code }}"
+  when:
+    - python_mirrors_enforce_country_code | length > 0
+
+- name: Normalize country code to uppercase
+  ansible.builtin.set_fact:
+    python_mirrors_country_normalized: "{{ python_mirrors_country | upper }}"
+    python_mirrors_country_code_allowlist_normalized: "{{ python_mirrors_country_code_allowlist | map('upper') | list }}"
+  when:
+    - python_mirrors_country is defined
+    - python_mirrors_country_code_allowlist is defined
+
+
+- name: "Create non-existent parent directories for {{ pip_config_file_root }} (root)"
+  become: true
+  become_user: root
+  block:
+    - name: create_dirs_traversal
+      ansible.builtin.include_role:
+        name: kwtoolset/create_dirs_traversal
+      vars:
+        create_dirs_traversal_path: "{{ pip_config_file_root }}"
+        create_dirs_traversal_strip_leaf: true
+        create_dirs_force_mode: "0775"
+
+- name: "Create non-existent parent directories for {{ uv_config_file_root }} (root)"
+  become: true
+  become_user: root
+  block:
+    - name: create_dirs_traversal
+      ansible.builtin.include_role:
+        name: kwtoolset/create_dirs_traversal
+      vars:
+        create_dirs_traversal_path: "{{ uv_config_file_root }}"
+        create_dirs_traversal_strip_leaf: true
+        create_dirs_force_mode: "0775"
+
+- name: "Create non-existent parent directories for {{ pip_config_file_user }}"
+  block:
+    - name: create_dirs_traversal
+      ansible.builtin.include_role:
+        name: kwtoolset/create_dirs_traversal
+      vars:
+        create_dirs_traversal_path: "{{ pip_config_file_user }}"
+        create_dirs_traversal_strip_leaf: true
+        create_dirs_force_mode: "0775"
+
+- name: "Create non-existent parent directories for {{ uv_config_file_user }}"
+  block:
+    - name: create_dirs_traversal
+      ansible.builtin.include_role:
+        name: kwtoolset/create_dirs_traversal
+      vars:
+        create_dirs_traversal_path: "{{ uv_config_file_user }}"
+        create_dirs_traversal_strip_leaf: true
+        create_dirs_force_mode: "0775"
+
+- name: "Render pip.conf to {{ pip_config_file_root }} (root)"
+  become: true
+  become_user: root
+  ansible.builtin.template:
+    src: pip.conf.j2
+    dest: "{{ pip_config_file_root }}"
+    mode: "0644"
+  when: python_mirrors_country_normalized in python_mirrors_country_code_allowlist_normalized
+
+- name: "Render uv.toml to {{ uv_config_file_root }} (root)"
+  become: true
+  become_user: root
+  ansible.builtin.template:
+    src: uv.toml.j2
+    dest: "{{ uv_config_file_root }}"
+    mode: "0644"
+  when: python_mirrors_country_normalized in python_mirrors_country_code_allowlist_normalized
+
+- name: "Render pip.conf to {{ pip_config_file_user }}"
+  ansible.builtin.template:
+    src: pip.conf.j2
+    dest: "{{ pip_config_file_user }}"
+    mode: "0644"
+  when: python_mirrors_country_normalized in python_mirrors_country_code_allowlist_normalized
+
+- name: "Render uv.toml to {{ uv_config_file_user }}"
+  ansible.builtin.template:
+    src: uv.toml.j2
+    dest: "{{ uv_config_file_user }}"
+    mode: "0644"
+  when: python_mirrors_country_normalized in python_mirrors_country_code_allowlist_normalized

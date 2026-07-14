@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/install_python_mirrors
+python_mirrors:
+  - url: https://mirror.yandex.ru/pypi/simple
+    preferred_country_code: RU
+  - url: https://pypi.depkit.ru/simple/
+    preferred_country_code: RU
+  - url: https://pypi.tuna.tsinghua.edu.cn/simple
+    preferred_country_code: CN
+  - url: https://mirrors.aliyun.com/pypi/simple/
+    preferred_country_code: CN
+  - url: https://mirrors.cloud.tencent.com/pypi/simple
+    preferred_country_code: CN
+  - url: https://repo.huaweicloud.com/repository/pypi/simple
+    preferred_country_code: CN
+  - url: https://mirrors.sustech.edu.cn/pypi/simple
+    preferred_country_code: CN
+python_mirrors_country_code_allowlist:
+  - RU
+  - CN
+python_mirrors_enforce_country_code: ''
+
+pip_config_file_root: "/etc/pip.conf"
+pip_config_file_user: "/home/{{ standard_user }}/.config/pip/pip.conf"
+uv_config_file_root: "/etc/uv/uv.toml"
+uv_config_file_user: "/home/{{ standard_user }}/.config/uv/uv.toml"

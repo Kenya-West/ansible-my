@@ -1,0 +1,8 @@
+---
+- name: Install Python mirrors
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - name: install_python_mirrors
+
