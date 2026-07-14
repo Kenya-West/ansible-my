@@ -3,115 +3,24 @@
 #
 # Ensures (creates/updates) the Cloudflare DNS records for the *current* host.
 # It talks to Cloudflare only through `community.general.cloudflare_dns` (no direct
-# API calls / zone probing) — the record's zone is derived from the record name by
-# stripping the left-most label, the same way the reusable `remap_dns_records`
-# role derives `remap_dns_records_root_domains`.
+# API calls); the record's zone is derived from the record name.
 #
-# Everything the scenario needs is inventory data of the host being processed, so
-# every task runs on the control node (`delegate_to: localhost`); nothing connects
-# to the managed host.
+# Shared logic:
+#   * ../dns_resolve_context.yml      — providers, tokens, record types
+#   * ../compute_host_dns_records.yml — the host's declared records -> cf_set_targets
+#   * ../validate_record_ips.yml      — A -> IPv4 / AAAA -> IPv6 pre-flight check
 #
-# Which records are set (two mutually exclusive sub-paths):
-#
-#   1. Default — the union of:
-#        * `remap_dns_records_domains` (produced by the reusable
-#          `kwtoolset/remap_dns_records` role from this host's `domains_keys`), and
-#        * `dns_records_addition` (optional extra records defined in host_vars).
-#
-#   2. Override — when `dns_records_override` is defined, ONLY those records are
-#      set and `remap_dns_records_domains` + `dns_records_addition` are ignored.
-#
-# Record entries use the same keys as `community.general.cloudflare_dns`, with two
-# exceptions handled by this scenario:
-#   * `dns_provider` — selects the provider whose `api_token` is used (not passed on);
-#   * `state`        — always forced to `present` (not taken from the entry).
-# When an entry has no `value`, it defaults to the host's address (`ansible_host`),
-# which is the IPv4 for an A record. All other keys are passed through as-is.
-#
-# `dns_hosting_record_types` selects which record *types* are written; it is
-# required — the scenario fails if it is not set. Before anything is written, the
-# fully-formed record list is validated (A -> IPv4, AAAA -> IPv6) in
-# `../validate_record_ips.yml`.
+# Everything runs on the control node (delegate_to: localhost); nothing connects
+# to the managed host. See compute_host_dns_records.yml for how the record list
+# (default remap + addition, or dns_records_override) is built.
 
-# --- Provider config --------------------------------------------------------
-
-- name: Assert that dns_hosting_record_types is set
-  ansible.builtin.assert:
-    that:
-      - dns_hosting_record_types is defined
-      - dns_hosting_record_types | length > 0
-    fail_msg: >-
-      `dns_hosting_record_types` must be set (e.g. in
-      inventory/group_vars/domain_management/dns.yaml) so the scenario knows
-      which record types to write.
-    success_msg: "Writing record types: {{ dns_hosting_record_types | join(', ') }}."
-  delegate_to: localhost
+- name: Resolve the shared DNS context
+  ansible.builtin.include_tasks: ../dns_resolve_context.yml
   tags:
     - cloudflare_check_set_records_for_host
 
-- name: Select the Cloudflare DNS hosting providers
-  ansible.builtin.set_fact:
-    cloudflare_providers: >-
-      {{ dns_hosting_providers | default([])
-         | selectattr('provider', 'equalto', 'cloudflare') | list }}
-  delegate_to: localhost
-  tags:
-    - cloudflare_check_set_records_for_host
-
-- name: Assert there is a Cloudflare provider to write with
-  ansible.builtin.assert:
-    that:
-      - cloudflare_providers | length > 0
-    fail_msg: >-
-      No Cloudflare provider found in `dns_hosting_providers`
-      (need an entry with `provider: cloudflare`).
-    success_msg: "Using {{ cloudflare_providers | length }} Cloudflare provider(s)."
-  delegate_to: localhost
-  tags:
-    - cloudflare_check_set_records_for_host
-
-- name: Map each DNS provider name to its API token
-  ansible.builtin.set_fact:
-    provider_tokens: >-
-      {{ dict(cloudflare_providers | map(attribute='provider')
-              | zip(cloudflare_providers | map(attribute='api_token'))) }}
-  delegate_to: localhost
-  tags:
-    - cloudflare_check_set_records_for_host
-
-# --- Determine the source records -------------------------------------------
-
-- name: Produce records from domains_keys via the reusable remap_dns_records role
-  ansible.builtin.include_role:
-    name: kwtoolset/remap_dns_records
-    public: true
-  vars:
-    # The role's task assigns `dns_records: {{ remap_dns_records }}`; feed it the
-    # computed list so the include succeeds. We consume `remap_dns_records_domains`.
-    remap_dns_records: "{{ remap_dns_records_domains }}"
-  when: dns_records_override is not defined
-  tags:
-    - cloudflare_check_set_records_for_host
-
-- name: Choose the source DNS records for this host
-  ansible.builtin.set_fact:
-    source_dns_records: >-
-      {{
-        dns_records_override if dns_records_override is defined
-        else (remap_dns_records_domains + (dns_records_addition | default([])))
-      }}
-  delegate_to: localhost
-  tags:
-    - cloudflare_check_set_records_for_host
-
-- name: Keep only records of an allowed type and a known Cloudflare provider
-  ansible.builtin.set_fact:
-    selected_dns_records: >-
-      {{ source_dns_records
-         | selectattr('type', 'in', dns_hosting_record_types)
-         | selectattr('dns_provider', 'in', provider_tokens.keys() | list)
-         | list }}
-  delegate_to: localhost
+- name: Compute the records this host declares
+  ansible.builtin.include_tasks: ../compute_host_dns_records.yml
   tags:
     - cloudflare_check_set_records_for_host
 
@@ -120,41 +29,8 @@
     msg: >-
       {{ inventory_hostname }} — source: {{ 'dns_records_override'
          if dns_records_override is defined else 'remap + dns_records_addition' }};
-      selected {{ selected_dns_records | length }} of
-      {{ source_dns_records | length }} record(s)
-      (types {{ dns_hosting_record_types | join(', ') }}).
-  delegate_to: localhost
-  tags:
-    - cloudflare_check_set_records_for_host
-
-# --- Build the desired records ----------------------------------------------
-
-- name: Build the community.general.cloudflare_dns argument sets
-  ansible.builtin.set_fact:
-    cf_set_targets: >-
-      {{ cf_set_targets | default([]) + [_args] }}
-  loop: "{{ selected_dns_records }}"
-  loop_control:
-    loop_var: rec
-    label: "{{ rec.type }} {{ rec.name }}"
-  vars:
-    # Zone = record name minus its left-most label (mirrors remap_dns_records).
-    _zone: "{{ rec.name | regex_replace('^[^.]+[.]', '') }}"
-    _value: "{{ rec.value | default(dns_hosting_record_value | default(ansible_host | default(inventory_hostname))) }}"
-    _args: >-
-      {{
-        rec
-        | combine({
-            'record': rec.name,
-            'zone': _zone,
-            'value': _value,
-            'state': 'present',
-            'api_token': provider_tokens[rec.dns_provider],
-          })
-        | dict2items
-        | rejectattr('key', 'in', ['name', 'dns_provider'])
-        | items2dict
-      }}
+      selected {{ selected_dns_records | length }} record(s)
+      (types {{ dns_hosting_record_types_resolved | join(', ') }}).
   delegate_to: localhost
   tags:
     - cloudflare_check_set_records_for_host
@@ -166,8 +42,6 @@
   delegate_to: localhost
   tags:
     - cloudflare_check_set_records_for_host
-
-# --- Validate, then apply ---------------------------------------------------
 
 - name: Validate that record values match their type (A -> IPv4, AAAA -> IPv6)
   ansible.builtin.include_tasks: ../validate_record_ips.yml

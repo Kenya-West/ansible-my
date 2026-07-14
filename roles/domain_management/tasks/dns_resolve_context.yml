@@ -1,0 +1,101 @@
+---
+# Shared context for the domain_management DNS scenarios.
+#
+# Resolves the Cloudflare provider config and the managed-domain list once, on the
+# control node, so every scenario (get_all, set, host validation, and future ones)
+# computes them the same way. Works whether the play targets the domain_management
+# group directly (vars are inherited) or a hostless controller like localhost
+# (vars are pulled from the group members via `hostvars`).
+#
+# Produces (run_once, group-wide, on localhost):
+#   * dns_hosting_providers_resolved
+#   * dns_hosting_record_types_resolved
+#   * cloudflare_providers
+#   * provider_tokens        (dict: provider name -> api_token)
+#   * managed_domains        (unique domains declared by every group member)
+
+- name: Resolve the DNS hosting providers and record types
+  ansible.builtin.set_fact:
+    dns_hosting_providers_resolved: >-
+      {{
+        dns_hosting_providers | default(
+          groups['domain_management'] | default([])
+          | map('extract', hostvars, 'dns_hosting_providers')
+          | select('defined') | list | first | default([])
+        )
+      }}
+    dns_hosting_record_types_resolved: >-
+      {{
+        dns_hosting_record_types | default(
+          groups['domain_management'] | default([])
+          | map('extract', hostvars, 'dns_hosting_record_types')
+          | select('defined') | list | first | default([])
+        )
+      }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Assert that dns_hosting_record_types is set
+  ansible.builtin.assert:
+    that:
+      - dns_hosting_record_types_resolved | length > 0
+    fail_msg: >-
+      `dns_hosting_record_types` must be set (e.g. in
+      inventory/group_vars/domain_management/dns.yaml) so the scenarios know
+      which record types are in scope.
+    success_msg: "Record types in scope: {{ dns_hosting_record_types_resolved | join(', ') }}."
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Select the Cloudflare DNS hosting providers
+  ansible.builtin.set_fact:
+    cloudflare_providers: >-
+      {{ dns_hosting_providers_resolved
+         | selectattr('provider', 'equalto', 'cloudflare') | list }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Assert there is a Cloudflare provider
+  ansible.builtin.assert:
+    that:
+      - cloudflare_providers | length > 0
+    fail_msg: >-
+      No Cloudflare provider found in `dns_hosting_providers`
+      (need an entry with `provider: cloudflare`).
+    success_msg: "Using {{ cloudflare_providers | length }} Cloudflare provider(s)."
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Map each DNS provider name to its API token
+  ansible.builtin.set_fact:
+    provider_tokens: >-
+      {{ dict(cloudflare_providers | map(attribute='provider')
+              | zip(cloudflare_providers | map(attribute='api_token'))) }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Gather the domains managed across the whole domain_management group
+  ansible.builtin.set_fact:
+    managed_domains: >-
+      {{
+        groups['domain_management'] | default([])
+        | map('extract', hostvars, 'domains')
+        | select('defined')
+        | list
+        | flatten
+        | unique
+      }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
