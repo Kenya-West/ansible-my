@@ -1,4 +1,7 @@
 ---
+# Step 0: Add domains for node
+- import_playbook: ../dns/set_record_host.yaml
+
 # Step 1: Install analytics and monitoring
 - import_playbook: ../observability/node/node_exporter.yaml
 - import_playbook: ../observability/node/fail2ban_exporter.yaml
