@@ -1,0 +1,14 @@
+---
+# tasks file for roles/install_backup_node_restic
+
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Execute scenarios for this role
+  ansible.builtin.include_role:
+    name: kwtoolset/scenarios
+  tags:
+    - always

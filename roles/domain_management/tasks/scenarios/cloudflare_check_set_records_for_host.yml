@@ -1,0 +1,265 @@
+---
+# Scenario: cloudflare_check_set_records_for_host
+#
+# Ensures (creates/updates) the Cloudflare DNS records for the domains of the
+# *current* host, pointing them at the host itself. Unlike `cloudflare_get_all`
+# (which is hostless and read-only), this scenario is meant to be run against the
+# hosts of the `domain_management` group — each host sets records for its own
+# `domains`, using its own address as the record value.
+#
+# Filtering mirrors `cloudflare_get_all`:
+#   * only providers whose `provider` is `cloudflare` are used;
+#   * only record types listed in `dns_hosting_record_types` are written
+#     (or a per-provider `record_types` override);
+#   * `ttl` / `proxied` come from `dns_hosting_record_ttl` / `dns_hosting_record_proxied`
+#     (or their per-provider `record_ttl` / `record_proxied` overrides).
+#
+# The record value defaults to the host's `ansible_host` (its IPv4 address for an
+# A record); override with `dns_hosting_record_value` if needed.
+#
+# `solo` is intentionally NOT set: several hosts may publish the same balancer
+# name (e.g. an "xray_under_dns_balancer" domain), each contributing one A record.
+#
+# Zone discovery and the actual API calls are delegated to `localhost` (the API
+# is reachable from the control node); zone discovery is `run_once` because the
+# zone list is the same for every host of the group.
+
+# --- Resolve provider config (shared by all hosts) --------------------------
+
+- name: Resolve the DNS hosting providers and record types
+  ansible.builtin.set_fact:
+    dns_hosting_providers_resolved: >-
+      {{
+        dns_hosting_providers | default(
+          groups['domain_management'] | default([])
+          | map('extract', hostvars, 'dns_hosting_providers')
+          | select('defined') | list | first | default([])
+        )
+      }}
+    dns_hosting_record_types_resolved: >-
+      {{
+        dns_hosting_record_types | default(
+          groups['domain_management'] | default([])
+          | map('extract', hostvars, 'dns_hosting_record_types')
+          | select('defined') | list | first | default(['A'])
+        )
+      }}
+  run_once: true
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Select the Cloudflare DNS hosting providers
+  ansible.builtin.set_fact:
+    cloudflare_providers: >-
+      {{ dns_hosting_providers_resolved
+         | selectattr('provider', 'equalto', 'cloudflare') | list }}
+  run_once: true
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Assert there is a Cloudflare provider to write with
+  ansible.builtin.assert:
+    that:
+      - cloudflare_providers | length > 0
+    fail_msg: >-
+      No Cloudflare provider found in `dns_hosting_providers`
+      (need an entry with `provider: cloudflare`).
+    success_msg: >-
+      Writing Cloudflare records via {{ cloudflare_providers | length }} provider(s).
+  run_once: true
+  tags:
+    - cloudflare_check_set_records_for_host
+
+# --- Discover zones once (paginated) ----------------------------------------
+
+- name: Fetch the first page of Cloudflare zones for every provider
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones?per_page=50&page=1"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ provider.api_token }}"
+    return_content: false
+  loop: "{{ cloudflare_providers }}"
+  loop_control:
+    loop_var: provider
+    label: "{{ provider.name }}"
+  register: cf_zones_page1
+  changed_when: false
+  check_mode: false
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Compute the remaining zone pages that still need to be fetched
+  ansible.builtin.set_fact:
+    cf_extra_page_requests: >-
+      {{
+        cf_extra_page_requests | default([])
+        + ([r.provider]
+           | product(range(2, (r.json.result_info.total_pages | int) + 1) | list)
+           | list)
+      }}
+  loop: "{{ cf_zones_page1.results | default([]) }}"
+  loop_control:
+    loop_var: r
+    label: "{{ r.provider.name }}"
+  run_once: true
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Fetch the remaining pages of Cloudflare zones
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones?per_page=50&page={{ item.1 }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ item.0.api_token }}"
+    return_content: false
+  loop: "{{ cf_extra_page_requests | default([]) }}"
+  loop_control:
+    loop_var: item
+    label: "{{ item.0.name }} (page {{ item.1 }})"
+  register: cf_zones_extra
+  changed_when: false
+  check_mode: false
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Reset the accumulated zone list
+  ansible.builtin.set_fact:
+    cf_zones: []
+  run_once: true
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Collect zones from the first page, tagging each with its provider
+  ansible.builtin.set_fact:
+    cf_zones: >-
+      {{ cf_zones + (r.json.result | map('combine', {'_cf_provider': r.provider}) | list) }}
+  loop: "{{ cf_zones_page1.results | default([]) }}"
+  loop_control:
+    loop_var: r
+    label: "{{ r.provider.name }}"
+  run_once: true
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Collect zones from the remaining pages, tagging each with its provider
+  ansible.builtin.set_fact:
+    cf_zones: >-
+      {{ cf_zones + (r.json.result | map('combine', {'_cf_provider': r.item.0}) | list) }}
+  loop: "{{ cf_zones_extra.results | default([]) }}"
+  loop_control:
+    loop_var: r
+    label: "{{ r.item.0.name }} (page {{ r.item.1 }})"
+  run_once: true
+  tags:
+    - cloudflare_check_set_records_for_host
+
+# --- Per host: match this host's domains to their zones ---------------------
+
+- name: Gather this host's own domains
+  ansible.builtin.set_fact:
+    host_domains: "{{ domains | default([]) | flatten | unique }}"
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Report and skip when this host declares no domains
+  ansible.builtin.debug:
+    msg: "Host {{ inventory_hostname }} has no `domains`; nothing to set."
+  when: host_domains | length == 0
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Keep only zones that host one of this host's domains
+  ansible.builtin.set_fact:
+    cf_host_zones: >-
+      {{ cf_host_zones | default([]) + [zone | combine({'_cf_domains': _zone_domains})] }}
+  loop: "{{ cf_zones | default([]) }}"
+  loop_control:
+    loop_var: zone
+    label: "{{ zone.name }}"
+  vars:
+    # A domain belongs to this zone when it equals the zone apex (`^`) or is a
+    # sub-domain of it (leading dot).
+    _zone_domains: >-
+      {{ host_domains
+         | select('search', '(^|\.)' ~ (zone.name | regex_escape) ~ '$')
+         | list }}
+  when: _zone_domains | length > 0
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Warn about this host's domains not found in any Cloudflare zone
+  ansible.builtin.debug:
+    msg: >-
+      These domains of {{ inventory_hostname }} were not found in any accessible
+      Cloudflare zone and will be skipped:
+      {{ host_domains | difference(cf_host_zones | default([]) | map(attribute='_cf_domains') | flatten | unique) }}
+  when:
+    - host_domains | length > 0
+    - (host_domains | difference(cf_host_zones | default([]) | map(attribute='_cf_domains') | flatten | unique)) | length > 0
+  tags:
+    - cloudflare_check_set_records_for_host
+
+# --- Per host: build and apply the desired records --------------------------
+
+- name: Build the list of DNS records to ensure for this host
+  ansible.builtin.set_fact:
+    cf_set_targets: >-
+      {{
+        cf_set_targets | default([])
+        + (_types
+           | map('community.general.dict_kv', 'type')
+           | map('combine', _base)
+           | list)
+      }}
+  loop: "{{ cf_host_zones | default([]) | subelements('_cf_domains') }}"
+  loop_control:
+    loop_var: pair
+    label: "{{ pair.1 }} (zone {{ pair.0.name }})"
+  vars:
+    _provider: "{{ pair.0._cf_provider }}"
+    _types: "{{ _provider.record_types | default(dns_hosting_record_types_resolved) }}"
+    _base:
+      zone: "{{ pair.0.name }}"
+      record: "{{ pair.1 }}"
+      api_token: "{{ _provider.api_token }}"
+      provider: "{{ _provider.name }}"
+      value: "{{ dns_hosting_record_value | default(ansible_host | default(inventory_hostname)) }}"
+      ttl: "{{ _provider.record_ttl | default(dns_hosting_record_ttl | default(300)) | int }}"
+      proxied: "{{ _provider.record_proxied | default(dns_hosting_record_proxied | default(false)) | bool }}"
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Ensure the Cloudflare DNS records for this host
+  community.general.cloudflare_dns:
+    api_token: "{{ target.api_token }}"
+    zone: "{{ target.zone }}"
+    record: "{{ target.record }}"
+    type: "{{ target.type }}"
+    value: "{{ target.value }}"
+    ttl: "{{ target.ttl }}"
+    proxied: "{{ target.proxied }}"
+    state: present
+  loop: "{{ cf_set_targets | default([]) }}"
+  loop_control:
+    loop_var: target
+    label: "{{ target.type }} {{ target.record }} -> {{ target.value }} (zone {{ target.zone }})"
+  register: cf_set_results
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Summarise the records ensured for this host
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        cf_set_results.results | default([])
+        | community.general.json_query('[].{record: target.record, type: target.type, value: target.value, zone: target.zone, changed: changed}')
+      }}
+  when: cf_set_targets | default([]) | length > 0
+  tags:
+    - cloudflare_check_set_records_for_host

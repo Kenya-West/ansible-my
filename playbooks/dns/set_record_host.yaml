@@ -1,0 +1,9 @@
+---
+- name: Check and set DNS records for the domains
+  hosts: domain_management
+
+  roles:
+    - role: domain_management
+      vars:
+        scenarios:
+          - cloudflare_check_set_records_for_host

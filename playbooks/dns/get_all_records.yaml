@@ -1,0 +1,9 @@
+---
+- name: Get all DNS records for the domains
+  hosts: domain_controller
+
+  roles:
+    - role: domain_management
+      vars:
+        scenarios:
+          - cloudflare_get_all

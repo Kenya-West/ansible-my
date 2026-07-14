@@ -1,0 +1,11 @@
+dns_hosting_providers:
+  - name: Cloudflare
+    provider: cloudflare
+    api_token: "{{ cloudflare_api_token_dns }}"
+
+dns_hosting_record_types: # could be record_types inside an entry of dns_hosting_providers list
+  - A
+
+dns_hosting_record_proxied: false # could be record_proxied inside an entry of dns_hosting_providers list
+
+dns_hosting_record_ttl: 300 # could be record_ttl inside an entry of dns_hosting_providers list
