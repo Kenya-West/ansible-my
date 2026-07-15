@@ -7,6 +7,7 @@
 - import_playbook: ../bootstrap/fail2ban.yaml
 
 # Step 2: System maintenance
+- import_playbook: ../base/deb_mirrors.yaml
 - import_playbook: ../maintenance/update.yaml
 - import_playbook: ../maintenance/reboot.yaml
 

@@ -1,0 +1,8 @@
+---
+- name: Install DEB mirrors
+  hosts: general_vps_prepare
+  become: true
+
+  roles:
+    - name: install_deb_mirrors
+

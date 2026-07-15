@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/install_deb_mirrors
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Get the public IP of the host
+  ansible.builtin.command: curl -s ifconfig.me
+  register: public_ip
+  changed_when: false
+  when:
+    - deb_mirrors_enforce_country_code | length == 0
+
+- name: Query IPInfo for geolocation information
+  ansible.builtin.uri:
+    url: "https://ipinfo.io/{{ public_ip.stdout }}/json"
+    method: GET
+    return_content: true
+  register: deb_mirrors_ipinfo_response
+  when:
+    - deb_mirrors_enforce_country_code | length == 0
+
+- name: Parse the country from IPInfo response
+  ansible.builtin.set_fact:
+    deb_mirrors_country: "{{ deb_mirrors_ipinfo_response.json.country }}"
+  when:
+    - deb_mirrors_enforce_country_code | length == 0
+
+- name: Debug country information
+  ansible.builtin.debug:
+    msg: "The country for IP {{ public_ip.stdout }} is {{ deb_mirrors_country }}"
+  when:
+    - deb_mirrors_enforce_country_code | length == 0
+
+- name: Enforce country fact if deb_mirrors_enforce_country_code is set
+  ansible.builtin.set_fact:
+    deb_mirrors_country: "{{ deb_mirrors_enforce_country_code }}"
+  when:
+    - deb_mirrors_enforce_country_code | length > 0
+
+- name: Normalize country code to uppercase
+  ansible.builtin.set_fact:
+    deb_mirrors_country_normalized: "{{ deb_mirrors_country | upper }}"
+    deb_mirrors_country_code_allowlist_normalized: "{{ deb_mirrors_country_code_allowlist | map('upper') | list }}"
+  when:
+    - deb_mirrors_country is defined
+    - deb_mirrors_country_code_allowlist is defined
+
+- name: Create APT mirror list
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/apt/ubuntu-mirrors.txt
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {% for mirror in deb_mirrors %}
+      {{ mirror.url }}
+      {% endfor %}
+  register: deb_mirror_list
+
+- name: Configure Ubuntu mirror list
+  become: true
+  ansible.builtin.deb822_repository:
+    name: ubuntu-mirror-list
+    types:
+      - deb
+    uris:
+      - mirror+file:/etc/apt/ubuntu-mirrors.txt
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}"
+      - "{{ ansible_facts['distribution_release'] }}-updates"
+      - "{{ ansible_facts['distribution_release'] }}-backports"
+      - "{{ ansible_facts['distribution_release'] }}-security"
+    components:
+      - main
+      - restricted
+      - universe
+      - multiverse
+    signed_by: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+    state: present
+  register: deb_mirror_repository
+  when:
+    - deb_mirrors_country_normalized
+        in deb_mirrors_country_code_allowlist_normalized
+
+- name: Update APT cache
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+  when:
+    - deb_mirrors_country_normalized
+        in deb_mirrors_country_code_allowlist_normalized
+    - deb_mirror_list.changed or deb_mirror_repository.changed
