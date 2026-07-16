@@ -1,2 +1,73 @@
 ---
 # tasks file for roles/install_docker
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Get the public IP of the host
+  ansible.builtin.command: curl -s ifconfig.me
+  register: public_ip
+  changed_when: false
+  when:
+    - docker_mirrors_enforce_country_code | length == 0
+
+- name: Query IPInfo for geolocation information
+  ansible.builtin.uri:
+    url: "https://ipinfo.io/{{ public_ip.stdout }}/json"
+    method: GET
+    return_content: true
+  register: docker_mirrors_ipinfo_response
+  when:
+    - docker_mirrors_enforce_country_code | length == 0
+
+- name: Parse the country from IPInfo response
+  ansible.builtin.set_fact:
+    docker_mirrors_country: "{{ docker_mirrors_ipinfo_response.json.country }}"
+  when:
+    - docker_mirrors_enforce_country_code | length == 0
+
+- name: Debug country information
+  ansible.builtin.debug:
+    msg: "The country for IP {{ public_ip.stdout }} is {{ docker_mirrors_country }}"
+  when:
+    - docker_mirrors_enforce_country_code | length == 0
+
+- name: Enforce country fact if docker_mirrors_enforce_country_code is set
+  ansible.builtin.set_fact:
+    docker_mirrors_country: "{{ docker_mirrors_enforce_country_code }}"
+  when:
+    - docker_mirrors_enforce_country_code | length > 0
+
+- name: Normalize country code to uppercase
+  ansible.builtin.set_fact:
+    docker_mirrors_country_normalized: "{{ docker_mirrors_country | upper }}"
+    docker_mirrors_country_code_allowlist_normalized: "{{ docker_mirrors_country_code_allowlist | map('upper') | list }}"
+  when:
+    - docker_mirrors_country is defined
+    - docker_mirrors_country_code_allowlist is defined
+
+- name: Set docker_repo_url fact based on country code
+  ansible.builtin.set_fact:
+    docker_repo_url: >-
+      {{ (
+            docker_mirrors
+            | selectattr('preferred_country_code', 'equalto', docker_mirrors_country_normalized)
+            | map(attribute='url')
+            | first
+          ) | default('https://download.docker.com/linux')
+      }}
+  when:
+    - docker_mirrors_country_normalized is defined
+    - docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
+
+- name: Display the selected Docker repository URL
+  ansible.builtin.debug:
+    msg: "Selected Docker repository URL: {{ docker_repo_url }} because the country code is {{ docker_mirrors_country_normalized }}"
+  when:
+    - docker_mirrors_country_normalized is defined
+    - docker_mirrors_country_normalized in docker_mirrors_country_code_allowlist_normalized
+    - docker_repo_url is defined
+
+- name: Run geerlingguy.docker role to install Docker
+  ansible.builtin.include_role:
+    name: geerlingguy.docker
