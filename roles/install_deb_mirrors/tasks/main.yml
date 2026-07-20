@@ -4,6 +4,11 @@
 - name: Gather service facts
   ansible.builtin.service_facts:
 
+- name: Ensure python3-debian is installed
+  ansible.builtin.apt:
+    name: python3-debian
+    state: present
+
 - name: Get the public IP of the host
   ansible.builtin.command: curl -s ifconfig.me
   register: public_ip
