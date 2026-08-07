@@ -9,13 +9,17 @@
     - name: Show an error if no result
       ansible.builtin.debug:
         msg: "Could not get compose project name for project at {{ item }}. It could be the missing docker-compose.yml file or project directory. Skipping."
+  when: compose_discover_project_name == true
 
 - name: Docker Compose project - container up
   community.docker.docker_compose_v2:
     project_src: "{{ item }}"
-    project_name: "{{ get_compose_project_name }}"
+    project_name: >-
+      {{
+        compose_project_name
+        | default(get_compose_project_name | default(omit))
+      }}
     files:
       - docker-compose.yml
     state: present
-  when: get_compose_project_name is defined
   failed_when: false
