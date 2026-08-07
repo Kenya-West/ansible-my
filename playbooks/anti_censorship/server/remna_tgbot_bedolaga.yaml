@@ -1,0 +1,8 @@
+---
+- name: Install and configure Telegram bots from Bedolaga for Remnawave panel
+  hosts: vpn_server_remnawave
+  become: false
+  become_user: "{{ standard_user }}"
+
+  roles:
+    - install_vpn_server_remnawave_tgbot_bedolaga

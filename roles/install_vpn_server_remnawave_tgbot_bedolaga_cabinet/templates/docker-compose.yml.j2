@@ -1,0 +1,24 @@
+{% set bot = vpn_server_remnawave_tgbot_bedolaga_cabinet_settings[current_index] %}
+{% set network_name = 'tgbot-bedolaga-cabinet-' + (current_index | string) %}
+
+services:
+  remnawave-telegram-tgbot-bedolaga-cabinet-{{ current_index | string }}-frontend:
+    image: ghcr.io/bedolaga-dev/bedolaga-cabinet:latest
+    container_name: ${SERVICE_NAME}-cabinet
+    restart: unless-stopped
+    networks:
+      - {{ network_name }}
+      - {{ docker_vpn_network }}
+    labels:
+      caddy: "${DOMAIN_FOR_CADDY}{% if vpn_server_remnawave_tgbot_bedolaga_cabinet_external_port is defined and vpn_server_remnawave_tgbot_bedolaga_cabinet_external_port %}:${EXTERNAL_PORT}{% endif %}"
+      caddy.import: "logging ${DOMAIN_FOR_CADDY}-remnawave-tgbot-bedolaga-cabinet"
+      {% raw %}caddy.reverse_proxy: "{{ upstreams 80 }}"{% endraw %}
+
+      caddy.handle_path: "/api/*"
+      caddy.handle_path.uri: "strip_prefix /api"
+      caddy.handle_path.reverse_proxy: "${BACKEND_API_URL}"
+
+networks:
+  {{ network_name }}:
+  {{ docker_vpn_network }}:
+    external: true

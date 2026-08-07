@@ -1,0 +1,8 @@
+vpn_server_remnawave_tgbot_bedolaga_cabinet_settings_global:
+  service_name_prefix: remnawave-telegram-tgbot-bedolaga-cabinet
+
+vpn_server_remnawave_tgbot_bedolaga_cabinet_settings:
+  - name: main
+    domain: "{{ domains_keys.remnawave_tgbot_bedolaga_cabinet }}"
+    cabinet_jwt_secret: ""
+    backend_api_url: "{{ domains_keys.remnawave_tgbot_bedolaga }}/{{ path_to_internal_services_predefined_full }}/{{ vpn_server_remnawave_tgbot_bedolaga_settings_global.service_name_prefix }}-{{ current_index | string }}"
