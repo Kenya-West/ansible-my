@@ -6,5 +6,7 @@ vpn_server_remnawave_project_structure_end_dirs__base:
   subpage: "{{ vpn_server_remnawave_project_structure_root }}/subpage"
   tg_miniapp: "{{ vpn_server_remnawave_project_structure_root }}/tg-miniapp"
   tgbot_jolymmiels: "{{ vpn_server_remnawave_project_structure_root }}/tgbot-jolymmiels"
+  tgbot_bedolaga: "{{ vpn_server_remnawave_project_structure_root }}/tgbot-bedolaga"
+  tgbot_bedolaga_cabinet: "{{ vpn_server_remnawave_project_structure_root }}/tgbot-bedolaga-cabinet"
 vpn_server_remnawave_project_structure_end_dirs: "{{ vpn_server_remnawave_project_structure_end_dirs__base }}"
 vpn_server_remnawave_project_structure_end_dirs_list: "{{ vpn_server_remnawave_project_structure_end_dirs.values() | list }}"
