@@ -1,0 +1,178 @@
+---
+# Migrates a single host's 0_all/1_domains.yaml from the legacy
+# domains_keys.xray_under_dns_balancer (a flat list of domain strings) to
+# domains_keys.remna_node (a list of {domain, type} objects, type taken from
+# inventory/group_vars/vpn_caddy/remna.yaml's remna_domain_types).
+#
+# Expects (set by the caller, one host per include):
+#   __host_name          - the inventory hostname being processed
+#   __host_domains_file  - absolute path to that host's 0_all/1_domains.yaml
+#   __report              - accumulator list this file appends {host, status, reason?} to
+#   __migrate_domains_exact_map - domain-label -> remna_domain_types key, for the
+#                                  explicit "global" variants (see the play's vars)
+#
+# The file is treated as inert text/data (slurp + from_yaml), never as live
+# Ansible vars, so the Jinja expressions it contains (e.g. "{{ inventory_hostname }}")
+# are read back and written out completely untouched.
+
+- name: "{{ __host_name }}: skip when host is not in the vpn_caddy group"
+  when: "'vpn_caddy' not in (hostvars[__host_name].group_names | default([]))"
+  block:
+    - name: "{{ __host_name }}: warn host not in vpn_caddy group"
+      ansible.builtin.debug:
+        msg: "WARNING: {{ __host_name }} is not in the vpn_caddy group, skipping"
+
+    - name: "{{ __host_name }}: append report entry (not in vpn_caddy group)"
+      ansible.builtin.set_fact:
+        __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'not in vpn_caddy group'}] }}"
+
+- name: "{{ __host_name }}: process host in the vpn_caddy group"
+  when: "'vpn_caddy' in (hostvars[__host_name].group_names | default([]))"
+  block:
+    - name: "{{ __host_name }}: check domains file exists"
+      ansible.builtin.stat:
+        path: "{{ __host_domains_file }}"
+      register: __host_stat
+
+    - name: "{{ __host_name }}: warn and skip when domains file is missing"
+      when: not __host_stat.stat.exists
+      block:
+        - name: "{{ __host_name }}: warn file not found"
+          ansible.builtin.debug:
+            msg: "WARNING: {{ __host_domains_file }} not found, skipping {{ __host_name }}"
+
+        - name: "{{ __host_name }}: append report entry (file not found)"
+          ansible.builtin.set_fact:
+            __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'file not found'}] }}"
+
+    - name: "{{ __host_name }}: migrate the existing domains file"
+      when: __host_stat.stat.exists
+      block:
+        - name: "{{ __host_name }}: read domains file"
+          ansible.builtin.slurp:
+            src: "{{ __host_domains_file }}"
+          register: __host_slurp
+
+        - name: "{{ __host_name }}: decode and parse the domains file"
+          ansible.builtin.set_fact:
+            __host_content: "{{ __host_slurp.content | b64decode }}"
+            __host_parsed: "{{ (__host_slurp.content | b64decode) | from_yaml }}"
+
+        - name: "{{ __host_name }}: skip when already migrated"
+          when: __host_parsed.domains_keys.remna_node is defined
+          block:
+            - name: "{{ __host_name }}: note already migrated"
+              ansible.builtin.debug:
+                msg: "{{ __host_domains_file }} already has domains_keys.remna_node, nothing to do"
+
+            - name: "{{ __host_name }}: append report entry (already migrated)"
+              ansible.builtin.set_fact:
+                __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'already migrated'}] }}"
+
+        - name: "{{ __host_name }}: migrate legacy schema"
+          when: __host_parsed.domains_keys.remna_node is not defined
+          block:
+            - name: "{{ __host_name }}: validate expected legacy schema"
+              ansible.builtin.assert:
+                that:
+                  - __host_parsed.domains_keys is defined
+                  - __host_parsed.domains_keys.main is defined
+                  - __host_parsed.domains_keys.xray_under_dns_balancer is defined
+                  - __host_parsed.domains_keys.xray_under_dns_balancer is sequence
+                  - __host_parsed.domains is defined
+                  - "__host_content is search('(?m)^\\s*xray_under_dns_balancer:\\s*(\\[\\]\\s*)?$')"
+                  - "__host_content is search('(?m)^domains: \"\\{\\{ domains_keys\\.values\\(\\) \\| list \\| unique \\}\\}\"\\s*$')"
+                fail_msg: >-
+                  Unexpected schema for domains_keys.xray_under_dns_balancer or the
+                  domains: line in {{ __host_domains_file }}
+
+            - name: "{{ __host_name }}: reset per-host migration accumulators"
+              ansible.builtin.set_fact:
+                __classified_domains: []
+                __remna_node_lines: []
+
+            - name: "{{ __host_name }}: classify each legacy balancer domain"
+              ansible.builtin.set_fact:
+                __classified_domains: "{{ __classified_domains + [{'domain': __balancer_domain, 'type_key': __type_key}] }}"
+              loop: "{{ __host_parsed.domains_keys.xray_under_dns_balancer }}"
+              loop_control:
+                loop_var: __balancer_domain
+                label: "{{ __balancer_domain }}"
+              vars:
+                __label: "{{ __balancer_domain.split('.')[0] }}"
+                __type_key: >-
+                  {{
+                    __migrate_domains_exact_map[__label]
+                    if __label in __migrate_domains_exact_map
+                    else ('location_net' if (__label is match('^net-(?!global-)[a-z0-9]+-[0-9]+$'))
+                    else ('location_chain' if (__label is match('^chain-(?!global-)[a-z0-9]+-[0-9]+$'))
+                    else 'other'))
+                  }}
+
+            - name: "{{ __host_name }}: build the remna_node entries (main domain first, type unique)"
+              ansible.builtin.set_fact:
+                __remna_node_pairs: >-
+                  {{
+                    [{'domain': __host_parsed.domains_keys.main, 'type_key': 'unique', 'quote': true}]
+                    + (__classified_domains | map('combine', {'quote': false}) | list)
+                  }}
+
+            - name: "{{ __host_name }}: render each remna_node entry as YAML lines"
+              ansible.builtin.set_fact:
+                __remna_node_lines: "{{ __remna_node_lines + [__domain_line, __type_line] }}"
+              loop: "{{ __remna_node_pairs }}"
+              loop_control:
+                loop_var: __pair
+                label: "{{ __pair.domain }}"
+              vars:
+                __domain_repr: "{{ ('\"' ~ __pair.domain ~ '\"') if __pair.quote else __pair.domain }}"
+                __domain_line: "{{ '    - domain: ' ~ __domain_repr }}"
+                __type_line: "{{ '      type: \"' ~ '{{' ~ ' remna_domain_types.' ~ __pair.type_key ~ ' ' ~ '}}' ~ '\"' }}"
+
+            - name: "{{ __host_name }}: build the replacement remna_node block"
+              ansible.builtin.set_fact:
+                __new_remna_node_block: "{{ '  remna_node:\n' ~ (__remna_node_lines | join('\n')) ~ '\n' }}"
+
+            - name: "{{ __host_name }}: build the replacement domains: line"
+              vars:
+                __sq: "'"
+              ansible.builtin.set_fact:
+                __new_domains_line: >-
+                  {{
+                    'domains: "'
+                    ~ '{{' ~ ' ((domains_keys | dict2items | rejectattr(' ~ __sq ~ 'key' ~ __sq ~ ', ' ~ __sq ~ 'equalto' ~ __sq ~ ', ' ~ __sq ~ 'remna_node' ~ __sq ~ ') | map(attribute=' ~ __sq ~ 'value' ~ __sq ~ ') | list) + (domains_keys.remna_node | map(attribute=' ~ __sq ~ 'domain' ~ __sq ~ ') | list)) | unique '
+                    ~ '}}' ~ '"'
+                  }}
+
+            - name: "{{ __host_name }}: replace the legacy xray_under_dns_balancer block"
+              ansible.builtin.set_fact:
+                __host_content_step1: >-
+                  {{
+                    __host_content
+                    | regex_replace('(?m)^([ \t]*)xray_under_dns_balancer:(?:[ \t]*\[\][ \t]*\n?|\n(?:\1  - [^\n]*\n?)*)', __new_remna_node_block)
+                  }}
+
+            - name: "{{ __host_name }}: replace the domains: line"
+              ansible.builtin.set_fact:
+                __host_content_final: >-
+                  {{
+                    __host_content_step1
+                    | regex_replace('(?m)^domains: "\{\{ domains_keys\.values\(\) \| list \| unique \}\}"[ \t]*$', __new_domains_line)
+                  }}
+
+            - name: "{{ __host_name }}: write the migrated domains file"
+              ansible.builtin.copy:
+                dest: "{{ __host_domains_file }}"
+                content: "{{ __host_content_final }}"
+
+            - name: "{{ __host_name }}: append report entry (migrated)"
+              ansible.builtin.set_fact:
+                __report: "{{ __report + [{'host': __host_name, 'status': 'migrated'}] }}"
+          rescue:
+            - name: "{{ __host_name }}: warn on parse failure or unexpected schema"
+              ansible.builtin.debug:
+                msg: "WARNING: {{ __host_domains_file }} could not be parsed or has an unexpected schema, skipping {{ __host_name }}"
+
+            - name: "{{ __host_name }}: append report entry (schema mismatch)"
+              ansible.builtin.set_fact:
+                __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'unexpected schema'}] }}"

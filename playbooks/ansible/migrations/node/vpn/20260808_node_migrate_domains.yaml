@@ -1,0 +1,57 @@
+---
+
+- name: Migrate domains_keys.xray_under_dns_balancer to domains_keys.remna_node
+  hosts: all
+  connection: local
+  become: false
+  gather_facts: false
+
+  vars:
+    __report: []
+
+    # Exact-match domain-label -> remna_domain_types key, for labels that carry an
+    # explicit variant (all / reality-tcp / reality-xhttp) under the "global" scope.
+    # See inventory/group_vars/vpn_caddy/remna.yaml for the type list. Anything not
+    # matched here, and not a plain "<net|chain>-<location>-<number>" domain, becomes
+    # type "other".
+    __migrate_domains_exact_map:
+      net-global-all: global_net_all
+      net-global-reality-tcp: global_net_reality_tcp
+      net-global-reality-xhttp: global_net_reality_xhttp
+      chain-global-all: global_chain_all
+      chain-global-reality-tcp: global_chain_reality_tcp
+      chain-global-reality-xhttp: global_chain_reality_xhttp
+      net-russia-all: russia_net_all
+      net-russia-reality-tcp: russia_net_reality_tcp
+      net-russia-reality-xhttp: russia_net_reality_xhttp
+      chain-russia-all: russia_chain_all
+      chain-russia-reality-tcp: russia_chain_reality_tcp
+      chain-russia-reality-xhttp: russia_chain_reality_xhttp
+
+  tasks:
+    - name: Migrate each selected host's domains file
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/migrate_domain_to_host.yaml"
+      run_once: true
+      loop: "{{ ansible_play_hosts_all }}"
+      loop_control:
+        loop_var: __host_name
+        label: "{{ __host_name }}"
+      vars:
+        __host_domains_file: "{{ inventory_dir }}/host_vars/{{ __host_name }}/0_all/1_domains.yaml"
+
+    - name: Print report per host
+      ansible.builtin.debug:
+        msg: "{{ item.host }}: {{ item.status }}{{ (' (' + item.reason + ')') if item.reason is defined else '' }}"
+      run_once: true
+      loop: "{{ __report }}"
+      loop_control:
+        label: "{{ item.host }}"
+
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: >-
+          Domains file migration processed for {{ __report | length }} host(s):
+          {{ __report | selectattr('status', 'equalto', 'migrated') | list | length }} migrated,
+          {{ __report | selectattr('status', 'equalto', 'skipped') | selectattr('reason', 'equalto', 'already migrated') | list | length }} already migrated,
+          {{ __report | selectattr('status', 'equalto', 'skipped') | rejectattr('reason', 'equalto', 'already migrated') | list | length }} skipped (not in vpn_caddy group, missing file, or unexpected schema).
+      run_once: true

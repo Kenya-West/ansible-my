@@ -2,7 +2,7 @@
 
 services:
   remna:
-    image: remnawave/node:{{ remna_node_container_image_pinned_version | default('latest') }}
+    image: remnawave/node:{{ (remna_node_container_image_pinned_version | string) | default('latest') }}
     container_name: remna
     cpus: 0.75
     mem_limit: 512m
@@ -18,7 +18,7 @@ services:
       - /home/{{ standard_user }}/logs/remnanode:/var/log/remnanode
     cap_add:
       - NET_ADMIN
-{% set sd = domains_keys.xray_under_dns_balancer | default([]) %}
+{% set sd = domains_keys.remna_node | map(attribute='domain') | list | default([]) %}
 {% if sd | length > 0 %}
     ports:
 {% if caddy_occupy_HTTPS is not defined or caddy_occupy_HTTPS == false %}

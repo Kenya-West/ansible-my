@@ -10,7 +10,7 @@
 # the time-to-live (TTL),
 # and the DNS provider (Cloudflare).
 # The list of DNS records is generated based on the domains specified in the domains_keys variable,
-# including the main domain and any additional domains under the xray_under_dns_balancer key.
+# including the main domain and any additional domains under the remna_node prop.
 
 _dns_records_raw:
   common_settings:
@@ -26,10 +26,12 @@ _dns_records_raw:
         }
       ]
       + (
-        domains_keys.xray_under_dns_balancer
-        | select
+        domains_keys.remna_node
+        | rejectattr('domain', 'equalto', domains_keys.main)
+        | map(attribute='domain')
         | map('community.general.dict_kv', 'name')
         | list
+        | unique
         )
     }}
 
