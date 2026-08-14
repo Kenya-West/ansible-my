@@ -1,0 +1,68 @@
+---
+
+- name: Add a domain to domains_keys.remna_node for selected hosts
+  hosts: all
+  connection: local
+  become: false
+  gather_facts: false
+
+  vars_prompt:
+    - name: add_domains_to_list_caddy_new_domain
+      prompt: "Enter the domain to add to domains_keys.remna_node for the selected host(s)"
+      private: false
+
+  vars:
+    __report: []
+
+    # Exact-match domain-label -> remna_domain_types key, for labels that carry an
+    # explicit variant (all / reality-tcp / reality-xhttp) under the "global" or
+    # "russia" scope. See inventory/group_vars/vpn_caddy/remna.yaml for the type
+    # list. Anything not matched here, and not a plain "<net|chain>-<location>-<number>"
+    # domain, becomes type "other".
+    __add_domains_to_list_caddy_exact_map:
+      net-global-all: global_net_all
+      net-global-reality-tcp: global_net_reality_tcp
+      net-global-reality-xhttp: global_net_reality_xhttp
+      chain-global-all: global_chain_all
+      chain-global-reality-tcp: global_chain_reality_tcp
+      chain-global-reality-xhttp: global_chain_reality_xhttp
+      net-russia-all: russia_net_all
+      net-russia-reality-tcp: russia_net_reality_tcp
+      net-russia-reality-xhttp: russia_net_reality_xhttp
+      chain-russia-all: russia_chain_all
+      chain-russia-reality-tcp: russia_chain_reality_tcp
+      chain-russia-reality-xhttp: russia_chain_reality_xhttp
+
+  tasks:
+    - name: Fail if no domain was provided
+      ansible.builtin.fail:
+        msg: "add_domains_to_list_caddy_new_domain must not be empty"
+      run_once: true
+      when: add_domains_to_list_caddy_new_domain | length == 0
+
+    - name: Process each selected host's domains file
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/add_domain_to_host.yaml"
+      run_once: true
+      loop: "{{ ansible_play_hosts_all }}"
+      loop_control:
+        loop_var: __host_name
+        label: "{{ __host_name }}"
+      vars:
+        __host_domains_file: "{{ inventory_dir }}/host_vars/{{ __host_name }}/0_all/1_domains.yaml"
+
+    - name: Print report per host
+      ansible.builtin.debug:
+        msg: "{{ item.host }}: {{ item.status }}{{ (' (' + item.reason + ')') if item.reason is defined else '' }}"
+      run_once: true
+      loop: "{{ __report }}"
+      loop_control:
+        label: "{{ item.host }}"
+
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: >-
+          Domain "{{ add_domains_to_list_caddy_new_domain }}" processed for {{ __report | length }} host(s):
+          {{ __report | selectattr('status', 'equalto', 'added') | list | length }} added,
+          {{ __report | selectattr('status', 'equalto', 'skipped') | selectattr('reason', 'equalto', 'already present') | list | length }} already present,
+          {{ __report | selectattr('status', 'equalto', 'skipped') | rejectattr('reason', 'equalto', 'already present') | list | length }} skipped (missing file or unexpected schema).
+      run_once: true

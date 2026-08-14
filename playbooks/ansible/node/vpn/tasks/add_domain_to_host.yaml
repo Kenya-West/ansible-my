@@ -1,0 +1,91 @@
+---
+
+- name: "{{ __host_name }}: check domains file exists"
+  ansible.builtin.stat:
+    path: "{{ __host_domains_file }}"
+  register: __host_stat
+
+- name: "{{ __host_name }}: warn and skip when domains file is missing"
+  when: not __host_stat.stat.exists
+  block:
+    - name: "{{ __host_name }}: warn file not found"
+      ansible.builtin.debug:
+        msg: "WARNING: {{ __host_domains_file }} not found, skipping {{ __host_name }}"
+
+    - name: "{{ __host_name }}: append report entry (file not found)"
+      ansible.builtin.set_fact:
+        __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'file not found'}] }}"
+
+- name: "{{ __host_name }}: parse and update existing domains file"
+  when: __host_stat.stat.exists
+  block:
+    - name: "{{ __host_name }}: read domains file"
+      ansible.builtin.slurp:
+        src: "{{ __host_domains_file }}"
+      register: __host_slurp
+
+    - name: "{{ __host_name }}: decode and parse the domains file"
+      ansible.builtin.set_fact:
+        __host_content: "{{ __host_slurp.content | b64decode }}"
+        __host_parsed: "{{ (__host_slurp.content | b64decode) | from_yaml }}"
+
+    - name: "{{ __host_name }}: validate expected schema"
+      ansible.builtin.assert:
+        that:
+          - __host_parsed.domains_keys is defined
+          - __host_parsed.domains_keys.remna_node is defined
+          - __host_parsed.domains_keys.remna_node is sequence
+          - "__host_content is search('(?m)^\\s*remna_node:\\s*(\\[\\]\\s*)?$')"
+        fail_msg: "Unexpected schema for domains_keys.remna_node in {{ __host_domains_file }}"
+
+    - name: "{{ __host_name }}: add domain when not already present"
+      when: add_domains_to_list_caddy_new_domain not in (__host_parsed.domains_keys.remna_node | map(attribute='domain') | list)
+      block:
+        - name: "{{ __host_name }}: classify the new domain's type"
+          ansible.builtin.set_fact:
+            __new_domain_type_key: >-
+              {{
+                __add_domains_to_list_caddy_exact_map[__new_domain_label]
+                if __new_domain_label in __add_domains_to_list_caddy_exact_map
+                else ('location_net' if (__new_domain_label is match('^net-(?!global-)[a-z0-9]+-[0-9]+$'))
+                else ('location_chain' if (__new_domain_label is match('^chain-(?!global-)[a-z0-9]+-[0-9]+$'))
+                else 'other'))
+              }}
+          vars:
+            __new_domain_label: "{{ add_domains_to_list_caddy_new_domain.split('.')[0] }}"
+
+        - name: "{{ __host_name }}: build the new remna_node entry lines"
+          ansible.builtin.set_fact:
+            __new_domain_line: "{{ '    - domain: ' ~ add_domains_to_list_caddy_new_domain }}"
+            __new_type_line: "{{ '      type: \"' ~ '{{' ~ ' remna_domain_types.' ~ __new_domain_type_key ~ ' ' ~ '}}' ~ '\"' }}"
+
+        - name: "{{ __host_name }}: insert the new entry right after remna_node:"
+          ansible.builtin.set_fact:
+            __host_content_final: >-
+              {{
+                __host_content
+                | regex_replace('(?m)^([ \t]*remna_node:[ \t]*)$', '\1\n' ~ __new_domain_line ~ '\n' ~ __new_type_line)
+                | regex_replace('(?m)^([ \t]*remna_node:[ \t]*)\[\][ \t]*$', '\1\n' ~ __new_domain_line ~ '\n' ~ __new_type_line)
+              }}
+
+        - name: "{{ __host_name }}: write the updated domains file"
+          ansible.builtin.copy:
+            dest: "{{ __host_domains_file }}"
+            content: "{{ __host_content_final }}"
+
+        - name: "{{ __host_name }}: append report entry (added)"
+          ansible.builtin.set_fact:
+            __report: "{{ __report + [{'host': __host_name, 'status': 'added'}] }}"
+
+    - name: "{{ __host_name }}: append report entry (already present)"
+      when: add_domains_to_list_caddy_new_domain in (__host_parsed.domains_keys.remna_node | map(attribute='domain') | list)
+      ansible.builtin.set_fact:
+        __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'already present'}] }}"
+  rescue:
+    - name: "{{ __host_name }}: warn on parse failure or unexpected schema"
+      ansible.builtin.debug:
+        msg: "WARNING: {{ __host_domains_file }} could not be parsed or has an unexpected schema, skipping {{ __host_name }}"
+
+    - name: "{{ __host_name }}: append report entry (schema mismatch)"
+      ansible.builtin.set_fact:
+        __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'unexpected schema'}] }}"
