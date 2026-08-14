@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Turns the list of provider answers into one result.
+#
+# Every field is decided by a plain majority vote: if three providers say RU and two say FR,
+# the result is RU. A tie is won by the provider that answered first, which is why the catalog
+# lists the community modules before the raw HTTP endpoints.
+#
+# The same code serves both policies. Under first_successful there is usually a single answer
+# to vote on, so the merged result is that answer.
+- name: Keep only the answers that carried something
+  ansible.builtin.set_fact:
+    _gid_ok: "{{ get_ip_data_results | selectattr('ok') | list }}"
+
+- name: Count how many providers voted for each value
+  ansible.builtin.set_fact:
+    _gid_consensus: "{{ _gid_consensus | combine({item: _gid_tally}) }}"
+  loop: "{{ get_ip_data_vote_fields }}"
+  loop_control:
+    label: "{{ item }}"
+  vars:
+    _gid_values: "{{ _gid_ok | map(attribute='data') | selectattr(item, 'defined') | map(attribute=item) | list }}"
+    _gid_tally: "{{ _gid_values | community.general.counter }}"
+  when: _gid_values | length > 0
+
+- name: Take the value with the most votes for every field
+  ansible.builtin.set_fact:
+    _gid_merged: >-
+      {{ _gid_merged
+         | combine({item.key: (item.value | dictsort(by='value', reverse=true) | map('first') | first)}) }}
+  loop: "{{ _gid_consensus | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+# Voting on coordinates would be pointless, no two providers report the exact same point.
+# The median of the sources that agree on the winning country stays on a real location
+# instead of landing in the sea between two of them.
+- name: Place the host at the median of the sources that agree on the country
+  ansible.builtin.set_fact:
+    _gid_merged: "{{ _gid_merged | combine(_gid_coords) }}"
+  when: _gid_ok | length > 0
+  vars:
+    _gid_agreeing: >-
+      {{ _gid_ok | map(attribute='data')
+         | selectattr('country_code', 'defined')
+         | selectattr('country_code', 'eq', _gid_merged.country_code | default('')) | list }}
+    _gid_base: "{{ _gid_agreeing if (_gid_agreeing | length > 0) else (_gid_ok | map(attribute='data') | list) }}"
+    _gid_lats: "{{ _gid_base | selectattr('latitude', 'defined') | map(attribute='latitude') | map('float') | list | sort }}"
+    _gid_lons: "{{ _gid_base | selectattr('longitude', 'defined') | map(attribute='longitude') | map('float') | list | sort }}"
+    _gid_coords: >-
+      {{ ({'latitude': _gid_lats[_gid_lats | length // 2]} if (_gid_lats | length > 0) else {})
+         | combine({'longitude': _gid_lons[_gid_lons | length // 2]} if (_gid_lons | length > 0) else {}) }}
+
+- name: Publish the merged IP data as "{{ get_ip_data_fact_name }}"
+  ansible.builtin.set_fact:
+    "{{ get_ip_data_fact_name }}": "{{ _gid_output }}"
+    cacheable: "{{ get_ip_data_fact_cacheable | bool }}"
+  vars:
+    _gid_summary: >-
+      {{ get_ip_data_schema | combine(_gid_merged)
+         | dict2items | rejectattr('value', 'none') | items2dict }}
+    _gid_output: >-
+      {{ _gid_summary | combine({
+           'policy': get_ip_data_policy,
+           'resolved': (_gid_ok | length > 0),
+           'complete': (get_ip_data_required_fields | difference(_gid_summary.keys() | list) | length == 0),
+           'queried': (get_ip_data_results | map(attribute='provider') | list),
+           'succeeded': (_gid_ok | map(attribute='provider') | list),
+           'failed': (get_ip_data_results | rejectattr('ok') | map(attribute='provider') | list),
+           'skipped': get_ip_data_skipped,
+           'consensus': _gid_consensus,
+           'sources': get_ip_data_results,
+         }) }}

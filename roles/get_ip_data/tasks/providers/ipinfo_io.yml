@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT-0
+---
+# https://ipinfo.io/json requested directly. Twin of the ipinfoio_facts module, which hits the
+# exact same URL, so with get_ip_data_prefer_modules this only runs when the module failed.
+# Worth keeping: it goes out with our own user agent and honours the role timeout settings,
+# which is occasionally the difference on a filtered network.
+- name: Ask ipinfo.io over HTTPS
+  ansible.builtin.include_tasks: _http_get.yml
+
+- name: Hand the ipinfo.io reply over to the shared mapping
+  ansible.builtin.set_fact:
+    _gid_payload: "{{ _gid_raw.json | default({}) }}"
+
+- name: Map the ipinfo.io reply onto the common schema
+  ansible.builtin.include_tasks: _ipinfo_schema.yml

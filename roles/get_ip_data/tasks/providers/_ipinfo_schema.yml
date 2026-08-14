@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Shared mapping for the two ipinfo.io providers, the community module and the raw request,
+# so the twins cannot drift apart. Expects _gid_payload to hold the parsed ipinfo.io reply.
+#
+# ipinfo.io packs the coordinates into "13.0470,100.9289" and the network into
+# "AS17552 True Online", both of which are taken apart here.
+- name: Map the ipinfo.io payload onto the common schema
+  ansible.builtin.set_fact:
+    _gid_fields:
+      ip: "{{ _gid_payload.ip | default(none) }}"
+      hostname: "{{ _gid_payload.hostname | default(none) }}"
+      country_code: "{{ _gid_payload.country | default(none) }}"
+      region_name: "{{ _gid_payload.region | default(none) }}"
+      city: "{{ _gid_payload.city | default(none) }}"
+      zip: "{{ _gid_payload.postal | default(none) }}"
+      latitude: "{{ _gid_loc[0] | default(none) }}"
+      longitude: "{{ _gid_loc[1] | default(none) }}"
+      timezone: "{{ _gid_payload.timezone | default(none) }}"
+      asn: "{{ _gid_token[2:] if (_gid_token is match('AS[0-9]+$')) else none }}"
+      asn_org: "{{ _gid_org.split(' ')[1:] | join(' ') if (_gid_token is match('AS[0-9]+$')) else none }}"
+      org: "{{ _gid_payload.org | default(none) }}"
+  vars:
+    _gid_loc: "{{ (_gid_payload.loc | default('')) | split(',') }}"
+    _gid_org: "{{ _gid_payload.org | default('') }}"
+    _gid_token: "{{ _gid_org.split(' ') | first | default('') }}"

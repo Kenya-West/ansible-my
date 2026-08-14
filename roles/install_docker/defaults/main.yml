@@ -9,4 +9,3 @@ docker_mirrors:
 docker_mirrors_country_code_allowlist:
   - RU
   - CN
-docker_mirrors_enforce_country_code: ''

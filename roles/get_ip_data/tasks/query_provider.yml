@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Queries a single provider from the catalog and appends its normalized answer to
+# get_ip_data_results. Included once per provider by tasks/main.yml.
+#
+# Whether the provider runs is decided here and stored in _gid_run rather than evaluated in
+# every when: below, because the answer of this very provider changes the condition halfway.
+- name: Decide whether {{ _gid_provider.id }} has to be queried at all
+  ansible.builtin.set_fact:
+    _gid_fields: {}
+    _gid_error: ""
+    _gid_result: {}
+    _gid_run: >-
+      {{ (get_ip_data_policy == 'check_all' or not (_gid_satisfied | bool))
+         and not (_gid_provider.type == 'http'
+                  and (get_ip_data_prefer_modules | bool)
+                  and _gid_provider.service in (get_ip_data_results | selectattr('ok') | map(attribute='service') | list)) }}
+
+- name: Query {{ _gid_provider.id }}
+  when: _gid_run | bool
+  block:
+    - name: Ask {{ _gid_provider.id }} and map its payload onto the common schema
+      ansible.builtin.include_tasks: "providers/{{ _gid_provider.id }}.yml"
+  rescue:
+    - name: Remember why {{ _gid_provider.id }} did not answer
+      ansible.builtin.set_fact:
+        _gid_fields: {}
+        _gid_error: "{{ ansible_failed_result.msg | default('unknown failure') | trim }}"
+
+- name: Normalize the answer of {{ _gid_provider.id }}
+  ansible.builtin.set_fact:
+    _gid_result:
+      provider: "{{ _gid_provider.id }}"
+      type: "{{ _gid_provider.type }}"
+      service: "{{ _gid_provider.service }}"
+      endpoint: "{{ _gid_provider.endpoint }}"
+      ok: "{{ _gid_data | length > 0 }}"
+      error: >-
+        {{ _gid_error if (_gid_error | length > 0)
+           else ('the provider replied but carried no usable field' if (_gid_data | length == 0) else '') }}
+      data: "{{ _gid_data }}"
+  when: _gid_run | bool
+  vars:
+    # Fill in the canonical key order, then throw away everything the provider left empty.
+    _gid_clean: >-
+      {{ get_ip_data_schema | combine(_gid_fields | default({}))
+         | dict2items
+         | rejectattr('value', 'none')
+         | rejectattr('value', 'eq', '')
+         | items2dict }}
+    # Common post-processing so the providers stay comparable: upper case codes, real numbers,
+    # and an IP version derived from the address whenever the provider does not report one.
+    _gid_fixups: >-
+      {{ ({'ip_version': ('v6' if ':' in (_gid_clean.ip | string) else 'v4')} if _gid_clean.ip is defined else {})
+         | combine({'country_code': _gid_clean.country_code | string | upper} if _gid_clean.country_code is defined else {})
+         | combine({'continent_code': _gid_clean.continent_code | string | upper} if _gid_clean.continent_code is defined else {})
+         | combine({'asn': _gid_clean.asn | int} if _gid_clean.asn is defined else {})
+         | combine({'latitude': _gid_clean.latitude | float | round(4)} if _gid_clean.latitude is defined else {})
+         | combine({'longitude': _gid_clean.longitude | float | round(4)} if _gid_clean.longitude is defined else {}) }}
+    _gid_data: "{{ _gid_clean | combine(_gid_fixups) }}"
+
+- name: Keep the answer of {{ _gid_provider.id }}
+  ansible.builtin.set_fact:
+    get_ip_data_results: "{{ get_ip_data_results + [_gid_result] }}"
+  when: _gid_run | bool
+
+- name: Note that {{ _gid_provider.id }} was not queried
+  ansible.builtin.set_fact:
+    get_ip_data_skipped: "{{ get_ip_data_skipped + [{'provider': _gid_provider.id, 'reason': _gid_reason}] }}"
+  when: not (_gid_run | bool)
+  vars:
+    _gid_reason: >-
+      {{ 'an earlier provider already satisfied the first_successful policy'
+         if (get_ip_data_policy == 'first_successful' and (_gid_satisfied | bool))
+         else ('the community module for ' ~ _gid_provider.service ~ ' already answered') }}
+
+- name: Stop the search now that {{ _gid_provider.id }} returned everything that was asked for
+  ansible.builtin.set_fact:
+    _gid_satisfied: true
+  when:
+    - _gid_run | bool
+    - _gid_result.ok | default(false) | bool
+    - get_ip_data_required_fields | difference(_gid_result.data.keys() | list) | length == 0

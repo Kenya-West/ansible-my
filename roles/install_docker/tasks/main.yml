@@ -4,39 +4,33 @@
 - name: Gather service facts
   ansible.builtin.service_facts:
 
-- name: Get the public IP of the host
-  ansible.builtin.command: curl -s ifconfig.me
-  register: public_ip
-  changed_when: false
-  when:
-    - docker_mirrors_enforce_country_code | length == 0
+- name: Detect country from IP when no override is set
+  block:
+    - name: Get IP geolocation data
+      ansible.builtin.include_role:
+        name: get_ip_data
+      vars:
+        get_ip_data_required_fields: ['country_code']
+        get_ip_data_policy: check_all
 
-- name: Query IPInfo for geolocation information
-  ansible.builtin.uri:
-    url: "https://ipinfo.io/{{ public_ip.stdout }}/json"
-    method: GET
-    return_content: true
-  register: docker_mirrors_ipinfo_response
-  when:
-    - docker_mirrors_enforce_country_code | length == 0
+    - name: Set country from IP data
+      ansible.builtin.set_fact:
+        docker_mirrors_country: "{{ ip_data.country_code }}"
+      when: ip_data.country_code | length > 0
 
-- name: Parse the country from IPInfo response
+    - name: Debug country information
+      ansible.builtin.debug:
+        msg: "The country for host {{ inventory_hostname }} with ip {{ ip_data.ip }} is {{ docker_mirrors_country }}"
+      when: ip_data.country_code | length > 0
+  when: enforce_country_code is not defined or enforce_country_code is not string or enforce_country_code | length == 0
+
+- name: Use forced country override
   ansible.builtin.set_fact:
-    docker_mirrors_country: "{{ docker_mirrors_ipinfo_response.json.country }}"
+    docker_mirrors_country: "{{ enforce_country_code }}"
   when:
-    - docker_mirrors_enforce_country_code | length == 0
-
-- name: Debug country information
-  ansible.builtin.debug:
-    msg: "The country for IP {{ public_ip.stdout }} is {{ docker_mirrors_country }}"
-  when:
-    - docker_mirrors_enforce_country_code | length == 0
-
-- name: Enforce country fact if docker_mirrors_enforce_country_code is set
-  ansible.builtin.set_fact:
-    docker_mirrors_country: "{{ docker_mirrors_enforce_country_code }}"
-  when:
-    - docker_mirrors_enforce_country_code | length > 0
+    - enforce_country_code is defined
+    - enforce_country_code is string
+    - enforce_country_code | length > 0
 
 - name: Normalize country code to uppercase
   ansible.builtin.set_fact:

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: MIT-0
+---
+# https://api.ip2location.io/ through community.general.ip2location_info.
+# The module talks to the keyless endpoint, which has a low daily quota but needs no signup.
+# Its time_zone is a "-08:00" style offset rather than an IANA name, so it is left out:
+# utc_offset is defined in seconds and only filled by the providers that report it that way.
+- name: Ask ip2location.io through community.general.ip2location_info
+  community.general.ip2location_info:
+    timeout: "{{ get_ip_data_timeout }}"
+    http_agent: "{{ get_ip_data_user_agent }}"
+  register: _gid_raw
+  retries: "{{ get_ip_data_retries }}"
+  delay: "{{ get_ip_data_retry_delay }}"
+  until: _gid_raw is not failed
+
+- name: Map the ip2location.io payload onto the common schema
+  ansible.builtin.set_fact:
+    _gid_fields:
+      ip: "{{ _gid_raw.ip | default(none) }}"
+      country_code: "{{ _gid_raw.country_code | default(none) }}"
+      country_name: "{{ _gid_raw.country_name | default(none) }}"
+      region_name: "{{ _gid_raw.region_name | default(none) }}"
+      city: "{{ _gid_raw.city_name | default(none) }}"
+      zip: "{{ _gid_raw.zip_code | default(none) }}"
+      latitude: "{{ _gid_raw.latitude | default(none) }}"
+      longitude: "{{ _gid_raw.longitude | default(none) }}"
+      asn: "{{ _gid_raw.asn | default(none) }}"
+      asn_org: "{{ _gid_raw['as'] | default(none) }}"
+      is_proxy: "{{ _gid_raw.is_proxy | default(none) }}"

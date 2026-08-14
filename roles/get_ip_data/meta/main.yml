@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: Kenya-West
+  description: >-
+    Ask several community modules and keyless HTTP services for the public IP data of a host,
+    map every answer onto one schema and merge them by majority vote. Built for hosts that can
+    only reach some of the internet.
+  license: MIT
+
+  min_ansible_version: "2.14"
+
+  galaxy_tags:
+    - ip
+    - geoip
+    - geolocation
+    - network
+    - facts
+
+dependencies: []

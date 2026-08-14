@@ -19,7 +19,6 @@ python_mirrors:
 python_mirrors_country_code_allowlist:
   - RU
   - CN
-python_mirrors_enforce_country_code: ''
 
 pip_config_file_root: "/etc/pip.conf"
 pip_config_file_user: "/home/{{ standard_user }}/.config/pip/pip.conf"

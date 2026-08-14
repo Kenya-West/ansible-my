@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: MIT-0
+---
+# https://api.ipapi.is/ - free and keyless, ~1000 requests a day.
+# The keyless reply is the short one (ip, cc, lat, lon, asn_num, and the detection flags).
+# The long form with the location and asn objects only arrives with a key, so both shapes
+# are mapped here and the short one wins whenever it is present.
+- name: Ask api.ipapi.is over HTTPS
+  ansible.builtin.include_tasks: _http_get.yml
+
+- name: Map the api.ipapi.is reply onto the common schema
+  ansible.builtin.set_fact:
+    _gid_fields:
+      ip: "{{ _gid_j.ip | default(none) }}"
+      continent_code: "{{ _gid_loc.continent | default(none) }}"
+      country_code: "{{ _gid_j.cc | default(_gid_loc.country_code) | default(none) }}"
+      country_name: "{{ _gid_loc.country | default(none) }}"
+      region_name: "{{ _gid_loc.state | default(none) }}"
+      city: "{{ _gid_loc.city | default(none) }}"
+      zip: "{{ _gid_loc.zip | default(none) }}"
+      latitude: "{{ _gid_j.lat | default(_gid_loc.latitude) | default(none) }}"
+      longitude: "{{ _gid_j.lon | default(_gid_loc.longitude) | default(none) }}"
+      timezone: "{{ _gid_loc.timezone | default(none) }}"
+      asn: "{{ _gid_j.asn_num | default(_gid_asn.asn) | default(none) }}"
+      asn_org: "{{ _gid_j.asn_org | default(_gid_asn.org) | default(none) }}"
+      isp: "{{ _gid_j.company_name | default(_gid_co.name) | default(none) }}"
+      is_proxy: "{{ _gid_j.is_proxy | default(none) }}"
+      is_vpn: "{{ _gid_j.is_vpn | default(none) }}"
+      is_tor: "{{ _gid_j.is_tor | default(none) }}"
+      is_hosting: "{{ _gid_j.is_datacenter | default(none) }}"
+      is_abuser: "{{ _gid_j.is_abuser | default(none) }}"
+  vars:
+    _gid_j: "{{ _gid_raw.json | default({}) }}"
+    _gid_loc: "{{ _gid_j.location | default({}) }}"
+    _gid_asn: "{{ _gid_j.asn | default({}) }}"
+    _gid_co: "{{ _gid_j.company | default({}) }}"
