@@ -1,2 +1,3 @@
 ---
 # defaults file for roles/kwtoolset/get_compose_project
+compose_timeout: 15

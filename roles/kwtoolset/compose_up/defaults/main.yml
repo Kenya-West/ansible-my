@@ -2,3 +2,4 @@
 # defaults file for roles/kwtoolset/compose_up
 
 compose_discover_project_name: true
+compose_timeout: 100
