@@ -5,7 +5,7 @@ services:
     image: remnawave/node:{{ (remna_node_container_image_pinned_version | string) | default('latest') }}
     container_name: remna
     cpus: 0.75
-    mem_limit: 512m
+    mem_limit: 768m
 {% if ansible_virtualization_type != 'lxc' %}
     ulimits:
       nofile:
