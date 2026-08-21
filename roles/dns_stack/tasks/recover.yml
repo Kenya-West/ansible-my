@@ -96,8 +96,8 @@
   ansible.builtin.lineinfile:
     path: /etc/hosts
     create: yes
-    regexp: '^\s*127\.0\.1\.1\s+{{ ansible_hostname }}(\s|$)'
-    line: "127.0.1.1 {{ ansible_hostname }}"
+    regexp: '^\s*127\.0\.1\.1\s+{{ ansible_facts.hostname }}(\s|$)'
+    line: "127.0.1.1 {{ ansible_facts['hostname'] }}"
     state: present
     owner: root
     group: root

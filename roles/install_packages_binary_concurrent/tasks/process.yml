@@ -53,7 +53,7 @@
   ansible.builtin.stat:
     path: "{{ dest_path_full }}/files/results/results_{{ chunk_index }}.json"
   register: results_file
-  failed_when: results_file.stat.exists and (ansible_date_time.epoch | int) - (results_file.stat.mtime | int) > 60
+  failed_when: results_file.stat.exists and (ansible_facts['date_time'].epoch | int) - (results_file.stat.mtime | int) > 60
   tags:
     - update_packages
 

@@ -6,7 +6,7 @@ services:
     container_name: remna
     cpus: 0.75
     mem_limit: 768m
-{% if ansible_virtualization_type != 'lxc' %}
+{% if ansible_facts['virtualization_type'] != 'lxc' %}
     ulimits:
       nofile:
         soft: 8192

@@ -259,7 +259,7 @@ class ActionModule(ActionBase):
             loader=self._loader,
             templar=self._templar,
         )
-        return template_lookup.run([path], convert_data=False, variables=task_vars)[0]
+        return template_lookup.run([path], variables=task_vars)[0]
 
     def _get_local_file_contents(self, path):
         # Non-template files are copied verbatim, so we read them as raw

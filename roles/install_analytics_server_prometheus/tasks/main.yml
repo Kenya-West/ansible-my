@@ -23,7 +23,7 @@
   tags:
     - always
 
-- name: "Set cert_location_path_section fact based on {{ ansible_hostname }} variables"
+- name: "Set cert_location_path_section fact based on {{ ansible_facts['hostname'] }} variables"
   ansible.builtin.include_role:
     name: kwtoolset/remap_caddy_cert_path
     apply:
