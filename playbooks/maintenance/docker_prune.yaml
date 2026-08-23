@@ -1,0 +1,12 @@
+---
+- name: Prune unused Docker objects
+  hosts: vpn_caddy
+
+  tasks:
+    - name: Prune everything
+      community.docker.docker_prune:
+        containers: true
+        images: true
+        networks: true
+        volumes: true
+        builder_cache: true
