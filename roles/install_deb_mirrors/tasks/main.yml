@@ -82,6 +82,75 @@
   when:
     - deb_mirrors_country_normalized
         in deb_mirrors_country_code_allowlist_normalized
+    - ansible_facts['distribution'] == "Ubuntu"
+
+
+- name: Configure Debian repositories
+  become: true
+  ansible.builtin.deb822_repository:
+    name: debian
+    types:
+      - deb
+    uris:
+      - https://deb.debian.org/debian
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}"
+      - "{{ ansible_facts['distribution_release'] }}-updates"
+      - "{{ ansible_facts['distribution_release'] }}-backports"
+    components:
+      - main
+      - contrib
+      - non-free
+      - non-free-firmware
+    signed_by: /usr/share/keyrings/debian-archive-keyring.gpg
+    state: present
+  register: debian_repository
+  when:
+    - ansible_facts['distribution'] == "Debian"
+
+
+- name: Configure Debian security repository
+  become: true
+  ansible.builtin.deb822_repository:
+    name: debian-security
+    types:
+      - deb
+    uris:
+      - https://security.debian.org/debian-security
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}-security"
+    components:
+      - main
+      - contrib
+      - non-free
+      - non-free-firmware
+    signed_by: /usr/share/keyrings/debian-archive-keyring.gpg
+    state: present
+  register: debian_security_repository
+  when:
+    - ansible_facts['distribution'] == "Debian"
+
+
+- name: Remove Ubuntu mirror repository from Debian
+  become: true
+  ansible.builtin.deb822_repository:
+    name: ubuntu-mirror-list
+    state: absent
+  when:
+    - ansible_facts['distribution'] == "Debian"
+
+
+- name: Update apt cache
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+  when:
+    - >
+      (deb_mirror_repository is defined and deb_mirror_repository is changed)
+      or
+      (debian_repository is defined and debian_repository is changed)
+      or
+      (debian_security_repository is defined and debian_security_repository is changed)
 
 - name: Update APT cache
   become: true

@@ -6,10 +6,10 @@
   args:
     apply:
       tags:
-        - update_config
+        - update_config_hard
         - install_systemd_timer
         - update_systemd_timer
   tags:
-    - update_config
+    - update_config_hard
     - install_systemd_timer
     - update_systemd_timer

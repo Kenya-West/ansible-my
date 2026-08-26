@@ -42,7 +42,7 @@ services:
       retries: 3
 
   remnawave-telegram-tgbot-bedolaga-{{ current_index | string }}-bot:
-    image: kenyawest/remnawave-bedolaga-telegram-bot:latest
+    image: ghcr.io/bedolaga-dev/remnawave-bedolaga-telegram-bot:latest
     container_name: ${SERVICE_NAME}-bot
     restart: unless-stopped
     depends_on:
