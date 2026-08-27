@@ -32,13 +32,13 @@
     name: kwtoolset/create_dirs_traversal
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     create_dirs_traversal_path: "{{ dest_project_fullpath }}"
     create_dirs_traversal_strip_leaf: true
     create_dirs_force_mode: "0775"
   tags:
-    - update_config
+    - update_config_hard
 
 - name: Set compose_project_name for this bot instance
   ansible.builtin.set_fact:
@@ -51,33 +51,36 @@
     name: kwtoolset/compose_pull
     apply:
       tags:
-        - update_image
+        - update_image_hard
+        - update_image_soft
   vars:
     project_paths:
       - "{{ dest_project_fullpath }}"
   tags:
-    - update_image
+    - update_image_hard
+    - update_image_soft
 
 - name: compose_down
   ansible.builtin.include_role:
     name: kwtoolset/compose_down
     apply:
       tags:
-        - update_image
-        - update_config
+        - update_image_hard
+        - update_config_hard
   vars:
     project_paths:
       - "{{ dest_project_fullpath }}"
   tags:
-    - update_image
-    - update_config
+    - update_image_hard
+    - update_config_hard
 
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
     apply:
       tags:
-        - update_config
+        - update_config_hard
+        - update_config_soft
   vars:
     copy_files_templating_dir_list:
       - src: "{{ item }}"
@@ -85,33 +88,35 @@
         default_mode: "0775"
   with_items: "{{ source_paths }}"
   tags:
-    - update_config
+    - update_config_hard
+    - update_config_soft
 
 - name: Start containers for this bot instance
   ansible.builtin.include_role:
     name: kwtoolset/compose_up
     apply:
       tags:
-        - update_image
-        - update_config
+        - update_image_hard
+        - update_config_hard
   vars:
     project_paths:
       - "{{ dest_project_fullpath }}"
   tags:
-    - update_image
-    - update_config
+    - update_image_hard
+    - update_config_hard
 
 - name: Restart containers for this bot instance
   ansible.builtin.include_role:
     name: kwtoolset/compose_restart
     apply:
       tags:
-        - update_config
+        - update_config_soft
   vars:
     project_paths:
       - "{{ dest_project_fullpath }}"
   tags:
     - never
+    - update_config_soft
 
 - name: Add port external port to UFW (if defined)
   become: true

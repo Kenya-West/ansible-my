@@ -3,20 +3,21 @@
     name: kwtoolset/create_dirs_traversal
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     create_dirs_traversal_path: "{{ dest_path_full }}"
     create_dirs_traversal_strip_leaf: true
     create_dirs_force_mode: "0775"
   tags:
-    - update_config
+    - update_config_hard
 
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
     apply:
       tags:
-        - update_config
+        - update_config_hard
+        - update_config_soft
         - update_scripts
   vars:
     copy_files_templating_dir_list:
@@ -27,7 +28,8 @@
   loop_control:
     loop_var: source_path
   tags:
-    - update_config
+    - update_config_hard
+    - update_config_soft
     - update_scripts
 
 - name: Find every file inside {{ dest_path_full }}/scripts
@@ -39,7 +41,7 @@
   failed_when: false
   changed_when: false
   tags:
-    - update_config
+    - update_config_hard
     - update_scripts
 
 - name: Make every script executable by everyone
@@ -49,7 +51,7 @@
   loop: "{{ git_sync_script_files.files }}"
   when: git_sync_script_files.matched | default(0) | int > 0
   tags:
-    - update_config
+    - update_config_hard
     - update_scripts
 
 - name: Ensure {{ dest_path_full }}/config directory exists
@@ -58,7 +60,7 @@
     state: directory
     mode: "0775"
   tags:
-    - update_config
+    - update_config_hard
     - update_sync_configs
 
 - name: Template each of git_sync_configs into own file name
@@ -70,7 +72,7 @@
   loop_control:
     loop_var: config_item
   tags:
-    - update_config
+    - update_config_hard
     - update_sync_configs
 
 - name: Ensure git is installed
@@ -90,7 +92,7 @@
     state: directory
     mode: "0600"
   tags:
-    - update_config
+    - update_config_hard
     - update_known_hosts
 
 - name: Create known_hosts file with correct permissions
@@ -101,7 +103,7 @@
     state: touch
     mode: "0600"
   tags:
-    - update_config
+    - update_config_hard
     - update_known_hosts
 
 - name: Ensure SSH host keys are present in known_hosts
@@ -115,7 +117,7 @@
     state: present
   loop: "{{ git_sync_hostkey_domains }}"
   tags:
-    - update_config
+    - update_config_hard
     - update_known_hosts
 
 - name: Create SSH key files from git_sync_ssh_keys
@@ -135,7 +137,7 @@
         mode: "0644"
       loop: "{{ git_sync_ssh_keys }}"
   tags:
-    - update_config
+    - update_config_hard
     - update_ssh_keys
 
 - name: Make {{ dest_path_full }}/sources a safe directory for git
@@ -146,7 +148,7 @@
   loop:
     - { key: "safe.directory", value: "{{ dest_path_full }}/sources" }
   tags:
-    - update_config
+    - update_config_hard
     - update_git_config
 - name: Make {{ dest_path_full }}/sources a safe directory for git (root)
   become: true
@@ -158,7 +160,7 @@
   loop:
     - { key: "safe.directory", value: "{{ dest_path_full }}/sources" }
   tags:
-    - update_config
+    - update_config_hard
     - update_git_config
 
 - name: Create cron jobs per git_sync_configs items
@@ -167,5 +169,5 @@
   loop_control:
     loop_var: config_item
   tags:
-    - update_config
+    - update_config_hard
     - update_cron_jobs

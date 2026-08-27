@@ -35,19 +35,20 @@
     name: kwtoolset/create_dirs_traversal
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     create_dirs_traversal_path: "{{ dest_path_full }}"
     create_dirs_traversal_strip_leaf: false
   tags:
-    - update_config
+    - update_config_hard
 
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
     apply:
       tags:
-        - update_config
+        - update_config_hard
+        - update_config_soft
   vars:
     copy_files_templating_dir_list:
       - src: "{{ source_path }}"
@@ -57,7 +58,8 @@
   loop_control:
     loop_var: source_path
   tags:
-    - update_config
+    - update_config_hard
+    - update_config_soft
 
 - name: Run commands in parallel for all packages
   ansible.builtin.command: "{{ dest_path_full }}/scripts/run-parallel-cmds.sh --prepend 'uv tool install' --logs --timeout {{ packages_binary_timeout }} -f {{ dest_path_full }}/files/commands.txt -o {{ dest_path_full }}/files/results/results.json"

@@ -35,12 +35,12 @@
       name: kwtoolset/create_dirs_traversal
       apply:
         tags:
-          - update_config
+          - update_config_hard
     vars:
       create_dirs_traversal_path: "{{ dest_path_full }}"
       create_dirs_traversal_strip_leaf: false
     tags:
-      - update_config
+      - update_config_hard
   become: true
   become_user: "{{ standard_user }}"
 
@@ -50,7 +50,8 @@
       name: kwtoolset/copy_files_templating
       apply:
         tags:
-          - update_config
+          - update_config_hard
+          - update_config_soft
     vars:
       copy_files_templating_dir_list:
         - src: "{{ source_path }}"
@@ -60,7 +61,8 @@
     loop_control:
       loop_var: source_path
     tags:
-      - update_config
+      - update_config_hard
+      - update_config_soft
   become: true
   become_user: "{{ standard_user }}"
 
