@@ -38,7 +38,7 @@ packages_binary_list:
     bin_name: tspin
   - repo: tomnomnom/gron
   - repo: PaulJuliusMartinez/jless
-  - repo: https://dystroy.org/broot/download/x86_64-linux/broot
+  - repo: https://dystroy.org/broot/download/x86_64-unknown-linux-musl/broot
   - repo: extrawurst/gitui
   - repo: solidiquis/erdtree
     assets:
