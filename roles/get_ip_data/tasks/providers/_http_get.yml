@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Shared request for every http provider. Not a provider itself, hence the leading underscore.
+# A non 200 reply, a TLS problem or a timeout raises, and query_provider.yml rescues it.
+- name: "GET {{ _gid_provider.endpoint }}"
+  ansible.builtin.uri:
+    url: "{{ _gid_provider.endpoint }}"
+    method: GET
+    status_code: [200]
+    timeout: "{{ get_ip_data_timeout }}"
+    validate_certs: "{{ get_ip_data_validate_certs }}"
+    headers:
+      Accept: application/json
+      User-Agent: "{{ get_ip_data_user_agent }}"
+  register: _gid_raw
+  retries: "{{ get_ip_data_retries }}"
+  delay: "{{ get_ip_data_retry_delay }}"
+  until: _gid_raw is not failed

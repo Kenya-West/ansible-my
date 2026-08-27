@@ -1,0 +1,104 @@
+{% set bot = vpn_server_remnawave_tgbot_bedolaga_settings[current_index] %}
+{% set network_name = 'tgbot-bedolaga-' + (current_index | string) %}
+
+services:
+  remnawave-telegram-tgbot-bedolaga-{{ current_index | string }}-bot-db:
+    image: postgres:15-alpine
+    container_name: ${SERVICE_NAME}-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-remnawave_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-remnawave_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_123}
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - {{ network_name }}
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-remnawave_user} -d ${POSTGRES_DB:-remnawave_bot}',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  remnawave-telegram-tgbot-bedolaga-{{ current_index | string }}-bot-redis:
+    image: redis:7-alpine
+    container_name: ${SERVICE_NAME}-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{ network_name }}
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  remnawave-telegram-tgbot-bedolaga-{{ current_index | string }}-bot:
+    image: ghcr.io/bedolaga-dev/remnawave-bedolaga-telegram-bot:latest
+    container_name: ${SERVICE_NAME}-bot
+    restart: unless-stopped
+    depends_on:
+      remnawave-telegram-tgbot-bedolaga-{{ current_index | string }}-bot-db:
+        condition: service_healthy
+      remnawave-telegram-tgbot-bedolaga-{{ current_index | string }}-bot-redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DOCKER_ENV: true
+      DATABASE_MODE: auto
+      POSTGRES_HOST: remnawave-telegram-tgbot-bedolaga-{{ current_index | string }}-bot-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-remnawave_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-remnawave_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_123}
+      REDIS_URL: redis://remnawave-telegram-tgbot-bedolaga-{{ current_index | string }}-bot-redis:6379/0
+      TZ: Asia/Yakutsk
+      LOCALES_PATH: ${LOCALES_PATH:-/app/locales}
+    volumes:
+      - ./logs:/app/logs:rw
+      - ./data:/app/data:rw
+      - ./locales:/app/locales:rw
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ./img/logo/vpn_logo.png:/app/vpn_logo.png:ro
+    ports:
+      - ${WEB_API_PORT:-8080}:8080
+    networks:
+      - {{ network_name }}
+      - {{ docker_vpn_network }}
+    labels:
+      caddy: "${DOMAIN_FOR_CADDY}{% if vpn_server_remnawave_tgbot_bedolaga_external_port is defined and vpn_server_remnawave_tgbot_bedolaga_external_port %}:${EXTERNAL_PORT}{% endif %}"
+      caddy.import: "logging ${DOMAIN_FOR_CADDY}-remnawave-tgbot-bedolaga"
+      caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
+      {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${WEB_API_PORT} }}"{% endraw %}
+
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import requests, os; requests.get(''http://localhost:8080/health'', headers={''X-API-Key'': os.environ.get(''WEB_API_DEFAULT_TOKEN'')}, timeout=5) or exit(1)"',
+        ]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  {{ network_name }}:
+  {{ docker_vpn_network }}:
+    external: true

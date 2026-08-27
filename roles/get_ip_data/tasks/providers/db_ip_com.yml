@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: MIT-0
+---
+# https://api.db-ip.com/v2/free/self - the free tier of db-ip.com, keyless, 1000 requests a day.
+# It only returns continent, country, state and city, no coordinates and no network data, but
+# that makes it a cheap extra vote on the country when the richer services are unreachable.
+# Quota refusals arrive as HTTP 200 with an error key, so the payload is checked here.
+- name: Ask db-ip.com over HTTPS
+  ansible.builtin.include_tasks: _http_get.yml
+
+- name: Map the db-ip.com reply onto the common schema
+  ansible.builtin.set_fact:
+    _gid_fields:
+      ip: "{{ _gid_j.ipAddress | default(none) }}"
+      continent_code: "{{ _gid_j.continentCode | default(none) }}"
+      continent_name: "{{ _gid_j.continentName | default(none) }}"
+      country_code: "{{ _gid_j.countryCode | default(none) }}"
+      country_name: "{{ _gid_j.countryName | default(none) }}"
+      region_name: "{{ _gid_j.stateProv | default(none) }}"
+      city: "{{ _gid_j.city | default(none) }}"
+  when: _gid_j.error is not defined
+  vars:
+    _gid_j: "{{ _gid_raw.json | default({}) }}"
+
+- name: Remember why db-ip.com refused to answer
+  ansible.builtin.set_fact:
+    _gid_error: "db-ip.com replied: {{ _gid_j.error | default('an unexpected payload') }}"
+  when: _gid_j.error is defined
+  vars:
+    _gid_j: "{{ _gid_raw.json | default({}) }}"

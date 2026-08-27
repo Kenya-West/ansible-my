@@ -1,0 +1,45 @@
+---
+# Step 1: Bootstrap VPS preparation
+- import_playbook: ../bootstrap/users.yaml
+- import_playbook: ../bootstrap/keys.yaml
+- import_playbook: ../bootstrap/ssh_ports.yaml
+- import_playbook: ../bootstrap/disable_password_auth.yaml
+- import_playbook: ../bootstrap/fail2ban.yaml
+
+# Step 2: System maintenance
+- import_playbook: ../base/deb_mirrors.yaml
+- import_playbook: ../maintenance/update.yaml
+- import_playbook: ../maintenance/reboot.yaml
+
+# Delay for reconnection
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: Wait for system to reconnect
+      pause:
+        seconds: 60
+
+# Step 3: Base packages and configuration
+- import_playbook: ../base/packages.yaml
+- import_playbook: ../base/eget.yaml
+- import_playbook: ../maintenance/copy_binaries_to_hosts.yaml
+- import_playbook: ../base/debget.yaml
+- import_playbook: ../base/packages_deb.yaml
+- import_playbook: ../base/python_mirrors.yaml
+- import_playbook: ../base/packages_python_concurrent.yaml
+- import_playbook: ../base/docker.yaml
+- import_playbook: ../base/docker_mirrors.yaml
+- import_playbook: ../base/ohmyposh.yaml
+- import_playbook: ../base/bash_default.yaml
+- import_playbook: ../base/bash.yaml
+- import_playbook: ../base/editor.yaml
+- import_playbook: ../base/doas.yaml
+- import_playbook: ../base/micro.yaml
+- import_playbook: ../base/broot.yaml
+- import_playbook: ../base/btop.yaml
+- import_playbook: ../base/hostname.yaml
+- import_playbook: ../base/journals.yaml
+- import_playbook: ../base/locale.yaml
+- import_playbook: ../base/clear_cache.yaml
+- import_playbook: ../base/logs.yaml
+- import_playbook: ../scenarios/backup_show_keys.yaml

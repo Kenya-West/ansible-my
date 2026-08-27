@@ -10,4 +10,3 @@ docker_mirrors_ru:
   - "https://registry.docker-cn.com"
 docker_mirrors_country_code_allowlist:
   - RU
-docker_mirrors_enforce_country_code: ''

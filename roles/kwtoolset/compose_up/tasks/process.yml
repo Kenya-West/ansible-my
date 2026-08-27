@@ -9,13 +9,40 @@
     - name: Show an error if no result
       ansible.builtin.debug:
         msg: "Could not get compose project name for project at {{ item }}. It could be the missing docker-compose.yml file or project directory. Skipping."
+  when: compose_discover_project_name == true
 
-- name: Docker Compose project - container up
-  community.docker.docker_compose_v2:
-    project_src: "{{ item }}"
-    project_name: "{{ get_compose_project_name }}"
-    files:
-      - docker-compose.yml
-    state: present
-  when: get_compose_project_name is defined
-  failed_when: false
+- name: Start Docker Compose containers
+  block:
+    - name: Docker Compose project - container up
+      community.docker.docker_compose_v2:
+        project_src: "{{ item }}"
+        project_name: >-
+          {{
+            compose_project_name
+            | default(get_compose_project_name | default(omit))
+          }}
+        files:
+          - docker-compose.yml
+        state: present
+      async: "{{ compose_timeout }}"
+      poll: 5
+      register: compose_result
+
+  rescue:
+    - name: Docker Compose up timed out
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: Docker Compose up for {{ item }}
+          timed out after {{ compose_timeout }} seconds.
+      when:
+        - compose_result is defined
+        - compose_result is not ansible.builtin.finished
+
+    - name: Docker Compose up failed for another reason
+      ansible.builtin.debug:
+        msg: >-
+          ERROR: Docker Compose up for {{ item }} failed.
+          {{ compose_result.msg | default('No error message returned') }}
+      when:
+        - compose_result is defined
+        - compose_result is ansible.builtin.finished

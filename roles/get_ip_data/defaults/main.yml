@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/get_ip_data
+
+# How much of the network to probe:
+#   check_all        - query every enabled provider and merge the answers by majority vote
+#   first_successful - stop at the first provider that returns get_ip_data_required_fields
+get_ip_data_policy: first_successful
+
+# A provider answer only counts as complete once it carries all of these normalized fields.
+# Under the first_successful policy this is also the condition that stops the loop.
+get_ip_data_required_fields:
+  - ip
+  - country_code
+
+# Provider ids to query, in catalog order. An empty list means "every provider in the catalog".
+get_ip_data_providers: []
+# Provider ids that must never be queried, applied on top of get_ip_data_providers.
+get_ip_data_disabled_providers: []
+
+# A community module and a raw HTTP endpoint can talk to the very same service (ipinfo.io does).
+# With this enabled the HTTP twin is only queried when the module twin failed to answer.
+get_ip_data_prefer_modules: true
+
+# Per-request budget. Keep it short: on a filtered network most endpoints simply hang.
+get_ip_data_timeout: 8
+get_ip_data_retries: 2
+get_ip_data_retry_delay: 2
+get_ip_data_validate_certs: true
+get_ip_data_user_agent: ansible-get-ip-data/1.0
+get_ip_data_language: en
+
+# Optional ipbase.com API key. Keyless requests work, a key only raises the quota.
+get_ip_data_ipbase_apikey: ""
+
+# Name of the fact that receives the merged result, and whether it reaches the fact cache.
+get_ip_data_fact_name: ip_data
+get_ip_data_fact_cacheable: false
+
+# Print the human readable summary when the role is done.
+get_ip_data_show_report: true
+# Also print every single provider answer. Useful when the providers disagree.
+get_ip_data_show_sources: false
+# Abort the play when not a single provider answered.
+get_ip_data_fail_when_no_result: true
+
+# The providers, in the order they are queried. Sits here rather than in vars/ so an inventory
+# can reorder it, drop entries or point one at an internal service.
+#
+# type      - module: a community.general module, http: a plain request through ansible.builtin.uri
+# service   - the upstream service behind the provider. Two entries sharing a service are twins,
+#             and get_ip_data_prefer_modules decides whether the http one is queried at all.
+# endpoint  - the URL that is actually contacted, for reporting and for the http providers
+#
+# Modules come first so they win the twin preference and the vote tie-breaks. ipify is last
+# because it only ever returns an IP address and can never satisfy a geolocation request.
+#
+# Every endpoint listed here answers without an API key. Services that demand one
+# (ipregistry.co, api.ipregistry.co) are deliberately absent, see the README.
+get_ip_data_provider_catalog:
+  - id: ipinfoio_facts
+    type: module
+    service: ipinfo
+    endpoint: https://ipinfo.io/json
+
+  - id: ipbase_info
+    type: module
+    service: ipbase
+    endpoint: https://api.ipbase.com/v2/info
+
+  - id: ip2location_info
+    type: module
+    service: ip2location
+    endpoint: https://api.ip2location.io/
+
+  - id: ipapi_is
+    type: http
+    service: ipapi_is
+    endpoint: https://api.ipapi.is/
+
+  - id: ip_api_com
+    type: http
+    service: ip_api_com
+    endpoint: "http://ip-api.com/json/?fields={{ get_ip_data_ip_api_com_fields | join(',') }}"
+
+  - id: ipapi_co
+    type: http
+    service: ipapi_co
+    endpoint: https://ipapi.co/json/
+
+  - id: db_ip_com
+    type: http
+    service: db_ip
+    endpoint: https://api.db-ip.com/v2/free/self
+
+  - id: ipinfo_io
+    type: http
+    service: ipinfo
+    endpoint: https://ipinfo.io/json
+
+  - id: ipify_facts
+    type: module
+    service: ipify
+    endpoint: https://api.ipify.org/
+
+# Fields ip-api.com is asked for. The free tier caps what it will return, trim the list if you
+# only care about a few of them.
+get_ip_data_ip_api_com_fields:
+  ["status", "message", "continent", "continentCode", "country", "countryCode",
+   "region", "regionName", "city", "zip", "lat", "lon", "timezone", "offset",
+   "isp", "org", "as", "asname", "reverse", "mobile", "proxy", "hosting", "query"]

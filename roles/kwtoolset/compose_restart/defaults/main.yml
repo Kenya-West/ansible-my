@@ -1,2 +1,5 @@
 ---
 # defaults file for roles/kwtoolset/compose_restart
+
+compose_discover_project_name: true
+compose_timeout: 60

@@ -1,0 +1,54 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/kwtoolset/remap_dns_records
+
+# This DNS records file uses domains_keys to define the DNS records
+# for the domains specified in the domains_keys variable.
+# It includes common settings for the DNS records,
+# such as the
+# type of record (A),
+# the time-to-live (TTL),
+# and the DNS provider (Cloudflare).
+# The list of DNS records is generated based on the domains specified in the domains_keys variable,
+# including the main domain and any additional domains under the remna_node prop.
+
+_dns_records_raw:
+  common_settings:
+    type: A
+    ttl: 300
+    dns_provider: cloudflare
+  list: >-
+    {{
+      [
+        {
+          'name': domains_keys.main,
+          'ttl': 1
+        }
+      ]
+      + (
+        domains_keys.remna_node
+        | rejectattr('domain', 'equalto', domains_keys.main)
+        | map(attribute='domain')
+        | map('community.general.dict_kv', 'name')
+        | list
+        | unique
+        )
+    }}
+
+# Each entry in _dns_records_raw.list, with _dns_records_raw.common_settings applied as defaults
+# (entry-specific fields, e.g. ttl, take precedence over common_settings).
+remap_dns_records_domains: >-
+  {%- set _dns_records = [] -%}
+  {%- for _record in _dns_records_raw.list -%}
+    {%- set _ = _dns_records.append(_dns_records_raw.common_settings | combine(_record)) -%}
+  {%- endfor -%}
+  {{ _dns_records }}
+
+remap_dns_records_root_domains: >-
+  {{
+    remap_dns_records_domains
+    | map(attribute='name')
+    | map('regex_replace', '^[^.]+\\.', '')
+    | list
+    | unique
+  }}

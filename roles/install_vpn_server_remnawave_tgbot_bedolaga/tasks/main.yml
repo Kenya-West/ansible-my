@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/install_vpn_server_remnawave_tgbot_bedolaga
+
+
+- name: Capture this role's path so nested role can use the parent role_path
+  ansible.builtin.set_fact:
+    this_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Deploy each bot instance sequentially
+  ansible.builtin.include_tasks: process.yml
+  loop: "{{ range(0, vpn_server_remnawave_tgbot_bedolaga_settings | length) | list }}"
+  loop_control:
+    loop_var: instance_index
+  vars:
+    current_index: "{{ instance_index }}"
+    dest_project_fullpath: "{{ dest_path_full }}/{{ instance_index }}"
+  tags:
+    - always

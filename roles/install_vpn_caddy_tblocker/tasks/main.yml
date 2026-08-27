@@ -31,7 +31,7 @@
                    | first }}"
   tags:
     - never
-    - update_image
+    - update_image_hard
     - update_executable
 - name: "Install binary using eget"
   ansible.builtin.include_role:
@@ -39,7 +39,7 @@
     apply:
       tags:
         - never
-        - update_image
+        - update_image_hard
         - update_executable
   vars:
     packages_binary_list:
@@ -50,7 +50,7 @@
       become_user: root
   tags:
     - never
-    - update_image
+    - update_image_hard
     - update_executable
 
 - name: copy_files_templating
@@ -58,7 +58,8 @@
     name: kwtoolset/copy_files_templating
     apply:
       tags:
-        - update_config
+        - update_config_hard
+        - update_config_soft
   vars:
     copy_files_templating_dir_list:
       - src: "{{ source_path }}/templates/config"
@@ -68,14 +69,15 @@
   loop_control:
     loop_var: source_path
   tags:
-    - update_config
+    - update_config_hard
+    - update_config_soft
 
 - name: Copy config for tblocker systemd service
   ansible.builtin.template:
     src: "{{ this_role_path }}/templates/systemd/tblocker.service.j2"
     dest: "{{ dest_path_full_systemd }}/tblocker.service"
   tags:
-    - update_config
+    - update_config_hard
 - name: Enable and start tblocker service
   ansible.builtin.systemd:
     name: tblocker
@@ -85,6 +87,6 @@
   register: tblocker_service_status
   failed_when: tblocker_service_status is failed
   tags:
-    - update_config
-    - update_image
+    - update_config_hard
+    - update_image_hard
     - update_executable

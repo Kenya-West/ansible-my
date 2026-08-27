@@ -1,0 +1,74 @@
+---
+# Scenario: cloudflare_check_set_records_for_host
+#
+# Ensures (creates/updates) the Cloudflare DNS records for the *current* host.
+# It talks to Cloudflare only through `community.general.cloudflare_dns` (no direct
+# API calls); the record's zone is derived from the record name.
+#
+# Shared logic:
+#   * ../dns_resolve_context.yml      — providers, tokens, record types
+#   * ../compute_host_dns_records.yml — the host's declared records -> cf_set_targets
+#   * ../validate_record_ips.yml      — A -> IPv4 / AAAA -> IPv6 pre-flight check
+#
+# Everything runs on the control node (delegate_to: localhost); nothing connects
+# to the managed host. See compute_host_dns_records.yml for how the record list
+# (default remap + addition, or dns_records_override) is built.
+
+- name: Resolve the shared DNS context
+  ansible.builtin.include_tasks: ../dns_resolve_context.yml
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Compute the records this host declares
+  ansible.builtin.include_tasks: ../compute_host_dns_records.yml
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Report the records selected for this host
+  ansible.builtin.debug:
+    msg: >-
+      {{ inventory_hostname }} — source: {{ 'dns_records_override'
+         if dns_records_override is defined else 'remap + dns_records_addition' }};
+      selected {{ selected_dns_records | length }} record(s)
+      (types {{ dns_hosting_record_types_resolved | join(', ') }}).
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Warn when there is nothing to set for this host
+  ansible.builtin.debug:
+    msg: "No matching DNS records to set for {{ inventory_hostname }}."
+  when: cf_set_targets | default([]) | length == 0
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Validate that record values match their type (A -> IPv4, AAAA -> IPv6)
+  ansible.builtin.include_tasks: ../validate_record_ips.yml
+  when: cf_set_targets | default([]) | length > 0
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Ensure the Cloudflare DNS records for this host
+  community.general.cloudflare_dns:
+  args: "{{ target }}"
+  loop: "{{ cf_set_targets | default([]) }}"
+  loop_control:
+    loop_var: target
+    label: "{{ target.type }} {{ target.record }} -> {{ target.value }} (zone {{ target.zone }})"
+  register: cf_set_results
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Summarise the records ensured for this host
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        cf_set_results.results | default([])
+        | community.general.json_query('[].{record: target.record, type: target.type, value: target.value, zone: target.zone, changed: changed}')
+      }}
+  when: cf_set_targets | default([]) | length > 0
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host

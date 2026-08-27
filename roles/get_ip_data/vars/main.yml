@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: MIT-0
+---
+# vars file for roles/get_ip_data
+
+# Every provider answer is mapped onto this schema before anything else touches it, so a
+# community module and a raw HTTP endpoint become directly comparable. A field a provider
+# cannot fill is dropped from its answer, never carried around as null.
+#
+#   utc_offset - seconds east of UTC, only filled by the providers that report it that way
+#   asn        - plain integer, without the "AS" prefix
+#   is_*       - advisory detection flags, providers disagree about them a lot
+get_ip_data_schema:
+  ip: null
+  ip_version: null
+  hostname: null
+  continent_code: null
+  continent_name: null
+  country_code: null
+  country_name: null
+  region_code: null
+  region_name: null
+  city: null
+  zip: null
+  latitude: null
+  longitude: null
+  timezone: null
+  utc_offset: null
+  asn: null
+  asn_org: null
+  isp: null
+  org: null
+  is_mobile: null
+  is_proxy: null
+  is_vpn: null
+  is_tor: null
+  is_hosting: null
+  is_abuser: null
+
+# Fields decided by a majority vote. Coordinates are left out on purpose: they are taken as
+# the median of the sources that agree on the winning country, see tasks/aggregate.yml.
+get_ip_data_vote_fields: "{{ get_ip_data_schema.keys() | difference(['latitude', 'longitude']) | list }}"

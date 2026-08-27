@@ -27,6 +27,7 @@ packages_list:
       - conntrack
       - parallel
       - nftables
+      - ufw
       # TermSCP dependencies
       - libdbus-1-dev
       - pkg-config
@@ -48,6 +49,7 @@ packages_list:
       - nala
       - doas
       # Service packages
+      - python3-debian # Needed for DEB mirrors
       - python3-docker # Needed for Ansible Docker modules
       - python3-passlib # Needed for Ansible htpasswd module
       - python3-bcrypt # Needed for Ansible htpasswd module

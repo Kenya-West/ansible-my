@@ -1,0 +1,45 @@
+---
+# Scenario: cloudflare_get_all
+#
+# Reads (never mutates) the Cloudflare zones that host any managed domain and
+# prints every record whose type is in `dns_hosting_record_types`.
+#
+# The heavy lifting is shared with the other scenarios:
+#   * ../dns_resolve_context.yml   — providers, tokens, record types, managed_domains
+#   * ../read_cloudflare_records.yml — the actual (paginated) zone/record read
+#
+# Everything runs once, from the control node (the helpers use run_once +
+# delegate_to: localhost), so it is safe to run hostless (e.g. against localhost).
+
+- name: Resolve the shared DNS context
+  ansible.builtin.include_tasks: ../dns_resolve_context.yml
+  tags:
+    - cloudflare_get_all
+
+- name: Report and stop early when no managed domains were found
+  ansible.builtin.debug:
+    msg: "No `domains` defined on any host in the domain_management group; nothing to read."
+  when: managed_domains | length == 0
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_get_all
+
+- name: Read the current Cloudflare records for the managed zones
+  ansible.builtin.include_tasks: ../read_cloudflare_records.yml
+  when: managed_domains | length > 0
+  tags:
+    - cloudflare_get_all
+
+- name: Show the Cloudflare records read for the managed domains
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        cloudflare_records | default([])
+        | selectattr('type', 'in', dns_hosting_record_types_resolved)
+        | community.general.json_query('[].{provider: _provider, zone: _zone, name: name, type: type, content: content, proxied: proxied, ttl: ttl}')
+      }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_get_all

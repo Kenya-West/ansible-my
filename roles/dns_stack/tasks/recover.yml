@@ -60,9 +60,10 @@
         (_svc_dnscrypt.rc != 0 or _svc_dnscrypt.stdout | default('') != 'active') and
         (
           (_resolv_raw is not failed and
-           ( _resolv_raw.content | b64decode | regex_search('(?m)^\\s*nameserver\\s+127\\.0\\.0\\.1') or
-             _resolv_raw.content | b64decode | regex_search('(?m)^\\s*nameserver\\s+127\\.0\\.1\\.1')
-           )
+            (_resolv_raw.content | b64decode) is ansible.builtin.search(
+              '^\s*nameserver\s+127\.0\.(?:0\.1|1\.1)(?:\s|$)',
+              multiline=true
+            )
           )
           or (_resolv_raw is failed)
         )
@@ -95,8 +96,8 @@
   ansible.builtin.lineinfile:
     path: /etc/hosts
     create: yes
-    regexp: '^\s*127\.0\.1\.1\s+{{ ansible_hostname }}(\s|$)'
-    line: "127.0.1.1 {{ ansible_hostname }}"
+    regexp: '^\s*127\.0\.1\.1\s+{{ ansible_facts.hostname }}(\s|$)'
+    line: "127.0.1.1 {{ ansible_facts['hostname'] }}"
     state: present
     owner: root
     group: root

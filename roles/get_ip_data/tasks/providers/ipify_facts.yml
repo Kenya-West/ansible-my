@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MIT-0
+---
+# https://api.ipify.org/ through community.general.ipify_facts - no key, no quota worth caring
+# about, and no geolocation either. Last in the catalog: it can never satisfy a request for
+# country data, but it still answers when every geolocation service is blocked, and knowing
+# the public IP alone is often enough.
+- name: Ask ipify.org through community.general.ipify_facts
+  community.general.ipify_facts:
+    timeout: "{{ get_ip_data_timeout }}"
+    validate_certs: "{{ get_ip_data_validate_certs }}"
+  register: _gid_raw
+  retries: "{{ get_ip_data_retries }}"
+  delay: "{{ get_ip_data_retry_delay }}"
+  until: _gid_raw is not failed
+
+- name: Map the ipify.org payload onto the common schema
+  ansible.builtin.set_fact:
+    _gid_fields:
+      ip: "{{ _gid_raw.ansible_facts.ipify_public_ip | default(none) }}"

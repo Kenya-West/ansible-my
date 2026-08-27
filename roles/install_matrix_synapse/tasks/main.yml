@@ -27,20 +27,20 @@
     name: kwtoolset/create_dirs_traversal
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     create_dirs_traversal_path: "{{ dest_path_full }}"
     create_dirs_traversal_strip_leaf: false
   tags:
-    - update_config
+    - update_config_hard
 
 - name: Check if docker-compose.yml exists at {{ dest_path_full }}
   ansible.builtin.stat:
     path: "{{ dest_path_full }}/docker-compose.yml"
   register: matrix_server_synapse_docker_compose_file
   tags:
-    - update_image
-    - update_config
+    - update_image_hard
+    - update_config_hard
 
 - name: Ensure Docker network {{ matrix_server_network_name }} exists with specific settings
   community.docker.docker_network:
@@ -53,12 +53,14 @@
     name: kwtoolset/compose_pull
     apply:
       tags:
-        - update_image
+        - update_image_hard
+        - update_image_soft
   vars:
     project_paths:
       - "{{ dest_path_full }}"
   tags:
-    - update_image
+    - update_image_hard
+    - update_image_soft
   when: matrix_server_synapse_docker_compose_file.stat.exists
 
 - name: compose_down
@@ -66,14 +68,14 @@
     name: kwtoolset/compose_down
     apply:
       tags:
-        - update_image
-        - update_config
+        - update_image_hard
+        - update_config_hard
   vars:
     project_paths:
       - "{{ dest_path_full }}"
   tags:
-    - update_image
-    - update_config
+    - update_image_hard
+    - update_config_hard
   when: not matrix_server_synapse_docker_compose_file.stat.exists
 
 - name: copy_files_templating
@@ -81,7 +83,8 @@
     name: kwtoolset/copy_files_templating
     apply:
       tags:
-        - update_config
+        - update_config_hard
+        - update_config_soft
   vars:
     copy_files_templating_dir_list:
       - src: "{{ source_path }}"
@@ -93,7 +96,22 @@
   loop_control:
     loop_var: source_path
   tags:
-    - update_config
+    - update_config_hard
+    - update_config_soft
+
+- name: compose_restart
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_restart
+    apply:
+      tags:
+        - never
+        - update_config_soft
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - never
+    - update_config_soft
 
 - name: Check if data directory exists at {{ dest_path_full }}
   ansible.builtin.stat:
@@ -101,7 +119,7 @@
   register: matrix_server_synapse_data_dir
   tags:
     - recreate_config
-    - update_config
+    - update_config_hard
 
 - name: Remove data directory at {{ dest_path_full }}/data if it exists
   become: true
@@ -127,7 +145,7 @@
     mode: "0775"
   when: not matrix_server_synapse_data_dir.stat.exists
   tags:
-    - update_config
+    - update_config_hard
     - recreate_config
 
 - name: Check if homeserver file exists at {{ dest_path_full }}
@@ -135,14 +153,14 @@
     path: "{{ dest_path_full }}/data/homeserver.yaml"
   register: matrix_server_synapse_config_file
   tags:
-    - update_config
+    - update_config_hard
     - recreate_config
 
 - name: Since homeserver.yaml does not exist, generate it by running the container once
   ansible.builtin.include_tasks: create_config.yml
   when: not matrix_server_synapse_config_file.stat.exists
   tags:
-    - update_config
+    - update_config_hard
     - recreate_config
 
 - name: compose_up
@@ -150,14 +168,16 @@
     name: kwtoolset/compose_up
     apply:
       tags:
-        - update_image
-        - update_config
+        - update_image_hard
+        - update_image_soft
+        - update_config_hard
   vars:
     project_paths:
       - "{{ dest_path_full }}"
   tags:
-    - update_image
-    - update_config
+    - update_image_hard
+    - update_image_soft
+    - update_config_hard
     - recreate_config
 
 - name: Add port {{ matrix_server_external_port }} to UFW

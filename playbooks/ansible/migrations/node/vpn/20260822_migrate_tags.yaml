@@ -1,0 +1,594 @@
+---
+# Migrates the "coarse" role task tags to the hard/soft scheme.
+#
+# What it does to every roles/*/tasks/**/*.yml file (all of it declared as data
+# in the `migrate_tags_*` vars below, so the rules can be read and tweaked
+# without touching the engine):
+#
+#   1. rename   - every `update_image` tag becomes `update_image_hard`,
+#                 every `update_config` tag becomes `update_config_hard`.
+#   2. add_tag  - a `kwtoolset/compose_pull` include whose tags contain
+#                 `update_image_hard` also gets `update_image_soft`;
+#                 a `kwtoolset/copy_files_templating` include whose tags contain
+#                 `update_config_hard` also gets `update_config_soft`;
+#                 a `kwtoolset/compose_up` include whose tags contain
+#                 `update_image_hard` also gets `update_image_soft`.
+#   3. insert_task - right after the `kwtoolset/copy_files_templating` task a new
+#                 `kwtoolset/compose_restart` task is inserted, cloned from the
+#                 file's `kwtoolset/compose_up` task (same `vars:`, no `when:`)
+#                 with the tags replaced by `never` + `update_config_soft`.
+#                 Files without a `compose_up` task are left alone.
+#
+# Every rule is applied to the task's root `tags:` and to the mirrored
+# `ansible.builtin.include_role.apply.tags:` alike, and each rule is a no-op when
+# its precondition is not met, so the playbook is safe to re-run (idempotent).
+#
+# Usage:
+#   ansible-playbook playbooks/ansible/migrations/node/vpn/20260822_migrate_tags.yaml
+#   ansible-playbook ... --check            # dry run, prints a unified diff per file
+#   ansible-playbook ... -e migrate_tags_search_root=roles/install_vpn_caddy_wg
+#                                                   # relative paths are resolved
+#                                                   # against the repo root
+#
+# Implementation note: the files are edited semantically, not blindly. The engine
+# below composes each YAML file into a node tree (PyYAML `compose()`, which keeps
+# source line marks), locates the real task / include_role / tags nodes in that
+# tree, and then rewrites only the exact source lines those nodes occupy. Nothing
+# is re-emitted by a YAML dumper, so comments, quoting, key order and blank lines
+# survive untouched. Each rewritten file is re-parsed before it is written back.
+
+- name: Migrate role task tags to the hard/soft scheme
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+
+  vars:
+    # Repo root, five levels up from playbooks/ansible/migrations/node/vpn.
+    migrate_tags_project_root: "{{ (playbook_dir ~ '/../../../../..') | realpath }}"
+    migrate_tags_search_root: "{{ migrate_tags_project_root }}/roles"
+    # `ansible.builtin.find` runs in its own working directory, so a relative
+    # `-e migrate_tags_search_root=...` would silently match nothing. Anchor it to
+    # the repo root instead, which is what a relative override always means here.
+    __migrate_tags_search_root: >-
+      {{
+        (
+          migrate_tags_search_root
+          if migrate_tags_search_root.startswith('/')
+          else migrate_tags_project_root ~ '/' ~ migrate_tags_search_root
+        ) | realpath
+      }}
+
+    # ---------------------------------------------------------------- rules ---
+    migrate_tags_rules:
+      # 1. plain tag renames, applied to every `tags:` sequence in the file.
+      rename:
+        update_image: update_image_hard
+        update_config: update_config_hard
+
+      # 2. extra tag added to an include_role task that already carries a given
+      #    tag. `when_tag` is matched against the post-rename tag value.
+      add_tag:
+        - role: kwtoolset/compose_pull
+          when_tag: update_image_hard
+          add_tag: update_image_soft
+        - role: kwtoolset/copy_files_templating
+          when_tag: update_config_hard
+          add_tag: update_config_soft
+        # Not in the original rule list, but required for the soft image update
+        # to actually bring the stack back up (pull + up, without a down), and it
+        # is what the already-migrated reference roles do. Drop this entry if the
+        # soft image flow should stop at `compose_pull`.
+        - role: kwtoolset/compose_up
+          when_tag: update_image_hard
+          add_tag: update_image_soft
+
+      # 3. new task cloned from an existing one and inserted after another one.
+      insert_task:
+        - after_role: kwtoolset/copy_files_templating
+          template_from_role: kwtoolset/compose_up
+          new_role: kwtoolset/compose_restart
+          new_name: compose_restart
+          tags:
+            - never
+            - update_config_soft
+          drop_keys:
+            - when
+          # Leave files that already have a compose_restart task alone.
+          skip_if_role_present: true
+
+    # ------------------------------------------------------------ the engine ---
+    # `!unsafe` so that Ansible never tries to template the Python source.
+    migrate_tags_engine: !unsafe |
+      #!/usr/bin/env python3
+      """Rule-driven, node-accurate tag migration for Ansible task files.
+
+      Reads a JSON job file: {"files": [...], "rules": {...}, "dry_run": bool}
+      and prints a JSON report on stdout.
+      """
+
+      import difflib
+      import json
+      import re
+      import sys
+
+      import yaml
+      from yaml.nodes import MappingNode, ScalarNode, SequenceNode
+
+      BLOCK_KEYS = ("block", "rescue", "always")
+      INCLUDE_ROLE_KEYS = ("ansible.builtin.include_role", "include_role")
+      LIST_ITEM_RE = re.compile(r"^(\s*-\s+)")
+      TAG_ITEM_RE = re.compile(r"^(\s*-\s+)(.*?)(\s*(?:#.*)?)$")
+
+
+      # --------------------------------------------------------------- helpers ---
+
+      def indent_of(line):
+          return len(line) - len(line.lstrip())
+
+
+      def block_end(lines, start):
+          """Index of the last source line belonging to the block opened at `start`."""
+          base = indent_of(lines[start])
+          end = start
+          index = start + 1
+          while index < len(lines):
+              line = lines[index]
+              if line.strip():
+                  if indent_of(line) <= base:
+                      break
+                  end = index
+              index += 1
+          return end
+
+
+      def map_pair(node, key):
+          if isinstance(node, MappingNode):
+              for key_node, value_node in node.value:
+                  if isinstance(key_node, ScalarNode) and key_node.value == key:
+                      return key_node, value_node
+          return None, None
+
+
+      def map_get(node, key):
+          return map_pair(node, key)[1]
+
+
+      def scalar_items(seq):
+          return [i for i in seq.value if isinstance(i, ScalarNode)]
+
+
+      class Edits(object):
+          """Line-addressed edits, all indexes relative to the original line list."""
+
+          def __init__(self, offset=0):
+              self.offset = offset
+              self.replaced = {}
+              self.inserted = {}
+              self.dropped = set()
+
+          def set_line(self, index, text):
+              self.replaced[index - self.offset] = text
+
+          def add_after(self, index, texts):
+              self.inserted.setdefault(index - self.offset, []).extend(texts)
+
+          def drop(self, first, last):
+              self.dropped.update(range(first - self.offset, last - self.offset + 1))
+
+          def apply(self, lines):
+              out = []
+              for index, line in enumerate(lines):
+                  if index not in self.dropped:
+                      out.append(self.replaced.get(index, line))
+                  out.extend(self.inserted.get(index, []))
+              return out
+
+
+      # ----------------------------------------------------------- task model ---
+
+      class Task(object):
+          """One task mapping, with its source line range and its place in the tree."""
+
+          def __init__(self, node, lines, parent, siblings):
+              self.node = node
+              self.parent = parent
+              self.siblings = siblings
+              self.start = node.start_mark.line
+              self.end = block_end(lines, self.start)
+              self.indent = indent_of(lines[self.start])
+
+          def root(self):
+              task = self
+              while task.parent is not None:
+                  task = task.parent
+              return task
+
+          def is_only_child(self):
+              return len(self.siblings) == 1
+
+          def include_role(self):
+              for key in INCLUDE_ROLE_KEYS:
+                  value = map_get(self.node, key)
+                  if isinstance(value, MappingNode):
+                      return value
+              return None
+
+          def role_name(self):
+              include = self.include_role()
+              if include is None:
+                  return None
+              name = map_get(include, "name")
+              return name.value if isinstance(name, ScalarNode) else None
+
+          def tags_nodes(self):
+              """[(label, sequence node)] for the task's own tags and apply.tags."""
+              found = []
+              own = map_get(self.node, "tags")
+              if isinstance(own, SequenceNode):
+                  found.append(("tags", own))
+              include = self.include_role()
+              if include is not None:
+                  applied = map_get(include, "apply")
+                  if isinstance(applied, MappingNode):
+                      applied_tags = map_get(applied, "tags")
+                      if isinstance(applied_tags, SequenceNode):
+                          found.append(("apply.tags", applied_tags))
+              return found
+
+
+      def collect_tasks(seq, lines, parent, flat):
+          """Build the task tree of a task sequence, appending every task to `flat`."""
+          siblings = []
+          for item in seq.value:
+              if isinstance(item, MappingNode):
+                  siblings.append(Task(item, lines, parent, siblings))
+          for task in siblings:
+              flat.append(task)
+              for key in BLOCK_KEYS:
+                  nested = map_get(task.node, key)
+                  if isinstance(nested, SequenceNode):
+                      collect_tasks(nested, lines, task, flat)
+          return siblings
+
+
+      def all_tags_nodes(node, found):
+          """Every sequence that is the value of a `tags:` key, anywhere in the tree."""
+          if isinstance(node, MappingNode):
+              for key_node, value_node in node.value:
+                  if (isinstance(key_node, ScalarNode) and key_node.value == "tags"
+                          and isinstance(value_node, SequenceNode)):
+                      found.append(value_node)
+                  all_tags_nodes(value_node, found)
+          elif isinstance(node, SequenceNode):
+              for item in node.value:
+                  all_tags_nodes(item, found)
+          return found
+
+
+      # ---------------------------------------------------------------- rules ---
+
+      def render_cloned_task(lines, template, target_indent, rule):
+          """Clone `template`'s source lines, retargeting name, role and tags."""
+          start, end = template.start, template.end
+          edits = Edits(offset=start)
+
+          new_name = rule.get("new_name")
+          if new_name:
+              name_node = map_get(template.node, "name")
+              if isinstance(name_node, ScalarNode):
+                  line = name_node.start_mark.line
+                  edits.set_line(line, re.sub(
+                      r"^(\s*(?:-\s+)?name:\s*).*$",
+                      lambda m: m.group(1) + new_name,
+                      lines[line]))
+
+          role_node = map_get(template.include_role(), "name")
+          line = role_node.start_mark.line
+          edits.set_line(line, re.sub(
+              r"^(\s*name:\s*).*$",
+              lambda m: m.group(1) + rule["new_role"],
+              lines[line]))
+
+          for _label, seq in template.tags_nodes():
+              items = scalar_items(seq)
+              if not items:
+                  continue
+              first = min(i.start_mark.line for i in items)
+              last = max(i.start_mark.line for i in items)
+              match = LIST_ITEM_RE.match(lines[first])
+              prefix = match.group(1) if match else (" " * (indent_of(lines[first])) + "- ")
+              edits.drop(first, last)
+              edits.add_after(last, [prefix + tag for tag in rule["tags"]])
+
+          for key in rule.get("drop_keys", []):
+              key_node = map_pair(template.node, key)[0]
+              if key_node is not None:
+                  key_line = key_node.start_mark.line
+                  edits.drop(key_line, block_end(lines, key_line))
+
+          rendered = edits.apply(lines[start:end + 1])
+          while rendered and not rendered[-1].strip():
+              rendered.pop()
+
+          shift = target_indent - template.indent
+          if shift > 0:
+              rendered = [(" " * shift + l) if l.strip() else l for l in rendered]
+          elif shift < 0:
+              trim = -shift
+              rendered = [l[min(trim, indent_of(l)):] if l.strip() else l for l in rendered]
+          return rendered
+
+
+      def migrate_file(path, rules):
+          report = {"file": path, "status": "unchanged", "changes": []}
+          with open(path, "r", encoding="utf-8") as handle:
+              original = handle.read()
+          lines = original.split("\n")
+
+          try:
+              root = yaml.compose(original)
+          except yaml.YAMLError as exc:
+              report["status"] = "skipped"
+              report["reason"] = "not parseable as YAML: %s" % exc
+              return report, original
+          if not isinstance(root, SequenceNode):
+              report["status"] = "skipped"
+              report["reason"] = "not a task list"
+              return report, original
+
+          tasks = []
+          collect_tasks(root, lines, None, tasks)
+          edits = Edits()
+          renames = rules.get("rename", {})
+
+          def effective(value):
+              return renames.get(value, value)
+
+          # 1. rename tags in every `tags:` sequence of the file.
+          for seq in all_tags_nodes(root, []):
+              for item in scalar_items(seq):
+                  new_value = renames.get(item.value)
+                  if not new_value:
+                      continue
+                  line = item.start_mark.line
+                  match = TAG_ITEM_RE.match(lines[line])
+                  if not match or match.group(2) != item.value:
+                      continue
+                  edits.set_line(line, match.group(1) + new_value + match.group(3))
+                  report["changes"].append(
+                      "L%d: tag %s -> %s" % (line + 1, item.value, new_value))
+
+          # 2. add a companion tag to specific include_role tasks.
+          for rule in rules.get("add_tag", []):
+              for task in tasks:
+                  if task.role_name() != rule["role"]:
+                      continue
+                  targets = list(task.tags_nodes())
+                  # A task that is the single child of a block inherits that
+                  # block's tags, so the block has to be tagged as well.
+                  ancestor = task
+                  while ancestor.parent is not None and ancestor.is_only_child():
+                      ancestor = ancestor.parent
+                      inherited = map_get(ancestor.node, "tags")
+                      if isinstance(inherited, SequenceNode):
+                          targets.append(("enclosing block tags", inherited))
+                  for label, seq in targets:
+                      items = scalar_items(seq)
+                      values = [effective(i.value) for i in items]
+                      if rule["when_tag"] not in values or rule["add_tag"] in values:
+                          continue
+                      anchor = items[values.index(rule["when_tag"])]
+                      line = anchor.start_mark.line
+                      match = LIST_ITEM_RE.match(lines[line])
+                      prefix = match.group(1) if match else "    - "
+                      edits.add_after(line, [prefix + rule["add_tag"]])
+                      report["changes"].append(
+                          "L%d: %s (%s): + %s"
+                          % (line + 1, rule["role"], label, rule["add_tag"]))
+
+          # 3. clone a task and insert it after another one.
+          for rule in rules.get("insert_task", []):
+              anchors = [t for t in tasks if t.role_name() == rule["after_role"]]
+              if not anchors:
+                  continue
+              if rule.get("skip_if_role_present", True) and any(
+                      t.role_name() == rule["new_role"] for t in tasks):
+                  report["changes"].append(
+                      "%s already present, no task inserted" % rule["new_role"])
+                  continue
+              template = next(
+                  (t for t in tasks if t.role_name() == rule["template_from_role"]), None)
+              if template is None:
+                  report["changes"].append(
+                      "no %s task to clone from, no %s task inserted"
+                      % (rule["template_from_role"], rule["new_role"]))
+                  continue
+              for anchor in anchors:
+                  outermost = anchor.root()
+                  rendered = render_cloned_task(
+                      lines, template, outermost.indent, rule)
+                  edits.add_after(outermost.end, [""] + rendered)
+                  report["changes"].append(
+                      "L%d: inserted %s task cloned from %s"
+                      % (outermost.end + 2, rule["new_role"], rule["template_from_role"]))
+
+          migrated = "\n".join(edits.apply(lines))
+          if migrated == original:
+              report["status"] = "unchanged"
+              report["changes"] = []
+              return report, original
+
+          try:
+              parsed = yaml.safe_load(migrated)
+          except yaml.YAMLError as exc:
+              report["status"] = "failed"
+              report["reason"] = "migrated file would not parse: %s" % exc
+              return report, original
+          if not isinstance(parsed, list) or len(parsed) < len(root.value):
+              report["status"] = "failed"
+              report["reason"] = "migrated file lost tasks, refusing to write"
+              return report, original
+
+          report["status"] = "migrated"
+          report["diff"] = "".join(difflib.unified_diff(
+              original.splitlines(True), migrated.splitlines(True),
+              fromfile=path, tofile=path + " (migrated)"))
+          return report, migrated
+
+
+      def main():
+          with open(sys.argv[1], "r", encoding="utf-8") as handle:
+              job = json.load(handle)
+          reports = []
+          for path in job["files"]:
+              try:
+                  report, migrated = migrate_file(path, job["rules"])
+              except Exception as exc:  # noqa: BLE001 - never abort the whole run
+                  reports.append({"file": path, "status": "failed",
+                                  "reason": "%s: %s" % (type(exc).__name__, exc),
+                                  "changes": []})
+                  continue
+              if report["status"] == "migrated" and not job.get("dry_run"):
+                  with open(path, "w", encoding="utf-8") as handle:
+                      handle.write(migrated)
+              reports.append(report)
+          summary = {}
+          for report in reports:
+              summary[report["status"]] = summary.get(report["status"], 0) + 1
+          json.dump({"reports": reports, "summary": summary}, sys.stdout)
+
+
+      main()
+
+  tasks:
+    - name: Fail early when PyYAML is not available to the local interpreter
+      ansible.builtin.command:
+        cmd: "{{ ansible_playbook_python }} -c 'import yaml'"
+      changed_when: false
+      check_mode: false
+
+    - name: Create a working directory for the migration engine
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: migrate-tags
+      register: __migrate_tags_tmp
+      changed_when: false
+      check_mode: false
+
+    - name: Check the search root is a directory
+      ansible.builtin.stat:
+        path: "{{ __migrate_tags_search_root }}"
+      register: __migrate_tags_root_stat
+      changed_when: false
+
+    - name: Fail loudly on a search root that does not exist
+      ansible.builtin.assert:
+        that:
+          - __migrate_tags_root_stat.stat.exists
+          - __migrate_tags_root_stat.stat.isdir
+        fail_msg: >-
+          migrate_tags_search_root={{ migrate_tags_search_root }} resolves to
+          {{ __migrate_tags_search_root }}, which is not an existing directory.
+          Relative paths are resolved against {{ migrate_tags_project_root }}.
+        quiet: true
+
+    - name: Find every role task file
+      ansible.builtin.find:
+        paths: "{{ __migrate_tags_search_root }}"
+        patterns:
+          - "*.yml"
+          - "*.yaml"
+        recurse: true
+      register: __migrate_tags_found
+
+    - name: Keep only files living under a role's tasks/ directory
+      ansible.builtin.set_fact:
+        __migrate_tags_files: >-
+          {{
+            __migrate_tags_found.files
+            | map(attribute='path')
+            | select('search', '/tasks/')
+            | sort
+            | list
+          }}
+
+    - name: Write the migration job (file list plus the declarative rules)
+      ansible.builtin.copy:
+        dest: "{{ __migrate_tags_tmp.path }}/job.json"
+        content: >-
+          {{
+            {
+              'files': __migrate_tags_files,
+              'rules': migrate_tags_rules,
+              'dry_run': ansible_check_mode,
+            } | to_json
+          }}
+        mode: "0600"
+      changed_when: false
+      check_mode: false
+
+    - name: Write the migration engine
+      ansible.builtin.copy:
+        dest: "{{ __migrate_tags_tmp.path }}/migrate_tags.py"
+        content: "{{ migrate_tags_engine }}"
+        mode: "0700"
+      changed_when: false
+      check_mode: false
+
+    - name: Migrate the tags
+      ansible.builtin.command:
+        cmd: >-
+          {{ ansible_playbook_python }}
+          {{ __migrate_tags_tmp.path }}/migrate_tags.py
+          {{ __migrate_tags_tmp.path }}/job.json
+      register: __migrate_tags_run
+      changed_when: (__migrate_tags_run.stdout | from_json).summary.migrated | default(0) > 0
+      check_mode: false
+
+    - name: Remove the working directory
+      ansible.builtin.file:
+        path: "{{ __migrate_tags_tmp.path }}"
+        state: absent
+      changed_when: false
+
+    - name: Report every file the migration touched
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.file | relpath(migrate_tags_project_root) }}: {{ item.status }}
+          {{ ('(' ~ item.reason ~ ')') if item.reason is defined else '' }}
+          {{ item.changes | default([]) }}
+      loop: "{{ (__migrate_tags_run.stdout | from_json).reports }}"
+      loop_control:
+        label: "{{ item.file | relpath(migrate_tags_project_root) }}"
+      when: item.status != 'unchanged'
+
+    - name: Show the diff of every migrated file
+      ansible.builtin.debug:
+        msg: "{{ item.diff.split('\n') }}"
+      loop: "{{ (__migrate_tags_run.stdout | from_json).reports }}"
+      loop_control:
+        label: "{{ item.file | relpath(migrate_tags_project_root) }}"
+      when:
+        - item.status == 'migrated'
+        - ansible_check_mode or migrate_tags_show_diff | default(false) | bool
+
+    - name: Warn about files the migration could not handle
+      ansible.builtin.debug:
+        msg: "WARNING: {{ item.file }} was not migrated: {{ item.reason | default('unknown reason') }}"
+      loop: "{{ (__migrate_tags_run.stdout | from_json).reports }}"
+      loop_control:
+        label: "{{ item.file | relpath(migrate_tags_project_root) }}"
+      when: item.status in ['failed', 'skipped']
+
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: >-
+          {{ __migrate_tags_files | length }} role task file(s) inspected under
+          {{ __migrate_tags_search_root | relpath(migrate_tags_project_root) }}:
+          {{ __summary.migrated | default(0) }} migrated{{ ' (check mode, nothing written)' if ansible_check_mode else '' }},
+          {{ __summary.unchanged | default(0) }} already up to date,
+          {{ __summary.skipped | default(0) }} skipped,
+          {{ __summary.failed | default(0) }} failed.
+      vars:
+        __summary: "{{ (__migrate_tags_run.stdout | from_json).summary }}"

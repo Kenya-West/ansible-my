@@ -6,7 +6,7 @@ x-common: &common
       hard: 1048576
   restart: always
   networks:
-    - remnawave-network
+    - {{ docker_vpn_server_remnawave_network }}
 
 x-logging: &logging
   logging:
@@ -20,7 +20,7 @@ x-env: &env
 
 services:
   remnawave:
-    image: remnawave/backend:2
+    image: remnawave/backend:3
     container_name: remnawave
     hostname: remnawave
     <<: [*common, *logging, *env]
@@ -45,9 +45,10 @@ services:
         condition: service_healthy
 
   remnawave-db:
-    image: postgres:17.6
+    image: postgres:18.4
     container_name: remnawave-db
     hostname: remnawave-db
+    shm_size: 512mb
     <<: [*common, *logging, *env]
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
@@ -59,7 +60,7 @@ services:
     networks:
       - {{ docker_vpn_server_remnawave_network }}
     volumes:
-      - remnawave-db-data:/var/lib/postgresql/data
+      - remnawave-db-data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 3s
@@ -69,7 +70,7 @@ services:
 
   remnawave-caddy:
     image: remnawave/caddy-with-auth:latest
-    container_name: 'remnawave-caddy'
+    container_name: remnawave-caddy
     hostname: remnawave-caddy
     restart: always
     env_file:

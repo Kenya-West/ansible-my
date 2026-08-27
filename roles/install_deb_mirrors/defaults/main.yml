@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/install_deb_mirrors
+deb_mirrors:
+  - url: https://mirror.truenetwork.ru/ubuntu/
+    preferred_country_code: RU
+  - url: http://mirror.yandex.ru/ubuntu/
+    preferred_country_code: RU
+deb_mirrors_country_code_allowlist:
+  - RU

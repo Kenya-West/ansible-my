@@ -1,2 +1,11 @@
 ---
 # defaults file for roles/install_docker
+
+docker_mirrors:
+  - url: https://mirror.yandex.ru/mirrors/download.docker.com/linux
+    preferred_country_code: RU
+  - url: https://mirrors.tuna.tsinghua.edu.cn/docker-ce/linux
+    preferred_country_code: CN
+docker_mirrors_country_code_allowlist:
+  - RU
+  - CN

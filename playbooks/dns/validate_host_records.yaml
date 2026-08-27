@@ -1,0 +1,10 @@
+---
+- name: Validate DNS records for the domains against each host's policy
+  hosts: domain_management
+  gather_facts: false
+
+  roles:
+    - role: domain_management
+      vars:
+        scenarios:
+          - cloudflare_dns_host_validation

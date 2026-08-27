@@ -1,0 +1,18 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/copy_eget_binaries_from_controller
+
+# Number of times to retry "eget install --all" on transient failures
+# (e.g. flaky network causing "EOF" download errors) before giving up.
+eget_install_retries: 5
+
+# Seconds to wait between retries of "eget install --all".
+eget_install_retry_delay: 5
+
+# Number of times to retry synchronizing binaries to each host on transient
+# rsync/ssh failures before giving up.
+eget_sync_retries: 3
+
+# Base seconds to wait between synchronize retries (multiplied by attempt
+# number, so the delay grows with each retry).
+eget_sync_retry_delay: 10

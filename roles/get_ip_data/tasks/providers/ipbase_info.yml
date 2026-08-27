@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: MIT-0
+---
+# https://api.ipbase.com/v2/info - answers without an API key, a key only raises the quota.
+# The richest of the free sources, so it heads the catalog and wins the vote tie-breaks.
+- name: Ask ipbase.com through community.general.ipbase_info
+  community.general.ipbase_info:
+    apikey: "{{ get_ip_data_ipbase_apikey | default(omit, true) }}"
+    language: "{{ get_ip_data_language }}"
+  register: _gid_raw
+  retries: "{{ get_ip_data_retries }}"
+  delay: "{{ get_ip_data_retry_delay }}"
+  until: _gid_raw is not failed
+
+- name: Map the ipbase.com payload onto the common schema
+  ansible.builtin.set_fact:
+    _gid_fields:
+      ip: "{{ _gid_d.ip | default(none) }}"
+      ip_version: "{{ _gid_d.type | default(none) }}"
+      hostname: "{{ _gid_d.hostname | default(none) }}"
+      continent_code: "{{ _gid_loc.continent.code | default(none) }}"
+      continent_name: "{{ _gid_loc.continent.name | default(none) }}"
+      country_code: "{{ _gid_loc.country.alpha2 | default(none) }}"
+      country_name: "{{ _gid_loc.country.name | default(none) }}"
+      region_code: "{{ _gid_loc.region.alpha2 | default(none) }}"
+      region_name: "{{ _gid_loc.region.name | default(none) }}"
+      city: "{{ _gid_loc.city.name | default(none) }}"
+      zip: "{{ _gid_loc.zip | default(none) }}"
+      latitude: "{{ _gid_loc.latitude | default(none) }}"
+      longitude: "{{ _gid_loc.longitude | default(none) }}"
+      timezone: "{{ _gid_d.timezone.id | default(none) }}"
+      utc_offset: "{{ _gid_d.timezone.gmt_offset | default(none) }}"
+      asn: "{{ _gid_con.asn | default(none) }}"
+      asn_org: "{{ _gid_con.organization | default(none) }}"
+      isp: "{{ _gid_con.isp | default(none) }}"
+      is_proxy: "{{ _gid_sec.is_proxy | default(none) }}"
+      is_vpn: "{{ _gid_sec.is_vpn | default(none) }}"
+      is_tor: "{{ _gid_sec.is_tor | default(none) }}"
+      is_hosting: "{{ _gid_sec.is_datacenter | default(none) }}"
+      is_abuser: "{{ _gid_sec.is_abuser | default(none) }}"
+  vars:
+    _gid_d: "{{ _gid_raw.data | default({}) }}"
+    _gid_loc: "{{ _gid_d.location | default({}) }}"
+    _gid_con: "{{ _gid_d.connection | default({}) }}"
+    # Only the paid plans fill this one in, keyless replies simply have no security block.
+    _gid_sec: "{{ _gid_d.security | default({}) }}"

@@ -17,10 +17,8 @@
   set_fact:
     unzip_file_extension: "{{ item }}"
   loop: "{{ supported_file_extensions }}"
-  when: unzip_source | basename | regex_search(item + '$')
+  when: (unzip_source | basename).endswith(item)
   until: unzip_file_extension != ""
-  vars:
-    ansible_loop_var: item
 
 - name: Show debug information
   ansible.builtin.debug:

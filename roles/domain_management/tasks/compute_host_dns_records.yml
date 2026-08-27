@@ -1,0 +1,91 @@
+---
+# Computes the DNS records the CURRENT host declares, as a list of
+# `community.general.cloudflare_dns` argument dicts (`cf_set_targets`). Shared by
+# the set + host-validation scenarios so "which records belong to this host" is
+# defined in exactly one place.
+#
+# Requires (from dns_resolve_context.yml):
+#   provider_tokens, dns_hosting_record_types_resolved.
+# Produces (per host, on localhost): selected_dns_records, cf_set_targets.
+#
+# Source records (mutually exclusive):
+#   * `dns_records_override`, when defined; otherwise
+#   * `remap_dns_records_domains` (from the reusable kwtoolset/remap_dns_records
+#     role, derived from this host's `domains_keys`) + `dns_records_addition`.
+#
+# Entry keys mirror `community.general.cloudflare_dns`, except:
+#   * `dns_provider` selects the provider whose api_token is used (dropped after);
+#   * `state` is forced to `present`;
+#   * `name` becomes `record` and `zone` is derived from it (left-most label
+#     stripped, mirroring remap_dns_records_root_domains);
+#   * a missing `value` defaults to the host's address (`ansible_host`).
+
+- name: Produce records from domains_keys via the reusable remap_dns_records role
+  ansible.builtin.include_role:
+    name: kwtoolset/remap_dns_records
+    public: true
+  vars:
+    # The role's task assigns `dns_records: {{ remap_dns_records }}`; feed it the
+    # computed list so the include succeeds. We consume `remap_dns_records_domains`.
+    remap_dns_records: "{{ remap_dns_records_domains }}"
+  when: dns_records_override is not defined
+  tags:
+    - always
+
+- name: Choose the source DNS records for this host
+  ansible.builtin.set_fact:
+    source_dns_records: >-
+      {{
+        dns_records_override if dns_records_override is defined
+        else (remap_dns_records_domains + (dns_records_addition | default([])))
+      }}
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Keep only records of an allowed type and a known Cloudflare provider
+  ansible.builtin.set_fact:
+    selected_dns_records: >-
+      {{ source_dns_records
+         | selectattr('type', 'in', dns_hosting_record_types_resolved)
+         | selectattr('dns_provider', 'in', provider_tokens.keys() | list)
+         | list }}
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Reset the computed record list for this host
+  ansible.builtin.set_fact:
+    cf_set_targets: []
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Build the community.general.cloudflare_dns argument sets
+  ansible.builtin.set_fact:
+    cf_set_targets: "{{ cf_set_targets + [_args] }}"
+  loop: "{{ selected_dns_records }}"
+  loop_control:
+    loop_var: rec
+    label: "{{ rec.type }} {{ rec.name }}"
+  vars:
+    # Zone = record name minus its left-most label (mirrors remap_dns_records).
+    _zone: "{{ rec.name | regex_replace('^[^.]+[.]', '') }}"
+    _value: "{{ rec.value | default(dns_hosting_record_value | default(ansible_host | default(inventory_hostname))) }}"
+    _args: >-
+      {{
+        rec
+        | combine({
+            'record': rec.name,
+            'zone': _zone,
+            'value': _value,
+            'state': 'present',
+            'api_token': provider_tokens[rec.dns_provider],
+          })
+        | dict2items
+        | rejectattr('key', 'in', ['name', 'dns_provider'])
+        | items2dict
+      }}
+  delegate_to: localhost
+  tags:
+    - always

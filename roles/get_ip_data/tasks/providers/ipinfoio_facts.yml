@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: MIT-0
+---
+# https://ipinfo.io/json through community.general.ipinfoio_facts - no token needed.
+#
+# Careful: this module returns its payload as ansible_facts, so it also sets host facts named
+# ip, city, region, country, org, loc, postal, hostname and timezone. Disable the provider when
+# those names mean something else in your inventory, see the README.
+- name: Ask ipinfo.io through community.general.ipinfoio_facts
+  community.general.ipinfoio_facts:
+    timeout: "{{ get_ip_data_timeout }}"
+    http_agent: "{{ get_ip_data_user_agent }}"
+  register: _gid_raw
+  retries: "{{ get_ip_data_retries }}"
+  delay: "{{ get_ip_data_retry_delay }}"
+  until: _gid_raw is not failed
+
+- name: Hand the ipinfo.io facts over to the shared mapping
+  ansible.builtin.set_fact:
+    _gid_payload: "{{ _gid_raw.ansible_facts | default({}) }}"
+
+- name: Map the ipinfo.io facts onto the common schema
+  ansible.builtin.include_tasks: _ipinfo_schema.yml

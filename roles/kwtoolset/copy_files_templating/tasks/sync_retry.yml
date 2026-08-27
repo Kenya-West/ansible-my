@@ -1,0 +1,35 @@
+---
+- name: Synchronize templated files to remote host {{ path.dest }} (attempt {{ copy_files_templating_sync_attempt | default(1) }}/{{ copy_files_templating_sync_retries }})
+  become: true
+  become_user: root
+  ansible.builtin.synchronize:
+    mode: push
+    src: "{{ copy_files_templating_temp_dir.path }}/"
+    dest: "{{ path.dest }}/"
+    ssh_connection_multiplexing: true
+    rsync_opts: "{{ copy_files_templating_rsync_opts }}"
+  delegate_to: localhost
+  register: copy_files_templating_sync_result
+  ignore_errors: "{{ (copy_files_templating_sync_attempt | default(1) | int) < (copy_files_templating_sync_retries | int) }}"
+
+- name: Wait before retrying synchronize to {{ path.dest }}
+  ansible.builtin.pause:
+    seconds: "{{ (copy_files_templating_sync_attempt | default(1) | int) * (copy_files_templating_sync_retry_delay | int) }}"
+  when:
+    - copy_files_templating_sync_result is failed
+    - (copy_files_templating_sync_attempt | default(1) | int) < (copy_files_templating_sync_retries | int)
+
+- name: Compute next synchronize attempt number for {{ path.dest }}
+  ansible.builtin.set_fact:
+    copy_files_templating_sync_next_attempt: "{{ (copy_files_templating_sync_attempt | default(1) | int) + 1 }}"
+  when:
+    - copy_files_templating_sync_result is failed
+    - (copy_files_templating_sync_attempt | default(1) | int) < (copy_files_templating_sync_retries | int)
+
+- name: Retry synchronize templated files to remote host {{ path.dest }}
+  ansible.builtin.include_tasks: sync_retry.yml
+  when:
+    - copy_files_templating_sync_result is failed
+    - (copy_files_templating_sync_attempt | default(1) | int) < (copy_files_templating_sync_retries | int)
+  vars:
+    copy_files_templating_sync_attempt: "{{ copy_files_templating_sync_next_attempt }}"

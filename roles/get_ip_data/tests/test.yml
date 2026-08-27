@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: MIT-0
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Collect the public IP data from every reachable provider
+      ansible.builtin.include_role:
+        name: get_ip_data
+      vars:
+        get_ip_data_policy: check_all
+        get_ip_data_show_sources: true
+        get_ip_data_fail_when_no_result: false
+
+    - name: Collect the public IP data from the first provider that answers
+      ansible.builtin.include_role:
+        name: get_ip_data
+      vars:
+        get_ip_data_policy: first_successful
+        get_ip_data_fact_name: ip_data_fast
+        get_ip_data_fail_when_no_result: false
+
+    - name: Both policies agree on the country
+      ansible.builtin.assert:
+        that:
+          - ip_data.country_code | default('') == ip_data_fast.country_code | default('')
+        success_msg: "both policies report {{ ip_data.country_code | default('no country') }}"
+        fail_msg: >-
+          check_all reports {{ ip_data.country_code | default('nothing') }} while
+          first_successful reports {{ ip_data_fast.country_code | default('nothing') }}
+      when: ip_data.resolved and ip_data_fast.resolved

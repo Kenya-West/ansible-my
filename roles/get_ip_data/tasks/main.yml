@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/get_ip_data
+- name: Assert the requested policy is supported
+  ansible.builtin.assert:
+    that:
+      - get_ip_data_policy in ['check_all', 'first_successful']
+    fail_msg: "get_ip_data_policy must be 'check_all' or 'first_successful', got '{{ get_ip_data_policy }}'."
+
+- name: Assert every requested provider exists in the catalog
+  ansible.builtin.assert:
+    that:
+      - _gid_unknown | length == 0
+    fail_msg: >-
+      Unknown provider id(s): {{ _gid_unknown | join(', ') }}.
+      Known ids: {{ get_ip_data_provider_catalog | map(attribute='id') | join(', ') }}.
+  vars:
+    _gid_unknown: >-
+      {{ (get_ip_data_providers + get_ip_data_disabled_providers)
+         | difference(get_ip_data_provider_catalog | map(attribute='id') | list) }}
+
+# Facts survive the role, so a second run in the same play would otherwise vote on the
+# answers of the first one.
+- name: Start with an empty result set
+  ansible.builtin.set_fact:
+    get_ip_data_results: []
+    get_ip_data_skipped: []
+    _gid_satisfied: false
+    _gid_consensus: {}
+    _gid_merged: {}
+
+- name: Build the ordered list of providers to query
+  ansible.builtin.set_fact:
+    _gid_providers: >-
+      {{ get_ip_data_provider_catalog
+         | selectattr('id', 'in', _gid_wanted)
+         | rejectattr('id', 'in', get_ip_data_disabled_providers)
+         | list }}
+  vars:
+    _gid_wanted: >-
+      {{ get_ip_data_providers if (get_ip_data_providers | length > 0)
+         else (get_ip_data_provider_catalog | map(attribute='id') | list) }}
+
+- name: Ask every provider for the public IP data of this host
+  ansible.builtin.include_tasks: query_provider.yml
+  loop: "{{ _gid_providers }}"
+  loop_control:
+    loop_var: _gid_provider
+    label: "{{ _gid_provider.id }} ({{ _gid_provider.type }})"
+
+- name: Merge every answer into a single result
+  ansible.builtin.include_tasks: aggregate.yml
+
+- name: Show what the providers answered
+  ansible.builtin.include_tasks: report.yml
+  when: get_ip_data_show_report | bool
+
+- name: Fail when not a single provider could be reached
+  ansible.builtin.fail:
+    msg: >-
+      None of the {{ _gid_providers | length }} IP data providers answered
+      ({{ get_ip_data_results | map(attribute='provider') | join(', ') }}).
+      This host has no usable route to any of them.
+  when:
+    - get_ip_data_fail_when_no_result | bool
+    - get_ip_data_results | selectattr('ok') | list | length == 0

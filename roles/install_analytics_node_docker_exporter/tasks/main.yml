@@ -18,18 +18,27 @@
         + (source_paths_add_user_dirs | default([]))
       }}
 
+- name: "Set cert_location_path_section fact based on {{ ansible_facts['hostname'] }} variables"
+  ansible.builtin.include_role:
+    name: kwtoolset/remap_caddy_cert_path
+    apply:
+      tags:
+        - always
+  tags:
+    - always
+
 - name: "Create non-existent parent directories for {{ dest_path_full }}"
   ansible.builtin.include_role:
     name: kwtoolset/create_dirs_traversal
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     create_dirs_traversal_path: "{{ dest_path_full }}"
     create_dirs_traversal_strip_leaf: true
     create_dirs_force_mode: "0775"
   tags:
-    - update_config
+    - update_config_hard
 
 - name: copy_files_templating
   ansible.builtin.include_role:
@@ -54,4 +63,4 @@
     to_port: "{{ docker_metrics_addr_port }}"
   when:
     - docker_metrics_addr_host is defined
-    - docker_metrics_addr_host | regex_search('^172')
+    - docker_metrics_addr_host is match('^172')

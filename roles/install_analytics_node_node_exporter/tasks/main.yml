@@ -27,20 +27,21 @@
     name: kwtoolset/create_dirs_traversal
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     create_dirs_traversal_path: "{{ dest_path_full }}"
     create_dirs_traversal_strip_leaf: true
     create_dirs_force_mode: "0775"
   tags:
-    - update_config
+    - update_config_hard
 
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
     apply:
       tags:
-        - update_config
+        - update_config_hard
+        - update_config_soft
   vars:
     copy_files_templating_dir_list:
       - src: "{{ source_path }}"
@@ -50,7 +51,8 @@
   loop_control:
     loop_var: source_path
   tags:
-    - update_config
+    - update_config_hard
+    - update_config_soft
 
 - block:
     - name: Install Node Exporter
@@ -70,5 +72,5 @@
     to_port: "{{ node_exporter_web_listen_address_port_internal | default(omit) }}"
   when:
     - node_exporter_web_listen_address_host is defined
-    - node_exporter_web_listen_address_host | regex_search('^172')
+    - node_exporter_web_listen_address_host is match('^172')
     - node_exporter_web_listen_address_port_internal is defined

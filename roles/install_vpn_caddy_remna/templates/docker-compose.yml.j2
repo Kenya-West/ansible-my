@@ -2,13 +2,15 @@
 
 services:
   remna:
-    image: remnawave/node:latest
+    image: remnawave/node:{{ (remna_node_container_image_pinned_version | string) | default('latest') }}
     container_name: remna
-{% if ansible_virtualization_type != 'lxc' %}
+    cpus: 0.75
+    mem_limit: 768m
+{% if ansible_facts['virtualization_type'] != 'lxc' %}
     ulimits:
       nofile:
-        soft: 1048576
-        hard: 1048576
+        soft: 8192
+        hard: 8192
 {% endif %}
     env_file:
       - .env
@@ -16,7 +18,7 @@ services:
       - /home/{{ standard_user }}/logs/remnanode:/var/log/remnanode
     cap_add:
       - NET_ADMIN
-{% set sd = domains_keys.xray_under_dns_balancer | default([]) %}
+{% set sd = domains_keys.remna_node | map(attribute='domain') | list | default([]) %}
 {% if sd | length > 0 %}
     ports:
 {% if caddy_occupy_HTTPS is not defined or caddy_occupy_HTTPS == false %}

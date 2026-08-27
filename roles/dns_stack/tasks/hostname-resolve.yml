@@ -1,7 +1,7 @@
 # Ensure hostname is set and resolvable locally
 - name: Ensure hostname matches desired value (optional, if you manage it)
   ansible.builtin.hostname:
-    name: "{{ dnscrypt.hostname | default(ansible_hostname) }}"
+    name: "{{ dnscrypt.hostname | default(ansible_facts['hostname']) }}"
 
 - name: Ensure /etc/hosts has localhost line
   ansible.builtin.lineinfile:
@@ -17,8 +17,8 @@
 - name: Ensure /etc/hosts maps hostname to 127.0.1.1
   ansible.builtin.lineinfile:
     path: /etc/hosts
-    regexp: '^\s*127\.0\.1\.1\s+{{ ansible_hostname }}(\s|$)'
-    line: "127.0.1.1 {{ ansible_hostname }}"
+    regexp: '^\s*127\.0\.1\.1\s+{{ ansible_facts.hostname }}(\s|$)'
+    line: "127.0.1.1 {{ ansible_facts['hostname'] }}"
     state: present
 
 - name: Ensure IPv6 localhost entries exist (safe even if you don't use IPv6)

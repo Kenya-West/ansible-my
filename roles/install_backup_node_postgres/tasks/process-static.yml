@@ -17,14 +17,14 @@
     name: kwtoolset/add_path_section
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     add_path_section_mode: list
     add_path_section_list: "{{ source_paths }}"
     add_path_section_section: "{{ location.source_path }}"
   register: source_paths_mapped_result
   tags:
-    - update_config
+    - update_config_hard
 - name: Set fact for source_paths_mapped
   ansible.builtin.set_fact:
     source_paths_mapped: "{{ add_path_section_result }}"
@@ -34,14 +34,14 @@
     name: kwtoolset/add_path_section
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     add_path_section_mode: single
     add_path_section_path: "{{ dest_path_full }}"
     add_path_section_section: "{{ location.dest_path }}"
   register: dest_path_full_mapped_result
   tags:
-    - update_config
+    - update_config_hard
 - name: Set fact for dest_path_full_mapped
   ansible.builtin.set_fact:
     dest_path_full_mapped: "{{ add_path_section_result }}"
@@ -51,7 +51,8 @@
     name: kwtoolset/copy_files_templating
     apply:
       tags:
-        - update_config
+        - update_config_hard
+        - update_config_soft
   vars:
     copy_files_templating_dir_list:
       - src: "{{ source_path }}"
@@ -61,7 +62,8 @@
   loop_control:
     loop_var: source_path
   tags:
-    - update_config
+    - update_config_hard
+    - update_config_soft
 
 # Cron job
 - name: Generate a cronjob without and with analytics paths

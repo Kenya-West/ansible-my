@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: MIT-0
+---
+# http://ip-api.com/json/ - free and keyless, 45 requests a minute per source IP.
+#
+# Plain HTTP on purpose: the free tier answers HTTPS with 403 "SSL unavailable for this
+# endpoint", TLS is a paid feature. Nothing secret leaves the host, the request carries no
+# credentials and the reply is public data, but drop it into get_ip_data_disabled_providers
+# if cleartext requests are unacceptable in your environment.
+#
+# The endpoint reports failures with HTTP 200 and status=fail, so the payload is checked here.
+- name: Ask ip-api.com over HTTP
+  ansible.builtin.include_tasks: _http_get.yml
+
+- name: Map the ip-api.com reply onto the common schema
+  ansible.builtin.set_fact:
+    _gid_fields:
+      ip: "{{ _gid_j.query | default(none) }}"
+      hostname: "{{ _gid_j.reverse | default(none) }}"
+      continent_code: "{{ _gid_j.continentCode | default(none) }}"
+      continent_name: "{{ _gid_j.continent | default(none) }}"
+      country_code: "{{ _gid_j.countryCode | default(none) }}"
+      country_name: "{{ _gid_j.country | default(none) }}"
+      region_code: "{{ _gid_j.region | default(none) }}"
+      region_name: "{{ _gid_j.regionName | default(none) }}"
+      city: "{{ _gid_j.city | default(none) }}"
+      zip: "{{ _gid_j.zip | default(none) }}"
+      latitude: "{{ _gid_j.lat | default(none) }}"
+      longitude: "{{ _gid_j.lon | default(none) }}"
+      timezone: "{{ _gid_j.timezone | default(none) }}"
+      utc_offset: "{{ _gid_j.offset | default(none) }}"
+      asn: "{{ _gid_token[2:] if (_gid_token is match('AS[0-9]+$')) else none }}"
+      asn_org: "{{ _gid_j.asname | default(none) }}"
+      isp: "{{ _gid_j.isp | default(none) }}"
+      org: "{{ _gid_j.org | default(none) }}"
+      is_mobile: "{{ _gid_j.mobile | default(none) }}"
+      is_proxy: "{{ _gid_j.proxy | default(none) }}"
+      is_hosting: "{{ _gid_j.hosting | default(none) }}"
+  when: _gid_j.status | default('') == 'success'
+  vars:
+    _gid_j: "{{ _gid_raw.json | default({}) }}"
+    # "as" arrives as "AS17552 True Online", only the number is wanted here.
+    _gid_token: "{{ (_gid_j['as'] | default('')).split(' ') | first | default('') }}"
+
+- name: Remember why ip-api.com refused to answer
+  ansible.builtin.set_fact:
+    _gid_error: "ip-api.com replied {{ _gid_j.status | default('an unexpected payload') }}: {{ _gid_j.message | default('no message') }}"
+  when: _gid_j.status | default('') != 'success'
+  vars:
+    _gid_j: "{{ _gid_raw.json | default({}) }}"

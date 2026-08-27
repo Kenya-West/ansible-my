@@ -1,0 +1,7 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/kwtoolset/remap_dns_records
+
+- name: Remap DNS records
+  ansible.builtin.set_fact:
+    dns_records: "{{ remap_dns_records }}"

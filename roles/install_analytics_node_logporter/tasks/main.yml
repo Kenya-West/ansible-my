@@ -28,13 +28,13 @@
     name: kwtoolset/create_dirs_traversal
     apply:
       tags:
-        - update_config
+        - update_config_hard
   vars:
     create_dirs_traversal_path: "{{ dest_path_full }}"
     create_dirs_traversal_strip_leaf: true
     create_dirs_force_mode: "0775"
   tags:
-    - update_config
+    - update_config_hard
 
 - name: Ensure Docker network {{ analytics_node_network_name }} exists with specific settings
   community.docker.docker_network:
@@ -47,7 +47,8 @@
     name: kwtoolset/copy_files_templating
     apply:
       tags:
-        - update_config
+        - update_config_hard
+        - update_config_soft
   vars:
     copy_files_templating_dir_list:
       - src: "{{ source_path }}"
@@ -57,44 +58,66 @@
   loop_control:
     loop_var: source_path
   tags:
-    - update_config
+    - update_config_hard
+    - update_config_soft
+
+- name: compose_restart
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_restart
+    apply:
+      tags:
+        - never
+        - update_config_soft
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - never
+    - update_config_soft
+
 - name: compose_pull
   ansible.builtin.include_role:
     name: kwtoolset/compose_pull
     apply:
       tags:
-        - update_image
+        - update_image_hard
+        - update_image_soft
   vars:
     project_paths:
       - "{{ dest_path_full }}"
   tags:
-    - update_image
+    - update_image_hard
+    - update_image_soft
+
 - name: compose_down
   ansible.builtin.include_role:
     name: kwtoolset/compose_down
     apply:
       tags:
-        - update_image
-        - update_config
+        - update_image_hard
+        - update_config_hard
   vars:
     project_paths:
       - "{{ dest_path_full }}"
   tags:
-    - update_image
-    - update_config
+    - update_image_hard
+    - update_config_hard
+
 - name: compose_up
   ansible.builtin.include_role:
     name: kwtoolset/compose_up
     apply:
       tags:
-        - update_image
-        - update_config
+        - update_image_hard
+        - update_image_soft
+        - update_config_hard
   vars:
     project_paths:
       - "{{ dest_path_full }}"
   tags:
-    - update_image
-    - update_config
+    - update_image_hard
+    - update_image_soft
+    - update_config_hard
 
 - name: Add port {{ logporter_exporter_external_port }} to UFW
   become: true

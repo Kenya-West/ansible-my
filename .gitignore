@@ -64,3 +64,6 @@ temp/*
 temp/**/*
 !temp/**/
 !temp/**/.gitkeep
+
+.ansible/collections
+.ansible/modules

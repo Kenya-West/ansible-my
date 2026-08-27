@@ -5,6 +5,7 @@ from pathlib import PurePath
 import os
 import os.path as path
 import stat
+import tempfile
 
 import ansible.module_utils.common.text.converters as converters
 
@@ -145,7 +146,12 @@ class ActionModule(ActionBase):
 
         if "warnings" in result:
             for warning in result["warnings"]:
-                self._display.warning(warning)
+                if isinstance(warning, str):
+                    self._display.warning(warning)
+                else:
+                    # ansible-core >= 2.18 returns structured WarningSummary
+                    # objects instead of plain strings.
+                    self._display.warning(warning.event.msg)
 
         # The find module always returns a message, either that all paths have been
         # examined, or that not all paths have been examined. In the second case, more
@@ -253,13 +259,17 @@ class ActionModule(ActionBase):
             loader=self._loader,
             templar=self._templar,
         )
-        return template_lookup.run([path], convert_data=False, variables=task_vars)[0]
+        return template_lookup.run([path], variables=task_vars)[0]
 
     def _get_local_file_contents(self, path):
+        # Non-template files are copied verbatim, so we read them as raw
+        # bytes instead of decoding them as text. Some files under a
+        # templates/ tree are genuinely binary (e.g. archives), and
+        # round-tripping their bytes through a text codec would fail.
         self._display.vvvv(f"File lookup using '{path}' as file")
         try:
             contents, _ = self._loader._get_file_contents(path)
-            return converters.to_text(contents, errors="surrogate_or_strict")
+            return contents
         except AnsibleParserError:
             raise AnsibleError(f"could not locate file in lookup: {path}")
 
@@ -367,26 +377,43 @@ class ActionModule(ActionBase):
             yield result
 
     def _copy_file(self, file, task_vars):
-        task = self._task.copy()
-        task.args = dict(
-            content=file["content"],
-            dest=file["dest"],
-            group=file["group"],
-            owner=file["owner"],
-            mode=file["mode"],
-        )
+        content = file["content"]
+        if content is None:
+            content = b""
+        elif isinstance(content, str):
+            # Templated files are rendered to text.
+            content = converters.to_bytes(content, errors="surrogate_or_strict")
+        # Otherwise, content is already the raw bytes of a non-template
+        # file, which may not be valid text (e.g. binary archives).
 
-        self._display.vv(f"COPY: {file['dest']}")
-        copy_action = self._shared_loader_obj.action_loader.get(
-            "ansible.builtin.copy",
-            task=task,
-            connection=self._connection,
-            play_context=self._play_context,
-            loader=self._loader,
-            templar=self._templar,
-            shared_loader_obj=self._shared_loader_obj,
-        )
-        return copy_action.run(task_vars=task_vars)
+        with tempfile.NamedTemporaryFile("wb", delete=False) as temp_file:
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+
+        try:
+            task = self._task.copy()
+            task.args = dict(
+                src=temp_file_path,
+                dest=file["dest"],
+                group=file["group"],
+                owner=file["owner"],
+                mode=file["mode"],
+            )
+
+            self._display.vv(f"COPY: {file['dest']}")
+            copy_action = self._shared_loader_obj.action_loader.get(
+                "ansible.builtin.copy",
+                task=task,
+                connection=self._connection,
+                play_context=self._play_context,
+                loader=self._loader,
+                templar=self._templar,
+                shared_loader_obj=self._shared_loader_obj,
+            )
+            return copy_action.run(task_vars=task_vars)
+        finally:
+            if path.exists(temp_file_path):
+                os.remove(temp_file_path)
 
     def _create_directory(self, directory, task_vars):
         self._display.vv(f"DIR: {directory['dest']}")

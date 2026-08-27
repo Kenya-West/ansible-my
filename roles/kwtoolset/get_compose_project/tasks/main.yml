@@ -1,15 +1,39 @@
 ---
 # tasks file for roles/kwtoolset/get_compose_project
+
 - name: Assert get_compose_project_dir is defined
   ansible.builtin.assert:
     that:
       - get_compose_project_dir is defined
     fail_msg: "get_compose_project_dir is not defined. Cannot proceed."
-- name: Get Docker compose project name
-  ansible.builtin.script: files/script.sh
-  args:
-    chdir: "{{ get_compose_project_dir }}"
-  register: result
+
+- name: Get Docker Compose project name
+  block:
+    - name: Run script to get Docker Compose project name
+      ansible.builtin.script: files/script.sh
+      args:
+        chdir: "{{ get_compose_project_dir }}"
+      timeout: "{{ compose_timeout }}"
+      check_mode: false
+      register: result
+
+  rescue:
+    - name: Get Docker Compose project name failed
+      ansible.builtin.debug:
+        msg: >-
+          ERROR: Failed to get Docker Compose project name.
+          {{ ansible_failed_result.msg
+             | default(ansible_failed_result.stderr
+             | default('Task failed or timed out')) }}
+
+    - name: Fail because Docker Compose project name could not be determined
+      ansible.builtin.fail:
+        msg: >-
+          ERROR: Failed to get Docker Compose project name.
+          {{ ansible_failed_result.msg
+             | default(ansible_failed_result.stderr
+             | default('Task failed or timed out')) }}
+
 - name: Set compose project name fact
   ansible.builtin.set_fact:
     get_compose_project_name: "{{ result.stdout | trim }}"

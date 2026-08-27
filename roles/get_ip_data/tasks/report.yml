@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: MIT-0
+---
+# Prints the merged result together with everything that went wrong on the way to it.
+- name: Show the merged IP data
+  ansible.builtin.debug:
+    msg: "{{ _gid_report }}"
+  vars:
+    _gid_out: "{{ lookup('vars', get_ip_data_fact_name) }}"
+    _gid_flag_names: ['is_mobile', 'is_proxy', 'is_vpn', 'is_tor', 'is_hosting', 'is_abuser']
+    # Folded across lines inside the Jinja expressions, where the extra whitespace is harmless.
+    _gid_flags: >-
+      {% for k in _gid_flag_names if _gid_out[k] is defined %}{{ k }}={{ _gid_out[k]
+      }}{{ ' ' if not loop.last else '' }}{% else %}none reported{% endfor %}
+    _gid_unreachable: >-
+      {% for s in _gid_out.sources if not s.ok %}{{ s.provider }} ({{ s.error
+      | truncate(70) }}){{ ', ' if not loop.last else '' }}{% else %}none{% endfor %}
+    _gid_untouched: >-
+      {% for s in _gid_out.skipped %}{{ s.provider }} ({{ s.reason
+      }}){{ ', ' if not loop.last else '' }}{% else %}none{% endfor %}
+    _gid_contested: >-
+      {% for k, v in _gid_out.consensus.items() if v | length > 1 %}{{ k }}={{ v
+      }}{{ ' ' if not loop.last else '' }}{% else %}nothing, every provider agreed{% endfor %}
+    _gid_report:
+      - "🌍 public IP data of {{ inventory_hostname }} (policy: {{ _gid_out.policy }})"
+      - "ip          : {{ _gid_out.ip | default('-') }} ({{ _gid_out.ip_version | default('-') }})"
+      - "hostname    : {{ _gid_out.hostname | default('-') }}"
+      - "country     : {{ _gid_out.country_code | default('-') }} {{ _gid_out.country_name | default('') }}"
+      - "region      : {{ _gid_out.region_name | default('-') }} {{ _gid_out.region_code | default('') }}"
+      - "city        : {{ _gid_out.city | default('-') }} {{ _gid_out.zip | default('') }}"
+      - "coordinates : {{ _gid_out.latitude | default('-') }}, {{ _gid_out.longitude | default('-') }}"
+      - "timezone    : {{ _gid_out.timezone | default('-') }}"
+      - "network     : {{ ('AS' ~ _gid_out.asn) if _gid_out.asn is defined else '-' }} {{ _gid_out.asn_org | default(_gid_out.isp) | default('') }}"
+      - "flags       : {{ _gid_flags }}"
+      - "answered    : {{ _gid_out.succeeded | join(', ') | default('nobody', true) }}"
+      - "unreachable : {{ _gid_unreachable }}"
+      - "not queried : {{ _gid_untouched }}"
+      - "contested   : {{ _gid_contested }}"
+
+- name: Show every provider answer on its own
+  ansible.builtin.debug:
+    msg: "{{ item.provider }} ({{ item.type }}, {{ item.endpoint }}) -> {{ item.data if item.ok else item.error }}"
+  loop: "{{ get_ip_data_results }}"
+  loop_control:
+    label: "{{ item.provider }}"
+  when: get_ip_data_show_sources | bool

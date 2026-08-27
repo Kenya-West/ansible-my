@@ -1,0 +1,13 @@
+{% set preferred = python_mirrors | selectattr('preferred_country_code', 'equalto', enforce_country_code | upper) | list %}
+{% set rest = python_mirrors | rejectattr('preferred_country_code', 'equalto', enforce_country_code | upper) | list %}
+{% set sorted_mirrors = preferred + rest %}
+{% for mirror in sorted_mirrors %}
+[[index]]
+url = "{{ mirror.url }}"
+{% if loop.last %}
+default = true
+{% endif %}
+
+ignore-error-codes = [500, 502, 503, 504]
+
+{% endfor %}

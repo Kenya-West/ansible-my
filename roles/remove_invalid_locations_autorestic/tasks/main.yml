@@ -16,8 +16,10 @@
 
 - name: Check existence of each 'from' directory in locations
   ansible.builtin.stat:
-    path: "{{ item.value.from }}"
+    path: "{{ path.value.from }}"
   loop: "{{ _autorestic_cfg.locations | dict2items }}"
+  loop_control:
+    loop_var: path
   register: location_stats
 
 - name: Count locations
@@ -26,9 +28,11 @@
 
 - name: Build dictionary of valid locations
   ansible.builtin.set_fact:
-    valid_locations: "{{ valid_locations | default({}) | combine({ (item.item.key): item.item.value }) }}"
+    valid_locations: "{{ valid_locations | default({}) | combine({ (path.path.key): path.path.value }) }}"
   loop: "{{ location_stats.results }}"
-  when: item.stat.exists
+  loop_control:
+    loop_var: path
+  when: path.stat.exists
 
 - name: Count valid locations
   ansible.builtin.set_fact:

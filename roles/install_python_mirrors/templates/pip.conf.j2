@@ -1,0 +1,11 @@
+{% set preferred = python_mirrors | selectattr('preferred_country_code', 'equalto', enforce_country_code | upper) | list %}
+{% set rest = python_mirrors | rejectattr('preferred_country_code', 'equalto', enforce_country_code | upper) | list %}
+{% set sorted_mirrors = preferred + rest %}
+[global]
+index-url = {{ sorted_mirrors[0].url }}
+{% if sorted_mirrors | length > 1 %}
+extra-index-url =
+{% for mirror in sorted_mirrors[1:] %}
+    {{ mirror.url }}
+{% endfor %}
+{% endif %}

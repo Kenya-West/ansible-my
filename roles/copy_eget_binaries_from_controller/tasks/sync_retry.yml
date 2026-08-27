@@ -1,0 +1,36 @@
+---
+- name: Synchronize binaries to host /usr/local/bin (attempt {{ eget_sync_attempt | default(1) }}/{{ eget_sync_retries }})
+  become: true
+  become_user: root
+  ansible.builtin.synchronize:
+    mode: push
+    src: "{{ hostvars[eget_primary_host].eget_temp_dir.path }}/binaries/"
+    dest: /usr/local/bin/
+    ssh_connection_multiplexing: true
+    rsync_opts:
+      - "--chmod=F0755"
+  delegate_to: localhost
+  register: eget_sync_result
+  ignore_errors: "{{ (eget_sync_attempt | default(1) | int) < (eget_sync_retries | int) }}"
+
+- name: Wait before retrying synchronize to host
+  ansible.builtin.pause:
+    seconds: "{{ (eget_sync_attempt | default(1) | int) * (eget_sync_retry_delay | int) }}"
+  when:
+    - eget_sync_result is failed
+    - (eget_sync_attempt | default(1) | int) < (eget_sync_retries | int)
+
+- name: Compute next synchronize attempt number
+  ansible.builtin.set_fact:
+    eget_sync_next_attempt: "{{ (eget_sync_attempt | default(1) | int) + 1 }}"
+  when:
+    - eget_sync_result is failed
+    - (eget_sync_attempt | default(1) | int) < (eget_sync_retries | int)
+
+- name: Retry synchronize binaries to host
+  ansible.builtin.include_tasks: sync_retry.yml
+  when:
+    - eget_sync_result is failed
+    - (eget_sync_attempt | default(1) | int) < (eget_sync_retries | int)
+  vars:
+    eget_sync_attempt: "{{ eget_sync_next_attempt }}"

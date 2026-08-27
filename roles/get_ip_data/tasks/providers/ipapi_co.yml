@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: MIT-0
+---
+# https://ipapi.co/json/ - free and keyless, 1000 requests a day per source IP.
+#
+# It is the twitchiest of the free endpoints: it answers HTTP 429 with
+# {"error": true, "reason": "RateLimited"} for datacenter ranges and for anyone who has spent
+# the daily budget, which _http_get.yml turns into a plain provider failure. It also signals
+# refusals with HTTP 200 and an error key, so the payload is checked here as well.
+- name: Ask ipapi.co over HTTPS
+  ansible.builtin.include_tasks: _http_get.yml
+
+- name: Map the ipapi.co reply onto the common schema
+  ansible.builtin.set_fact:
+    _gid_fields:
+      ip: "{{ _gid_j.ip | default(none) }}"
+      continent_code: "{{ _gid_j.continent_code | default(none) }}"
+      country_code: "{{ _gid_j.country_code | default(none) }}"
+      country_name: "{{ _gid_j.country_name | default(none) }}"
+      region_code: "{{ _gid_j.region_code | default(none) }}"
+      region_name: "{{ _gid_j.region | default(none) }}"
+      city: "{{ _gid_j.city | default(none) }}"
+      zip: "{{ _gid_j.postal | default(none) }}"
+      latitude: "{{ _gid_j.latitude | default(none) }}"
+      longitude: "{{ _gid_j.longitude | default(none) }}"
+      timezone: "{{ _gid_j.timezone | default(none) }}"
+      asn: "{{ _gid_asn[2:] if (_gid_asn is match('AS[0-9]+$')) else none }}"
+      asn_org: "{{ _gid_j.org | default(none) }}"
+      org: "{{ _gid_j.org | default(none) }}"
+  when: _gid_j.error is not defined
+  vars:
+    _gid_j: "{{ _gid_raw.json | default({}) }}"
+    # "asn" arrives as "AS17552".
+    _gid_asn: "{{ _gid_j.asn | default('') }}"
+
+- name: Remember why ipapi.co refused to answer
+  ansible.builtin.set_fact:
+    _gid_error: "ipapi.co replied {{ _gid_j.reason | default('an error') }}: {{ _gid_j.message | default('no message') }}"
+  when: _gid_j.error is defined
+  vars:
+    _gid_j: "{{ _gid_raw.json | default({}) }}"

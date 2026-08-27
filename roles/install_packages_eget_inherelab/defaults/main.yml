@@ -1,0 +1,4 @@
+---
+# defaults file for roles/install_packages_eget_inherelab
+
+eget_config_location: "/home/{{ standard_user }}/.config/eget/eget.toml"

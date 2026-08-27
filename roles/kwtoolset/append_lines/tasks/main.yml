@@ -11,7 +11,7 @@
     - append_lines_list | length > 0
   ignore_errors: true
 
-- name: Remove lines by regex {{ item }} if any
+- name: Remove lines by regex if any
   ansible.builtin.lineinfile:
     path: "{{ append_lines_dest_file_path }}"
     regexp: "{{ item }}"

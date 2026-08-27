@@ -1,0 +1,162 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/install_deb_mirrors
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Ensure python3-debian is installed
+  ansible.builtin.apt:
+    name: python3-debian
+    state: present
+
+- name: Detect country from IP when no override is set
+  block:
+    - name: Get IP geolocation data
+      ansible.builtin.include_role:
+        name: get_ip_data
+      vars:
+        get_ip_data_required_fields: ['country_code']
+        get_ip_data_policy: check_all
+
+    - name: Set country from IP data
+      ansible.builtin.set_fact:
+        deb_mirrors_country: "{{ ip_data.country_code }}"
+      when: ip_data.country_code | length > 0
+
+    - name: Debug country information
+      ansible.builtin.debug:
+        msg: "The country for host {{ inventory_hostname }} with ip {{ ip_data.ip }} is {{ deb_mirrors_country }}"
+      when: ip_data.country_code | length > 0
+  when: enforce_country_code is not defined or enforce_country_code is not string or enforce_country_code | length == 0
+
+- name: Use forced country override
+  ansible.builtin.set_fact:
+    deb_mirrors_country: "{{ enforce_country_code }}"
+  when:
+    - enforce_country_code is defined
+    - enforce_country_code is string
+    - enforce_country_code | length > 0
+
+- name: Normalize country code to uppercase
+  ansible.builtin.set_fact:
+    deb_mirrors_country_normalized: "{{ deb_mirrors_country | upper }}"
+    deb_mirrors_country_code_allowlist_normalized: "{{ deb_mirrors_country_code_allowlist | map('upper') | list }}"
+  when:
+    - deb_mirrors_country is defined
+    - deb_mirrors_country_code_allowlist is defined
+
+- name: Create APT mirror list
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/apt/ubuntu-mirrors.txt
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {% for mirror in deb_mirrors %}
+      {{ mirror.url }}
+      {% endfor %}
+  register: deb_mirror_list
+
+- name: Configure Ubuntu mirror list
+  become: true
+  ansible.builtin.deb822_repository:
+    name: ubuntu-mirror-list
+    types:
+      - deb
+    uris:
+      - mirror+file:/etc/apt/ubuntu-mirrors.txt
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}"
+      - "{{ ansible_facts['distribution_release'] }}-updates"
+      - "{{ ansible_facts['distribution_release'] }}-backports"
+      - "{{ ansible_facts['distribution_release'] }}-security"
+    components:
+      - main
+      - restricted
+      - universe
+      - multiverse
+    signed_by: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+    state: present
+  register: deb_mirror_repository
+  when:
+    - deb_mirrors_country_normalized
+        in deb_mirrors_country_code_allowlist_normalized
+    - ansible_facts['distribution'] == "Ubuntu"
+
+
+- name: Configure Debian repositories
+  become: true
+  ansible.builtin.deb822_repository:
+    name: debian
+    types:
+      - deb
+    uris:
+      - https://deb.debian.org/debian
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}"
+      - "{{ ansible_facts['distribution_release'] }}-updates"
+      - "{{ ansible_facts['distribution_release'] }}-backports"
+    components:
+      - main
+      - contrib
+      - non-free
+      - non-free-firmware
+    signed_by: /usr/share/keyrings/debian-archive-keyring.gpg
+    state: present
+  register: debian_repository
+  when:
+    - ansible_facts['distribution'] == "Debian"
+
+
+- name: Configure Debian security repository
+  become: true
+  ansible.builtin.deb822_repository:
+    name: debian-security
+    types:
+      - deb
+    uris:
+      - https://security.debian.org/debian-security
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}-security"
+    components:
+      - main
+      - contrib
+      - non-free
+      - non-free-firmware
+    signed_by: /usr/share/keyrings/debian-archive-keyring.gpg
+    state: present
+  register: debian_security_repository
+  when:
+    - ansible_facts['distribution'] == "Debian"
+
+
+- name: Remove Ubuntu mirror repository from Debian
+  become: true
+  ansible.builtin.deb822_repository:
+    name: ubuntu-mirror-list
+    state: absent
+  when:
+    - ansible_facts['distribution'] == "Debian"
+
+
+- name: Update apt cache
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+  when:
+    - >
+      (deb_mirror_repository is defined and deb_mirror_repository is changed)
+      or
+      (debian_repository is defined and debian_repository is changed)
+      or
+      (debian_security_repository is defined and debian_security_repository is changed)
+
+- name: Update APT cache
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+  when:
+    - deb_mirrors_country_normalized
+        in deb_mirrors_country_code_allowlist_normalized
+    - deb_mirror_list.changed or deb_mirror_repository.changed

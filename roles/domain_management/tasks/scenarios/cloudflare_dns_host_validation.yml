@@ -1,0 +1,130 @@
+---
+# Scenario: cloudflare_dns_host_validation
+#
+# Read-only audit. For every host in the domain_management group it checks that
+# the records the host declares actually exist in Cloudflare (e.g. an A record
+# for the host's domain pointing at the host's IP), and that each domain stays
+# within the per-host policy defined in `domains_settings`. It only reports — it
+# never changes anything.
+#
+# Shared logic (identical to the other scenarios):
+#   * ../dns_resolve_context.yml      — providers, tokens, record types, managed_domains
+#   * ../read_cloudflare_records.yml   — the actual Cloudflare state (run_once, shared)
+#   * ../compute_host_dns_records.yml  — the host's declared records -> cf_set_targets
+#
+# Policy — `domains_settings` (per host, optional):
+#   - name: <domain>
+#     records_limit:
+#       - { type: A, limit: 1 }     # at most 1 A record for <domain>; -1 = unlimited
+#   The default policy (no entry, or limit -1) is "no limitation".
+#
+# Everything runs on the control node (delegate_to: localhost).
+
+- name: Resolve the shared DNS context
+  ansible.builtin.include_tasks: ../dns_resolve_context.yml
+  tags:
+    - cloudflare_dns_host_validation
+
+- name: Report and stop early when no managed domains were found
+  ansible.builtin.debug:
+    msg: "No `domains` defined on any host in the domain_management group; nothing to validate."
+  when: managed_domains | length == 0
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_dns_host_validation
+
+- name: Read the current Cloudflare records for the managed zones
+  ansible.builtin.include_tasks: ../read_cloudflare_records.yml
+  when: managed_domains | length > 0
+  tags:
+    - cloudflare_dns_host_validation
+
+- name: Compute the records this host declares
+  ansible.builtin.include_tasks: ../compute_host_dns_records.yml
+  tags:
+    - cloudflare_dns_host_validation
+
+# --- Checks (per host) ------------------------------------------------------
+
+- name: Reset the per-host validation accumulators
+  ansible.builtin.set_fact:
+    missing_records: []
+    limit_violations: []
+  delegate_to: localhost
+  tags:
+    - cloudflare_dns_host_validation
+
+- name: Find declared records missing from Cloudflare
+  ansible.builtin.set_fact:
+    missing_records: "{{ missing_records + [exp] }}"
+  loop: "{{ cf_set_targets | default([]) }}"
+  loop_control:
+    loop_var: exp
+    label: "{{ exp.type }} {{ exp.record }} -> {{ exp.value }}"
+  vars:
+    # A declared record is present when Cloudflare has a record with the same
+    # name, type and content (value).
+    _matches: >-
+      {{ cloudflare_records | default([])
+         | selectattr('name', 'equalto', exp.record)
+         | selectattr('type', 'equalto', exp.type)
+         | selectattr('content', 'equalto', exp.value)
+         | list }}
+  when: _matches | length == 0
+  delegate_to: localhost
+  tags:
+    - cloudflare_dns_host_validation
+
+- name: Find record-limit violations against this host's domains_settings
+  ansible.builtin.set_fact:
+    limit_violations: >-
+      {{ limit_violations + [{
+           'domain': limit_rule.0.name,
+           'type': limit_rule.1.type,
+           'limit': limit_rule.1.limit | int,
+           'actual': _count | int,
+         }] }}
+  loop: "{{ domains_settings | default([]) | subelements('records_limit', skip_missing=true) }}"
+  loop_control:
+    loop_var: limit_rule
+    label: "{{ limit_rule.0.name }} {{ limit_rule.1.type }} (limit {{ limit_rule.1.limit }})"
+  vars:
+    _count: >-
+      {{ cloudflare_records | default([])
+         | selectattr('name', 'equalto', limit_rule.0.name)
+         | selectattr('type', 'equalto', limit_rule.1.type)
+         | list | length }}
+  when:
+    - (limit_rule.1.limit | int) != -1
+    - (_count | int) > (limit_rule.1.limit | int)
+  delegate_to: localhost
+  tags:
+    - cloudflare_dns_host_validation
+
+# --- Report (per host) ------------------------------------------------------
+
+- name: Report the DNS validation result for this host
+  ansible.builtin.debug:
+    msg:
+      host: "{{ inventory_hostname }}"
+      status: "{{ 'OK' if (missing_records | length == 0 and limit_violations | length == 0) else 'ISSUES FOUND' }}"
+      declared_records: "{{ cf_set_targets | default([]) | length }}"
+      missing_records: >-
+        {{ missing_records
+           | community.general.json_query('[].{record: record, type: type, value: value, zone: zone}') }}
+      limit_violations: "{{ limit_violations }}"
+  delegate_to: localhost
+  tags:
+    - cloudflare_dns_host_validation
+
+- name: Warn when this host has DNS validation issues
+  ansible.builtin.debug:
+    msg: >-
+      ⚠ {{ inventory_hostname }}: {{ missing_records | length }} declared record(s)
+      missing from Cloudflare, {{ limit_violations | length }} record-limit
+      violation(s). See the report above.
+  when: (missing_records | length > 0) or (limit_violations | length > 0)
+  delegate_to: localhost
+  tags:
+    - cloudflare_dns_host_validation

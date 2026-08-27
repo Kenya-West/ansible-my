@@ -1,0 +1,7 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/kwtoolset/remap_caddy_cert_path
+
+- name: Remap Caddy certificate path
+  ansible.builtin.set_fact:
+    cert_location_path_section: "{{ remap_caddy_cert_path }}"

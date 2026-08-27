@@ -7,6 +7,11 @@
   tags:
     - always
 
+- name: Merge restic configuration from various sources
+  ansible.builtin.include_tasks: merge_config.yml
+  tags:
+    - always
+
 - name: Execute scenarios for this role
   ansible.builtin.include_role:
     name: kwtoolset/scenarios

@@ -1,0 +1,9 @@
+---
+- name: Copy eget binaries from controller to hosts
+  hosts: vps_russia:general_vps_prepare 
+
+  environment:
+    EGET_GITHUB_TOKEN: "{{ github_api_token_eget | default(omit) }}"
+
+  roles:
+    - name: copy_eget_binaries_from_controller
