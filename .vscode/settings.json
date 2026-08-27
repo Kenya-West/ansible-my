@@ -3,5 +3,16 @@
     "search.exclude": {
         "**/ansible-log.log": true
     },
-    "search.useIgnoreFiles": false
+    "search.useIgnoreFiles": false,
+    "git-worktree-manager.worktreeCopyPatterns": [
+        ".env*",
+        ".vscode/**",
+        "*.local",
+        "assets/hosts-list/**",
+        "ansible.cfg",
+        "inventory/host_vars/**",
+        "inventory/production.ini",
+        "inventory/staging.ini",
+        "inventory/group_vars/all/z_common_hosts_secrets/**"
+    ]
 }
