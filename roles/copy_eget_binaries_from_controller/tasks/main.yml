@@ -153,10 +153,14 @@
   ansible.builtin.include_tasks: sync_retry.yml
   when: hostvars[eget_primary_host].eget_install_result.rc == 0
 
+- name: Move binaries declaring a dest_loc to their final location on the host
+  ansible.builtin.include_tasks: place_binaries.yml
+  when: hostvars[eget_primary_host].eget_install_result.rc == 0
+
 - name: Grant user rx on directory and existing contents
   become: true
   ansible.posix.acl:
-    path: /usr/local/bin
+    path: "{{ eget_host_bin_dir }}"
     entity: "{{ standard_user }}"
     etype: user
     permissions: rx
@@ -167,7 +171,7 @@
 - name: Grant user rx as default ACL for future files
   become: true
   ansible.posix.acl:
-    path: /usr/local/bin
+    path: "{{ eget_host_bin_dir }}"
     entity: "{{ standard_user }}"
     etype: user
     permissions: rx
@@ -178,7 +182,7 @@
 - name: Ensure ACL mask allows rx
   become: true
   ansible.posix.acl:
-    path: /usr/local/bin
+    path: "{{ eget_host_bin_dir }}"
     etype: mask
     permissions: rx
     state: present

@@ -16,3 +16,8 @@ eget_sync_retries: 3
 # Base seconds to wait between synchronize retries (multiplied by attempt
 # number, so the delay grows with each retry).
 eget_sync_retry_delay: 10
+
+# Directory on the managed host that the staged binaries are rsynced into.
+# Packages declaring a different dest_loc are moved out of it afterwards by
+# tasks/place_binaries.yml.
+eget_host_bin_dir: /usr/local/bin
