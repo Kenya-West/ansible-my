@@ -204,11 +204,13 @@
   become: true
   become_user: root
   ansible.builtin.file:
-    path: "{{ item.path }}"
+    path: "{{ autorestic_file.path }}"
     owner: "{{ standard_user }}"
     group: "{{ standard_user }}"
     mode: "0775"
   loop: "{{ autorestic_config_files_to_change_perms.files }}"
+  loop_control:
+    loop_var: autorestic_file
 
 # Cron
 - name: Add cron job for autorestic
