@@ -17,3 +17,6 @@ collections:
   - name: ansible.posix
   - name: prometheus.prometheus
   - name: devsec.hardening
+  - name: https://github.com/kenya-west/remnawave-ansible-collection
+    type: git
+    version: master
