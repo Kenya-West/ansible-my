@@ -2,7 +2,7 @@
 # defaults file for roles/configure_bash_profile
 project_dir: "{{ general_vps_prepare_project_structure_end_dirs.bash | ansible.builtin.basename }}"
 project_root_dir: "{{ general_vps_prepare_project_structure_root }}"
-source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root_dir }}"
+source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
 source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
 
 source_paths_add_role_dirs:
