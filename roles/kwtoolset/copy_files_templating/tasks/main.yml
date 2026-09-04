@@ -83,6 +83,7 @@
   when: copy_files_templating_jinja_files_list | length > 0
   delegate_to: localhost
   become: false
+  check_mode: false
   vars:
     ansible_become: false
 
