@@ -100,7 +100,7 @@
     - update_image_soft
     - update_config_hard
 
-- name: Add port {{ pushgateway_external_port }} to UFW
+- name: Add port {{ pushgateway_external_port | default('undefined') }} to UFW
   become: true
   become_user: root
   community.general.ufw:
@@ -109,4 +109,4 @@
     proto: tcp
   when:
     - pushgateway_external_port is defined
-    - pushgateway_external_port | length > 0
+    - pushgateway_external_port | string | length > 0

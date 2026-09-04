@@ -119,7 +119,7 @@
     - update_image_soft
     - update_config_hard
 
-- name: Add port {{ vpn_server_remnawave_external_port }} to UFW
+- name: Add port {{ vpn_server_remnawave_external_port | default('undefined') }} to UFW
   become: true
   become_user: root
   community.general.ufw:
@@ -128,6 +128,6 @@
     proto: tcp
   when:
     - vpn_server_remnawave_external_port is defined
-    - vpn_server_remnawave_external_port | length > 0
+    - vpn_server_remnawave_external_port | string | length > 0
   tags:
     - ports_ufw
