@@ -132,3 +132,5 @@
   ansible.builtin.include_tasks: systemd-install.yml
   tags:
     - update_config_hard
+    - install_systemd_timer
+    - update_systemd_timer

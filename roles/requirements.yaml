@@ -3,14 +3,7 @@ roles:
   - src: geerlingguy.docker
   - src: linux-system-roles.journald
   - src: oefenweb.fail2ban
-  - name: o1labs.systemd
-    src: https://github.com/O1labs/ansible-role-systemd
-    scm: git
-    version: master
-  - name: kenyawest.systemd
-    src: https://github.com/kenya-west/ansible-role-systemd
-    scm: git
-    version: feature/user-level
+  - src: 0x0I.systemd
 
 collections:
   - name: community.general
