@@ -48,8 +48,6 @@ packages_binary_list:
   - repo: fioncat/otree
   - repo: ajeetdsouza/zoxide
   - repo: veeso/termscp
-    assets:
-      - gnu
   - repo: cupcakearmy/autorestic
   - repo: kutovoys/xray-torrent-blocker
     assets:
