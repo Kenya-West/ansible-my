@@ -1,0 +1,32 @@
+vless_reality_xhttp_001:
+  tag: "tag_id"
+  protocol: vless
+
+  settings:
+    vnext:
+      - port: 443
+        users:
+          - id: "{{ service_user_id }}"
+            flow: ''
+            level: 0
+            encryption: none
+        address: "{{ node_address }}"
+
+  xhttpSettings:
+    host: "{{ node_address }}"
+    mode: auto
+    path: "/"
+    headers: {}
+    noSSEHeader: false
+    xPaddingBytes: 100-1000
+    scMaxBufferedPosts: 30
+    scMaxEachPostBytes: 1000000
+    scStreamUpServerSecs: 20-80
+
+  streamSettings:
+    network: xhttp
+    security: reality
+    realitySettings:
+      password: "{{ vpn_server_remnawave_xray_reality_password }}"
+      serverName: "{{ node_address }}"
+      fingerprint: chrome

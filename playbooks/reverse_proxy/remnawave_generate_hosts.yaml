@@ -1,0 +1,4 @@
+- name: Generate Remnawave hosts
+  hosts: vpn_caddy
+  become: false
+  become_user: "{{ standard_user }}"

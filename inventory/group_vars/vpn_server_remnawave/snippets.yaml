@@ -1,0 +1,6 @@
+vpn_server_remnawave_snippets_key_rules_all: rules_all_prod_1
+vpn_server_remnawave_snippets_key_outbounds_all: rules_all_prod_1
+
+# Which domain types to add to snippets for the remna_node domain type. Taken from remna_domain_types
+vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter:
+  - "{{ remna_domain_types.location_chain }}"

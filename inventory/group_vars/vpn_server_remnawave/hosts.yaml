@@ -1,0 +1,22 @@
+# It can be: api_token, caddy_custom_path
+vpn_server_remnawave_access_mode: caddy_custom_path
+
+# It can be: autoselect_if_single, manual_set
+# autoselect_if_single: if there is only one panel, it will be selected automatically
+# manual_set: you need to set the panel manually in the configuration
+vpn_server_remnawave_choose_panel_strategy: autoselect_if_single
+
+# Set pre-configured panel hostname if manual_set is used in vpn_server_remnawave_choose_panel_strategy
+# vpn_server_remnawave_selected_panel_hostname: ''
+
+# What property of domains_keys to use for the remna_node domain type. It can be: main, remna_node, or else
+vpn_server_remnawave_hosts_node_manage_key: remna_node
+
+# Which domain types to use for the remna_node domain type. Taken from remna_domain_types
+vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter:
+  - "{{ remna_domain_types.global_chain_reality_tcp }}"
+  - "{{ remna_domain_types.global_net_reality_tcp }}"
+
+# Only those hosts are managed that have this tag.
+# Everything is being created, searched for, managed and deleted only for hosts that have this tag.
+vpn_server_remnawave_hosts_tag: ansible-managed
