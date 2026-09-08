@@ -1,6 +1,5 @@
-#SPDX-License-Identifier: MIT-0
 ---
 - hosts: localhost
   remote_user: root
   roles:
-    - roles/configure_remnawave_panel_generate_setup
+    - configure_remnawave_panel_generate_setup

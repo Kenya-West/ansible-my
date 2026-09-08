@@ -1,3 +1,46 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # tasks file for roles/configure_remnawave_panel_generate_setup
+#
+# Generates the Remnawave panel setup - outbounds, routing rules and hosts -
+# out of the node facts already in the inventory, and applies it through the
+# kenyawest.remnawave collection.
+
+- name: Choose which Remnawave panel to configure
+  ansible.builtin.include_tasks: select_panel.yml
+  tags:
+    - always
+
+- name: Configure the selected panel
+  when: inventory_hostname == crpgs_selected_panel
+  module_defaults:
+    group/kenyawest.remnawave.remnawave:
+      panel_url: "{{ vpn_server_remnawave_panel_url }}"
+      token: "{{ vpn_server_remnawave_api_token }}"
+      # An empty key is the same as none: the client only sends the header
+      # when there is something to put in it.
+      api_key: >-
+        {{
+          vpn_server_remnawave_custom_login_route_api_token | default('')
+          if vpn_server_remnawave_access_mode == 'caddy_custom_path'
+          else ''
+        }}
+      validate_certs: "{{ vpn_server_remnawave_panel_validate_certs }}"
+      timeout: "{{ vpn_server_remnawave_panel_timeout }}"
+  block:
+    - name: Build the desired setup from the inventory
+      ansible.builtin.include_tasks: build_model.yml
+      tags:
+        - always
+
+    - name: Generate the snippets
+      ansible.builtin.include_tasks: snippets.yml
+      when: "'snippets' in vpn_server_remnawave_generate_stages"
+      tags:
+        - remnawave_snippets
+
+    - name: Generate the hosts
+      ansible.builtin.include_tasks: hosts.yml
+      when: "'hosts' in vpn_server_remnawave_generate_stages"
+      tags:
+        - remnawave_hosts
