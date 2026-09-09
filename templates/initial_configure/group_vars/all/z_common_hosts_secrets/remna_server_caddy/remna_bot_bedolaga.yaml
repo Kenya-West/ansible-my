@@ -11,7 +11,6 @@ vpn_server_remnawave_tgbot_bedolaga_settings:
     run_mode: webhook
 
     webhook_url: "{{ domains_keys.remnawave_tgbot_bedolaga }}" # no https:// prefix
-    webhook_path_prefix: "/{{ vpn_server_remnawave_tgbot_bedolaga_settings_global.service_name_prefix }}"
     webhook_secret_token: ""
 
     web_api_enabled: true
