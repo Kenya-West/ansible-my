@@ -21,7 +21,7 @@ so a round-robin record in front of two nodes stays a single Host in the
 panel, bound to both.
 
 **Chain entries** are the distinct domains of type `location_chain`
-published by nodes whose `enforce_country_code` is listed in
+published by nodes whose `country_code_upper` is listed in
 `vpn_server_remnawave_hosts_chain.entry_country_codes`.
 
 For every exit the role generates:

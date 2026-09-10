@@ -4,46 +4,19 @@
 - name: Gather service facts
   ansible.builtin.service_facts:
 
+- name: Validate country code
+  ansible.builtin.assert:
+    that:
+      - country_code is match('^[a-z]{2}$')
+    fail_msg: >-
+      Invalid country code "{{ country_code }}" in
+      inventory hostname "{{ inventory_hostname }}".
+      Expected exactly two lowercase letters.
+
 - name: Ensure python3-debian is installed
   ansible.builtin.apt:
     name: python3-debian
     state: present
-
-- name: Detect country from IP when no override is set
-  block:
-    - name: Get IP geolocation data
-      ansible.builtin.include_role:
-        name: get_ip_data
-      vars:
-        get_ip_data_required_fields: ['country_code']
-        get_ip_data_policy: check_all
-
-    - name: Set country from IP data
-      ansible.builtin.set_fact:
-        deb_mirrors_country: "{{ ip_data.country_code }}"
-      when: ip_data.country_code | length > 0
-
-    - name: Debug country information
-      ansible.builtin.debug:
-        msg: "The country for host {{ inventory_hostname }} with ip {{ ip_data.ip }} is {{ deb_mirrors_country }}"
-      when: ip_data.country_code | length > 0
-  when: enforce_country_code is not defined or enforce_country_code is not string or enforce_country_code | length == 0
-
-- name: Use forced country override
-  ansible.builtin.set_fact:
-    deb_mirrors_country: "{{ enforce_country_code }}"
-  when:
-    - enforce_country_code is defined
-    - enforce_country_code is string
-    - enforce_country_code | length > 0
-
-- name: Normalize country code to uppercase
-  ansible.builtin.set_fact:
-    deb_mirrors_country_normalized: "{{ deb_mirrors_country | upper }}"
-    deb_mirrors_country_code_allowlist_normalized: "{{ deb_mirrors_country_code_allowlist | map('upper') | list }}"
-  when:
-    - deb_mirrors_country is defined
-    - deb_mirrors_country_code_allowlist is defined
 
 - name: Create APT mirror list
   become: true
@@ -57,6 +30,10 @@
       {{ mirror.url }}
       {% endfor %}
   register: deb_mirror_list
+  when:
+    - country_code_upper
+        in deb_mirrors_country_code_allowlist
+    - ansible_facts['distribution'] == "Ubuntu"
 
 - name: Configure Ubuntu mirror list
   become: true
@@ -80,8 +57,8 @@
     state: present
   register: deb_mirror_repository
   when:
-    - deb_mirrors_country_normalized
-        in deb_mirrors_country_code_allowlist_normalized
+    - country_code_upper
+        in deb_mirrors_country_code_allowlist
     - ansible_facts['distribution'] == "Ubuntu"
 
 
@@ -157,6 +134,6 @@
   ansible.builtin.apt:
     update_cache: true
   when:
-    - deb_mirrors_country_normalized
-        in deb_mirrors_country_code_allowlist_normalized
+    - country_code_upper
+        in deb_mirrors_country_code_allowlist
     - deb_mirror_list.changed or deb_mirror_repository.changed

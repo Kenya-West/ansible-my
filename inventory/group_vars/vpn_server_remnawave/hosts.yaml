@@ -79,7 +79,7 @@ vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
 # again through the chain domain of every node that may act as a chain entry,
 # so the same exit can be reached the long way round.
 vpn_server_remnawave_hosts_chain:
-  # A node may act as a chain entry when its enforce_country_code is listed
+  # A node may act as a chain entry when its country_code_upper is listed
   # here and it publishes a domain of a type in
   # vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter.
   entry_country_codes:

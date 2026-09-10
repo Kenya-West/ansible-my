@@ -1,0 +1,2 @@
+country_code: "{{ inventory_hostname.split('-')[1] }}"
+country_code_upper: "{{ country_code | upper }}"

@@ -12,7 +12,7 @@
       {%-   set _ = collected.append({
               'name': node,
               'panel_name': facts.remna_node_panel_name | default(node, true),
-              'country': facts.enforce_country_code | default('', true),
+              'country': facts.country_code_upper | default('', true),
               'protocol': facts.remna_node_primary_protocol_type
                           | default(vpn_server_remnawave_snippets_default_protocol_type, true),
               'domains': (facts.domains_keys | default({}))
