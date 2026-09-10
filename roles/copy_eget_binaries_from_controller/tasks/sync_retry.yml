@@ -1,11 +1,11 @@
 ---
-- name: Synchronize binaries to host /usr/local/bin (attempt {{ eget_sync_attempt | default(1) }}/{{ eget_sync_retries }})
+- name: Synchronize binaries to host {{ eget_host_bin_dir }} (attempt {{ eget_sync_attempt | default(1) }}/{{ eget_sync_retries }})
   become: true
   become_user: root
   ansible.builtin.synchronize:
     mode: push
     src: "{{ hostvars[eget_primary_host].eget_temp_dir.path }}/binaries/"
-    dest: /usr/local/bin/
+    dest: "{{ eget_host_bin_dir }}/"
     ssh_connection_multiplexing: true
     rsync_opts:
       - "--chmod=F0755"

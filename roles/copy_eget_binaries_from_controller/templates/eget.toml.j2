@@ -27,9 +27,12 @@
 
 [packages.{{ name }}]
   repo = "{{ repo }}"
-{%   if pkg.dest_loc is defined %}
-  target = "{{ pkg.dest_loc }}"
-{%   endif %}
+{#   dest_loc is a path on the *managed host*, not on the controller. Emitting
+     it here would make eget write to that absolute path on the controller --
+     usually a permission denied on system dirs, and the binary would never
+     reach the staging dir, so it would never be synced anywhere. Everything
+     stages flat under [global] target; place_binaries.yml moves the packages
+     that declare a dest_loc into place on the host after the rsync. #}
 {%   if pkg.bin_name is defined %}
   name = "{{ pkg.bin_name }}"
 {%   endif %}

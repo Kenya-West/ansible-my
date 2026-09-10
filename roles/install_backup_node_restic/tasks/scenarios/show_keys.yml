@@ -1,3 +1,42 @@
+- name: Check if backup directories exist
+  ansible.builtin.stat:
+    path: "{{ dir }}"
+  loop: "{{ [backup_restic_node_project_structure_end_dirs.rclone] + [backup_restic_node_project_structure_end_dirs.autorestic] }}"
+  loop_control:
+    loop_var: dir
+  register: backup_dirs_result
+  when:
+    - "'backup_restic_node' in (group_names | default([]))"
+    - backup_restic_node_project_structure_end_dirs_list is defined
+
+- name: Check if rclone and autorestic binaries exist
+  ansible.builtin.shell:
+    cmd: |
+      if ! command -v rclone &> /dev/null; then
+        echo "rclone not found"
+        exit 1
+      fi
+      if ! command -v autorestic &> /dev/null; then
+        echo "autorestic not found"
+        exit 1
+      fi
+  register: binaries_check_result
+  failed_when: binaries_check_result.rc > 1
+  when:
+    - "'backup_restic_node' in (group_names | default([]))"
+
+- name: Set backup_restic_node_deployed to true if directories exist
+  ansible.builtin.set_fact:
+    backup_restic_node_deployed: true
+  when:
+    - backup_dirs_result is defined
+    - backup_dirs_result is not failed
+    - backup_dirs_result is not skipped
+    - backup_dirs_result.results | selectattr('stat.exists', 'equalto', true) | selectattr('stat.isdir', 'equalto', true) | list | length == backup_dirs_result.results | length
+    - binaries_check_result is defined
+    - binaries_check_result is not failed
+    - binaries_check_result is not skipped
+
 - name: Force unlock restic repository
   become: true
   become_user: root
@@ -5,6 +44,8 @@
     cmd: "./scripts/unlock-force.sh"
     chdir: "{{ dest_path_full }}"
   register: unlock_result
+  when:
+    - backup_restic_node_deployed is defined and backup_restic_node_deployed is true
 
 - name: Assert that the unlock was successful
   ansible.builtin.assert:
@@ -14,6 +55,8 @@
     fail_msg: "Failed to unlock the restic repository. Please check the output for details."
   tags:
     - show_keys
+  when:
+    - backup_restic_node_deployed is defined and backup_restic_node_deployed is true
 
 - name: Show keys by running key.sh script
   become: true
@@ -24,6 +67,8 @@
   register: keys
   tags:
     - show_keys
+  when:
+    - backup_restic_node_deployed is defined and backup_restic_node_deployed is true
 
 - name: Debug the keys
   debug:
@@ -39,3 +84,5 @@
           ] }}"
   tags:
     - show_keys
+  when:
+    - backup_restic_node_deployed is defined and backup_restic_node_deployed is true

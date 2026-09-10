@@ -1,0 +1,47 @@
+# Names of the two panel snippets the generated configuration is written into.
+# Override them per panel in host_vars.
+vpn_server_remnawave_snippets_key_rules_all: rules_all_prod_1
+vpn_server_remnawave_snippets_key_outbounds_all: outbounds_all_prod_1
+
+# Snippet templates live beside this file as snippet_<protocol key>_<revision>.yaml
+# and define one variable of the same name, e.g. vless_reality_tcp_001. The
+# protocol key is the key of remna_protocol_types whose value a node declares in
+# remna_node_primary_protocol_type; a node that declares nothing gets the
+# default below.
+vpn_server_remnawave_snippets_template_revision: '001'
+vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vless_reality_tcp }}"
+
+# Generated outbound tags are
+#   <prefix>-<region code>-<protocol type>-<NNN>
+# for example out-chain-auto-eu-tcp-001, numbered per region and protocol.
+#
+# The role owns exactly the outbounds whose tag starts with this prefix, and
+# exactly the rules whose vlessRoute is a single number inside the owned range
+# below. Everything else in both snippets is read back and written out again
+# untouched, so hand-written outbounds and rules - the geo-targeted families,
+# the balancers, the catch-all ranges - survive a regeneration.
+#
+# The default prefix is deliberately distinct from the hand-written out-chain-*
+# tags. Set it to out-chain only once the role is meant to own that namespace.
+vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain-auto
+vpn_server_remnawave_snippets_outbound_tag_index_width: 3
+vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]
+
+# Direct domains are labelled net-<region>-<n>; this maps that region to the
+# short code used in outbound tags. A region that is not listed uses its first
+# two letters.
+vpn_server_remnawave_snippets_region_codes:
+  europe: eu
+  asia: as
+  russia: ru
+  china: cn
+  iran: ir
+  turkmenistan: tm
+  northamerica: na
+  southamerica: sa
+  africa: af
+  oceania: oc
+
+# Whether to push the regenerated snippets into the config profiles that embed
+# them. It can be: on_change, never, always.
+vpn_server_remnawave_snippets_sync: on_change

@@ -27,6 +27,9 @@ services:
     volumes:
       - valkey-socket:/var/run/valkey
       - certs:/etc/remna/certs
+{% if vpn_server_remnawave_notifications_config %}
+      - ./config/notifications.yml:/var/lib/remnawave/configs/notifications/notifications-config.yml:ro
+{% endif %}
     ports:
       - 127.0.0.1:3000:${APP_PORT:-3000}
       - 127.0.0.1:3001:${METRICS_PORT:-3001}

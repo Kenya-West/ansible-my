@@ -2,7 +2,7 @@
 # defaults file for roles/install_vpn_caddy_remna
 project_dir: "{{ vpn_project_structure_end_dirs.remna | ansible.builtin.basename }}"
 project_root_dir: "{{ vpn_project_structure_root }}"
-source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root_dir }}"
+source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
 source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
 
 source_paths_add_role_dirs:
@@ -34,6 +34,8 @@ systemd_unit_configs:
   - name: "{{ systemd_timer_name }}"
     type: service
     scope: user
+    user: "{{ systemd_user }}"
+    group: "{{ systemd_group }}"
     path: "{{ systemd_user_unit_path }}"
     Unit:
       Description: "Run {{ systemd_timer_name }} script"
@@ -55,6 +57,8 @@ systemd_unit_configs:
   - name: "{{ systemd_timer_name }}"
     type: timer
     scope: user
+    user: "{{ systemd_user }}"
+    group: "{{ systemd_group }}"
     path: "{{ systemd_user_unit_path }}"
     enabled: true
     state: started

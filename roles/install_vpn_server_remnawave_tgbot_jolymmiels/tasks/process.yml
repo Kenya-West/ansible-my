@@ -107,7 +107,7 @@
     - never
     - update_config_soft
 
-- name: Add port {{ vpn_server_remnawave_tgbot_jolymmiels_external_port }} to UFW (if defined)
+- name: Add port {{ vpn_server_remnawave_tgbot_jolymmiels_external_port | default('undefined') }} to UFW (if defined)
   become: true
   become_user: root
   community.general.ufw:
@@ -116,7 +116,7 @@
     proto: tcp
   when:
     - vpn_server_remnawave_tgbot_jolymmiels_external_port is defined
-    - vpn_server_remnawave_tgbot_jolymmiels_external_port | length > 0
+    - vpn_server_remnawave_tgbot_jolymmiels_external_port | string | length > 0
 
 - name: Reminder to run ufw.yaml playbook (if port defined)
   ansible.builtin.debug:
@@ -125,7 +125,7 @@
       Example command: ansible-playbook -i {{ inventory_file | basename }} ufw.yaml --limit {{ inventory_hostname }}
   when:
     - vpn_server_remnawave_tgbot_jolymmiels_external_port is defined
-    - vpn_server_remnawave_tgbot_jolymmiels_external_port | length > 0
+    - vpn_server_remnawave_tgbot_jolymmiels_external_port | string | length > 0
 
 - name: Empty the fact install_vpn_server_remnawave_tgbot_jolymmiels_source_paths_currentindex
   ansible.builtin.set_fact:

@@ -1,0 +1,47 @@
+---
+# Runs on the managed host, after the rsync has dropped every staged binary
+# into {{ eget_host_bin_dir }}.
+#
+# The controller-side eget.toml deliberately ignores dest_loc (see the comment
+# in templates/eget.toml.j2), so eget stages every package flat. Packages that
+# declare a dest_loc want to live somewhere else on the host -- e.g.
+# DNSCrypt/dnscrypt-proxy in /usr/sbin -- so move them into place here.
+#
+# eget_bin_name below mirrors the name-derivation in templates/eget.toml.j2:
+# keep the two in sync, since that is the name the staged file arrives under.
+
+- name: Build relocation list for packages that declare a dest_loc
+  ansible.builtin.set_fact:
+    eget_relocations: >-
+      {{ packages_binary_list
+         | selectattr('dest_loc', 'defined')
+         | rejectattr('dest_loc', 'equalto', eget_host_bin_dir)
+         | list }}
+
+- name: Ensure destination directories exist
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ dest_loc }}"
+    state: directory
+  loop: "{{ eget_relocations | map(attribute='dest_loc') | unique | list }}"
+  loop_control:
+    loop_var: dest_loc
+
+# "removes" makes this a no-op once the binary has already been relocated, so
+# re-running the role does not fail on the second pass.
+- name: Move binaries from {{ eget_host_bin_dir }} to their configured dest_loc
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    cmd: mv -f {{ eget_host_bin_dir }}/{{ eget_bin_name }} {{ pkg.dest_loc }}/{{ eget_bin_name }}
+    removes: "{{ eget_host_bin_dir }}/{{ eget_bin_name }}"
+  vars:
+    eget_bin_name: >-
+      {{ pkg.bin_name
+         | default(pkg.file
+                   | default((pkg.repo.split('/') | last).split('.')[0])) }}
+  loop: "{{ eget_relocations }}"
+  loop_control:
+    loop_var: pkg
+    label: "{{ pkg.repo }} -> {{ pkg.dest_loc }}"

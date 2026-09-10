@@ -122,13 +122,13 @@
     - update_image_soft
     - update_config_hard
 
-- name: Add port {{ prometheus_external_port }} to UFW
+- name: Add port {{ prometheus_server_external_port | default('undefined') }} to UFW
   become: true
   become_user: root
   community.general.ufw:
     rule: allow
-    port: "{{ prometheus_external_port }}"
+    port: "{{ prometheus_server_external_port }}"
     proto: tcp
   when:
-    - prometheus_external_port is defined
-    - prometheus_external_port | length > 0
+    - prometheus_server_external_port is defined
+    - prometheus_server_external_port | string | length > 0

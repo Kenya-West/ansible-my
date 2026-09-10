@@ -1,1 +1,2 @@
-location_custom_files_path: "{{ playbook_dir }}/assets/hosts-list/{{ inventory_hostname }}"
+location_custom_files_path_common: "{{ (inventory_dir ~ '/../assets/hosts-list/common') | realpath }}"
+location_custom_files_path_hostname: "{{ (inventory_dir ~ '/../assets/hosts-list/' ~ inventory_hostname) | realpath }}"

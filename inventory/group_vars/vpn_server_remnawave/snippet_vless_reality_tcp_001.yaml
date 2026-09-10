@@ -1,0 +1,21 @@
+vless_reality_tcp_001:
+  tag: "tag_id"
+  protocol: vless
+
+  settings:
+    vnext:
+      - port: 443
+        users:
+          - id: "{{ service_user_id }}"
+            flow: xtls-rprx-vision
+            level: 0
+            encryption: none
+        address: "{{ node_address }}"
+
+  streamSettings:
+    network: raw
+    security: reality
+    realitySettings:
+      password: "{{ vpn_server_remnawave_xray_reality_password }}"
+      serverName: "{{ node_address }}"
+      fingerprint: chrome
