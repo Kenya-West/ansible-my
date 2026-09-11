@@ -86,12 +86,14 @@
     apply:
       tags:
         - update_image_hard
+        - update_image_soft
         - update_config_hard
   vars:
     project_paths:
       - "{{ dest_project_fullpath }}"
   tags:
     - update_image_hard
+    - update_image_soft
     - update_config_hard
 
 - name: Restart containers for this bot instance
