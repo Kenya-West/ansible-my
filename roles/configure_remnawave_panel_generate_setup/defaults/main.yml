@@ -71,5 +71,4 @@ vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vl
 vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain-auto
 vpn_server_remnawave_snippets_outbound_tag_index_width: 3
 vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]
-vpn_server_remnawave_snippets_region_codes: {}
 vpn_server_remnawave_snippets_sync: on_change

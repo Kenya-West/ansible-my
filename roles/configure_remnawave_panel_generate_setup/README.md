@@ -171,7 +171,7 @@ vpn_server_remnawave_hosts_chain:
 | `vpn_server_remnawave_snippets_outbound_tag_prefix` | `out-chain-auto` | Prefix marking the outbounds the role owns |
 | `vpn_server_remnawave_snippets_outbound_tag_index_width` | `3` | Zero padding of the per-region index |
 | `vpn_server_remnawave_snippets_vless_route_id_range` | `[400, 499]` | Route ids the role owns in the rules snippet |
-| `vpn_server_remnawave_snippets_region_codes` | `{}` | `europe: eu`, ...; an unlisted region uses its first two letters |
+| `vpn_deployments_region_codes` | `{}` | `europe: eu`, ...; an unlisted region uses its first two letters |
 | `vpn_server_remnawave_snippets_sync` | `on_change` | Whether to push the snippets into the profiles embedding them |
 
 Outbound templates live beside the inventory as

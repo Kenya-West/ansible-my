@@ -1,0 +1,19 @@
+
+# This file contains the default region codes for VPN deployments.
+# Each region is mapped to a specific code that can be used in configuration and deployment scripts.
+# The region here may deserve a separate entry
+# because it is a distinct geographic area
+# with specific network characteristics and/or regulatory requirements.
+# This variable is primarly used in Remnawave-related roles.
+# Due to several inventory groups that are using this var, it is landed in defauls.
+vpn_deployments_region_codes:
+  europe: eu
+  asia: as
+  russia: ru
+  china: cn
+  iran: ir
+  turkmenistan: tm
+  northamerica: na
+  southamerica: sa
+  africa: af
+  oceania: oc

@@ -41,7 +41,7 @@
       skip_same_country: "{{ vpn_server_remnawave_hosts_chain.skip_same_country | default(true) }}"
       exclude: "{{ vpn_server_remnawave_hosts_chain.exclude | default([]) }}"
       labels: "{{ vpn_server_remnawave_hosts_labels }}"
-      region_codes: "{{ vpn_server_remnawave_snippets_region_codes }}"
+      region_codes: "{{ vpn_deployments_region_codes }}"
       outbound_tag_prefix: "{{ vpn_server_remnawave_snippets_outbound_tag_prefix }}"
       outbound_tag_index_width: "{{ vpn_server_remnawave_snippets_outbound_tag_index_width }}"
       route_id_base: "{{ vpn_server_remnawave_hosts_vless_route_id_base }}"

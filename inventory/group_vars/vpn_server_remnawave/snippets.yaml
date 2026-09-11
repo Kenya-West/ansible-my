@@ -27,21 +27,6 @@ vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain-auto
 vpn_server_remnawave_snippets_outbound_tag_index_width: 3
 vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]
 
-# Direct domains are labelled net-<region>-<n>; this maps that region to the
-# short code used in outbound tags. A region that is not listed uses its first
-# two letters.
-vpn_server_remnawave_snippets_region_codes:
-  europe: eu
-  asia: as
-  russia: ru
-  china: cn
-  iran: ir
-  turkmenistan: tm
-  northamerica: na
-  southamerica: sa
-  africa: af
-  oceania: oc
-
 # Whether to push the regenerated snippets into the config profiles that embed
 # them. It can be: on_change, never, always.
 vpn_server_remnawave_snippets_sync: on_change
