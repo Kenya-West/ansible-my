@@ -67,7 +67,7 @@ vpn_server_remnawave_hosts_vless_route_id_direct: 2
 vpn_server_remnawave_snippets_key_rules_all: rules_all_prod_1
 vpn_server_remnawave_snippets_key_outbounds_all: outbounds_all_prod_1
 vpn_server_remnawave_snippets_template_revision: '001'
-vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vless_reality_tcp }}"
+vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vless_reality_tcp.full }}"
 vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain-auto
 vpn_server_remnawave_snippets_outbound_tag_index_width: 3
 vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]

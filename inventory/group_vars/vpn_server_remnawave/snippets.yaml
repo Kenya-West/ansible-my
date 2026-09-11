@@ -9,7 +9,7 @@ vpn_server_remnawave_snippets_key_outbounds_all: outbounds_all_prod_1
 # remna_node_primary_protocol_type; a node that declares nothing gets the
 # default below.
 vpn_server_remnawave_snippets_template_revision: '001'
-vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vless_reality_tcp }}"
+vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vless_reality_tcp.full }}"
 
 # Generated outbound tags are
 #   <prefix>-<region code>-<protocol type>-<NNN>

@@ -1,19 +1,403 @@
+vpn_deployments_country_to_regions_matcher:
+  # africa
+  ao: africa
+  bf: africa
+  bi: africa
+  bj: africa
+  bw: africa
+  cd: africa
+  cf: africa
+  cg: africa
+  ci: africa
+  cm: africa
+  cv: africa
+  dj: africa
+  dz: africa
+  eg: africa
+  eh: africa
+  er: africa
+  et: africa
+  ga: africa
+  gh: africa
+  gm: africa
+  gn: africa
+  gq: africa
+  gw: africa
+  io: africa
+  ke: africa
+  km: africa
+  lr: africa
+  ls: africa
+  ly: africa
+  ma: africa
+  mg: africa
+  ml: africa
+  mr: africa
+  mu: africa
+  mw: africa
+  mz: africa
+  na: africa
+  ne: africa
+  ng: africa
+  re: africa
+  rw: africa
+  sc: africa
+  sd: africa
+  sh: africa
+  sl: africa
+  sn: africa
+  so: africa
+  ss: africa
+  st: africa
+  sz: africa
+  td: africa
+  tf: africa
+  tg: africa
+  tn: africa
+  tz: africa
+  ug: africa
+  yt: africa
+  za: africa
+  zm: africa
+  zw: africa
 
-# This file contains the default region codes for VPN deployments.
-# Each region is mapped to a specific code that can be used in configuration and deployment scripts.
-# The region here may deserve a separate entry
-# because it is a distinct geographic area
-# with specific network characteristics and/or regulatory requirements.
-# This variable is primarly used in Remnawave-related roles.
-# Due to several inventory groups that are using this var, it is landed in defauls.
-vpn_deployments_region_codes:
+  # asia
+  ae: asia
+  af: asia
+  am: asia
+  az: asia
+  bd: asia
+  bh: asia
+  bn: asia
+  bt: asia
+  cn: asia
+  cy: asia
+  ge: asia
+  hk: asia
+  id: asia
+  il: asia
+  in: asia
+  iq: asia
+  ir: asia
+  jo: asia
+  jp: asia
+  kg: asia
+  kh: asia
+  kp: asia
+  kr: asia
+  kw: asia
+  kz: asia
+  la: asia
+  lb: asia
+  lk: asia
+  mm: asia
+  mn: asia
+  mo: asia
+  mv: asia
+  my: asia
+  np: asia
+  om: asia
+  ph: asia
+  pk: asia
+  ps: asia
+  qa: asia
+  sa: asia
+  sg: asia
+  sy: asia
+  th: asia
+  tj: asia
+  tl: asia
+  tm: asia
+  tr: asia
+  tw: asia
+  uz: asia
+  vn: asia
+  ye: asia
+
+  # europe
+  ad: europe
+  al: europe
+  at: europe
+  ax: europe
+  ba: europe
+  be: europe
+  bg: europe
+  by: europe
+  ch: europe
+  cz: europe
+  de: europe
+  dk: europe
+  ee: europe
+  es: europe
+  fi: europe
+  fo: europe
+  fr: europe
+  gb: europe
+  gg: europe
+  gi: europe
+  gr: europe
+  hr: europe
+  hu: europe
+  ie: europe
+  im: europe
+  is: europe
+  it: europe
+  je: europe
+  li: europe
+  lt: europe
+  lu: europe
+  lv: europe
+  mc: europe
+  md: europe
+  me: europe
+  mk: europe
+  mt: europe
+  nl: europe
+  no: europe
+  pl: europe
+  pt: europe
+  ro: europe
+  rs: europe
+  ru: europe
+  se: europe
+  si: europe
+  sj: europe
+  sk: europe
+  sm: europe
+  ua: europe
+  va: europe
+
+  # north america + central america + caribbean
+  ag: northamerica
+  ai: northamerica
+  aw: northamerica
+  bb: northamerica
+  bl: northamerica
+  bm: northamerica
+  bq: northamerica
+  bs: northamerica
+  bz: northamerica
+  ca: northamerica
+  cr: northamerica
+  cu: northamerica
+  cw: northamerica
+  dm: northamerica
+  do: northamerica
+  gd: northamerica
+  gl: northamerica
+  gp: northamerica
+  gt: northamerica
+  hn: northamerica
+  ht: northamerica
+  jm: northamerica
+  kn: northamerica
+  ky: northamerica
+  lc: northamerica
+  mf: northamerica
+  mq: northamerica
+  ms: northamerica
+  mx: northamerica
+  ni: northamerica
+  pa: northamerica
+  pm: northamerica
+  pr: northamerica
+  sv: northamerica
+  sx: northamerica
+  tc: northamerica
+  tt: northamerica
+  us: northamerica
+  vc: northamerica
+  vg: northamerica
+  vi: northamerica
+
+  # south america
+  ar: southamerica
+  bo: southamerica
+  br: southamerica
+  bv: southamerica
+  cl: southamerica
+  co: southamerica
+  ec: southamerica
+  fk: southamerica
+  gf: southamerica
+  gs: southamerica
+  gy: southamerica
+  pe: southamerica
+  py: southamerica
+  sr: southamerica
+  uy: southamerica
+  ve: southamerica
+
+  # oceania
+  as: oceania
+  au: oceania
+  cc: oceania
+  ck: oceania
+  cx: oceania
+  fj: oceania
+  fm: oceania
+  gu: oceania
+  hm: oceania
+  ki: oceania
+  mh: oceania
+  mp: oceania
+  nc: oceania
+  nf: oceania
+  nr: oceania
+  nu: oceania
+  nz: oceania
+  pf: oceania
+  pg: oceania
+  pn: oceania
+  pw: oceania
+  sb: oceania
+  tk: oceania
+  to: oceania
+  tv: oceania
+  um: oceania
+  vu: oceania
+  wf: oceania
+  ws: oceania
+
+  # no region in source csv
+  aq: unknown
+
+# Countries which must resolve to a dedicated deployment region
+# instead of their normal geographical region.
+vpn_deployments_country_to_censorship_region_matcher:
+  ru: russia
+  cn: china
+  ir: iran
+  tm: turkmenistan
+
+# Default region codes for global VPN deployments.
+vpn_deployments_region_codes_global:
   europe: eu
   asia: as
-  russia: ru
-  china: cn
-  iran: ir
-  turkmenistan: tm
   northamerica: na
   southamerica: sa
   africa: af
   oceania: oc
+  unknown: zz
+
+# Region codes for countries requiring dedicated deployments.
+vpn_deployments_region_codes_censorship:
+  russia: ru
+  china: cn
+  iran: ir
+  turkmenistan: tm
+
+
+# Domain naming associated with each resulting deployment region.
+vpn_deployments_region_to_censorship_geo_mapping:
+  europe: global
+  asia: global
+  northamerica: global
+  southamerica: global
+  africa: global
+  oceania: global
+  unknown: global
+
+  russia: russia
+  china: china
+  iran: iran
+  turkmenistan: turkmenistan
+
+
+# Resolve the country into a deployment region.
+#
+# Priority:
+#   1. Dedicated censorship-region matcher
+#   2. Normal geographical-region matcher
+#   3. unknown
+#
+# Examples:
+#   ru -> russia
+#   cn -> china
+#   ir -> iran
+#   tm -> turkmenistan
+#   de -> europe
+#   th -> asia
+#   us -> northamerica
+#   xx -> unknown
+vpn_deployment_region: >-
+  {{
+    vpn_deployments_country_to_censorship_region_matcher.get(
+      country_code | lower,
+      vpn_deployments_country_to_regions_matcher.get(
+        country_code | lower,
+        'unknown'
+      )
+    )
+  }}
+
+# Resolve the deployment region into its short region code.
+#
+# Dedicated censorship regions are checked first, then global regions.
+#
+# Examples:
+#   russia       -> ru
+#   china        -> cn
+#   europe       -> eu
+#   asia         -> as
+#   northamerica -> na
+#   unknown      -> zz
+vpn_deployment_region_code: >-
+  {{
+    vpn_deployments_region_codes_censorship.get(
+      vpn_deployment_region,
+      vpn_deployments_region_codes_global.get(
+        vpn_deployment_region,
+        'zz'
+      )
+    )
+  }}
+
+# Resolve the deployment region into its censorship geo naming category.
+#
+# Examples:
+#   europe -> global
+#   asia   -> global
+#   russia -> russia
+#   china  -> china
+vpn_deployment_censorship_geo: >-
+  {{
+    vpn_deployments_region_to_censorship_geo_mapping.get(
+      vpn_deployment_region,
+      'global'
+    )
+  }}
+
+vpn_deployment_domain_prefix:
+  unique:
+    type: unique
+    value: "{{ inventory_hostname }}"
+  net_location:
+    type: net-location
+    value: "net-{{ vpn_deployment_region }}"
+  chain_location:
+    type: chain-location
+    value: "chain-{{ vpn_deployment_region }}"
+  net_all:
+    type: net-all
+    value: "net-{{ vpn_deployment_censorship_geo }}-all"
+  net_protocol:
+    type: net-protocol
+    value: "net-{{ vpn_deployment_censorship_geo }}-{{ remna_node_primary_protocol_type.short }}"
+  chain_all:
+    type: chain-all
+    value: "chain-{{ vpn_deployment_censorship_geo }}-all"
+  chain_protocol:
+    type: chain-protocol
+    value: "chain-{{ vpn_deployment_censorship_geo }}-{{ remna_node_primary_protocol_type.short }}"
+  other:
+    type: other
+    value: "other-{{ vpn_deployment_region }}"
+
+remna_node_domain_types_allowlist: >-
+  {{
+    vpn_deployment_domain_prefix
+    | dict2items
+    | rejectattr('key', 'equalto', 'other')
+    | items2dict
+  }}

@@ -167,7 +167,7 @@ vpn_server_remnawave_hosts_chain:
 | `vpn_server_remnawave_snippets_key_outbounds_all` | `outbounds_all_prod_1` | Panel snippet the outbounds are written into |
 | `vpn_server_remnawave_snippets_key_rules_all` | `rules_all_prod_1` | Panel snippet the routing rules are written into |
 | `vpn_server_remnawave_snippets_template_revision` | `'001'` | Suffix of the template variable names |
-| `vpn_server_remnawave_snippets_default_protocol_type` | `remna_protocol_types.vless_reality_tcp` | Used by a node that declares no `remna_node_primary_protocol_type` |
+| `vpn_server_remnawave_snippets_default_protocol_type` | `remna_protocol_types.vless_reality_tcp.full` | Used by a node that declares no `remna_node_primary_protocol_type` |
 | `vpn_server_remnawave_snippets_outbound_tag_prefix` | `out-chain-auto` | Prefix marking the outbounds the role owns |
 | `vpn_server_remnawave_snippets_outbound_tag_index_width` | `3` | Zero padding of the per-region index |
 | `vpn_server_remnawave_snippets_vless_route_id_range` | `[400, 499]` | Route ids the role owns in the rules snippet |

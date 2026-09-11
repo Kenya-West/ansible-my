@@ -51,8 +51,8 @@ vpn_server_remnawave_hosts_publish_state: disabled
 vpn_server_remnawave_hosts_config_profile: ''
 vpn_server_remnawave_hosts_inbound: ''
 vpn_server_remnawave_hosts_inbound_by_protocol: {}
-#  "{{ remna_protocol_types.vless_reality_tcp }}": vless-reality-tcp
-#  "{{ remna_protocol_types.vless_reality_xhttp }}": vless-reality-xhttp
+#  "{{ remna_protocol_types.vless_reality_tcp.full }}": vless-reality-tcp
+#  "{{ remna_protocol_types.vless_reality_xhttp.full }}": vless-reality-xhttp
 
 vpn_server_remnawave_hosts_port: 443
 vpn_server_remnawave_hosts_fingerprint: chrome
