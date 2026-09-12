@@ -1,0 +1,33 @@
+---
+
+services:
+  microwarp:
+    image: ghcr.io/ccbkkb/microwarp:latest
+    container_name: ${SERVICE_NAME}
+    env_file:
+      - .env
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    networks:
+      - {{ docker_vpn_network }}
+    ports:
+      - "127.0.0.1:1080:${BIND_PORT:-1080}"
+    volumes:
+      - warp_data:/etc/wireguard # Keep account data to avoid rate limits
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 3m
+        max-file: 3
+
+
+networks:
+  {{ docker_vpn_network }}:
+    external: true
+
+volumes:
+  warp_data:

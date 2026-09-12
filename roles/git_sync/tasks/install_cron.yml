@@ -31,7 +31,7 @@
   tags:
     - always
 
-- name: Add cron job for autorestic
+- name: Add cron job
   become: true
   become_user: root
   ansible.builtin.cron:
