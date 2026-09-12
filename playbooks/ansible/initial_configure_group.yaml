@@ -1,0 +1,17 @@
+---
+# The secrets of one inventory group, in
+# inventory/group_vars/all/z_common_hosts_secrets. Asks which group to write
+# and whether the values already there are kept, so that regenerating a group
+# does not rotate the credentials of the hosts already deployed.
+# See roles/setup/secrets.
+#
+#   ansible-playbook -i inventory/production.ini playbooks/ansible/initial_configure_group.yaml
+
+- name: Write the secrets of one inventory group
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  roles:
+    - role: setup/secrets
+      setup_secrets_scope: group
