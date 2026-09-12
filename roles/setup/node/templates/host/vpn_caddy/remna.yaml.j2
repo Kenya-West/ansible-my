@@ -1,6 +1,13 @@
 {% set o = '{{' %}
 {% set c = '}}' %}
+{% set setup_node_remna_protocol_type_chosen = initial_configure_host_remna_primary_protocol | default(setup_node_remna_protocol_type_default) %}
+{% if setup_node_remna_protocol_type_chosen != setup_node_remna_protocol_type_default %}
 # The primary protocol of the Remnawave node on this host. It picks the
 # net-<geo>-<protocol> and chain-<geo>-<protocol> domains; the types are
 # listed in inventory/group_vars/vpn_caddy/remna.yaml.
-remna_node_primary_protocol_type: "{{ o }} remna_protocol_types.{{ initial_configure_host_remna_primary_protocol | default(setup_node_remna_protocol_type_default) }} {{ c }}"
+remna_node_primary_protocol_type: "{{ o }} remna_protocol_types.{{ setup_node_remna_protocol_type_chosen }} {{ c }}"
+{% else %}
+# The primary protocol of this host matches the default in
+# inventory/group_vars/vpn_caddy/remna.yaml (remna_node_primary_protocol_type),
+# so nothing is set here.
+{% endif %}
