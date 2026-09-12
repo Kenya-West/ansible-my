@@ -1,92 +1,14 @@
 ---
+# Add a host to the inventory: asks for its name parts, address, groups and
+# domains, then writes inventory/host_vars/<hostname>/ and the host's inventory
+# sections. See roles/setup/node.
+#
+#   ansible-playbook -i inventory/production.ini playbooks/ansible/node/add_host_initial.yaml
 
 - name: Create basic host configuration
   hosts: localhost
-  become: true
-  become_user: "{{ standard_user }}"
-  gather_facts: no
+  become: false
+  gather_facts: false
 
-  tasks:
-    - name: Prompt for the hostname
-      ansible.builtin.pause:
-        prompt: "Enter the hostname. It will be used to update the first and default user"
-        echo: true
-      register: __hostname_variable
-      failed_when: __hostname_variable.user_input | length == 0
-
-    - name: Set hostname fact
-      set_fact:
-        initial_configure_host_hostname: "{{ __hostname_variable.user_input }}"
-    
-    - name: Check if hosname directory exists
-      ansible.builtin.stat:
-        path: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}"
-        get_checksum: false
-      register: __hostname_dir_stat
-    
-    - name: Fail if hostname directory already exists
-      ansible.builtin.fail:
-        msg: "The host directory {{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }} already exists. Aborting."
-      when: __hostname_dir_stat.stat.exists
-
-    - name: Prompt for the IP address
-      ansible.builtin.pause:
-        prompt: "Enter the IP address. It will be used to update the first and default user"
-        echo: true
-      register: __ip_address_variable
-      failed_when: (__ip_address_variable.user_input | length == 0) or (__ip_address_variable.user_input | length > 15)
-
-    - name: Set IP address fact
-      set_fact:
-        initial_configure_host_ip_address: "{{ __ip_address_variable.user_input }}"
-
-    - name: Prompt for the domain name
-      ansible.builtin.pause:
-        prompt: "Enter the domain name. Usually, it is a subdomain, like sub.example.tld. It will be used to update the first and default user. You can leave it empty if you do not need it."
-        echo: true
-      register: __domain_name_variable
-
-    - name: Set domain name fact
-      set_fact:
-        initial_configure_host_domain_name: "{{ __domain_name_variable.user_input }}"
-
-    - name: Prompt for the domain name of XRay load balancer
-      ansible.builtin.pause:
-        prompt: "Enter the domain name if your host takes a part in DNS load balancing. Usually, it is a subdomain, like sub.example.tld. It will be used to update the first and default user. You can leave it empty if you do not need it."
-        echo: true
-      register: __xray_domain_name_variable
-
-    - name: Set domain name fact
-      set_fact:
-        initial_configure_host_xray_domain_name: "{{ __xray_domain_name_variable.user_input }}"
-
-    - name: Create hostname directory
-      ansible.builtin.file:
-        path: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}"
-        state: directory
-        mode: "0775"
-
-    - name: Copy templated files from group_vars_initial/all/z_common_hosts_secrets
-      ansible.builtin.include_role:
-        name: kwtoolset/copy_files_templating
-      vars:
-        copy_files_templating_dir_list:
-          - src: "{{ playbook_dir }}/templates/initial_configure/host/0_all/"
-            dest: "{{ playbook_dir }}/host_vars/{{ initial_configure_host_hostname }}/0_all"
-            default_mode: "0775"
-
-    - name: Ensure "{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }} is in section "[general_vps_prepare]" in each inventory source
-      community.general.ini_file:
-        path: "{{ item }}"
-        section: general_vps_prepare
-        option: "{{ initial_configure_host_hostname }} ansible_host"
-        value: "{{ initial_configure_host_ip_address }}"
-        backup: true
-      with_items: "{{ ansible_inventory_sources }}"
-
-    - name: Remove spaces between equal sign and value in each inventory source for "{{ initial_configure_host_hostname }} ansible_host = {{ initial_configure_host_ip_address }}" value
-      ansible.builtin.replace:
-        path: "{{ item }}"
-        regexp: '{{ initial_configure_host_hostname }} ansible_host\s*=\s*{{ initial_configure_host_ip_address }}'
-        replace: '{{ initial_configure_host_hostname }} ansible_host={{ initial_configure_host_ip_address }}'
-      with_items: "{{ ansible_inventory_sources }}"
+  roles:
+    - role: setup/node

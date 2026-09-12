@@ -1,0 +1,13 @@
+---
+# Step 2 of the initial configuration, on the controller: the shared secrets
+# of inventory/group_vars/all/z_common_hosts_secrets. See roles/setup/secrets.
+#
+#   ansible-playbook -i inventory/production.ini playbooks/scenarios/initial_configure_step2.yaml
+
+- name: Run initial configuration tasks (step 2)
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  roles:
+    - role: setup/secrets

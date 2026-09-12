@@ -86,7 +86,7 @@
       - src: "{{ item }}"
         dest: "{{ dest_project_fullpath }}"
         default_mode: "0775"
-  with_items: "{{ source_paths }}"
+  with_items: "{{ install_vpn_server_remnawave_tgbot_bedolaga_source_paths_currentindex }}"
   tags:
     - update_config_hard
     - update_config_soft
@@ -97,12 +97,14 @@
     apply:
       tags:
         - update_image_hard
+        - update_image_soft
         - update_config_hard
   vars:
     project_paths:
       - "{{ dest_project_fullpath }}"
   tags:
     - update_image_hard
+    - update_image_soft
     - update_config_hard
 
 - name: Restart containers for this bot instance

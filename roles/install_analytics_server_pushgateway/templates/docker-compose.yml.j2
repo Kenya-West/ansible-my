@@ -9,6 +9,7 @@ services:
       - .env
     networks:
       - {{ docker_vpn_network }}
+      - pushgateway-server
     labels:
       caddy: "${DOMAIN}:${EXTERNAL_PORT}"
       caddy.import: "logging ${DOMAIN}"
@@ -16,9 +17,21 @@ services:
 
       caddy.basic_auth.prometheus: "${METRICS_PROMETHEUS_USER_PASSWORD}"
       caddy.basic_auth.client: "${METRICS_CLIENT_USER_PASSWORD}"
+    restart: unless-stopped
 
+  pushgateway-cleaner:
+    image: ghcr.io/abatilo/pushgateway-cleaner:latest
+    depends_on:
+      - pushgateway
+    command:
+      - --pushgateway-url=http://pushgateway:${PORT}
+      - --ttl={{ pushgateway_cleaner_ttl | default('720h') }}
+      - --sync-period={{ pushgateway_cleaner_sync_period | default('24h') }}
+    networks:
+      - pushgateway-server
     restart: unless-stopped
 
 networks:
+  pushgateway-server:
   {{ docker_vpn_network }}:
     external: true

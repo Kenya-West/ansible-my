@@ -1,0 +1,65 @@
+---
+- name: Settle the facts the host templates use
+  ansible.builtin.set_fact:
+    initial_configure_host_hostname: "{{ initial_configure_host_provider }}-{{ initial_configure_host_country_code }}-{{ initial_configure_host_index }}"
+    initial_configure_host_base_domain_name: >-
+      {{ initial_configure_host_base_domain_name_custom
+         | default(initial_configure_host_base_domain_name_choice | default('', true), true) }}
+    initial_configure_host_xray_base_domain_name: >-
+      {{ initial_configure_host_xray_base_domain_name_custom
+         | default(initial_configure_host_xray_base_domain_name_choice | default('', true), true) }}
+    setup_node_region: >-
+      {{ vpn_deployments_country_to_censorship_region_matcher.get(initial_configure_host_country_code,
+           vpn_deployments_country_to_regions_matcher.get(initial_configure_host_country_code, 'unknown')) }}
+    setup_node_groups_chosen: "{{ initial_configure_host_groups | default([], true) }}"
+
+- name: Settle the groups of the host
+  ansible.builtin.set_fact:
+    setup_node_groups: >-
+      {{ (setup_node_groups_required + setup_node_groups_chosen
+          + (__setup_node_region_groups | rejectattr('requires', 'defined') | map(attribute='name') | list)
+          + (__setup_node_region_groups | selectattr('requires', 'defined')
+             | selectattr('requires', 'in', setup_node_groups_chosen) | map(attribute='name') | list))
+         | unique }}
+    setup_node_remna_node_enabled: "{{ 'vpn_caddy' in setup_node_groups_chosen }}"
+  vars:
+    __setup_node_region_groups: "{{ setup_node_groups_by_region.get(setup_node_region, []) }}"
+
+- name: Check the answers the templates rely on
+  ansible.builtin.assert:
+    that:
+      - initial_configure_host_base_domain_name | length > 0
+      - not setup_node_remna_node_enabled or initial_configure_host_xray_base_domain_name | length > 0
+    fail_msg: A base domain is needed for the domains of the host.
+    quiet: true
+
+- name: Check whether host_vars/{{ initial_configure_host_hostname }} exists
+  ansible.builtin.stat:
+    path: "{{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}"
+    get_checksum: false
+  register: __setup_node_host_dir_stat
+
+- name: Stop when host_vars/{{ initial_configure_host_hostname }} exists
+  ansible.builtin.fail:
+    msg: "{{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }} already exists. Nothing was written."
+  when: __setup_node_host_dir_stat.stat.exists
+
+- name: Find the host template directories of this role
+  ansible.builtin.find:
+    paths: "{{ setup_node_role_path }}/templates/host"
+    file_type: directory
+    recurse: false
+  register: __setup_node_template_dirs
+
+- name: Render host_vars/{{ initial_configure_host_hostname }}
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: render_tree
+  vars:
+    setup_render_tree_src: "{{ setup_node_role_path }}/templates/host/{{ setup_node_template_dir }}"
+    setup_render_tree_dest: "{{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}/{{ setup_node_template_dir }}"
+  loop: >-
+    {{ (setup_node_templates_always + setup_node_groups) | unique
+       | select('in', __setup_node_template_dirs.files | map(attribute='path') | map('basename') | list) | list }}
+  loop_control:
+    loop_var: setup_node_template_dir

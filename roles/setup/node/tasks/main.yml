@@ -1,0 +1,60 @@
+---
+# tasks file for roles/setup/node
+#
+# Adds a host to the inventory, on the controller:
+#   1. scan.yml      - what the inventory already holds: hosts, addresses, base
+#                      domains, location indexes;
+#   2. prompt.yml    - the questionnaire: hostname parts, address, groups,
+#                      domains;
+#   3. host_vars.yml - host_vars/<hostname>/ rendered from templates/host/;
+#   4. inventory_prepare.yml - the host in every group of the inventory file(s).
+
+- name: Capture this role's path so nested roles can use it
+  ansible.builtin.set_fact:
+    setup_node_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Check that the inventory is loaded for the controller
+  ansible.builtin.assert:
+    that:
+      - vpn_deployments_country_to_regions_matcher is defined
+      - vpn_deployments_country_to_censorship_region_matcher is defined
+    fail_msg: >-
+      The region matchers of inventory/group_vars/all/0_defaults/regions.yaml
+      are not loaded. Run the play against the inventory
+      (-i inventory/production.ini) with localhost listed in it, so that
+      group_vars/all applies to the controller.
+    quiet: true
+  tags:
+    - always
+
+- name: Look at what the inventory already holds
+  ansible.builtin.include_tasks: scan.yml
+  tags:
+    - always
+
+- name: Ask about the new host
+  ansible.builtin.include_tasks: prompt.yml
+  tags:
+    - always
+
+- name: Write the host_vars of the new host
+  ansible.builtin.include_tasks: host_vars.yml
+  tags:
+    - always
+
+- name: Add the host to the inventory file(s)
+  ansible.builtin.include_tasks: inventory_prepare.yml
+  tags:
+    - always
+
+- name: Report
+  ansible.builtin.debug:
+    msg:
+      - "Host {{ initial_configure_host_hostname }} ({{ initial_configure_host_ip_address }}) added."
+      - "Deployment region: {{ setup_node_region }}."
+      - "Groups: {{ setup_node_groups | join(', ') }}."
+      - "host_vars: {{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}/"
+      - "Inventory file(s): {{ setup_node_inventory_files | join(', ') }}."
+      - "Review the files, then prepare the host with the 0_start_* playbooks."

@@ -1,0 +1,16 @@
+---
+# tasks file for roles/setup/common
+#
+# This role only carries task files for the other roles under roles/setup/.
+# Include one of them with tasks_from:
+#
+#   - ansible.builtin.include_role:
+#       name: setup/common
+#       tasks_from: render_tree
+#     vars:
+#       setup_render_tree_src: /abs/path/of/a/template/tree
+#       setup_render_tree_dest: /abs/path/to/write/into
+
+- name: Explain how setup/common is meant to be used
+  ansible.builtin.debug:
+    msg: setup/common only provides task files; include it with tasks_from (render_tree).

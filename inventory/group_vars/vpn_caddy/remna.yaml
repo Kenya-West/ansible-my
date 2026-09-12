@@ -1,17 +1,19 @@
-remna_domain_types:
-  unique: unique
-  location_net: location-net
-  location_chain: location-chain
-  global_net_all: global-net-all
-  global_net_reality_tcp: global-net-reality-tcp
-  global_net_reality_xhttp: global-net-reality-xhttp
-  global_chain_all: global-chain-all
-  global_chain_reality_tcp: global-chain-reality-tcp
-  global_chain_reality_xhttp: global-chain-reality-xhttp
-  russia_net_all: russia-net-all
-  russia_net_reality_tcp: russia-net-reality-tcp
-  russia_net_reality_xhttp: russia-net-reality-xhttp
-  russia_chain_all: russia-chain-all
-  russia_chain_reality_tcp: russia-chain-reality-tcp
-  russia_chain_reality_xhttp: russia-chain-reality-xhttp
-  other: other
+remna_protocol_types:
+  vless_reality_tcp:
+    parts:
+      - vless
+      - reality
+      - tcp
+    root: vless
+    short: reality-tcp
+    full: vless-reality-tcp
+  vless_reality_xhttp:
+    parts:
+      - vless
+      - reality
+      - xhttp
+    root: vless
+    short: reality-xhttp
+    full: vless-reality-xhttp
+
+remna_node_primary_protocol_type: "{{ remna_protocol_types.vless_reality_tcp }}"

@@ -180,7 +180,7 @@
     - update_config_hard
     - recreate_config
 
-- name: Add port {{ matrix_server_external_port }} to UFW
+- name: Add port {{ matrix_server_external_port | default('undefined') }} to UFW
   become: true
   become_user: root
   community.general.ufw:
@@ -189,4 +189,4 @@
     proto: tcp
   when:
     - matrix_server_external_port is defined
-    - matrix_server_external_port | length > 0
+    - matrix_server_external_port | string | length > 0

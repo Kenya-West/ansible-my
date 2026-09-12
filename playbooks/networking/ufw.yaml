@@ -23,6 +23,7 @@
         input_mode: complex
     # SSH custom ports, if any
     - name: kwtoolset/get_strings_from_file
+      become: true
       vars:
         get_strings_from_file_file_path: "/etc/ssh/sshd_config"
         get_strings_from_file_regex_pattern: "^Port [0-9]{1,5}$"

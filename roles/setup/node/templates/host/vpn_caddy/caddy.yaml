@@ -1,0 +1,4 @@
+# Uncomment on a host whose Caddy must own HTTPS (port 443) itself, as on the
+# server running the Remnawave panel. A plain Remnawave node leaves it unset:
+# the node takes 443 and Caddy sits behind it.
+# caddy_occupy_HTTPS: true

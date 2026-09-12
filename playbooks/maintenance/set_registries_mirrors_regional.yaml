@@ -1,0 +1,4 @@
+---
+- import_playbook: ../base/deb_mirrors.yaml
+- import_playbook: ../base/python_mirrors.yaml
+- import_playbook: ../base/docker_mirrors.yaml

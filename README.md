@@ -222,6 +222,17 @@ Luckily, [there are playbooks](https://github.com/Kenya-West/ansible-my/wiki/Ini
 
 Dive into wiki for detailed configuration steps.
 
+The steps are launchers of the roles under `roles/setup/`; each role's README has the details:
+
+```bash
+# 1. inventory file, localhost in its sections, standard user
+ansible-playbook -i inventory/production.ini playbooks/scenarios/initial_configure_step1.yaml
+# 2. shared secrets in inventory/group_vars/all/z_common_hosts_secrets
+ansible-playbook -i inventory/production.ini playbooks/scenarios/initial_configure_step2.yaml
+# 3. a new host: its inventory record and inventory/host_vars/<hostname>/
+ansible-playbook -i inventory/production.ini playbooks/ansible/node/add_host_initial.yaml
+```
+
 ## 📖 Usage
 
 The usage process of this Ansible project is quite complex, and because it is designed for modularity, there are several ways to run it.
@@ -255,6 +266,7 @@ Playbooks:
    - `0_start_step_*.yaml`: contains automated steps to run base and bootstrap playbooks, decomposed to smaller steps to make it easier to debug and run;
    - `base/*.yaml`: concise playbooks for basic node setup, like installing packages, configuring shell/profile, and system hardening;
     - `install_vpn_caddy*.yaml`, `install_vpnremna_on_server_*.yaml`, `install_analytics_on_node*.yaml`, `install_analytics_on_server*.yaml`, `install_backup_on_node*.yaml`: playbooks that install specific services on the node and server, like VPN, analytics, and backup;
+   - `scenarios/initial_configure_step1.yaml`, `scenarios/initial_configure_step2.yaml` and `ansible/node/add_host_initial.yaml`: launchers of the roles under `roles/setup/`, which configure this project itself: the inventory file and the standard user, the shared secrets, and a new host record with its `host_vars/`;
 
 `inventory/group_vars`:
 - `all/`: Variables applied to all hosts
@@ -366,6 +378,7 @@ ansible-my/
 ├── host_vars/                    # Host-specific variables
 ├── roles/                        # Ansible custom roles
 │   ├── kwtoolset/               # Custom utility roles
+│   ├── setup/                   # Roles that configure this project itself (inventory, secrets, hosts)
 │   ├── install_*/               # Installation roles
 │   └── requirements.yaml        # Role dependencies
 ├── assets/                       # Static files and templates

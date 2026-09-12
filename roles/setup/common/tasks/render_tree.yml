@@ -1,0 +1,46 @@
+---
+# Write a directory tree of templates and plain files, kept in a role, into a
+# directory of this project on the controller.
+#
+# Files ending with .j2 are rendered with ansible.builtin.template and lose
+# the extension. Every other file is copied byte for byte, so the Jinja of a
+# plain .yaml file (a "{{ inventory_hostname }}" meant for the inventory to
+# render later) survives untouched. Nothing here needs rsync or privilege
+# escalation: everything is written as the user running ansible-playbook.
+#
+# Inputs:
+#   setup_render_tree_src        source directory, absolute path
+#   setup_render_tree_dest       destination directory, created when missing
+#   setup_render_tree_file_mode  mode of the written files (0664)
+#   setup_render_tree_dir_mode   mode of the created directories (0775)
+
+- name: Collect the entries of {{ setup_render_tree_src }}
+  ansible.builtin.set_fact:
+    __setup_render_tree_entries: "{{ query('community.general.filetree', setup_render_tree_src) }}"
+
+- name: Create the directories under {{ setup_render_tree_dest }}
+  ansible.builtin.file:
+    path: "{{ setup_render_tree_dest }}/{{ item.path }}"
+    state: directory
+    mode: "{{ setup_render_tree_dir_mode | default('0775') }}"
+  loop: "{{ [{'path': ''}] + (__setup_render_tree_entries | selectattr('state', 'equalto', 'directory') | list) }}"
+  loop_control:
+    label: "{{ setup_render_tree_dest }}/{{ item.path }}"
+
+- name: Render the templates into {{ setup_render_tree_dest }}
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ setup_render_tree_dest }}/{{ item.path | regex_replace('\\.j2$', '') }}"
+    mode: "{{ setup_render_tree_file_mode | default('0664') }}"
+  loop: "{{ __setup_render_tree_entries | selectattr('state', 'equalto', 'file') | selectattr('path', 'search', '\\.j2$') | list }}"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Copy the plain files into {{ setup_render_tree_dest }}
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ setup_render_tree_dest }}/{{ item.path }}"
+    mode: "{{ setup_render_tree_file_mode | default('0664') }}"
+  loop: "{{ __setup_render_tree_entries | selectattr('state', 'equalto', 'file') | rejectattr('path', 'search', '\\.j2$') | list }}"
+  loop_control:
+    label: "{{ item.path }}"

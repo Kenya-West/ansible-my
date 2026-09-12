@@ -1,0 +1,115 @@
+# It can be: api_token, caddy_custom_path
+vpn_server_remnawave_access_mode: caddy_custom_path
+
+# It can be: autoselect_if_single, manual_set
+# autoselect_if_single: if there is only one panel, it will be selected automatically
+# manual_set: you need to set the panel manually in the configuration
+vpn_server_remnawave_choose_panel_strategy: autoselect_if_single
+
+# Set pre-configured panel hostname if manual_set is used in vpn_server_remnawave_choose_panel_strategy
+# vpn_server_remnawave_selected_panel_hostname: ''
+
+# What property of domains_keys to use for the remna_node domain type. It can be: main, remna_node, or else
+vpn_server_remnawave_hosts_node_manage_key: remna_node
+
+# Which domain types to use for the remna_node domain type. Taken from remna_domain_types.
+# These are the domains a node is entered through when it relays for someone else,
+# so they are what the generated chain hosts are addressed by.
+vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter:
+  - "{{ remna_domain_types.location_chain }}"
+
+# Which domain types a node's own, direct Remnawave Host is published on.
+# One Remnawave Host is generated per distinct domain here, bound to every
+# Ansible host that publishes it - several nodes behind one round-robin
+# domain stay a single Host in the panel.
+vpn_server_remnawave_hosts_node_manage_domain_types_direct_filter:
+  - "{{ remna_domain_types.location_net }}"
+
+# Only those hosts are managed that have this tag.
+# Everything is being created, searched for, managed and deleted only for hosts that have this tag.
+# The panel restricts tags to A-Z, 0-9, _ and : - lowercase or hyphens are rejected.
+vpn_server_remnawave_hosts_tag: ANSIBLE_MANAGED
+
+# Which Ansible group the nodes are taken from.
+vpn_server_remnawave_hosts_node_group: vpn_caddy
+
+# ---------------------------------------------------------------------------
+# Publishing
+# ---------------------------------------------------------------------------
+
+# The state generated Remnawave Hosts are published in. It can be:
+#   disabled: created disabled and disabled again on every run, so a generated
+#             host never carries traffic until it is reviewed (the default)
+#   enabled:  created enabled and re-enabled on every run
+#   present:  created disabled, then left in whatever state the panel has, so a
+#             host switched on by hand in the panel stays on
+vpn_server_remnawave_hosts_publish_state: disabled
+
+# The config profile and inbound generated hosts are attached to. Both are
+# required - the panel cannot create a host without them. The inbound may be
+# chosen per protocol type; the plain value is the fallback.
+vpn_server_remnawave_hosts_config_profile: ''
+vpn_server_remnawave_hosts_inbound: ''
+vpn_server_remnawave_hosts_inbound_by_protocol: {}
+#  "{{ remna_protocol_types.vless_reality_tcp.full }}": vless-reality-tcp
+#  "{{ remna_protocol_types.vless_reality_xhttp.full }}": vless-reality-xhttp
+
+vpn_server_remnawave_hosts_port: 443
+vpn_server_remnawave_hosts_fingerprint: chrome
+
+# Human labels used to build host remarks, keyed by the domain label
+# (net-europe-1, chain-russia-1). A domain that is not listed uses its own
+# label, so the panel stays readable without this being filled in.
+#
+# Remarks are how the role finds the hosts it owns again. Point a label at the
+# remark an existing host already has to make the role adopt that host instead
+# of creating a second one beside it.
+vpn_server_remnawave_hosts_labels: {}
+#  net-europe-1: "🇩🇪 EU-1"
+#  chain-russia-1: "RU-1"
+
+# A chain host's remark is "<exit label><separator><entry label>".
+vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
+
+# ---------------------------------------------------------------------------
+# Chains
+# ---------------------------------------------------------------------------
+
+# Every exit gets its own direct Remnawave Host. On top of that it is published
+# again through the chain domain of every node that may act as a chain entry,
+# so the same exit can be reached the long way round.
+vpn_server_remnawave_hosts_chain:
+  # A node may act as a chain entry when its country_code_upper is listed
+  # here and it publishes a domain of a type in
+  # vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter.
+  entry_country_codes:
+    - RU
+
+  # Do not chain an exit through an entry in its own country: there is no
+  # "RU-1 by RU-2", only "AS-1 by RU-2".
+  skip_same_country: true
+
+  # Pairs never to generate, on top of the rule above. Each item names an exit
+  # by its direct domain, and the entry domains to skip for it; entries: '*'
+  # leaves that exit out of chaining altogether.
+  exclude: []
+  #  - exit: net-europe-15.123987465.xyz
+  #    entries: '*'
+  #  - exit: net-asia-1.123987465.xyz
+  #    entries:
+  #      - chain-russia-7.123987465.xyz
+
+# ---------------------------------------------------------------------------
+# VLESS route ids
+# ---------------------------------------------------------------------------
+
+# Route ids are computed, not stored: a chained exit's id is the base plus its
+# position in the ordered list of chained exits (by region, then protocol, then
+# domain). Adding or removing a chained exit therefore renumbers the ones after
+# it - the rules snippet is regenerated in the same run, so panel and rules stay
+# in step, but anything outside this repo that hardcodes an id will not.
+vpn_server_remnawave_hosts_vless_route_id_base: 400
+
+# Route id put on every direct host. Leave empty to publish direct hosts
+# without a route id at all.
+vpn_server_remnawave_hosts_vless_route_id_direct: 2

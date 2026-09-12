@@ -1,6 +1,6 @@
 - name: Install SystemD unit and timer for remna node restart on regular basis
   ansible.builtin.include_role:
-    name: kenyawest.systemd
+    name: 0x0I.systemd
   vars:
     unit_config: "{{ systemd_unit_configs }}"
   args:

@@ -1,0 +1,87 @@
+---
+# defaults file for roles/setup/node
+
+# Where the inventory lives: the directory of the inventory the play runs with,
+# otherwise inventory/ of the project.
+setup_node_project_dir: "{{ (role_path ~ '/../../..') | realpath }}"
+setup_node_inventory_dir: "{{ inventory_dir | default(setup_node_project_dir ~ '/inventory', true) }}"
+setup_node_host_vars_dir: "{{ setup_node_inventory_dir }}/host_vars"
+
+# The inventory files that get the new host: every INI file the play was
+# started with (-i ...).
+setup_node_inventory_files: >-
+  {{ ansible_inventory_sources | default([]) | select('search', '\.ini$') | list }}
+
+# The file of a host that lists its domains; read from every existing host to
+# offer the base domains already in use and to suggest location indexes.
+setup_node_scan_domains_file: 1_domains.yaml
+
+# Groups every new host joins, the ones offered at the prompt (value: label)
+# and the ones chosen when Enter is pressed.
+setup_node_groups_required:
+  - general_vps_prepare
+  - domain_management
+setup_node_groups_optional:
+  vpn_caddy: "vpn_caddy - Remnawave node behind Caddy (VPN/proxy)"
+  analytics_node: "analytics_node - exporters feeding the analytics server"
+  backup_restic_node: "backup_restic_node - Autorestic backups of the host"
+setup_node_groups_optional_default:
+  - vpn_caddy
+  - analytics_node
+  - backup_restic_node
+
+# Groups joined on top, depending on the deployment region of the host. An
+# entry with `requires` is only joined when that group was chosen too.
+setup_node_groups_by_region:
+  russia:
+    - name: vps_russia
+    - name: vpn_caddy_russia_chain
+      requires: vpn_caddy
+
+# Directories of templates/host/ rendered into host_vars/<hostname>/. The ones
+# listed here always are; any other is when the host joins the group of the
+# same name and the directory exists.
+setup_node_templates_always:
+  - 0_all
+
+# The remna_node domains of a vpn_caddy host, written to 0_all/1_domains.yaml.
+# `key` is a key of remna_node_domain_types_allowlist (see
+# inventory/group_vars/all/0_defaults/regions.yaml), `base` picks the base
+# domain (main or xray) and `index` appends the location index (net or chain)
+# chosen at the prompt.
+setup_node_remna_node_domains:
+  - key: unique
+    base: main
+  - key: net_location
+    base: xray
+    index: net
+  - key: chain_location
+    base: xray
+    index: chain
+  - key: net_all
+    base: xray
+  - key: net_protocol
+    base: xray
+  - key: chain_all
+    base: xray
+  - key: chain_protocol
+    base: xray
+
+# Protocols of the Remnawave node offered at the prompt: keys of
+# remna_protocol_types (inventory/group_vars/vpn_caddy/remna.yaml).
+setup_node_remna_protocol_types:
+  - vless_reality_tcp
+  - vless_reality_xhttp
+setup_node_remna_protocol_type_default: vless_reality_tcp
+
+# Restic remotes a backup_restic_node host backs up to; by default the ones
+# of backup_restic_node_remotes_base, when the controller sees it.
+setup_node_backup_restic_remotes: "{{ backup_restic_node_remotes_base | default({}) | list }}"
+
+# The choice that stands for "another domain, typed next" in the base domain
+# prompts.
+setup_node_other_choice: __other__
+
+# Preset answers for the prompts, by prompt id (see vars/prompts/host.yml),
+# for unattended runs together with prompting_engine_interactive=false.
+setup_node_prompt_answers: {}

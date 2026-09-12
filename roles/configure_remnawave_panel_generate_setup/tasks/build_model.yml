@@ -1,0 +1,68 @@
+---
+# Turn the inventory's node facts into the setup to apply. Everything the role
+# writes - hosts, outbounds, rules and the route ids tying them together - is
+# derived here in one pass, so the three sides cannot drift apart.
+
+- name: Collect the node facts the setup is built from
+  ansible.builtin.set_fact:
+    crpgs_nodes: >-
+      {%- set collected = [] -%}
+      {%- for node in groups[vpn_server_remnawave_hosts_node_group] | default([]) -%}
+      {%-   set facts = hostvars[node] -%}
+      {%-   set _ = collected.append({
+              'name': node,
+              'panel_name': facts.remna_node_panel_name | default(node, true),
+              'country': facts.country_code_upper | default('', true),
+              'protocol': facts.remna_node_primary_protocol_type
+                          | default(vpn_server_remnawave_snippets_default_protocol_type, true),
+              'domains': (facts.domains_keys | default({}))
+                         .get(vpn_server_remnawave_hosts_node_manage_key, []),
+            }) -%}
+      {%- endfor -%}
+      {{ collected }}
+
+- name: There must be nodes to generate a setup from
+  ansible.builtin.assert:
+    that:
+      - crpgs_nodes | length > 0
+    fail_msg: >-
+      Group '{{ vpn_server_remnawave_hosts_node_group }}' is empty, so there
+      are no nodes to publish.
+
+- name: Build the desired setup
+  ansible.builtin.set_fact:
+    crpgs_model: "{{ crpgs_nodes | remnawave_model(crpgs_model_options) }}"
+  vars:
+    crpgs_model_options:
+      default_protocol: "{{ vpn_server_remnawave_snippets_default_protocol_type }}"
+      direct_domain_types: "{{ vpn_server_remnawave_hosts_node_manage_domain_types_direct_filter }}"
+      entry_domain_types: "{{ vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter }}"
+      entry_country_codes: "{{ vpn_server_remnawave_hosts_chain.entry_country_codes | default([]) }}"
+      skip_same_country: "{{ vpn_server_remnawave_hosts_chain.skip_same_country | default(true) }}"
+      exclude: "{{ vpn_server_remnawave_hosts_chain.exclude | default([]) }}"
+      labels: "{{ vpn_server_remnawave_hosts_labels }}"
+      region_codes: "{{ vpn_deployments_region_codes }}"
+      outbound_tag_prefix: "{{ vpn_server_remnawave_snippets_outbound_tag_prefix }}"
+      outbound_tag_index_width: "{{ vpn_server_remnawave_snippets_outbound_tag_index_width }}"
+      route_id_base: "{{ vpn_server_remnawave_hosts_vless_route_id_base }}"
+      route_id_range: "{{ vpn_server_remnawave_snippets_vless_route_id_range }}"
+      direct_route_id: "{{ vpn_server_remnawave_hosts_vless_route_id_direct }}"
+      chain_bind_nodes: "{{ vpn_server_remnawave_hosts_chain_bind_nodes }}"
+      remark_chain_separator: "{{ vpn_server_remnawave_hosts_remark_chain_separator }}"
+
+- name: Report what the inventory produced
+  ansible.builtin.debug:
+    msg: >-
+      {{ crpgs_model.exits | length }} exits
+      ({{ crpgs_model.chained | length }} of them chained),
+      {{ crpgs_model.entries | length }} chain entries,
+      {{ crpgs_model.hosts | length }} hosts,
+      {{ crpgs_model.outbounds | length }} outbounds,
+      route ids
+      {{ crpgs_model.chained | map(attribute='route_id') | min | default('-') }}-{{
+         crpgs_model.chained | map(attribute='route_id') | max | default('-') }}
+
+- name: Surface anything questionable in the inventory
+  ansible.builtin.debug:
+    msg: "{{ crpgs_model.warnings }}"
+  when: crpgs_model.warnings | length > 0
