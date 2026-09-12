@@ -1,0 +1,13 @@
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: Kenya-West
+  description: >-
+    Task files shared by the roles under roles/setup/. Include it with
+    tasks_from; it does nothing on its own.
+  license: MIT
+  min_ansible_version: '2.19'
+  galaxy_tags:
+    - setup
+    - inventory
+
+dependencies: []

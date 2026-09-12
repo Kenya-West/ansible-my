@@ -1,0 +1,6 @@
+{% set o = '{{' %}
+{% set c = '}}' %}
+# The primary protocol of the Remnawave node on this host. It picks the
+# net-<geo>-<protocol> and chain-<geo>-<protocol> domains; the types are
+# listed in inventory/group_vars/vpn_caddy/remna.yaml.
+remna_node_primary_protocol_type: "{{ o }} remna_protocol_types.{{ initial_configure_host_remna_primary_protocol | default(setup_node_remna_protocol_type_default) }} {{ c }}"

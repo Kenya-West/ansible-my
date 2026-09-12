@@ -1,0 +1,21 @@
+---
+# Questionnaire of roles/setup/bootstrap, run by the ansible-prompting-engine
+# role. The format is documented in the role's docs/SPEC.md.
+settings:
+  intro: |-
+    Bootstrap of the Ansible project: the standard user.
+    Press Enter to accept a default; Ctrl+C, then A, aborts.
+
+prompts:
+  - id: standard_user
+    var: standard_user
+    prompt: Standard username
+    help: >-
+      The user Ansible connects as, and creates, on every host. It becomes the
+      name of the first entry of users_to_set in
+      group_vars/general_vps_prepare/users.yaml and goes into the initial
+      secrets.
+    default: "{{ standard_user | default(lookup('ansible.builtin.env', 'USER')) }}"
+    validate:
+      - pattern: '^[a-z_][a-z0-9_-]{0,31}$'
+        msg: "'{{ answer }}' is not a valid Linux username: lowercase letters, digits, '_' and '-', 32 characters at most."

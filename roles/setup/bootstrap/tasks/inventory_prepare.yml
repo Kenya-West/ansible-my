@@ -1,0 +1,32 @@
+---
+- name: Ensure {{ setup_bootstrap_inventory_dir }} exists
+  ansible.builtin.file:
+    path: "{{ setup_bootstrap_inventory_dir }}"
+    state: directory
+    mode: "0775"
+
+- name: Check whether {{ setup_bootstrap_inventory_file }} exists
+  ansible.builtin.stat:
+    path: "{{ setup_bootstrap_inventory_file }}"
+    get_checksum: false
+  register: __setup_bootstrap_inventory_stat
+
+- name: Create {{ setup_bootstrap_inventory_file }} from the template
+  ansible.builtin.template:
+    src: inventory/production.ini.j2
+    dest: "{{ setup_bootstrap_inventory_file }}"
+    mode: "0644"
+  when: not __setup_bootstrap_inventory_stat.stat.exists
+
+- name: Ensure localhost is in every section it should be in {{ setup_bootstrap_inventory_file | basename }}
+  community.general.ini_file:
+    path: "{{ setup_bootstrap_inventory_file }}"
+    section: "{{ item }}"
+    option: "{{ setup_bootstrap_localhost_option }}"
+    value: "{{ setup_bootstrap_localhost_value }}"
+    no_extra_spaces: true
+    backup: "{{ ansible_loop.first }}"
+  loop: "{{ setup_bootstrap_localhost_sections }}"
+  loop_control:
+    extended: true
+    extended_allitems: false

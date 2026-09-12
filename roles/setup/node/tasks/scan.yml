@@ -1,0 +1,131 @@
+---
+# Look at what the inventory already holds, so that the prompts can check the
+# new host against it and suggest defaults: the hostnames and addresses in
+# use, the base domains of the existing hosts and their location indexes.
+
+- name: Ensure {{ setup_node_host_vars_dir }} exists
+  ansible.builtin.file:
+    path: "{{ setup_node_host_vars_dir }}"
+    state: directory
+    mode: "0775"
+
+- name: Find the existing host_vars directories
+  ansible.builtin.find:
+    paths: "{{ setup_node_host_vars_dir }}"
+    file_type: directory
+    recurse: false
+  register: __setup_node_host_dirs
+
+- name: Find the domain files of the existing hosts
+  ansible.builtin.find:
+    paths: "{{ setup_node_host_vars_dir }}"
+    patterns: "{{ setup_node_scan_domains_file }}"
+    recurse: true
+  register: __setup_node_domain_files
+
+- name: Read the domain files
+  ansible.builtin.slurp:
+    src: "{{ item.path }}"
+  loop: "{{ __setup_node_domain_files.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: __setup_node_domain_slurp
+
+- name: Collect the hostnames and the addresses the inventory knows
+  ansible.builtin.set_fact:
+    setup_node_scan_existing_hostnames: >-
+      {{ ((__setup_node_host_dirs.files | map(attribute='path') | map('basename') | list)
+          + (groups['all'] | default([]))) | unique | sort }}
+    __setup_node_ip_addresses_json: >-
+      {%- set ips = [] -%}
+      {%- for h in groups['all'] | default([]) -%}
+      {%-   if hostvars[h].ansible_host is defined -%}
+      {%-     set _ = ips.append(hostvars[h].ansible_host | string) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ips | to_json }}
+
+# One entry per domain of every host: which host and region it belongs to,
+# the base domain (the string after the first label, Jinja included), and for
+# the net-<region>-N / chain-<region>-N domains their kind and index.
+- name: Collect the domains of every host
+  ansible.builtin.set_fact:
+    __setup_node_domain_entries_json: >-
+      {%- set host = item.item.path | dirname | dirname | basename -%}
+      {%- set data = item.content | b64decode | from_yaml -%}
+      {%- set dk = (data.domains_keys | default({})) if data is mapping else {} -%}
+      {%- set domains = [] -%}
+      {%- if dk.main is defined and dk.main is string -%}
+      {%-   set _ = domains.append({'key': 'main', 'domain': dk.main}) -%}
+      {%- endif -%}
+      {%- for e in dk.remna_node | default([]) if e is mapping and e.domain is defined and e.domain is string -%}
+      {%-   set _ = domains.append({'key': 'remna_node', 'domain': e.domain}) -%}
+      {%- endfor -%}
+      {%- set parts = host.split('-') -%}
+      {%- set cc = '' -%}
+      {%- if parts | length >= 3 -%}
+      {%-   set cc = (hostvars[host].country_code | default(parts[1], true)) if host in hostvars else parts[1] -%}
+      {%- endif -%}
+      {%- set region = vpn_deployments_country_to_censorship_region_matcher.get(cc, vpn_deployments_country_to_regions_matcher.get(cc, 'unknown')) -%}
+      {%- set entries = [] -%}
+      {%- for d in domains -%}
+      {%-   set kind = 'net_location' if 'net_location.value' in d.domain else ('chain_location' if 'chain_location.value' in d.domain else 'other') -%}
+      {%-   set index = d.domain | regex_search('-[0-9]+\.') -%}
+      {%-   set _ = entries.append({'host': host, 'region': region, 'key': d.key, 'domain': d.domain,
+                                    'base': d.domain | regex_replace('^(?:\{\{[^}]*\}\}|[^.]+)[^.]*\.', ''),
+                                    'kind': kind,
+                                    'index': (index | regex_replace('[^0-9]', '') | int) if (index and kind != 'other') else none}) -%}
+      {%- endfor -%}
+      {{ ((__setup_node_domain_entries_json | default('[]') | from_json) + entries) | to_json }}
+  loop: "{{ __setup_node_domain_slurp.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
+- name: Settle the collected hosts and domains
+  ansible.builtin.set_fact:
+    setup_node_scan_existing_ip_addresses: "{{ __setup_node_ip_addresses_json | from_json }}"
+    setup_node_scan_domain_entries: "{{ __setup_node_domain_entries_json | default('[]') | from_json }}"
+    setup_node_scan_providers: >-
+      {{ setup_node_scan_existing_hostnames
+         | select('match', '^[a-z0-9]+-[a-z]{2}-[0-9]+$')
+         | map('regex_replace', '-.*$', '') | unique | sort }}
+
+- name: Derive the base domains in use and the location indexes
+  ansible.builtin.set_fact:
+    setup_node_scan_base_domains: >-
+      {{ __setup_node_bases | community.general.counter | dict2items
+         | sort(attribute='value', reverse=true) | map(attribute='key') | list }}
+    setup_node_scan_base_domain_default: >-
+      {{ (__setup_node_main_bases | community.general.counter | dict2items | sort(attribute='value', reverse=true) | map(attribute='key') | first)
+         if __setup_node_main_bases | length > 0 else (__setup_node_bases | first | default('')) }}
+    setup_node_scan_xray_base_domain_default: >-
+      {{ (__setup_node_xray_bases | community.general.counter | dict2items | sort(attribute='value', reverse=true) | map(attribute='key') | first)
+         if __setup_node_xray_bases | length > 0 else (__setup_node_bases | first | default('')) }}
+    __setup_node_location_indexes_json: >-
+      {%- set idx = {} -%}
+      {%- for e in setup_node_scan_domain_entries if e.kind != 'other' and e.index is not none -%}
+      {%-   if e.region not in idx -%}
+      {%-     set _ = idx.update({e.region: {'net_location': [], 'chain_location': []}}) -%}
+      {%-   endif -%}
+      {%-   set _ = idx[e.region][e.kind].append(e.index) -%}
+      {%- endfor -%}
+      {{ idx | to_json }}
+  vars:
+    __setup_node_domain_pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
+    __setup_node_bases: >-
+      {{ setup_node_scan_domain_entries | map(attribute='base')
+         | select('match', __setup_node_domain_pattern) | list }}
+    __setup_node_main_bases: >-
+      {{ setup_node_scan_domain_entries | selectattr('key', 'equalto', 'main')
+         | map(attribute='base') | select('match', __setup_node_domain_pattern) | list }}
+    __setup_node_xray_bases: >-
+      {{ setup_node_scan_domain_entries | selectattr('key', 'equalto', 'remna_node')
+         | rejectattr('domain', 'search', 'unique.value')
+         | map(attribute='base') | select('match', __setup_node_domain_pattern) | list }}
+
+- name: Settle the location indexes and the base domain choices
+  ansible.builtin.set_fact:
+    setup_node_scan_location_indexes: "{{ __setup_node_location_indexes_json | from_json }}"
+    setup_node_scan_base_domain_choices: >-
+      {{ dict(setup_node_scan_base_domains | zip(setup_node_scan_base_domains))
+         | combine({setup_node_other_choice: 'Another domain (typed next)'}) }}

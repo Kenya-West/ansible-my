@@ -1,0 +1,23 @@
+---
+# tasks file for roles/setup/bootstrap
+#
+# Step 1 of the initial configuration, on the controller:
+#   1. the inventory file exists, and localhost is in the sections it should be;
+#   2. the standard user is asked for, written to
+#      group_vars/general_vps_prepare/users.yaml and to the initial secrets.
+
+- name: Capture this role's path so nested roles can use it
+  ansible.builtin.set_fact:
+    setup_bootstrap_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Prepare the inventory file
+  ansible.builtin.include_tasks: inventory_prepare.yml
+  tags:
+    - always
+
+- name: Ask for the standard user and write it down
+  ansible.builtin.include_tasks: users.yml
+  tags:
+    - always

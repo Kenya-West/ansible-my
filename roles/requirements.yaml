@@ -4,6 +4,10 @@ roles:
   - src: linux-system-roles.journald
   - src: oefenweb.fail2ban
   - src: 0x0I.systemd
+  - src: https://github.com/kenya-west/ansible-prompting-engine
+    scm: git
+    version: master
+    name: ansible-prompting-engine
 
 collections:
   - name: community.general

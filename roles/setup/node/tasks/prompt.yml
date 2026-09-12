@@ -1,0 +1,22 @@
+---
+- name: Ask about the new host
+  ansible.builtin.include_role:
+    name: ansible-prompting-engine
+  vars:
+    prompting_engine_spec_file: "{{ setup_node_role_path }}/vars/prompts/host.yml"
+    prompting_engine_answers: "{{ setup_node_prompt_answers }}"
+    # Derived from the answers as they come in; the prompts refer to them.
+    setup_node_region: >-
+      {{ vpn_deployments_country_to_censorship_region_matcher.get(initial_configure_host_country_code,
+           vpn_deployments_country_to_regions_matcher.get(initial_configure_host_country_code, 'unknown')) }}
+    setup_node_hostname: "{{ initial_configure_host_provider }}-{{ initial_configure_host_country_code }}-{{ initial_configure_host_index }}"
+    setup_node_country_hostnames: >-
+      {{ setup_node_scan_existing_hostnames
+         | select('match', '^[a-z0-9]+-' ~ initial_configure_host_country_code ~ '-[0-9]+$') | list }}
+    setup_node_next_host_index: >-
+      {{ ((setup_node_country_hostnames | map('regex_replace', '^.*-', '') | map('int') | list) + [0]) | max + 1 }}
+    setup_node_region_indexes: "{{ setup_node_scan_location_indexes.get(setup_node_region, {'net_location': [], 'chain_location': []}) }}"
+    setup_node_next_net_location_index: "{{ (setup_node_region_indexes.net_location + [0]) | max + 1 }}"
+    setup_node_xray_base_domain: >-
+      {{ initial_configure_host_xray_base_domain_name_custom
+         | default(initial_configure_host_xray_base_domain_name_choice | default('', true), true) }}
