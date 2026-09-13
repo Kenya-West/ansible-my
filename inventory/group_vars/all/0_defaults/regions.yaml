@@ -368,6 +368,48 @@ vpn_deployment_censorship_geo: >-
     )
   }}
 
+# Maps a lowercase latin letter to its regional indicator symbol,
+# used to compose a country's flag emoji from its ISO 3166-1 alpha-2 code.
+vpn_deployments_regional_indicator_symbols:
+  a: "🇦"
+  b: "🇧"
+  c: "🇨"
+  d: "🇩"
+  e: "🇪"
+  f: "🇫"
+  g: "🇬"
+  h: "🇭"
+  i: "🇮"
+  j: "🇯"
+  k: "🇰"
+  l: "🇱"
+  m: "🇲"
+  n: "🇳"
+  o: "🇴"
+  p: "🇵"
+  q: "🇶"
+  r: "🇷"
+  s: "🇸"
+  t: "🇹"
+  u: "🇺"
+  v: "🇻"
+  w: "🇼"
+  x: "🇽"
+  y: "🇾"
+  z: "🇿"
+
+# Compose the flag emoji for `country_code`.
+#
+# Examples:
+#   de -> 🇩🇪
+#   us -> 🇺🇸
+#   th -> 🇹🇭
+vpn_deployment_country_flag_emoji: >-
+  {{
+    vpn_deployments_regional_indicator_symbols[(country_code | lower)[0]]
+    ~ vpn_deployments_regional_indicator_symbols[(country_code | lower)[1]]
+  }}
+
 vpn_deployment_domain_prefix:
   unique:
     type: unique
