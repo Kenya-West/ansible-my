@@ -73,3 +73,9 @@ systemd_unit_configs:
       Persistent: "true"
     Install:
       WantedBy: "timers.target"
+
+# The Remnawave panel this node connects to, resolved by the playbook with
+# kwtoolset/resolve_host_relations (vpn_server_remnawave/remna), and the
+# SECRET_KEY it issues to its nodes.
+install_vpn_caddy_remna_panel: "{{ resolve_host_relations_host | default('') }}"
+remna_node_ssl_cert_from_panel: "{{ hostvars[install_vpn_caddy_remna_panel].vpn_server_remnawave_node_secret_key }}"

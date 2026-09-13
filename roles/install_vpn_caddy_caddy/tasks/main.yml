@@ -7,6 +7,18 @@
   tags:
     - always
 
+- name: Resolve the analytics servers scraping this host
+  ansible.builtin.include_tasks:
+    file: analytics_servers.yml
+    apply:
+      tags:
+        - always
+  loop: "{{ ['caddy'] + (['node_exporter', 'docker_exporter'] if 'analytics_node' in group_names else []) }}"
+  loop_control:
+    loop_var: install_vpn_caddy_caddy_analytics_component
+  tags:
+    - always
+
 - name: Add to source_paths the current role templates directory
   ansible.builtin.set_fact:
     source_paths: >-

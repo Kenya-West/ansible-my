@@ -5,6 +5,9 @@ Adds a host to the inventory, on the controller. It was
 `playbooks/ansible/node/add_host_initial.yaml` (and the `vpn/add_host_*`
 playbooks) before; that playbook is now only its launcher.
 
+Servers (`analytics_server`, `vpn_server_remnawave`, `backup_restic_server`,
+`matrix_server`) are added by `setup/server`, which also writes their secrets.
+
 What it does
 ------------
 
@@ -42,7 +45,7 @@ What it does
      and `vpn_server_remnawave` groups of the inventory the play runs
      against (deduplicated), or typed when there is none or another one is
      wanted.
-3. Renders `templates/host/0_all/` and, for every group joined that has a
+3. Renders `templates/host/0_all/` of `setup/common` and of this role and, for every group joined that has a
    directory of the same name in `templates/host/`, that directory into
    `host_vars/<hostname>/`.
 4. Adds `<hostname> ansible_host=<ip>` to every group's section of the
@@ -100,15 +103,13 @@ Templates
   `host_relations.default`, `remna_node_use_dns01_cloudflare` and
   `domains_settings`, in the shape of
   the existing hosts.
-- `host/0_all/2_domains.yaml`: how to add or override DNS records and
-  define `host_relations` (resolved by `kwtoolset/resolve_host_relations`), as
-  comments.
+- `host/0_all/2_domains.yaml` of `setup/common`: how to add or override DNS
+  records and define `host_relations` (resolved by
+  `kwtoolset/resolve_host_relations`), as comments.
 - `host/vpn_caddy/remna.yaml.j2`: `remna_node_primary_protocol_type`.
 - `host/vpn_caddy/caddy.yaml`: `caddy_occupy_HTTPS`, commented out.
 - `host/backup_restic_node/backup_restic_node.yaml.j2`: the postgres
   location and one restic key per remote.
-- `host/analytics_server/analytics_server_telepush.yaml`: placeholders,
-  rendered when `analytics_server` is added to the optional groups.
 
 Requirements
 ------------

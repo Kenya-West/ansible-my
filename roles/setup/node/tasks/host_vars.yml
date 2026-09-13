@@ -54,6 +54,14 @@
     recurse: false
   register: __setup_node_template_dirs
 
+- name: Render the files every host gets into host_vars/{{ initial_configure_host_hostname }}/0_all
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: render_tree
+  vars:
+    setup_render_tree_src: "{{ (setup_node_role_path ~ '/../common/templates/host/0_all') | realpath }}"
+    setup_render_tree_dest: "{{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}/0_all"
+
 - name: Render host_vars/{{ initial_configure_host_hostname }}
   ansible.builtin.include_role:
     name: setup/common

@@ -1,0 +1,164 @@
+---
+# Questionnaire of roles/setup/server, run by the ansible-prompting-engine
+# role. The format is documented in the role's docs/SPEC.md.
+#
+# Besides the play's variables and the setup_node_scan_* facts of the scan,
+# the role passes in values derived from the answers as they come
+# (tasks/prompt.yml): setup_server_hostname, setup_server_country_hostnames,
+# setup_server_next_host_index, setup_server_base_domain and
+# setup_server_relation_host_choices.
+settings:
+  var_prefix: initial_configure_server_
+  intro: |-
+    New server of the inventory, with secrets of its own written into its
+    host_vars. Its name is <provider>-<country>-<index>, like play2go-nl-3.
+    Press Enter to accept a default; Ctrl+C, then A, aborts.
+  review: true
+
+prompts:
+  - id: provider
+    prompt: Hosting provider
+    help: >-
+      Lowercase letters and digits, no dashes: the first part of the hostname.
+      Providers already in the inventory:
+      {{ setup_node_scan_providers | join(', ') if setup_node_scan_providers | length > 0 else 'none yet' }}.
+    validate:
+      - pattern: '^[a-z0-9]+$'
+        msg: "'{{ answer }}' is not valid: lowercase letters and digits only."
+
+  - id: country_code
+    prompt: Country of the server
+    help: >-
+      Two lowercase letters (ISO 3166-1 alpha-2): the second part of the
+      hostname, from which country_code is derived.
+    validate:
+      - pattern: '^[a-z]{2}$'
+        msg: "'{{ answer }}' is not a two-letter lowercase country code."
+
+  - id: index
+    prompt: "Index of the server: {{ answers.provider }}-{{ answers.country_code }}-<index>"
+    help: >-
+      Hosts in {{ answers.country_code }} so far:
+      {{ setup_server_country_hostnames | join(', ') if setup_server_country_hostnames | length > 0 else 'none' }}.
+    type: int
+    default: "{{ setup_server_next_host_index }}"
+    validate:
+      - min: 1
+      - that: (answers.provider ~ '-' ~ answers.country_code ~ '-' ~ answer) not in setup_node_scan_existing_hostnames
+        msg: "{{ answers.provider }}-{{ answers.country_code }}-{{ answer }} already exists, in host_vars/ or in the inventory."
+
+  - id: ip_address
+    prompt: "IPv4 address of {{ setup_server_hostname }}"
+    help: Written as ansible_host in the inventory file(s).
+    validate:
+      - pattern: '^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
+        msg: "'{{ answer }}' is not an IPv4 address."
+      - that: answer not in setup_node_scan_existing_ip_addresses
+        msg: "{{ answer }} is already the ansible_host of another host."
+
+  - id: groups
+    prompt: "Server groups of {{ setup_server_hostname }}"
+    help: >-
+      {{ setup_server_groups_required | join(' and ') }} are always joined.
+      Choose at least one (numbers separated by commas); every group gets its
+      secrets generated into host_vars/{{ setup_server_hostname }}/<group>/.
+    type: multichoice
+    choices: "{{ setup_server_groups_optional }}"
+    default: "{{ setup_server_groups_optional_default }}"
+    validate:
+      - min_length: 1
+
+  - id: base_domain_name_choice
+    prompt: "Base domain of the server's own domain: {{ setup_server_hostname }}.<base domain>"
+    help: The base domains the hosts of this inventory already use.
+    type: choice
+    choices: "{{ setup_node_scan_base_domain_choices }}"
+    default: "{{ setup_node_scan_base_domain_default }}"
+    when: setup_node_scan_base_domains | length > 0
+
+  - id: base_domain_name_custom
+    prompt: "Base domain of the server's own domain: {{ setup_server_hostname }}.<base domain>"
+    when: answers.base_domain_name_choice | default(setup_server_other_choice, true) == setup_server_other_choice
+    validate:
+      - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
+        msg: "'{{ answer }}' does not look like a domain."
+
+  - id: analytics_base_domain_name
+    prompt: Base domain of the analytics services
+    help: >-
+      {{ setup_server_service_domains.analytics_server.values() | unique | join(', ') }}
+      become <name>.<base domain> in domains_keys.
+    default: "{{ setup_server_base_domain }}"
+    when: "'analytics_server' in answers.groups | default([], true)"
+    validate:
+      - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
+        msg: "'{{ answer }}' does not look like a domain."
+
+  - id: remnawave_base_domain_name
+    prompt: Base domain of the Remnawave panel and its services
+    help: >-
+      {{ setup_server_service_domains.vpn_server_remnawave.values() | unique | join(', ') }}
+      become <name>.<base domain> in domains_keys.
+    default: "{{ setup_server_base_domain }}"
+    when: "'vpn_server_remnawave' in answers.groups | default([], true)"
+    validate:
+      - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
+        msg: "'{{ answer }}' does not look like a domain."
+
+  - id: matrix_base_domain_name
+    prompt: Base domain of the Matrix server
+    help: >-
+      Synapse answers on {{ setup_server_service_domains.matrix_server.matrix_server }}.<base domain>,
+      and the base domain is matrix_server_root_domain, the domain of the
+      Matrix IDs (@user:<base domain>).
+    default: "{{ setup_server_base_domain }}"
+    when: "'matrix_server' in answers.groups | default([], true)"
+    validate:
+      - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
+        msg: "'{{ answer }}' does not look like a domain."
+
+  - id: matrix_server_id
+    prompt: Admin account of the Matrix server
+    help: matrix_server_id of matrix_server/matrix_server.yaml.
+    default: admin
+    when: "'matrix_server' in answers.groups | default([], true)"
+    validate:
+      - pattern: '^[a-z0-9._=/-]+$'
+        msg: "'{{ answer }}' is not a valid Matrix user name."
+
+  - id: telepush_bot_token
+    prompt: Telegram bot token of Telepush
+    help: >-
+      telepush_bot_token of analytics_server/analytics_server_telepush.yaml,
+      created with https://t.me/BotFather. Leave empty to fill it in later.
+    secret: true
+    required: false
+    when: "'analytics_server' in answers.groups | default([], true)"
+    validate:
+      - pattern: '^[0-9]+:[A-Za-z0-9_-]{30,}$'
+        msg: That does not look like a Telegram bot token (123456789:ABC...).
+
+  - id: default_relation_host_choice
+    prompt: "Host {{ setup_server_hostname }} relates to by default"
+    help: >-
+      host_relations.default of 0_all/1_domains.yaml: the upstream a node
+      component of the server falls back to. The server itself, or the hosts
+      of {{ setup_server_relation_host_groups | join(' and ') }} in this
+      inventory.
+    type: choice
+    choices: "{{ setup_server_relation_host_choices }}"
+    default: >-
+      {{ setup_server_hostname
+         if (answers.groups | default([], true) | select('in', setup_server_relation_host_groups) | list | length > 0)
+            or setup_node_scan_relation_hosts | length == 0
+         else setup_node_scan_relation_hosts | first }}
+
+  - id: default_relation_host_custom
+    prompt: "Host {{ setup_server_hostname }} relates to by default"
+    help: >-
+      host_relations.default of 0_all/1_domains.yaml, an inventory_hostname
+      like play2go-nl-3.
+    when: answers.default_relation_host_choice | default(setup_server_other_choice, true) == setup_server_other_choice
+    validate:
+      - pattern: '^[a-z0-9][a-z0-9._-]*$'
+        msg: "'{{ answer }}' does not look like an inventory hostname."

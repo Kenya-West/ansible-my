@@ -1,0 +1,24 @@
+{% set o = '{{' %}
+{% set c = '}}' %}
+domains_keys:
+  main: "{{ o }} inventory_hostname {{ c }}.{{ initial_configure_server_base_domain_name }}"
+{% for group in setup_server_groups if group in setup_server_service_domains %}
+{% for key, label in setup_server_service_domains[group].items() %}
+  {{ key }}: {{ label }}.{{ setup_server_service_base_domains[group] }}
+{% endfor %}
+{% endfor %}
+  remna_node: []
+domains: "{{ o }} ((domains_keys | dict2items | rejectattr('key', 'equalto', 'remna_node') | map(attribute='value') | list) + (domains_keys.remna_node | map(attribute='domain') | list)) | unique {{ c }}"
+
+{% if initial_configure_server_default_relation_host | default('', true) | length > 0 %}
+host_relations:
+  default:
+    hosts:
+      - host: {{ initial_configure_server_default_relation_host }}
+
+{% endif %}
+domains_settings:
+  - name: "{{ o }} domains_keys.main {{ c }}"
+    records_limit:
+      - type: A
+        limit: 1

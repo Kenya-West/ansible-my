@@ -1,0 +1,89 @@
+---
+# tasks file for roles/setup/server
+#
+# Adds a server to the inventory, on the controller, with secrets of its own:
+#   1. the scan of setup/node - the hostnames, addresses, base domains and
+#                               relation hosts the inventory already holds;
+#   2. prompt.yml             - the questionnaire: hostname parts, address,
+#                               server groups, domains, the secrets that
+#                               cannot be generated;
+#   3. host_vars.yml          - freshly generated passwords, and
+#                               host_vars/<hostname>/ rendered from
+#                               templates/host/;
+#   4. the server in every group of the inventory file(s).
+#
+# The secrets of a server are written into its host_vars and nowhere else:
+# the nodes read them through host_relations.
+
+- name: Capture this role's path so nested roles can use it
+  ansible.builtin.set_fact:
+    setup_server_role_path: "{{ role_path }}"
+  tags:
+    - always
+
+- name: Check that the inventory is loaded for the controller
+  ansible.builtin.assert:
+    that:
+      - vpn_deployments_country_to_regions_matcher is defined
+      - standard_user is defined
+    fail_msg: >-
+      The variables of group_vars/all are not loaded. Run the play against the
+      inventory (-i inventory/production.ini) with localhost listed in it, after
+      steps 1 and 2 of the initial configuration.
+    quiet: true
+  tags:
+    - always
+
+- name: Look at what the inventory already holds
+  ansible.builtin.include_role:
+    name: setup/node
+    tasks_from: scan
+  tags:
+    - always
+
+- name: Ask about the new server
+  ansible.builtin.include_tasks: prompt.yml
+  tags:
+    - always
+
+- name: Write the host_vars of the new server
+  ansible.builtin.include_tasks: host_vars.yml
+  tags:
+    - always
+
+- name: Add the server to the inventory file(s)
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: inventory_add_host
+  vars:
+    setup_inventory_add_host_files: "{{ setup_server_inventory_files }}"
+    setup_inventory_add_host_name: "{{ initial_configure_server_hostname }}"
+    setup_inventory_add_host_address: "{{ initial_configure_server_ip_address }}"
+    setup_inventory_add_host_groups: "{{ setup_server_groups }}"
+  tags:
+    - always
+
+- name: Find the files of the new server that still hold placeholders
+  ansible.builtin.find:
+    paths: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}"
+    recurse: true
+    contains: '^[^#]*<[^<>]+>'
+  register: __setup_server_placeholders
+  tags:
+    - always
+
+- name: Report
+  ansible.builtin.debug:
+    msg:
+      - "Server {{ initial_configure_server_hostname }} ({{ initial_configure_server_ip_address }}) added."
+      - "Groups: {{ setup_server_groups | join(', ') }}."
+      - "host_vars, with the secrets of the server: {{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/"
+      - "Inventory file(s): {{ setup_server_inventory_files | join(', ') }}."
+      - >-
+        Values to fill in (<placeholders>):
+        {{ __setup_server_placeholders.files | map(attribute='path')
+           | map('relpath', setup_server_host_vars_dir ~ '/' ~ initial_configure_server_hostname)
+           | sort | join(', ') | default('none', true) }}.
+      - "Review the files, then prepare the server with the 0_start_* playbooks."
+  tags:
+    - always

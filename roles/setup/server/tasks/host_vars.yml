@@ -1,0 +1,80 @@
+---
+- name: Settle the facts the server templates use
+  ansible.builtin.set_fact:
+    initial_configure_server_hostname: >-
+      {{ initial_configure_server_provider }}-{{ initial_configure_server_country_code }}-{{ initial_configure_server_index }}
+    initial_configure_server_base_domain_name: >-
+      {{ initial_configure_server_base_domain_name_custom
+         | default(initial_configure_server_base_domain_name_choice | default('', true), true) }}
+    initial_configure_server_default_relation_host: >-
+      {{ initial_configure_server_default_relation_host_custom
+         | default(initial_configure_server_default_relation_host_choice | default('', true), true) }}
+    setup_server_groups: "{{ (setup_server_groups_required + (initial_configure_server_groups | default([], true))) | unique }}"
+    # The e-mail addresses the templates read, taken from the inventory the
+    # way setup/secrets does it for a group.
+    initial_configure_user_input_user_email:
+      main: "{{ emails.main | default('', true) }}"
+      domain: "{{ emails.domain | default(emails.main | default('', true), true) }}"
+
+- name: Settle the base domain of the services of each group
+  ansible.builtin.set_fact:
+    setup_server_service_base_domains:
+      analytics_server: "{{ initial_configure_server_analytics_base_domain_name | default(initial_configure_server_base_domain_name, true) }}"
+      vpn_server_remnawave: "{{ initial_configure_server_remnawave_base_domain_name | default(initial_configure_server_base_domain_name, true) }}"
+      matrix_server: "{{ initial_configure_server_matrix_base_domain_name | default(initial_configure_server_base_domain_name, true) }}"
+
+- name: Check the answers the templates rely on
+  ansible.builtin.assert:
+    that:
+      - initial_configure_server_base_domain_name | length > 0
+      - setup_server_groups | select('in', setup_server_groups_optional) | list | length > 0
+    fail_msg: A base domain and at least one server group are needed.
+    quiet: true
+
+- name: Check whether host_vars/{{ initial_configure_server_hostname }} exists
+  ansible.builtin.stat:
+    path: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}"
+    get_checksum: false
+  register: __setup_server_host_dir_stat
+
+- name: Stop when host_vars/{{ initial_configure_server_hostname }} exists
+  ansible.builtin.fail:
+    msg: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }} already exists. Nothing was written."
+  when: __setup_server_host_dir_stat.stat.exists
+
+- name: Generate the passwords of the server
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: generate_passwords
+  vars:
+    setup_generate_passwords: "{{ setup_server_generated_passwords }}"
+    setup_generate_passwords_length: "{{ setup_server_password_length }}"
+    setup_generate_passwords_special_chars: "{{ setup_server_password_special_chars }}"
+
+- name: Find the host template directories of this role
+  ansible.builtin.find:
+    paths: "{{ setup_server_role_path }}/templates/host"
+    file_type: directory
+    recurse: false
+  register: __setup_server_template_dirs
+
+- name: Render the files every host gets into host_vars/{{ initial_configure_server_hostname }}/0_all
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: render_tree
+  vars:
+    setup_render_tree_src: "{{ (setup_server_role_path ~ '/../common/templates/host/0_all') | realpath }}"
+    setup_render_tree_dest: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/0_all"
+
+- name: Render host_vars/{{ initial_configure_server_hostname }}
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: render_tree
+  vars:
+    setup_render_tree_src: "{{ setup_server_role_path }}/templates/host/{{ setup_server_template_dir }}"
+    setup_render_tree_dest: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/{{ setup_server_template_dir }}"
+  loop: >-
+    {{ (setup_server_templates_always + setup_server_groups) | unique
+       | select('in', __setup_server_template_dirs.files | map(attribute='path') | map('basename') | list) | list }}
+  loop_control:
+    loop_var: setup_server_template_dir

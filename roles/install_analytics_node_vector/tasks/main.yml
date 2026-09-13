@@ -6,6 +6,18 @@
   tags:
     - always
 
+- name: Assert the analytics server of this host is resolved
+  ansible.builtin.assert:
+    that:
+      - install_analytics_node_vector_server | length > 0
+    fail_msg: >-
+      No analytics_server resolved for {{ inventory_hostname }}: set host_relations
+      (analytics_server.components.vector, analytics_server or default) in its host_vars; the
+      playbook resolves it with kwtoolset/resolve_host_relations before this role.
+    quiet: true
+  tags:
+    - always
+
 - name: Add to source_paths the current role templates directory
   ansible.builtin.set_fact:
     source_paths: >-

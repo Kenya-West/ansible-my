@@ -15,3 +15,18 @@ dest_path_root: "/home/{{ standard_user }}/{{ analytics_node.project.root }}"
 dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
+
+# The analytics server scraping this host, resolved by the playbook with
+# kwtoolset/resolve_host_relations (analytics_server/logporter).
+install_analytics_node_logporter_server: "{{ resolve_host_relations_host | default('') }}"
+
+# logporter_server_users, and the prometheus user of the server's
+# prometheus_server_scrape_credentials.logporter.
+install_analytics_node_logporter_users: >-
+  {{ (logporter_server_users | default([])
+      | rejectattr('name', 'equalto',
+                   hostvars[install_analytics_node_logporter_server].prometheus_server_scrape_credentials.logporter.username)
+      | list)
+     + [{'name': hostvars[install_analytics_node_logporter_server].prometheus_server_scrape_credentials.logporter.username,
+         'password': hostvars[install_analytics_node_logporter_server].prometheus_server_scrape_credentials.logporter.password,
+         'hash_scheme': 'bcrypt'}] }}

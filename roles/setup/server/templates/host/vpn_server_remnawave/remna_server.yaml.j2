@@ -1,6 +1,10 @@
 vpn_server_remnawave_app_secret: <jwt_auth_secret>
 vpn_server_remnawave_api_token: <jwt_api_tokens_secret>
 
+# The SECRET_KEY the panel shows for its nodes; the nodes relating to this
+# panel (host_relations) read it from here.
+vpn_server_remnawave_node_secret_key: <node_secret_key_from_panel>
+
 vpn_server_remnawave_is_telegram_notifications_enabled: false
 vpn_server_remnawave_telegram_bot_token: <telegram_bot_token>
 vpn_server_remnawave_telegram_notify_users_chat_id: <telegram_notify_users_chat_id>
@@ -19,6 +23,11 @@ vpn_server_remnawave_metrics_pass: "{{ initial_configure_generated_password_vpn_
 
 vpn_server_remnawave_webhook_url: "" # Only https:// is allowed
 vpn_server_remnawave_webhook_secret_header: <token> # This secret is used to sign the webhook payload, must be exact 64 characters. Only a-z, 0-9, A-Z are allowed.
+
+vpn_server_remnawave_subscription_api_token: "<api_token>" # This token is used to authenticate the subscription service, must be exact 64 characters. Only a-z, 0-9, A-Z are allowed.
+
+vpn_server_remnawave_subscription_meta_title: "<Title of your VPN service>"
+vpn_server_remnawave_subscription_meta_description: "<Description of your VPN service>"
 
 vpn_server_remnawave_postgres_password: <postgres_password>
 
