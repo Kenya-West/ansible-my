@@ -1,0 +1,271 @@
+---
+# Scenario: cloudflare_sync_state
+#
+# Makes the Cloudflare DNS state of the CURRENT environment match the inventory,
+# group-wide. Where cloudflare_check_set_records_for_host reconciles only the
+# names a host declares, this scenario also removes what no host declares any
+# more:
+#   * records for names no host declares  (domains with no host linked);
+#   * records whose content no host declares for that name (leftover A records,
+#     e.g. the IP of a removed or re-addressed host), and duplicates;
+#   * declared records that are missing are created (or a leftover re-pointed).
+#
+# Scope (a record is only ever touched when BOTH hold):
+#   * its comment carries the `dns_hosting_tags` primary filter (managed-by=ansible);
+#   * its comment carries every `dns_sync_scope_tags` tag — by default every other
+#     `dns_hosting_tags` value, i.e. `environment=<inventory>`. Managed records of
+#     another environment (or without the tag) are reported, never changed.
+#
+# Safety:
+#   * the play must cover the whole domain_management group (no --limit, no
+#     failed host), otherwise the records of the missing hosts would look orphaned;
+#   * `dns_sync_dry_run: true` (or --check) prints the plan without changing anything;
+#   * deleting while no host declares any record needs `dns_sync_allow_delete_all: true`.
+#
+# Shared logic:
+#   * ../dns_resolve_context.yml      — providers, tokens, record types, tags
+#   * ../compute_host_dns_records.yml — each host's declared records -> cf_set_targets
+#   * ../validate_record_ips.yml      — A -> IPv4 / AAAA -> IPv6 pre-flight check
+#   * ../read_cloudflare_records.yml  — the managed records (all zones by default)
+#   * ../plan_group_dns_sync.yml      — the group-wide diff
+#
+# Everything runs on the control node (delegate_to: localhost).
+
+- name: Resolve the shared DNS context
+  ansible.builtin.include_tasks: ../dns_resolve_context.yml
+  tags:
+    - cloudflare_sync_state
+
+- name: Fail unless the play covers the whole domain_management group
+  ansible.builtin.assert:
+    that:
+      - _missing_hosts | length == 0
+    fail_msg: >-
+      The sync must run against every host of the domain_management group (no
+      --limit, no failed host); otherwise their records would be deleted as
+      orphans. Not in the play: {{ _missing_hosts }}
+    quiet: true
+  vars:
+    _missing_hosts: "{{ groups['domain_management'] | default([]) | difference(ansible_play_hosts) }}"
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Compute the records this host declares
+  ansible.builtin.include_tasks: ../compute_host_dns_records.yml
+  tags:
+    - cloudflare_sync_state
+
+- name: Validate that record values match their type (A -> IPv4, AAAA -> IPv6)
+  ansible.builtin.include_tasks: ../validate_record_ips.yml
+  tags:
+    - cloudflare_sync_state
+
+- name: Re-check that no host dropped out while computing its records
+  ansible.builtin.assert:
+    that:
+      - groups['domain_management'] | default([]) | difference(ansible_play_hosts) | length == 0
+    fail_msg: >-
+      Some hosts failed while computing their records:
+      {{ groups['domain_management'] | default([]) | difference(ansible_play_hosts) }}.
+      Refusing to sync a partial view.
+    quiet: true
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Aggregate the records declared by every host and resolve the scope tags
+  ansible.builtin.set_fact:
+    dns_sync_desired: "{{ _desired }}"
+    dns_sync_scope_tags_resolved: >-
+      {{ dns_sync_scope_tags | default(dns_hosting_tags_resolved
+         | map(attribute='value') | reject('equalto', dns_primary_filter) | list) }}
+  vars:
+    _desired: >-
+      {%- set out = [] -%}
+      {%- for h in groups['domain_management'] | default([]) -%}
+        {%- for t in hostvars[h].cf_set_targets | default([]) -%}
+          {%- set _ = out.append(t | combine({'_host': h})) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ out }}
+  no_log: true # entries carry the api_token
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Read the managed Cloudflare records
+  ansible.builtin.include_tasks: ../read_cloudflare_records.yml
+  vars:
+    dns_read_all_zones: "{{ dns_sync_scan_all_zones }}"
+  tags:
+    - cloudflare_sync_state
+
+- name: Plan the sync
+  ansible.builtin.include_tasks: ../plan_group_dns_sync.yml
+  tags:
+    - cloudflare_sync_state
+
+# --- Report -----------------------------------------------------------------
+
+- name: Report the sync plan
+  ansible.builtin.debug:
+    msg:
+      environment_scope: "{{ [dns_primary_filter] + dns_sync_scope_tags_resolved }}"
+      declared: "{{ dns_sync_desired | length }} record(s) by {{ dns_sync_desired | map(attribute='_host') | unique | length }} host(s)"
+      in_cloudflare: "{{ dns_sync_actual | length }} in-scope managed record(s)"
+      create: "{{ dns_sync_plan['create'] | community.general.json_query('[].{name: body.name, type: body.type, content: body.content, hosts: hosts}') }}"
+      update: "{{ dns_sync_plan['update'] | community.general.json_query('[].{name: body.name, type: body.type, from: from, content: body.content, reason: reason, hosts: hosts}') }}"
+      delete: "{{ dns_sync_plan['delete'] | community.general.json_query('[].{name: name, type: type, content: content, reason: reason, value_owners: value_owners}') }}"
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Report managed records outside the sync scope (never changed)
+  ansible.builtin.debug:
+    msg: >-
+      {{ dns_sync_foreign | length }} managed record(s) lack the scope tags
+      {{ dns_sync_scope_tags_resolved }} (another environment, or created before
+      tagging) and are left untouched:
+      {{ dns_sync_foreign | community.general.json_query('[].{name: name, type: type, content: content, comment: comment}') }}
+  when: dns_sync_foreign | length > 0
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Fail when a declared name exceeds its domains_settings records_limit
+  ansible.builtin.assert:
+    that:
+      - dns_sync_violations | length == 0
+    fail_msg: >-
+      These names are declared with more values than `domains_settings.records_limit`
+      allows: {{ dns_sync_violations }}
+    quiet: true
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Fail when every record would be deleted because nothing is declared
+  ansible.builtin.assert:
+    that:
+      - dns_sync_desired | length > 0 or dns_sync_plan['delete'] | length == 0 or dns_sync_allow_delete_all | bool
+    fail_msg: >-
+      No host declares any DNS record, yet {{ dns_sync_plan['delete'] | length }}
+      managed record(s) would be deleted. If that is intended, re-run with
+      `-e dns_sync_allow_delete_all=true`.
+    quiet: true
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Stop here on a dry run
+  ansible.builtin.debug:
+    msg: "Dry run: no changes made (dns_sync_dry_run or --check)."
+  when: dns_sync_dry_run | bool or ansible_check_mode
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+# --- Apply ------------------------------------------------------------------
+
+- name: Update the drifted and re-pointed records
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ call.zone_id }}/dns_records/{{ call.id }}"
+    method: PATCH
+    headers:
+      Authorization: "Bearer {{ call.api_token }}"
+    body_format: json
+    body: "{{ call.body }}"
+  loop: "{{ dns_sync_plan['update'] }}"
+  loop_control:
+    loop_var: call
+    label: "{{ call.body.type }} {{ call.body.name }}: {{ call.from }} -> {{ call.body.content }} ({{ call.reason }})"
+  changed_when: true
+  when: not (dns_sync_dry_run | bool)
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Create the missing records
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ call.zone_id }}/dns_records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ call.api_token }}"
+    body_format: json
+    body: "{{ call.body }}"
+    # 400 is inspected below to explain conflicts with unmanaged records.
+    status_code: [200, 400]
+  loop: "{{ dns_sync_plan['create'] }}"
+  loop_control:
+    loop_var: call
+    label: "{{ call.body.type }} {{ call.body.name }} -> {{ call.body.content }}"
+  register: dns_sync_create_results
+  changed_when: dns_sync_create_results.status | default(0) == 200
+  when: not (dns_sync_dry_run | bool)
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Fail when Cloudflare rejected a record creation
+  ansible.builtin.assert:
+    that:
+      - _rejected | length == 0
+    fail_msg: >-
+      Cloudflare rejected {{ _rejected | length }} record creation(s): {{ _rejected }}.
+      Error 81058 ("An identical record already exists") or 81053 usually means a
+      record NOT in the sync scope (unmanaged, or another environment) already
+      exists for that name: delete it in Cloudflare, or adopt it by adding
+      `{{ dns_records_comment }}` to its comment, then re-run. Nothing was deleted.
+    quiet: true
+  vars:
+    _rejected: >-
+      {{ dns_sync_create_results.results | default([])
+         | selectattr('status', 'defined')
+         | rejectattr('status', 'equalto', 200)
+         | community.general.json_query('[].{name: call.body.name, type: call.body.type, content: call.body.content, errors: json.errors}') }}
+  when: not (dns_sync_dry_run | bool)
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Delete the records no host declares
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ call.zone_id }}/dns_records/{{ call.id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ call.api_token }}"
+  loop: "{{ dns_sync_plan['delete'] }}"
+  loop_control:
+    loop_var: call
+    label: "{{ call.type }} {{ call.name }} -> {{ call.content }} ({{ call.reason }})"
+  changed_when: true
+  when: not (dns_sync_dry_run | bool)
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state
+
+- name: Summarise the sync
+  ansible.builtin.debug:
+    msg: >-
+      {{ dns_sync_plan['create'] | length }} created,
+      {{ dns_sync_plan['update'] | length }} updated,
+      {{ dns_sync_plan['delete'] | length }} deleted
+      (records tagged {{ ([dns_primary_filter] + dns_sync_scope_tags_resolved) | join(' + ') }} only).
+  when: not (dns_sync_dry_run | bool) and not ansible_check_mode
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_sync_state

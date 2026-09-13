@@ -1,0 +1,106 @@
+---
+# Lists (never mutates) every Cloudflare zone accessible to each Cloudflare
+# provider token. Zones are not DNS records, so the `dns_hosting_tags` primary
+# filter does not apply here; it is applied to every record read/written.
+#
+# Requires (from dns_resolve_context.yml): cloudflare_providers.
+# Produces (run_once, group-wide, on localhost):
+#   * cf_zones (every accessible zone, tagged with _cf_provider)
+
+- name: Fetch the first page of Cloudflare zones for every provider
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones?per_page=50&page=1"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ provider.api_token }}"
+    return_content: false
+  loop: "{{ cloudflare_providers }}"
+  loop_control:
+    loop_var: provider
+    label: "{{ provider.name }}"
+  register: cf_zones_page1
+  changed_when: false
+  check_mode: false
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Reset the remaining zone page requests
+  ansible.builtin.set_fact:
+    cf_extra_page_requests: []
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Compute the remaining zone pages that still need to be fetched
+  ansible.builtin.set_fact:
+    cf_extra_page_requests: >-
+      {{
+        cf_extra_page_requests
+        + ([r.provider]
+           | product(range(2, (r.json.result_info.total_pages | int) + 1) | list)
+           | list)
+      }}
+  loop: "{{ cf_zones_page1.results | default([]) }}"
+  loop_control:
+    loop_var: r
+    label: "{{ r.provider.name }}"
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Fetch the remaining pages of Cloudflare zones
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones?per_page=50&page={{ item.1 }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ item.0.api_token }}"
+    return_content: false
+  loop: "{{ cf_extra_page_requests | default([]) }}"
+  loop_control:
+    loop_var: item
+    label: "{{ item.0.name }} (page {{ item.1 }})"
+  register: cf_zones_extra
+  changed_when: false
+  check_mode: false
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Reset the accumulated zone list
+  ansible.builtin.set_fact:
+    cf_zones: []
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Collect zones from the first page, tagging each with its provider
+  ansible.builtin.set_fact:
+    cf_zones: >-
+      {{ cf_zones + (r.json.result | map('combine', {'_cf_provider': r.provider}) | list) }}
+  loop: "{{ cf_zones_page1.results | default([]) }}"
+  loop_control:
+    loop_var: r
+    label: "{{ r.provider.name }}"
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Collect zones from the remaining pages, tagging each with its provider
+  ansible.builtin.set_fact:
+    cf_zones: >-
+      {{ cf_zones + (r.json.result | map('combine', {'_cf_provider': r.item.0}) | list) }}
+  loop: "{{ cf_zones_extra.results | default([]) }}"
+  loop_control:
+    loop_var: r
+    label: "{{ r.item.0.name }} (page {{ r.item.1 }})"
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always

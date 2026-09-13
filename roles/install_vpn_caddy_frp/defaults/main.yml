@@ -1,6 +1,6 @@
 ---
 # defaults file for roles/install_vpn_caddy_frp
-project_dir: "{{ vpn_caddy.project.paths.frp | ansible.builtin.basename }}"
+project_dir: "{{ vpn_caddy.project.paths.frps | ansible.builtin.basename }}"
 project_root_dir: "{{ vpn_caddy.project.root }}"
 source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
 source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"

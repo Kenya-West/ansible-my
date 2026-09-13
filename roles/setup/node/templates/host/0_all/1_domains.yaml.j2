@@ -22,12 +22,3 @@ host_relations:
       - host: {{ initial_configure_host_default_relation_host }}
 
 {% endif %}
-{% if setup_node_remna_node_enabled %}
-remna_node_use_dns01_cloudflare: {{ initial_configure_host_remna_use_dns01_cloudflare | default(true) | bool | lower }}
-{% endif %}
-
-domains_settings:
-  - name: "{{ o }} domains_keys.main {{ c }}"
-    records_limit:
-      - type: A
-        limit: 1

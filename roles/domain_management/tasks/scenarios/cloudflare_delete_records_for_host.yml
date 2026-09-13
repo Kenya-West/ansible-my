@@ -1,0 +1,95 @@
+---
+# Scenario: cloudflare_delete_records_for_host
+#
+# Deletes the Cloudflare DNS records the *current* host declares — but only
+# records whose comment carries the `dns_hosting_tags` primary filter
+# (e.g. `managed-by=ansible`) and whose name, type and content match a declared
+# record. Unmanaged records are never read nor deleted.
+#
+# Shared logic:
+#   * ../dns_resolve_context.yml          — providers, tokens, record types, tags
+#   * ../compute_host_dns_records.yml     — the host's declared records -> cf_set_targets
+#   * ../read_cloudflare_zones.yml        — zone name -> zone id
+#   * ../lookup_host_managed_records.yml  — managed records per declared name + type
+#
+# Everything runs on the control node (delegate_to: localhost).
+
+- name: Resolve the shared DNS context
+  ansible.builtin.include_tasks: ../dns_resolve_context.yml
+  tags:
+    - cloudflare_delete_records_for_host
+
+- name: Compute the records this host declares
+  ansible.builtin.include_tasks: ../compute_host_dns_records.yml
+  tags:
+    - cloudflare_delete_records_for_host
+
+- name: Warn when there is nothing to delete for this host
+  ansible.builtin.debug:
+    msg: "No matching DNS records declared by {{ inventory_hostname }}; nothing to delete."
+  when: cf_set_targets | default([]) | length == 0
+  delegate_to: localhost
+  tags:
+    - cloudflare_delete_records_for_host
+
+- name: List the accessible Cloudflare zones
+  ansible.builtin.include_tasks: ../read_cloudflare_zones.yml
+  when: cf_set_targets | default([]) | length > 0
+  tags:
+    - cloudflare_delete_records_for_host
+
+- name: Look up the managed records for this host's declared names
+  ansible.builtin.include_tasks: ../lookup_host_managed_records.yml
+  when: cf_set_targets | default([]) | length > 0
+  tags:
+    - cloudflare_delete_records_for_host
+
+- name: Reset the per-host delete plan
+  ansible.builtin.set_fact:
+    cf_plan_delete: []
+  delegate_to: localhost
+  tags:
+    - cloudflare_delete_records_for_host
+
+- name: Plan the deletion of managed records matching the declared content
+  ansible.builtin.set_fact:
+    cf_plan_delete: >-
+      {{ cf_plan_delete
+         + (group.existing
+            | selectattr('content', 'in', group.desired | map(attribute='value') | list)
+            | community.general.json_query('[].{id: id, name: name, type: type, content: content}')
+            | map('combine', {'zone_id': group.zone_id, 'api_token': group.api_token})
+            | list) }}
+  loop: "{{ cf_host_record_groups | default([]) if (cf_set_targets | default([]) | length > 0) else [] }}"
+  loop_control:
+    loop_var: group
+    label: "{{ group.type }} {{ group.record }}"
+  no_log: true # entries carry the api_token
+  delegate_to: localhost
+  tags:
+    - cloudflare_delete_records_for_host
+
+- name: Report the delete plan for this host
+  ansible.builtin.debug:
+    msg:
+      host: "{{ inventory_hostname }}"
+      managed_by: "{{ dns_primary_filter }}"
+      delete: "{{ cf_plan_delete | community.general.json_query('[].{name: name, type: type, content: content}') }}"
+  delegate_to: localhost
+  tags:
+    - cloudflare_delete_records_for_host
+
+- name: Delete the managed records declared by this host
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ call.zone_id }}/dns_records/{{ call.id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ call.api_token }}"
+  loop: "{{ cf_plan_delete }}"
+  loop_control:
+    loop_var: call
+    label: "{{ call.type }} {{ call.name }} -> {{ call.content }}"
+  changed_when: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_delete_records_for_host

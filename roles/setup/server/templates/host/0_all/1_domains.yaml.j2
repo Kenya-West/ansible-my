@@ -17,8 +17,3 @@ host_relations:
       - host: {{ initial_configure_server_default_relation_host }}
 
 {% endif %}
-domains_settings:
-  - name: "{{ o }} domains_keys.main {{ c }}"
-    records_limit:
-      - type: A
-        limit: 1

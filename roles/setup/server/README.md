@@ -100,8 +100,8 @@ Templates
 ---------
 
 - `host/0_all/1_domains.yaml.j2`: `domains_keys.main` and the service
-  domains of the groups joined, an empty `remna_node`, `domains`,
-  `host_relations.default` and `domains_settings`.
+  domains of the groups joined, an empty `remna_node`, `domains` and
+  `host_relations.default`.
 - `host/analytics_server/`: Prometheus (its basic auth users, the scrape jobs
   and `prometheus_server_scrape_credentials`, the credentials the nodes
   relating to the server read), PushGateway, VictoriaLogs, VictoriaMetrics,

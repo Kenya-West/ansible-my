@@ -17,3 +17,5 @@ remna_protocol_types:
     full: vless-reality-xhttp
 
 remna_node_primary_protocol_type: "{{ remna_protocol_types.vless_reality_tcp }}"
+
+remna_node_use_dns01_cloudflare: true

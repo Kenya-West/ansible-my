@@ -99,9 +99,8 @@ Templates
 ---------
 
 - `host/0_all/1_domains.yaml.j2`: `domains_keys.main`, the `remna_node`
-  list (empty for a host outside `vpn_caddy`), `domains`,
-  `host_relations.default`, `remna_node_use_dns01_cloudflare` and
-  `domains_settings`, in the shape of
+  list (empty for a host outside `vpn_caddy`), `domains` and
+  `host_relations.default` in the shape of
   the existing hosts.
 - `host/0_all/2_domains.yaml` of `setup/common`: how to add or override DNS
   records and define `host_relations` (resolved by

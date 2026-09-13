@@ -2,19 +2,32 @@
 # Shared context for the domain_management DNS scenarios.
 #
 # Resolves the Cloudflare provider config and the managed-domain list once, on the
-# control node, so every scenario (get_all, set, host validation, and future ones)
-# computes them the same way. Works whether the play targets the domain_management
-# group directly (vars are inherited) or a hostless controller like localhost
-# (vars are pulled from the group members via `hostvars`).
+# control node, so every scenario (get_all, set, delete, host validation, and
+# future ones) computes them the same way. Works whether the play targets the
+# domain_management group directly (vars are inherited) or a hostless controller
+# like localhost (vars are pulled from the group members via `hostvars`).
+#
+# Ownership: every record this role reads, creates, updates or deletes is scoped
+# by the `dns_hosting_tags` entry marked `primary_filter: true` (e.g.
+# `managed-by=ansible`). All tags are written, space-separated, into the record's
+# Cloudflare `comment`; reads use `comment.contains=<primary filter>`. Records
+# without that tag are never touched.
 #
 # Produces (run_once, group-wide, on localhost):
 #   * dns_hosting_providers_resolved
 #   * dns_hosting_record_types_resolved
+#   * dns_hosting_record_ttl_resolved
+#   * dns_hosting_record_proxied_resolved
+#   * dns_hosting_tags_resolved
+#   * dns_primary_filter        (e.g. `managed-by=ansible`)
+#   * dns_primary_filter_query  (e.g. `comment.contains=managed-by%3Dansible`)
+#   * dns_primary_filter_regex  (matches the primary filter as a whole tag)
+#   * dns_records_comment       (every tag value joined by a space)
 #   * cloudflare_providers
 #   * provider_tokens        (dict: provider name -> api_token)
 #   * managed_domains        (unique domains declared by every group member)
 
-- name: Resolve the DNS hosting providers and record types
+- name: Resolve the DNS hosting providers, record types, defaults and tags
   ansible.builtin.set_fact:
     dns_hosting_providers_resolved: >-
       {{
@@ -32,6 +45,30 @@
           | select('defined') | list | first | default([])
         )
       }}
+    dns_hosting_record_ttl_resolved: >-
+      {{
+        dns_hosting_record_ttl | default(
+          groups['domain_management'] | default([])
+          | map('extract', hostvars, 'dns_hosting_record_ttl')
+          | select('defined') | list | first | default(1)
+        ) | int
+      }}
+    dns_hosting_record_proxied_resolved: >-
+      {{
+        dns_hosting_record_proxied | default(
+          groups['domain_management'] | default([])
+          | map('extract', hostvars, 'dns_hosting_record_proxied')
+          | select('defined') | list | first | default(false)
+        ) | bool
+      }}
+    dns_hosting_tags_resolved: >-
+      {{
+        dns_hosting_tags | default(
+          groups['domain_management'] | default([])
+          | map('extract', hostvars, 'dns_hosting_tags')
+          | select('defined') | list | first | default([])
+        )
+      }}
   run_once: true
   delegate_to: localhost
   tags:
@@ -46,6 +83,76 @@
       inventory/group_vars/domain_management/dns.yaml) so the scenarios know
       which record types are in scope.
     success_msg: "Record types in scope: {{ dns_hosting_record_types_resolved | join(', ') }}."
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Assert that dns_hosting_tags has exactly one usable primary filter
+  ansible.builtin.assert:
+    that:
+      - _primary | length == 1
+      - (_primary | first).value | default('') | length > 0
+      - dns_hosting_tags_resolved | map(attribute='value') | select('search', ' ') | list | length == 0
+    fail_msg: >-
+      `dns_hosting_tags` must contain exactly one entry with `primary_filter: true`
+      and a non-empty `value`, and no tag value may contain a space (tags are
+      space-separated in the record comment). This tag scopes every Cloudflare
+      record the role reads or changes.
+    success_msg: "Managing only Cloudflare records whose comment contains `{{ (_primary | first).value }}`."
+  vars:
+    _primary: >-
+      {{ dns_hosting_tags_resolved
+         | selectattr('primary_filter', 'defined')
+         | selectattr('primary_filter')
+         | list }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Resolve the primary filter
+  ansible.builtin.set_fact:
+    dns_primary_filter: >-
+      {{ (dns_hosting_tags_resolved
+          | selectattr('primary_filter', 'defined')
+          | selectattr('primary_filter')
+          | first).value }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Build the record comment and the Cloudflare filter from the tags
+  ansible.builtin.set_fact:
+    dns_primary_filter_query: "comment.contains={{ dns_primary_filter | urlencode }}"
+    # Whole-tag match, whatever separates tags in the comment (space, `;`, `,`,
+    # ...): the neighbours must not be tag characters, so `managed-by=ansible;x`
+    # matches but `managed-by=ansible-old` does not.
+    dns_primary_filter_regex: >-
+      {{ '(^|[^A-Za-z0-9_.=-])' ~ (dns_primary_filter | regex_escape) ~ '($|[^A-Za-z0-9_.=-])' }}
+    # Primary filter first, then every other tag (in declaration order).
+    dns_records_comment: >-
+      {{ ([dns_primary_filter]
+          + (dns_hosting_tags_resolved
+             | map(attribute='value')
+             | reject('equalto', dns_primary_filter)
+             | list))
+         | join(' ') }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Assert that the record comment fits Cloudflare's comment length limit
+  ansible.builtin.assert:
+    that:
+      - dns_records_comment | length <= (dns_hosting_comment_max_length | int)
+    fail_msg: >-
+      The record comment `{{ dns_records_comment }}` is {{ dns_records_comment | length }}
+      characters, over `dns_hosting_comment_max_length`
+      ({{ dns_hosting_comment_max_length }}). Shorten `dns_hosting_tags`.
+    quiet: true
   run_once: true
   delegate_to: localhost
   tags:

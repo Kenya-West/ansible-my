@@ -9,3 +9,20 @@ dns_hosting_record_types: # could be record_types inside an entry of dns_hosting
 dns_hosting_record_proxied: false # could be record_proxied inside an entry of dns_hosting_providers list
 
 dns_hosting_record_ttl: 300 # could be record_ttl inside an entry of dns_hosting_providers list
+
+dns_hosting_tags: # could be tags inside an entry of dns_hosting_providers list
+  - value: "managed-by=ansible"
+    primary_filter: true
+  - value: "environment={{ inventory_file | basename | splitext | first }}"
+
+domains_settings:
+  defaults:
+    records_limit:
+      - type: A
+        limit: -1 # Unlimited
+    ttl: auto
+  explicit:
+    - name: "{{ domains_keys.main }}"
+      records_limit:
+        - type: A
+          limit: 1
