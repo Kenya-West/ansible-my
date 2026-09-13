@@ -123,6 +123,22 @@
          | rejectattr('domain', 'search', 'unique.value')
          | map(attribute='base') | select('match', __setup_node_domain_pattern) | list }}
 
+# The hosts the new one can relate to by default: those of the groups of
+# setup_node_relation_host_groups, in the inventory the play runs against.
+- name: Derive the hosts offered as the default relation host
+  ansible.builtin.set_fact:
+    setup_node_scan_relation_hosts: "{{ __setup_node_relation_hosts }}"
+    setup_node_scan_relation_host_choices: >-
+      {{ dict(__setup_node_relation_hosts | zip(__setup_node_relation_hosts))
+         | combine({setup_node_other_choice: 'Another host (typed next)'}) }}
+  vars:
+    __setup_node_relation_hosts: >-
+      {%- set hosts = [] -%}
+      {%- for group in setup_node_relation_host_groups -%}
+      {%-   set _ = hosts.extend(groups.get(group, [])) -%}
+      {%- endfor -%}
+      {{ hosts | reject('equalto', 'localhost') | unique | sort }}
+
 - name: Settle the location indexes and the base domain choices
   ansible.builtin.set_fact:
     setup_node_scan_location_indexes: "{{ __setup_node_location_indexes_json | from_json }}"

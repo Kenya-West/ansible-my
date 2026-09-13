@@ -78,8 +78,16 @@ setup_node_remna_protocol_type_default: vless_reality_tcp
 # of backup_restic_node_remotes_base, when the controller sees it.
 setup_node_backup_restic_remotes: "{{ backup_restic_node_remotes_base | default({}) | list }}"
 
-# The choice that stands for "another domain, typed next" in the base domain
-# prompts.
+# Inventory groups whose hosts are offered at the prompt as the default
+# relation host of the new host (host_relations.default of
+# 0_all/1_domains.yaml). When the inventory the play runs against has none of
+# them, the host is typed instead.
+setup_node_relation_host_groups:
+  - analytics_server
+  - vpn_server_remnawave
+
+# The choice that stands for "another one, typed next" in the base domain and
+# relation host prompts.
 setup_node_other_choice: __other__
 
 # Preset answers for the prompts, by prompt id (see vars/prompts/host.yml),

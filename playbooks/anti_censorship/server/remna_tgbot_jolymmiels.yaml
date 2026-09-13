@@ -12,4 +12,8 @@
       - "{{ source_asset_fullpath_project }}"
 
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: vpn_server_remnawave
+        resolve_host_relations_component: tgbot_jolymmiels
     - install_vpn_server_remnawave_tgbot_jolymmiels

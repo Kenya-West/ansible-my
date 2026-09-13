@@ -153,3 +153,24 @@ prompts:
     type: bool
     default: true
     when: "'vpn_caddy' in answers.groups | default([], true)"
+
+  - id: default_relation_host_choice
+    prompt: "Host {{ setup_node_hostname }} relates to by default"
+    help: >-
+      host_relations.default of 0_all/1_domains.yaml: the upstream a component
+      of the host falls back to. The hosts of
+      {{ setup_node_relation_host_groups | join(' and ') }} in this inventory.
+    type: choice
+    choices: "{{ setup_node_scan_relation_host_choices }}"
+    default: "{{ setup_node_scan_relation_hosts | first }}"
+    when: setup_node_scan_relation_hosts | length > 0
+
+  - id: default_relation_host_custom
+    prompt: "Host {{ setup_node_hostname }} relates to by default"
+    help: >-
+      host_relations.default of 0_all/1_domains.yaml, an inventory_hostname
+      like play2go-nl-3.
+    when: answers.default_relation_host_choice | default(setup_node_other_choice, true) == setup_node_other_choice
+    validate:
+      - pattern: '^[a-z0-9][a-z0-9._-]*$'
+        msg: "'{{ answer }}' does not look like an inventory hostname."

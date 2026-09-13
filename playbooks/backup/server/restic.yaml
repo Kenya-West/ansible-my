@@ -15,6 +15,10 @@
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: backup_restic_server
+        resolve_host_relations_component: restic_server
     - name: kwtoolset/compose_down
       vars:
         project_paths:

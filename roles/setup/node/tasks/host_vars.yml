@@ -8,6 +8,9 @@
     initial_configure_host_xray_base_domain_name: >-
       {{ initial_configure_host_xray_base_domain_name_custom
          | default(initial_configure_host_xray_base_domain_name_choice | default('', true), true) }}
+    initial_configure_host_default_relation_host: >-
+      {{ initial_configure_host_default_relation_host_custom
+         | default(initial_configure_host_default_relation_host_choice | default('', true), true) }}
     setup_node_region: >-
       {{ vpn_deployments_country_to_censorship_region_matcher.get(initial_configure_host_country_code,
            vpn_deployments_country_to_regions_matcher.get(initial_configure_host_country_code, 'unknown')) }}

@@ -14,6 +14,14 @@ domains_keys:
   remna_node: []
 {% endif %}
 domains: "{{ o }} ((domains_keys | dict2items | rejectattr('key', 'equalto', 'remna_node') | map(attribute='value') | list) + (domains_keys.remna_node | map(attribute='domain') | list)) | unique {{ c }}"
+
+{% if initial_configure_host_default_relation_host | default('', true) | length > 0 %}
+host_relations:
+  default:
+    hosts:
+      - host: {{ initial_configure_host_default_relation_host }}
+
+{% endif %}
 {% if setup_node_remna_node_enabled %}
 remna_node_use_dns01_cloudflare: {{ initial_configure_host_remna_use_dns01_cloudflare | default(true) | bool | lower }}
 {% endif %}

@@ -15,4 +15,8 @@
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: analytics_server
+        resolve_host_relations_component: logporter
     - install_analytics_node_logporter

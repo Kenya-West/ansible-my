@@ -2,6 +2,7 @@
 # In entries of this structure, there could be any of the same keys as in the community.general.cloudflare_dns role
 # If value prop is absent, it means role fills it with the host's ansible_host (IPv4 address for A record).
 # All others (except dns_provider and state) are mapped as is
+#
 # dns_records_addition:
 #   - name: "{{ domains_keys.main }}"
 #     type: A
@@ -17,6 +18,7 @@
 # In entries of this structure, there could be any of the same keys as in the community.general.cloudflare_dns role
 # If value prop is absent, it means role fills it with the host's ansible_host (IPv4 address for A record).
 # All others (except dns_provider and state) are mapped as is
+#
 # dns_records_override:
 #   - name: "{{ domains_keys.main }}"
 #     type: A
@@ -27,3 +29,38 @@
 #     type: A
 #     ttl: 300
 #     dns_provider: cloudflare
+
+# Defines relationships between this host and other inventory hosts.
+#
+# Resolution order:
+#   1. component-specific hosts
+#   2. relation-specific hosts
+#   3. default hosts
+#
+# Relations may contain multiple hosts.
+# Components that support multiple upstream instances use all resolved hosts.
+# Components that require a single upstream use the host with the highest
+# priority (lowest numeric value).
+#
+# `host` must reference an Ansible inventory_hostname.
+#
+# Playbooks resolve it with the kwtoolset/resolve_host_relations role.
+# host_relations.default is set in 1_domains.yaml; defining host_relations
+# here replaces it as a whole.
+#
+# host_relations:
+#   default:
+#     hosts:
+#       - host: somehosting-zz-1
+#         priority: 10
+#       - host: somehosting-zz-2
+#         priority: 20
+#
+#   analytics_server:
+#     hosts:
+#       - host: somehosting-zz-4
+#
+#     components:
+#       pushgateway:
+#         hosts:
+#           - host: somehosting-zz-3

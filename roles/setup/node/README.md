@@ -36,7 +36,12 @@ What it does
      (the `4` of `chain-russia-4.123987465.xyz`; the default is the next
      free index of the region, and an existing one joins that round-robin
      domain), the primary protocol of the node and whether its
-     certificates use the Cloudflare DNS-01 challenge.
+     certificates use the Cloudflare DNS-01 challenge;
+   - the host the new one relates to by default (`host_relations.default`
+     of `1_domains.yaml`): chosen from the hosts of the `analytics_server`
+     and `vpn_server_remnawave` groups of the inventory the play runs
+     against (deduplicated), or typed when there is none or another one is
+     wanted.
 3. Renders `templates/host/0_all/` and, for every group joined that has a
    directory of the same name in `templates/host/`, that directory into
    `host_vars/<hostname>/`.
@@ -60,7 +65,8 @@ Unattended, e.g. for a host in Germany:
       -e '{"setup_node_prompt_answers": {"provider": "hetzner", "country_code": "de", "index": 14,
            "ip_address": "203.0.113.10", "groups": ["vpn_caddy", "analytics_node", "backup_restic_node"],
            "base_domain_name_choice": "accessto.page", "xray_base_domain_name_choice": "123987465.xyz",
-           "net_location_index": 15, "chain_location_index": 15}}'
+           "net_location_index": 15, "chain_location_index": 15,
+           "default_relation_host_choice": "play2go-nl-3"}}'
 
 Role variables
 --------------
@@ -76,22 +82,26 @@ Role variables
 | `setup_node_templates_always` | `0_all` | Template directories rendered for every host. |
 | `setup_node_remna_node_domains` | the seven keys of `remna_node_domain_types_allowlist` | The `remna_node` entries of `1_domains.yaml`: `key`, `base` (`main` or `xray`), optional `index` (`net` or `chain`). |
 | `setup_node_remna_protocol_types` | `vless_reality_tcp`, `vless_reality_xhttp` | Protocols offered at the prompt. |
+| `setup_node_relation_host_groups` | `analytics_server`, `vpn_server_remnawave` | Groups whose hosts are offered as the default relation host. |
 | `setup_node_backup_restic_remotes` | keys of `backup_restic_node_remotes_base` | Remotes written to `backup_restic_node/backup_restic_node.yaml`, each with a generated restic key. |
 | `setup_node_prompt_answers` | `{}` | Preset answers by prompt id, for unattended runs. |
 
 The prompts are in `vars/prompts/host.yml`; every answer is set as the
 fact `initial_configure_host_<id>`, and the role adds
-`initial_configure_host_hostname`, `initial_configure_host_base_domain_name`
-and `initial_configure_host_xray_base_domain_name` for the templates.
+`initial_configure_host_hostname`, `initial_configure_host_base_domain_name`,
+`initial_configure_host_xray_base_domain_name` and
+`initial_configure_host_default_relation_host` for the templates.
 
 Templates
 ---------
 
 - `host/0_all/1_domains.yaml.j2`: `domains_keys.main`, the `remna_node`
   list (empty for a host outside `vpn_caddy`), `domains`,
-  `remna_node_use_dns01_cloudflare` and `domains_settings`, in the shape of
+  `host_relations.default`, `remna_node_use_dns01_cloudflare` and
+  `domains_settings`, in the shape of
   the existing hosts.
-- `host/0_all/2_domains.yaml`: how to add or override DNS records, as
+- `host/0_all/2_domains.yaml`: how to add or override DNS records and
+  define `host_relations` (resolved by `kwtoolset/resolve_host_relations`), as
   comments.
 - `host/vpn_caddy/remna.yaml.j2`: `remna_node_primary_protocol_type`.
 - `host/vpn_caddy/caddy.yaml`: `caddy_occupy_HTTPS`, commented out.
