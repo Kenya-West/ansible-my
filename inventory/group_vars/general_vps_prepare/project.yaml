@@ -1,0 +1,14 @@
+---
+general_vps_prepare:
+  project:
+    root: general-machine-prepare
+    paths:
+      bash: "{{ general_vps_prepare.project.root }}/bash"
+      pwsh: "{{ general_vps_prepare.project.root }}/pwsh"
+      doas: "{{ general_vps_prepare.project.root }}/doas"
+      micro: "{{ general_vps_prepare.project.root }}/micro"
+      broot: "{{ general_vps_prepare.project.root }}/broot"
+      btop: "{{ general_vps_prepare.project.root }}/btop"
+      logrotate: "{{ general_vps_prepare.project.root }}/logrotate"
+      eget: "{{ general_vps_prepare.project.root }}/eget"
+      uv: "{{ general_vps_prepare.project.root }}/uv"

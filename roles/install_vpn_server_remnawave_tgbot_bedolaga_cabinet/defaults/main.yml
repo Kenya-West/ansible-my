@@ -2,8 +2,8 @@
 ---
 # defaults file for roles/install_vpn_server_remnawave_tgbot_bedolaga_cabinet
 
-project_dir: "{{ vpn_server_remnawave_project_structure_end_dirs.tgbot_bedolaga_cabinet | ansible.builtin.basename }}"
-project_root_dir: "{{ vpn_server_remnawave_project_structure_root }}"
+project_dir: "{{ vpn_server_remnawave.project.paths.tgbot_bedolaga_cabinet | ansible.builtin.basename }}"
+project_root_dir: "{{ vpn_server_remnawave.project.root }}"
 source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
 source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
 
@@ -13,5 +13,5 @@ source_paths_add_repo_dirs:
   - "{{ source_asset_fullpath_project }}"
 source_paths_add_user_dirs: []
 
-dest_path_root: "/home/{{ standard_user }}/{{ vpn_server_remnawave_project_structure_root }}"
+dest_path_root: "/home/{{ standard_user }}/{{ vpn_server_remnawave.project.root }}"
 dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"

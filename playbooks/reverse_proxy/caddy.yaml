@@ -4,8 +4,8 @@
   become: false
   become_user: "{{ standard_user }}"
   vars:
-    project_dir: "{{ vpn_project_structure_end_dirs.caddy | ansible.builtin.basename }}"
-    project_root_dir: "{{ vpn_project_structure_root }}"
+    project_dir: "{{ vpn_caddy.project.paths.caddy | ansible.builtin.basename }}"
+    project_root_dir: "{{ vpn_caddy.project.root }}"
     source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
     source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
     install_vpn_caddy_caddy_source_paths__base:

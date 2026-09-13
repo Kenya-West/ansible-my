@@ -1,13 +1,13 @@
 - name: Check if backup directories exist
   ansible.builtin.stat:
     path: "{{ dir }}"
-  loop: "{{ [backup_restic_node_project_structure_end_dirs.rclone] + [backup_restic_node_project_structure_end_dirs.autorestic] }}"
+  loop: "{{ [backup_restic_node.project.paths.rclone] + [backup_restic_node.project.paths.autorestic] }}"
   loop_control:
     loop_var: dir
   register: backup_dirs_result
   when:
     - "'backup_restic_node' in (group_names | default([]))"
-    - backup_restic_node_project_structure_end_dirs_list is defined
+    - backup_restic_node.project.paths | length > 0
 
 - name: Check if rclone and autorestic binaries exist
   ansible.builtin.shell:

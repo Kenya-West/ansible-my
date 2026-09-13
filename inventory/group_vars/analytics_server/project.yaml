@@ -1,0 +1,15 @@
+---
+analytics_server:
+  project:
+    root: analytics-server
+    paths:
+      prometheus: "{{ analytics_server.project.root }}/prometheus"
+      grafana: "{{ analytics_server.project.root }}/grafana"
+      blackbox: "{{ analytics_server.project.root }}/blackbox_exporter"
+      xray_checker: "{{ analytics_server.project.root }}/xray_checker"
+      pushgateway: "{{ analytics_server.project.root }}/pushgateway"
+      mongodb: "{{ analytics_server.project.root }}/mongodb_exporter"
+      telepush: "{{ analytics_server.project.root }}/telepush"
+      alertmanager: "{{ analytics_server.project.root }}/alertmanager"
+      victorialogs: "{{ analytics_server.project.root }}/victorialogs"
+      victoriametrics: "{{ analytics_server.project.root }}/victoriametrics"

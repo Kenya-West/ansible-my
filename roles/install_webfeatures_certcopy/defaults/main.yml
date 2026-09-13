@@ -1,7 +1,7 @@
 ---
 # defaults file for roles/install_webfeatures_certcopy
-project_dir: "{{ webfeatures_project_structure_end_dirs.certcopy | ansible.builtin.basename }}"
-project_root_dir: "{{ webfeatures_project_structure_root }}"
+project_dir: "{{ webfeatures.project.paths.certcopy | ansible.builtin.basename }}"
+project_root_dir: "{{ webfeatures.project.root }}"
 source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
 source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
 
@@ -11,7 +11,7 @@ source_paths_add_repo_dirs:
   - "{{ source_asset_fullpath_project }}"
 source_paths_add_user_dirs: []
 
-dest_path_root: "/home/{{ standard_user }}/{{ webfeatures_project_structure_root }}"
+dest_path_root: "/home/{{ standard_user }}/{{ webfeatures.project.root }}"
 dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
