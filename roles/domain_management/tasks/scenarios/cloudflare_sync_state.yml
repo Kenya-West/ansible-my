@@ -12,9 +12,11 @@
 #
 # Scope (a record is only ever touched when BOTH hold):
 #   * its comment carries the `dns_hosting_tags` primary filter (managed-by=ansible);
-#   * its comment carries every `dns_sync_scope_tags` tag — by default every other
-#     `dns_hosting_tags` value, i.e. `environment=<inventory>`. Managed records of
-#     another environment (or without the tag) are reported, never changed.
+#   * its name is declared by a host of this environment, OR its comment carries
+#     every `dns_sync_scope_tags` tag — by default every other `dns_hosting_tags`
+#     value, i.e. `environment=<inventory>`. On a declared name every managed
+#     record is reconciled (old-format comments are adopted or deleted); managed
+#     records of undeclared names without the tags are reported, never changed.
 #
 # Safety:
 #   * the play must cover the whole domain_management group (no --limit, no
@@ -118,8 +120,8 @@
       declared: "{{ dns_sync_desired | length }} record(s) by {{ dns_sync_desired | map(attribute='_host') | unique | length }} host(s)"
       in_cloudflare: "{{ dns_sync_actual | length }} in-scope managed record(s)"
       create: "{{ dns_sync_plan['create'] | community.general.json_query('[].{name: body.name, type: body.type, content: body.content, hosts: hosts}') }}"
-      update: "{{ dns_sync_plan['update'] | community.general.json_query('[].{name: body.name, type: body.type, from: from, content: body.content, reason: reason, hosts: hosts}') }}"
-      delete: "{{ dns_sync_plan['delete'] | community.general.json_query('[].{name: name, type: type, content: content, reason: reason, value_owners: value_owners}') }}"
+      update: "{{ dns_sync_plan['update'] | community.general.json_query('[].{name: body.name, type: body.type, from: from, content: body.content, reason: reason, from_comment: from_comment, hosts: hosts}') }}"
+      delete: "{{ dns_sync_plan['delete'] | community.general.json_query('[].{name: name, type: type, content: content, reason: reason, comment: comment, value_owners: value_owners}') }}"
   run_once: true
   delegate_to: localhost
   tags:
@@ -128,11 +130,11 @@
 - name: Report managed records outside the sync scope (never changed)
   ansible.builtin.debug:
     msg: >-
-      {{ dns_sync_foreign | length }} managed record(s) lack the scope tags
-      {{ dns_sync_scope_tags_resolved }} (another environment, or created before
-      tagging) and are left untouched:
-      {{ dns_sync_foreign | community.general.json_query('[].{name: name, type: type, content: content, comment: comment}') }}
-  when: dns_sync_foreign | length > 0
+      {{ dns_sync_foreign_untouched | length }} managed record(s) on names no host
+      declares lack the scope tags {{ dns_sync_scope_tags_resolved }} (another
+      environment, or an old comment format) and are left untouched:
+      {{ dns_sync_foreign_untouched | community.general.json_query('[].{name: name, type: type, content: content, comment: comment}') }}
+  when: dns_sync_foreign_untouched | length > 0
   run_once: true
   delegate_to: localhost
   tags:

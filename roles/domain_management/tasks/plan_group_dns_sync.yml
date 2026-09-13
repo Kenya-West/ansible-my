@@ -11,13 +11,20 @@
 #   * dns_sync_scope_tags_resolved — tags a record must carry to be in scope
 # Produces (run_once, on localhost):
 #   * dns_sync_actual     (in-scope managed records)
-#   * dns_sync_foreign    (managed records of an allowed type NOT in scope: reported only)
+#   * dns_sync_foreign    (managed records of an allowed type without the scope tags)
+#   * dns_sync_foreign_untouched (the foreign records on names no host declares:
+#                          another environment's, reported only)
 #   * dns_sync_violations (declared name + type over its records_limit)
 #   * dns_sync_plan       ({create, update, delete}; every entry carries a `reason`)
 #
+# A name declared by a host of this environment belongs to this environment, so
+# EVERY managed record of that name is reconciled, scope tags or not (e.g. records
+# tagged with an old `inventory=staging` comment). Foreign records on undeclared
+# names are never changed.
+#
 # Per (name, type):
 #   1. a record whose content is declared is kept (PATCHed when ttl / proxied /
-#      comment drifted);
+#      comment drifted; a foreign one is adopted by rewriting its comment);
 #   2. a declared content with no record is served by re-pointing a leftover
 #      record of that name (least recently modified first), else created;
 #   3. every remaining record is deleted, with the reason:
@@ -113,9 +120,12 @@
       {%- for k in dns_sync_keys -%}
         {%- set desired = dns_sync_desired | selectattr('record', 'equalto', k.name)
                           | selectattr('type', 'equalto', k.type) | list -%}
-        {%- set existing = dns_sync_actual | selectattr('name', 'equalto', k.name)
+        {#- Foreign records join in only on names this environment declares. -#}
+        {%- set candidates = dns_sync_actual + (dns_sync_foreign if desired | length > 0 else []) -%}
+        {%- set existing = candidates | selectattr('name', 'equalto', k.name)
                            | selectattr('type', 'equalto', k.type)
                            | sort(attribute='modified_on') | list -%}
+        {%- set foreign_ids = dns_sync_foreign | map(attribute='id') | list -%}
         {%- set zone_name = (existing | first)._zone if existing | length > 0 else (desired | first).zone -%}
         {%- set zone = cf_zones | selectattr('name', 'equalto', zone_name) | first -%}
         {%- set call = {'zone_id': zone.id, 'api_token': zone._cf_provider.api_token} -%}
@@ -135,7 +145,8 @@
             {%- set _ = used.append(e.id) -%}
             {%- if e.proxied != d.proxied or e.comment != d.comment or (not d.proxied and e.ttl != d.ttl) -%}
               {%- set _ = plan['update'].append(call | combine({'id': e.id, 'from': e.content, 'body': body,
-                                                                'hosts': hosts, 'reason': 'drift'})) -%}
+                                                                'from_comment': e.comment, 'hosts': hosts,
+                                                                'reason': 'adopt' if e.id in foreign_ids else 'drift'})) -%}
             {%- endif -%}
           {%- else -%}
             {%- set _ = pending.append({'body': body, 'hosts': hosts}) -%}
@@ -146,6 +157,7 @@
           {%- if loop.index0 < leftover | length -%}
             {%- set e = leftover[loop.index0] -%}
             {%- set _ = plan['update'].append(call | combine({'id': e.id, 'from': e.content, 'body': p.body,
+                                                              'from_comment': e.comment,
                                                               'hosts': p.hosts, 'reason': 'repoint'})) -%}
           {%- else -%}
             {%- set _ = plan['create'].append(call | combine({'body': p.body, 'hosts': p.hosts,
@@ -164,12 +176,31 @@
           {%- endif -%}
           {%- set _ = plan['delete'].append(call | combine({
                 'id': e.id, 'name': e.name, 'type': e.type, 'content': e.content, 'reason': reason,
+                'comment': e.comment,
                 'value_owners': dns_sync_desired | selectattr('value', 'equalto', e.content)
                                 | map(attribute='_host') | unique | list})) -%}
         {%- endfor -%}
       {%- endfor -%}
       {{ plan }}
   no_log: true # entries carry the api_token
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Keep the foreign records on undeclared names (left untouched)
+  ansible.builtin.set_fact:
+    dns_sync_foreign_untouched: "{{ _untouched }}"
+  vars:
+    _untouched: >-
+      {%- set out = [] -%}
+      {%- for r in dns_sync_foreign -%}
+        {%- if not (dns_sync_desired | selectattr('record', 'equalto', r.name)
+                    | selectattr('type', 'equalto', r.type) | list) -%}
+          {%- set _ = out.append(r) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
   run_once: true
   delegate_to: localhost
   tags:
