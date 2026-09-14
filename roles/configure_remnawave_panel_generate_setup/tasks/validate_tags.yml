@@ -1,0 +1,17 @@
+---
+# The tags have to be accepted by the panel before anything is sent, and at
+# least one of them has to be a primary filter, or the role could not tell its
+# entities from anyone else's.
+
+- name: The tags must fit the panel and name a primary filter
+  ansible.builtin.assert:
+    that:
+      - crpgs_primary_tags | length > 0
+      - crpgs_tags | length <= 10
+      - crpgs_tags | unique | length == crpgs_tags | length
+      - crpgs_tags | reject('match', '^[A-Z0-9_:]{1,36}$') | list | length == 0
+    fail_msg: >-
+      vpn_server_remnawave_tags must hold at most 10 distinct tags of up to 36
+      characters of A-Z, 0-9, _ and :, at least one of them marked
+      primary_filter: true. Got {{ vpn_server_remnawave_tags }}.
+    quiet: true

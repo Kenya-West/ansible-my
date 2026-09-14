@@ -1,3 +1,0 @@
-# Set it in hosts that are in vpn_server_remnawave group,
-# and it will be used to set the service_user_id in the Remnawave panel
-service_user_id: <UUID>

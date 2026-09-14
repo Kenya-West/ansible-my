@@ -110,8 +110,9 @@ Templates
   Restic job's is the backup server's: they are placeholders unless the
   backup server is this one.
 - `host/vpn_server_remnawave/`: the panel (`vpn_server_remnawave_node_secret_key`
-  included, to fill in from the panel), the custom login route, the mini app
-  and the bots.
+  included, to fill in from the panel), the custom login route, the mini app,
+  the bots, and the service user and REALITY password the generated chain
+  outbounds are rendered with.
 - `host/backup_restic_server/`: the users of the Restic REST server.
 - `host/matrix_server/`: the Synapse settings and its database password.
 

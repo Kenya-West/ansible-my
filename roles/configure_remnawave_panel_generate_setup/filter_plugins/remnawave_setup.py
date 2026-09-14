@@ -331,10 +331,24 @@ def remnawave_merge_rules(existing, generated, route_id_range):
     return [r for r in (existing or []) if not owned(r)] + list(generated or [])
 
 
+def remnawave_select_tagged(entities, tags, tagged=True):
+    """The panel entities carrying every one of ``tags``, or with ``tagged``
+    false, the ones that do not.
+
+    The panel is shared with entities made by hand, so the role only ever
+    takes over, retires or cleans what carries all of its primary tags.
+    """
+    wanted = set(tags or [])
+    tagged = _as_bool(tagged)
+    return [entity for entity in (entities or [])
+            if wanted.issubset((entity or {}).get('tags') or []) == tagged]
+
+
 class FilterModule(object):
     def filters(self):
         return {
             'remnawave_model': remnawave_model,
             'remnawave_merge_outbounds': remnawave_merge_outbounds,
             'remnawave_merge_rules': remnawave_merge_rules,
+            'remnawave_select_tagged': remnawave_select_tagged,
         }

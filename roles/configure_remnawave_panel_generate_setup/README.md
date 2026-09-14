@@ -1,8 +1,9 @@
 configure_remnawave_panel_generate_setup
 ========================================
 
-Generates a Remnawave panel's chain setup out of the node facts already in
-this inventory, and applies it through the
+Generates the chain setup of the Remnawave panel on the host it runs against
+out of the facts of the nodes relating to that panel, and applies it through
+the
 [kenyawest.remnawave](https://github.com/kenya-west/remnawave-ansible-collection)
 collection.
 
@@ -12,15 +13,39 @@ client connects to, the **routing rule** that catches it, and the
 derived in one pass from the same ordered list of exits - the role never
 stores a route id, it computes one.
 
+Which panel, which nodes
+------------------------
+
+The role configures the panel of the host it runs against: a host of
+`vpn_server_remnawave`, reached at `https://<domains_keys.remnawave>` with that
+host's own `vpn_server_remnawave_api_token` (and
+`vpn_server_remnawave_custom_login_route_api_token` behind the Caddy custom
+path). There is nothing to choose - run against several panels, each one is
+configured with its own nodes.
+
+A node of `vpn_server_remnawave_hosts_node_group` belongs to the panel when its
+`host_relations` resolve to it, exactly as the node's own remna playbook
+resolves them (`kwtoolset/resolve_host_relations`, group
+`vpn_server_remnawave`, component `remna`):
+
+```yaml
+# host_vars/cloudrix-ru-11/0_all/1_domains.yaml
+host_relations:
+  default:
+    hosts:
+      - host: play2go-nl-3
+```
+
 What it generates
 -----------------
 
-**Exits** are the distinct domains of type `location_net` published by the
-nodes. A domain is one exit no matter how many Ansible hosts sit behind it,
-so a round-robin record in front of two nodes stays a single Host in the
-panel, bound to both.
+**Exits** are the distinct domains of type `net-location`
+(`vpn_deployment_domain_prefix.net_location.type`) published by the nodes. A
+domain is one exit no matter how many Ansible hosts sit behind it, so a
+round-robin record in front of two nodes stays a single Host in the panel,
+bound to both.
 
-**Chain entries** are the distinct domains of type `location_chain`
+**Chain entries** are the distinct domains of type `chain-location`
 published by nodes whose `country_code_upper` is listed in
 `vpn_server_remnawave_hosts_chain.entry_country_codes`.
 
@@ -53,11 +78,44 @@ hardcodes a route id will not.
 Direct hosts all carry
 `vpn_server_remnawave_hosts_vless_route_id_direct` instead.
 
-What it will not touch
-----------------------
+Tags: what the role owns
+------------------------
 
-Both snippets are read back before they are written, and only the parts the
-role owns are replaced:
+Every host the role publishes carries every tag of
+`vpn_server_remnawave_tags`. Tags are authoritative, so a tag added by hand to
+such a host is removed on the next run. The tags marked `primary_filter: true`
+are how the role recognises its own hosts:
+
+```yaml
+vpn_server_remnawave_tags:
+  - value: "MANAGED_BY:ANSIBLE"
+    primary_filter: true
+  - value: "ENVIRONMENT:{{ inventory_file | basename | splitext | first | upper }}"
+    primary_filter: true
+```
+
+With several primary tags a host is the role's only when it carries all of
+them, so above, a run with `staging.ini` never touches the hosts a run with
+`production.ini` published on the same panel, and the other way round.
+
+- The panel is read through `kenyawest.remnawave.remnawave` with only
+  `remnawave_gather` set, and its hosts are split into the ones carrying
+  **all** primary tags and the rest.
+- Only the former are retired when the inventory stops producing them
+  (`vpn_server_remnawave_hosts_prune`), and cleaned by
+  `remnawave_clean_hosts.yaml`.
+- A generated host whose remark belongs to a host *without* the primary tags
+  is not published, and is reported. Set
+  `vpn_server_remnawave_hosts_adopt_untagged: true` to take such hosts over
+  and tag them - once is enough to adopt hosts published before the tags
+  existed (for example ones tagged `ANSIBLE_MANAGED`).
+
+The tags are checked before anything is sent: at most 10 distinct tags of up
+to 36 characters of `A-Z`, `0-9`, `_` and `:`, at least one of them primary.
+
+Snippets have no tags in Remnawave, so what the role owns inside them is told
+apart by content. Both snippets are read back before they are written, and
+only the parts the role owns are replaced:
 
 - an **outbound** is the role's when its `tag` starts with
   `vpn_server_remnawave_snippets_outbound_tag_prefix`;
@@ -70,18 +128,48 @@ tag prefix is `out-chain-auto`, deliberately distinct from a hand-written
 `out-chain-*` namespace; point it at `out-chain` only when the role is meant
 to own that namespace.
 
-**Hosts** are found by their remark, and the role only ever retires hosts
-carrying `vpn_server_remnawave_hosts_tag`. A host you created by hand is
-never disabled or deleted by this role.
+New hosts are disabled
+----------------------
+
+A host the panel does not have yet is created disabled - `isDisabled` is part
+of the create request, so it never carries traffic before it is reviewed.
+What happens afterwards is `vpn_server_remnawave_hosts_publish_state`:
+
+| Value | New host | Existing host |
+| --- | --- | --- |
+| `present` (default) | created disabled | switch left as the panel has it, so a host enabled by hand stays enabled |
+| `disabled` | created disabled | disabled again on every run |
+| `enabled` | created enabled | enabled again on every run |
+
+Cleaning
+--------
+
+`playbooks/reverse_proxy/remnawave_clean_hosts.yaml` (`tasks_from:
+clean_hosts`) lists every host of the panel carrying all the primary tags,
+asks for `yes`, and deletes them. Hosts without the primary tags are never
+touched.
+
+```sh
+ansible-playbook -i inventory/production.ini playbooks/reverse_proxy/remnawave_clean_hosts.yaml
+  # -e vpn_server_remnawave_hosts_clean_state=disabled   disable instead of delete
+  # -e vpn_server_remnawave_hosts_clean_confirm=true     do not ask
+```
+
+`--check` lists what would be cleaned without asking.
 
 Requirements
 ------------
 
-- The `kenyawest.remnawave` collection, version 1.1.0 or newer - earlier
-  versions cannot set `vless_route_id`. Install it with
+- The `kenyawest.remnawave` collection, version 1.2.0 or newer - the panel is
+  read through the `remnawave_gather` of its role. Install it with
   `ansible-galaxy collection install -r roles/requirements.yaml`.
-- Nodes in `vpn_server_remnawave_hosts_node_group` with
-  `domains_keys.remna_node` entries typed from `remna_domain_types`.
+- The `kwtoolset/resolve_host_relations` role of this repository.
+- Nodes in `vpn_server_remnawave_hosts_node_group` with `host_relations`
+  resolving to the panel and `domains_keys.remna_node` entries typed from
+  `vpn_deployment_domain_prefix`.
+- In the panel host's `host_vars`: `domains_keys.remnawave`,
+  `vpn_server_remnawave_api_token`, and for the snippets `service_user_id` and
+  `vpn_server_remnawave_xray_reality_password` (generated by `setup/server`).
 - A config profile and an inbound that already exist in the panel.
 - The nodes themselves already registered in the panel. A host is bound to
   the node named after its inventory hostname; set `remna_node_panel_name`
@@ -93,38 +181,36 @@ Requirements
 Role Variables
 --------------
 
-Set in `inventory/group_vars/vpn_server_remnawave/`; the role's
-`defaults/main.yml` holds the same names as fallbacks.
+Set in `inventory/group_vars/vpn_server_remnawave/`, or per panel in its
+`host_vars`; the role's `defaults/main.yml` holds the same names as fallbacks.
 
 ### Panel
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `vpn_server_remnawave_panel_group` | `vpn_server_remnawave` | Group the panel is taken from |
-| `vpn_server_remnawave_choose_panel_strategy` | `autoselect_if_single` | `autoselect_if_single` picks the only panel there is; `manual_set` always uses the recorded one |
-| `vpn_server_remnawave_selected_panel_hostname` | unset | The panel to use. Written here automatically after a prompt |
-| `vpn_server_remnawave_selected_panel_record` | `true` | Whether an answer at the prompt is written back to the inventory |
 | `vpn_server_remnawave_access_mode` | `api_token` | `caddy_custom_path` also sends the Caddy `X-Api-Key` |
+| `vpn_server_remnawave_panel_url` | `https://{{ domains_keys.remnawave }}` | URL of the panel of this host |
+| `vpn_server_remnawave_panel_validate_certs` | `true` | Whether TLS certificates are validated |
+| `vpn_server_remnawave_panel_timeout` | `30` | Per-request timeout in seconds |
+| `vpn_server_remnawave_tags` | `[{value: MANAGED_BY:ANSIBLE, primary_filter: true}]` | Tags put on what the role creates; the primary ones mark what it owns |
 | `vpn_server_remnawave_generate_stages` | `[snippets, hosts]` | Which halves this run generates |
-
-When the panel cannot be derived the role asks, accepts a number or a
-hostname, and records the answer in
-`vpn_server_remnawave_selected_panel_record_path`, so it asks once.
 
 ### Hosts
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `vpn_server_remnawave_hosts_node_group` | `vpn_caddy` | Group the nodes are read from |
+| `vpn_server_remnawave_hosts_node_relation_group` | `vpn_server_remnawave` | Relation group a node names its panel by |
+| `vpn_server_remnawave_hosts_node_relation_component` | `remna` | Relation component a node names its panel by |
 | `vpn_server_remnawave_hosts_node_manage_key` | `remna_node` | Key of `domains_keys` holding the node's domains |
-| `..._domain_types_direct_filter` | `[location_net]` | Domain types a direct host is published on |
-| `..._domain_types_specific_filter` | `[location_chain]` | Domain types a chain host is entered through |
-| `vpn_server_remnawave_hosts_publish_state` | `disabled` | `disabled`, `enabled`, or `present` (create switched off, then leave the panel's own switch alone) |
-| `vpn_server_remnawave_hosts_tag` | `ANSIBLE_MANAGED` | Tag marking the hosts the role may retire. The panel only accepts `A-Z`, `0-9`, `_` and `:` |
-| `vpn_server_remnawave_hosts_prune` | `disable` | What to do with tagged hosts the inventory no longer produces: `ignore`, `disable`, `delete` |
+| `..._domain_types_direct_filter` | `[net-location]` | Domain types a direct host is published on |
+| `..._domain_types_specific_filter` | `[chain-location]` | Domain types a chain host is entered through |
+| `vpn_server_remnawave_hosts_publish_state` | `present` | `present`, `disabled` or `enabled`, see [New hosts are disabled](#new-hosts-are-disabled) |
+| `vpn_server_remnawave_hosts_adopt_untagged` | `false` | Whether a generated host may take over a host of its remark without the primary tags |
+| `vpn_server_remnawave_hosts_prune` | `disable` | What to do with primary-tagged hosts the inventory no longer produces: `ignore`, `disable`, `delete` |
 | `vpn_server_remnawave_hosts_config_profile` | `''` | **Required.** Config profile the hosts attach to |
 | `vpn_server_remnawave_hosts_inbound` | `''` | Inbound tag, unless given per protocol below |
-| `vpn_server_remnawave_hosts_inbound_by_protocol` | `{}` | Inbound tag per `remna_protocol_types` value |
+| `vpn_server_remnawave_hosts_inbound_by_protocol` | `{}` | Inbound tag per `remna_protocol_types.<key>.full` value |
 | `vpn_server_remnawave_hosts_port` | `443` | Port advertised to clients |
 | `vpn_server_remnawave_hosts_fingerprint` | `chrome` | uTLS fingerprint |
 | `vpn_server_remnawave_hosts_labels` | `{}` | Display names keyed by domain label, used to build remarks |
@@ -136,7 +222,8 @@ work again. By default a host is named after its domain label
 (`net-europe-1`, `net-europe-1 | by chain-russia-1`). Point
 `vpn_server_remnawave_hosts_labels` at the remark an existing host already
 has to make the role **adopt** that host instead of creating a second one
-beside it:
+beside it (a host without the primary tags also needs
+`vpn_server_remnawave_hosts_adopt_untagged`):
 
 ```yaml
 vpn_server_remnawave_hosts_labels:
@@ -160,6 +247,13 @@ vpn_server_remnawave_hosts_chain:
 | `vpn_server_remnawave_hosts_vless_route_id_base` | `400` |
 | `vpn_server_remnawave_hosts_vless_route_id_direct` | `2` |
 
+### Cleaning
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `vpn_server_remnawave_hosts_clean_state` | `absent` | `absent` deletes the primary-tagged hosts, `disabled` switches them off |
+| `vpn_server_remnawave_hosts_clean_confirm` | `false` | Skip the confirmation prompt |
+
 ### Snippets
 
 | Variable | Default | Meaning |
@@ -167,26 +261,28 @@ vpn_server_remnawave_hosts_chain:
 | `vpn_server_remnawave_snippets_key_outbounds_all` | `outbounds_all_prod_1` | Panel snippet the outbounds are written into |
 | `vpn_server_remnawave_snippets_key_rules_all` | `rules_all_prod_1` | Panel snippet the routing rules are written into |
 | `vpn_server_remnawave_snippets_template_revision` | `'001'` | Suffix of the template variable names |
-| `vpn_server_remnawave_snippets_default_protocol_type` | `remna_protocol_types.vless_reality_tcp.full` | Used by a node that declares no `remna_node_primary_protocol_type` |
+| `vpn_server_remnawave_snippets_default_protocol_type` | `vless-reality-tcp` | Used by a node that declares no `remna_node_primary_protocol_type` |
 | `vpn_server_remnawave_snippets_outbound_tag_prefix` | `out-chain-auto` | Prefix marking the outbounds the role owns |
 | `vpn_server_remnawave_snippets_outbound_tag_index_width` | `3` | Zero padding of the per-region index |
 | `vpn_server_remnawave_snippets_vless_route_id_range` | `[400, 499]` | Route ids the role owns in the rules snippet |
-| `vpn_deployments_region_codes` | `{}` | `europe: eu`, ...; an unlisted region uses its first two letters |
+| `vpn_server_remnawave_snippets_region_codes` | `vpn_deployments_region_codes_global` + `_censorship` | `europe: eu`, ...; an unlisted region uses its first two letters |
 | `vpn_server_remnawave_snippets_sync` | `on_change` | Whether to push the snippets into the profiles embedding them |
 
 Outbound templates live beside the inventory as
 `group_vars/vpn_server_remnawave/snippet_<protocol key>_<revision>.yaml` and
 define one variable of the same name, for example `vless_reality_tcp_001`.
-The protocol key is the key of `remna_protocol_types` whose value a node
-declares in `remna_node_primary_protocol_type`. A template is rendered once
-per chained exit with `node_address` set to that exit's domain, and
-`service_user_id` and `vpn_server_remnawave_xray_reality_password` in scope;
-its `tag` is replaced with the generated one.
+The protocol key is the key of `remna_protocol_types` (read from the nodes)
+whose `full` value a node declares in `remna_node_primary_protocol_type`. A
+template is rendered once per chained exit with `node_address` set to that
+exit's domain, and `service_user_id` and
+`vpn_server_remnawave_xray_reality_password` of the panel host in scope; its
+`tag` is replaced with the generated one.
 
 Dependencies
 ------------
 
-`kenyawest.remnawave` >= 1.1.0, declared in `roles/requirements.yaml`.
+`kenyawest.remnawave` >= 1.2.0, declared in `roles/requirements.yaml`, and
+`kwtoolset/resolve_host_relations`.
 
 Example Playbook
 ----------------

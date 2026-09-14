@@ -7,9 +7,10 @@ vpn_server_remnawave_snippets_key_outbounds_all: outbounds_all_prod_1
 # and define one variable of the same name, e.g. vless_reality_tcp_001. The
 # protocol key is the key of remna_protocol_types whose value a node declares in
 # remna_node_primary_protocol_type; a node that declares nothing gets the
-# default below.
+# default below, a remna_protocol_types.<key>.full value. remna_protocol_types
+# belongs to the nodes (vpn_caddy), so it is written out here.
 vpn_server_remnawave_snippets_template_revision: '001'
-vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vless_reality_tcp.full }}"
+vpn_server_remnawave_snippets_default_protocol_type: vless-reality-tcp
 
 # Generated outbound tags are
 #   <prefix>-<region code>-<protocol type>-<NNN>

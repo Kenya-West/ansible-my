@@ -1,33 +1,54 @@
 ---
-# Turn the inventory's node facts into the setup to apply. Everything the role
-# writes - hosts, outbounds, rules and the route ids tying them together - is
-# derived here in one pass, so the three sides cannot drift apart.
+# Turn the facts of the nodes relating to this panel into the setup to apply.
+# Everything the role writes - hosts, outbounds, rules and the route ids tying
+# them together - is derived here in one pass, so the three sides cannot drift
+# apart.
+
+- name: Start from no related nodes
+  ansible.builtin.set_fact:
+    crpgs_related_nodes: []
+
+- name: Find the nodes that relate to this panel
+  ansible.builtin.include_tasks: resolve_node_relation.yml
+  loop: "{{ groups[vpn_server_remnawave_hosts_node_group] | default([]) }}"
+  loop_control:
+    loop_var: crpgs_node
+
+- name: There must be nodes relating to this panel
+  ansible.builtin.assert:
+    that:
+      - crpgs_related_nodes | length > 0
+    fail_msg: >-
+      No host of group '{{ vpn_server_remnawave_hosts_node_group }}' relates
+      to {{ inventory_hostname }} through its host_relations
+      ({{ vpn_server_remnawave_hosts_node_relation_group }}/{{
+      vpn_server_remnawave_hosts_node_relation_component }}), so there are no
+      nodes to publish.
 
 - name: Collect the node facts the setup is built from
   ansible.builtin.set_fact:
     crpgs_nodes: >-
       {%- set collected = [] -%}
-      {%- for node in groups[vpn_server_remnawave_hosts_node_group] | default([]) -%}
+      {%- for node in crpgs_related_nodes -%}
       {%-   set facts = hostvars[node] -%}
+      {%-   set protocol = facts.remna_node_primary_protocol_type | default('', true) -%}
       {%-   set _ = collected.append({
               'name': node,
               'panel_name': facts.remna_node_panel_name | default(node, true),
               'country': facts.country_code_upper | default('', true),
-              'protocol': facts.remna_node_primary_protocol_type
+              'protocol': (protocol.full | default('', true) if protocol is mapping else protocol)
                           | default(vpn_server_remnawave_snippets_default_protocol_type, true),
               'domains': (facts.domains_keys | default({}))
                          .get(vpn_server_remnawave_hosts_node_manage_key, []),
             }) -%}
       {%- endfor -%}
       {{ collected }}
+    # Protocol types are defined for the nodes, not for the panel.
+    crpgs_protocol_types: "{{ hostvars[crpgs_related_nodes | first].remna_protocol_types | default({}) }}"
 
-- name: There must be nodes to generate a setup from
-  ansible.builtin.assert:
-    that:
-      - crpgs_nodes | length > 0
-    fail_msg: >-
-      Group '{{ vpn_server_remnawave_hosts_node_group }}' is empty, so there
-      are no nodes to publish.
+- name: Report the nodes this panel is built from
+  ansible.builtin.debug:
+    msg: "{{ crpgs_related_nodes | length }} nodes relate to {{ inventory_hostname }}: {{ crpgs_related_nodes | join(', ') }}"
 
 - name: Build the desired setup
   ansible.builtin.set_fact:
@@ -41,7 +62,7 @@
       skip_same_country: "{{ vpn_server_remnawave_hosts_chain.skip_same_country | default(true) }}"
       exclude: "{{ vpn_server_remnawave_hosts_chain.exclude | default([]) }}"
       labels: "{{ vpn_server_remnawave_hosts_labels }}"
-      region_codes: "{{ vpn_deployments_region_codes }}"
+      region_codes: "{{ vpn_server_remnawave_snippets_region_codes }}"
       outbound_tag_prefix: "{{ vpn_server_remnawave_snippets_outbound_tag_prefix }}"
       outbound_tag_index_width: "{{ vpn_server_remnawave_snippets_outbound_tag_index_width }}"
       route_id_base: "{{ vpn_server_remnawave_hosts_vless_route_id_base }}"

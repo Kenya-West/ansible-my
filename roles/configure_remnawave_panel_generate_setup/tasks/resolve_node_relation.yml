@@ -1,0 +1,17 @@
+---
+# Whether one node (crpgs_node) relates to the panel of the host the role runs
+# against, resolved the way the node's own remna playbook resolves it. Appends
+# the node to crpgs_related_nodes when it does.
+
+- name: Resolve the panel {{ crpgs_node }} relates to
+  ansible.builtin.include_role:
+    name: kwtoolset/resolve_host_relations
+  vars:
+    resolve_host_relations_group: "{{ vpn_server_remnawave_hosts_node_relation_group }}"
+    resolve_host_relations_component: "{{ vpn_server_remnawave_hosts_node_relation_component }}"
+    resolve_host_relations_source: "{{ hostvars[crpgs_node].host_relations | default({}, true) }}"
+
+- name: Keep {{ crpgs_node }} when it relates to this panel
+  ansible.builtin.set_fact:
+    crpgs_related_nodes: "{{ crpgs_related_nodes + [crpgs_node] }}"
+  when: resolve_host_relations_host == inventory_hostname

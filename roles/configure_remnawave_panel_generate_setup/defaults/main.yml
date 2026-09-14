@@ -5,6 +5,9 @@
 # Every variable here is normally set in
 # inventory/group_vars/vpn_server_remnawave/. These are the fallbacks that
 # keep the role usable on its own.
+#
+# The role configures the panel of the host it runs against, with the nodes
+# whose host_relations resolve to that host.
 
 # Which halves of the setup this run generates. The two playbooks each pick
 # one; leaving both in place generates everything.
@@ -13,31 +16,37 @@ vpn_server_remnawave_generate_stages:
   - hosts
 
 # --- panel ------------------------------------------------------------------
-vpn_server_remnawave_panel_group: vpn_server_remnawave
-vpn_server_remnawave_choose_panel_strategy: autoselect_if_single
 vpn_server_remnawave_access_mode: api_token
-
-# Where a panel chosen at the prompt is written back to, so the next run does
-# not ask again. Set the record flag to false to be asked every time.
-vpn_server_remnawave_selected_panel_record: true
-vpn_server_remnawave_selected_panel_record_path: >-
-  {{ inventory_dir }}/group_vars/{{ vpn_server_remnawave_panel_group }}/hosts.yaml
-
 vpn_server_remnawave_panel_url: "https://{{ domains_keys.remnawave }}"
 vpn_server_remnawave_panel_validate_certs: true
 vpn_server_remnawave_panel_timeout: 30
 
+# Tags put on every entity the role creates. The ones marked
+# primary_filter: true are how the role tells its entities from hand-made
+# ones: it only takes over, retires and cleans entities carrying all of them.
+vpn_server_remnawave_tags:
+  - value: "MANAGED_BY:ANSIBLE"
+    primary_filter: true
+
 # --- what the nodes are read from -------------------------------------------
 vpn_server_remnawave_hosts_node_group: vpn_caddy
+# The relation a node names its panel by - the one its remna playbook
+# resolves, so a node is published on the panel it registers with.
+vpn_server_remnawave_hosts_node_relation_group: vpn_server_remnawave
+vpn_server_remnawave_hosts_node_relation_component: remna
 vpn_server_remnawave_hosts_node_manage_key: remna_node
 vpn_server_remnawave_hosts_node_manage_domain_types_direct_filter:
-  - "{{ remna_domain_types.location_net }}"
+  - "{{ vpn_deployment_domain_prefix.net_location.type }}"
 vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter:
-  - "{{ remna_domain_types.location_chain }}"
+  - "{{ vpn_deployment_domain_prefix.chain_location.type }}"
 
 # --- hosts ------------------------------------------------------------------
-vpn_server_remnawave_hosts_tag: ANSIBLE_MANAGED
-vpn_server_remnawave_hosts_publish_state: disabled
+# A host the panel does not have yet is always created disabled, unless this
+# is 'enabled'. It can be: present, disabled, enabled.
+vpn_server_remnawave_hosts_publish_state: present
+# Whether a generated host may take over a host of the same remark that does
+# not carry the primary tags.
+vpn_server_remnawave_hosts_adopt_untagged: false
 vpn_server_remnawave_hosts_config_profile: ''
 vpn_server_remnawave_hosts_inbound: ''
 vpn_server_remnawave_hosts_inbound_by_protocol: {}
@@ -46,8 +55,8 @@ vpn_server_remnawave_hosts_fingerprint: chrome
 vpn_server_remnawave_hosts_labels: {}
 vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
 
-# What to do with hosts carrying the tag that the inventory no longer produces.
-# It can be: ignore, disable, delete.
+# What to do with hosts carrying the primary tags that the inventory no longer
+# produces. It can be: ignore, disable, delete.
 vpn_server_remnawave_hosts_prune: disable
 
 # Which nodes a generated chain host is bound to.
@@ -63,12 +72,25 @@ vpn_server_remnawave_hosts_chain:
 vpn_server_remnawave_hosts_vless_route_id_base: 400
 vpn_server_remnawave_hosts_vless_route_id_direct: 2
 
+# --- cleaning (tasks_from: clean_hosts) -------------------------------------
+# What happens to the hosts carrying the primary tags. It can be: absent,
+# disabled.
+vpn_server_remnawave_hosts_clean_state: absent
+# Skip the confirmation prompt.
+vpn_server_remnawave_hosts_clean_confirm: false
+
 # --- snippets ---------------------------------------------------------------
 vpn_server_remnawave_snippets_key_rules_all: rules_all_prod_1
 vpn_server_remnawave_snippets_key_outbounds_all: outbounds_all_prod_1
 vpn_server_remnawave_snippets_template_revision: '001'
-vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vless_reality_tcp.full }}"
+# A remna_protocol_types.<key>.full value.
+vpn_server_remnawave_snippets_default_protocol_type: vless-reality-tcp
 vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain-auto
 vpn_server_remnawave_snippets_outbound_tag_index_width: 3
 vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]
 vpn_server_remnawave_snippets_sync: on_change
+# Region (net-<region>-<n>) to the code used in outbound tags; an unlisted
+# region uses its first two letters.
+vpn_server_remnawave_snippets_region_codes: >-
+  {{ vpn_deployments_region_codes_global | default({})
+     | combine(vpn_deployments_region_codes_censorship | default({})) }}
