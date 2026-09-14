@@ -90,10 +90,18 @@
         quiet: true
       when: crpgs_clean_hosts | length > 0
 
+    # One task for the whole list: the panel is read once, and every host is
+    # checked before any of them is written.
     - name: Clean the hosts
-      kenyawest.remnawave.host:
-        remark: "{{ item.remark }}"
-        state: "{{ vpn_server_remnawave_hosts_clean_state }}"
-      loop: "{{ crpgs_clean_hosts }}"
-      loop_control:
-        label: "{{ item.remark }} ({{ item.address }})"
+      kenyawest.remnawave.hosts:
+        hosts: >-
+          {%- set entries = [] -%}
+          {%- for host in crpgs_clean_hosts -%}
+          {%-   set _ = entries.append({
+                  'remark': host.remark,
+                  'state': vpn_server_remnawave_hosts_clean_state,
+                }) -%}
+          {%- endfor -%}
+          {{ entries }}
+      delegate_to: localhost
+      when: crpgs_clean_hosts | length > 0

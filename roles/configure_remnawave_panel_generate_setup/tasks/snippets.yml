@@ -84,6 +84,7 @@
             vpn_server_remnawave_snippets_outbound_tag_prefix)
       }}
     sync: "{{ vpn_server_remnawave_snippets_sync }}"
+  delegate_to: localhost
   register: crpgs_outbounds_snippet
 
 - name: Write the rules snippet
@@ -97,4 +98,5 @@
             vpn_server_remnawave_snippets_vless_route_id_range)
       }}
     sync: "{{ vpn_server_remnawave_snippets_sync }}"
+  delegate_to: localhost
   register: crpgs_rules_snippet

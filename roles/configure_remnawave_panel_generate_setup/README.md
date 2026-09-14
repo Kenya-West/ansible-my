@@ -160,9 +160,13 @@ ansible-playbook -i inventory/production.ini playbooks/reverse_proxy/remnawave_c
 Requirements
 ------------
 
-- The `kenyawest.remnawave` collection, version 1.2.0 or newer - the panel is
-  read through the `remnawave_gather` of its role. Install it with
-  `ansible-galaxy collection install -r roles/requirements.yaml`.
+- The `kenyawest.remnawave` collection, version 1.2.1 or newer - the panel is
+  read through the `remnawave_gather` of its role, and hosts are published,
+  retired and cleaned in one `kenyawest.remnawave.hosts` task each. Install it
+  with `ansible-galaxy collection install -r roles/requirements.yaml`.
+- Network access from the controller to the panel: every Remnawave task is
+  delegated to `localhost`, so nothing goes over SSH to the panel host, which
+  only lends its variables.
 - The `kwtoolset/resolve_host_relations` role of this repository.
 - Nodes in `vpn_server_remnawave_hosts_node_group` with `host_relations`
   resolving to the panel and `domains_keys.remna_node` entries typed from
@@ -281,7 +285,7 @@ exit's domain, and `service_user_id` and
 Dependencies
 ------------
 
-`kenyawest.remnawave` >= 1.2.0, declared in `roles/requirements.yaml`, and
+`kenyawest.remnawave` >= 1.2.1, declared in `roles/requirements.yaml`, and
 `kwtoolset/resolve_host_relations`.
 
 Example Playbook
