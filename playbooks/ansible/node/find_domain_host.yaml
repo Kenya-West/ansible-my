@@ -37,7 +37,7 @@
 
     - name: Filter entries matching search_domain
       ansible.builtin.set_fact:
-        _domain_matches: "{{ _domain_entries | selectattr('domain', 'search', search_domain) | list }}"
+        _domain_matches: "{{ _domain_entries | selectattr('domain', 'search', search_domain | regex_escape) | list }}"
 
 - name: Report matches
   hosts: localhost
