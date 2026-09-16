@@ -1,0 +1,64 @@
+---
+# Follow what the panel holds the way a client is routed, and check it against
+# itself and against the desired setup (crpgs_model, build_model.yml):
+#
+#   - every managed host's route id, through the rules snippet to the outbound
+#     and the exit it reaches, which must be the exit the host is named after;
+#   - the nodes a host binds to, which must exist and activate its config
+#     profile and inbound;
+#   - the config profile, which must embed the outbounds and rules snippets;
+#   - the balancers, whose outbounds must exist;
+#   - what the panel holds beyond the inventory: stale hosts and unused rules.
+#
+# Nothing is written. Problems - what would misroute or drop traffic - fail
+# the play unless vpn_server_remnawave_verify_fail is false, or the run is
+# --check, where the panel has not been written yet and the report shows what
+# a real run would have to fix.
+
+- name: Read the hosts, nodes, snippets and config profiles of the panel
+  ansible.builtin.include_tasks: read_panel.yml
+  vars:
+    crpgs_gather:
+      hosts: {}
+      nodes: {}
+      snippets: {}
+      config_profiles: {}
+
+- name: Check the panel against itself and the desired setup
+  ansible.builtin.set_fact:
+    crpgs_verified: "{{ remnawave_gathered | remnawave_verify(crpgs_model, crpgs_verify_options) }}"
+  vars:
+    crpgs_verify_options:
+      primary_tags: "{{ crpgs_primary_tags }}"
+      separator: "{{ vpn_server_remnawave_hosts_remark_chain_separator }}"
+      direct_route_id: "{{ vpn_server_remnawave_hosts_vless_route_id_direct }}"
+      route_id_range: "{{ vpn_server_remnawave_snippets_vless_route_id_range }}"
+      rules_snippet: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
+      outbounds_snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_all }}"
+      balancers_snippet: "{{ vpn_server_remnawave_snippets_key_balancers_all | default('') }}"
+
+# One expression evaluating to a list, so the callback prints a line each.
+- name: Report what the panel holds
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        ['Checked %d managed hosts (%d without the primary tags), %d rules, %d outbounds, %d nodes, %d config profiles'
+         | format(crpgs_verified.checked.hosts, crpgs_verified.checked.untagged_hosts,
+                  crpgs_verified.checked.rules, crpgs_verified.checked.outbounds,
+                  crpgs_verified.checked.nodes, crpgs_verified.checked.config_profiles)]
+        + ['%d problems:' | format(crpgs_verified.problems | length)] + crpgs_verified.problems
+        + ['%d notes:' | format(crpgs_verified.notes | length)] + crpgs_verified.notes
+      }}
+
+- name: The panel must route every host to the exit it is named after
+  ansible.builtin.assert:
+    that:
+      - crpgs_verified.problems | length == 0
+    fail_msg: >-
+      {{ crpgs_verified.problems | length }} problems in the panel of
+      {{ inventory_hostname }}, listed above. Regenerate the stages involved
+      (remnawave_generate_all.yaml), or resolve the hosts left out by hand.
+    quiet: true
+  when:
+    - vpn_server_remnawave_verify_fail | bool
+    - not ansible_check_mode

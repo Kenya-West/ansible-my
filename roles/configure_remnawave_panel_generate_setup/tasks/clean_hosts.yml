@@ -1,0 +1,107 @@
+---
+# Entry point (tasks_from: clean_hosts). Deletes - or disables, with
+# vpn_server_remnawave_hosts_clean_state: disabled - every host of the panel on
+# the host the role runs against that carries all the primary tags of
+# vpn_server_remnawave_tags. Hosts without them are never touched.
+
+- name: Check the tags the role filters by
+  ansible.builtin.include_tasks: validate_tags.yml
+
+- name: The clean state must be one the role knows
+  ansible.builtin.assert:
+    that:
+      - vpn_server_remnawave_hosts_clean_state in ['absent', 'disabled']
+    fail_msg: >-
+      vpn_server_remnawave_hosts_clean_state is
+      '{{ vpn_server_remnawave_hosts_clean_state }}'; it can be absent or disabled.
+    quiet: true
+
+- name: Clean the panel of this host
+  module_defaults:
+    group/kenyawest.remnawave.remnawave:
+      panel_url: "{{ crpgs_panel.panel_url }}"
+      token: "{{ crpgs_panel.token }}"
+      api_key: "{{ crpgs_panel.api_key }}"
+      validate_certs: "{{ crpgs_panel.validate_certs }}"
+      timeout: "{{ crpgs_panel.timeout }}"
+  block:
+    - name: Read the hosts in the panel
+      ansible.builtin.include_tasks: read_panel.yml
+      vars:
+        crpgs_gather:
+          hosts: {}
+
+    - name: Pick the hosts carrying the primary tags
+      ansible.builtin.set_fact:
+        crpgs_clean_hosts: "{{ remnawave_gathered.hosts | remnawave_select_tagged(crpgs_primary_tags) }}"
+
+    # Hosts are addressed by remark, and a remark shared with another host
+    # would make the module refuse rather than guess.
+    - name: Find the remarks that do not identify a single host
+      ansible.builtin.set_fact:
+        crpgs_clean_ambiguous: >-
+          {%- set remarks = remnawave_gathered.hosts | map(attribute='remark') | list -%}
+          {%- set found = [] -%}
+          {%- for host in crpgs_clean_hosts -%}
+          {%-   if remarks | select('equalto', host.remark) | list | length > 1
+                   and host.remark not in found -%}
+          {%-     set _ = found.append(host.remark) -%}
+          {%-   endif -%}
+          {%- endfor -%}
+          {{ found }}
+
+    - name: Every host to clean must have a remark of its own
+      ansible.builtin.assert:
+        that:
+          - crpgs_clean_ambiguous | length == 0
+        fail_msg: >-
+          These remarks are shared by several hosts of the panel, so the hosts
+          behind them cannot be addressed one by one: {{ crpgs_clean_ambiguous | join('; ') }}.
+          Rename them in the panel first. Nothing was changed.
+        quiet: true
+
+    - name: Report the hosts to clean
+      ansible.builtin.debug:
+        msg: >-
+          {{ crpgs_clean_hosts | length }} hosts of {{ inventory_hostname }} carry
+          {{ crpgs_primary_tags | join(', ') }} and will be
+          {{ 'deleted' if vpn_server_remnawave_hosts_clean_state == 'absent' else 'disabled' }}:
+          {{ crpgs_clean_hosts | map(attribute='remark') | join('; ') }}
+
+    - name: Confirm the cleaning
+      ansible.builtin.pause:
+        prompt: >-
+          Type 'yes' to {{ 'delete' if vpn_server_remnawave_hosts_clean_state == 'absent' else 'disable' }}
+          the hosts listed above
+      register: crpgs_clean_answer
+      when:
+        - crpgs_clean_hosts | length > 0
+        - not ansible_check_mode
+        - not vpn_server_remnawave_hosts_clean_confirm | bool
+
+    - name: The cleaning must be confirmed
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_check_mode
+            or vpn_server_remnawave_hosts_clean_confirm | bool
+            or crpgs_clean_answer.user_input | default('') | trim | lower == 'yes'
+        fail_msg: Not confirmed. Nothing was changed.
+        quiet: true
+      when: crpgs_clean_hosts | length > 0
+
+    # One task for the whole list: the panel is read once, and every host is
+    # checked before any of them is written.
+    - name: Clean the hosts
+      kenyawest.remnawave.hosts:
+        hosts: >-
+          {%- set entries = [] -%}
+          {%- for host in crpgs_clean_hosts -%}
+          {%-   set _ = entries.append({
+                  'remark': host.remark,
+                  'state': vpn_server_remnawave_hosts_clean_state,
+                }) -%}
+          {%- endfor -%}
+          {{ entries }}
+      delegate_to: localhost
+      when: crpgs_clean_hosts | length > 0

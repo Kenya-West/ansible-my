@@ -18,7 +18,7 @@ services:
       caddy: "${SERVICE_DOMAIN}"
       caddy.handle_path: "/{{ path_to_internal_services_predefined_full }}/${SERVICE_NAME}/*"
       caddy.handle_path.basic_auth:
-{% for user in logporter_server_users %}
+{% for user in install_analytics_node_logporter_users %}
       caddy.handle_path.basic_auth.{{user.name}}: "${BASIC_AUTH_USER_{{user.name | upper}}}"
 {% endfor %}
       {% raw %}caddy.handle_path.reverse_proxy: "{{ upstreams ${SERVICE_PORT_INTERNAL} }}"{% endraw %}

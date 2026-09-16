@@ -17,6 +17,30 @@
         + (source_paths_add_repo_dirs | default([]))
         + (source_paths_add_user_dirs | default([]))
       }}
+  tags:
+    - always
+
+- name: Check which source_paths actually exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ source_paths }}"
+  delegate_to: localhost
+  become: false
+  register: source_paths_stat
+  tags:
+    - always
+
+- name: Exclude non-existing paths from source_paths
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        source_paths_stat.results
+        | selectattr('stat.exists')
+        | map(attribute='item')
+        | list
+      }}
+  tags:
+    - always
 
 - name: Get Powershell executable path
   ansible.builtin.shell: "command -v pwsh"
@@ -53,7 +77,6 @@
     src: "{{ item }}/{{ powershell_profile_source_path }}"
     dest: "{{ powershell_profile_temp_dir.path }}/Microsoft.PowerShell_profile.ps1"
   with_items: "{{ source_paths }}"
-  failed_when: false
 
 - name: Apply text_from_file role
   ansible.builtin.include_role:

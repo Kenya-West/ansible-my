@@ -1,7 +1,7 @@
 ---
 # defaults file for roles/install_vpn_caddy_remna
-project_dir: "{{ vpn_project_structure_end_dirs.remna | ansible.builtin.basename }}"
-project_root_dir: "{{ vpn_project_structure_root }}"
+project_dir: "{{ vpn_caddy.project.paths.remna | ansible.builtin.basename }}"
+project_root_dir: "{{ vpn_caddy.project.root }}"
 source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
 source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
 
@@ -11,13 +11,12 @@ source_paths_add_repo_dirs:
   - "{{ source_asset_fullpath_project }}"
 source_paths_add_user_dirs: []
 
-dest_path_root: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+dest_path_root: "/home/{{ standard_user }}/{{ vpn_caddy.project.root }}"
 dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
 
 remna_node_app_port: 2220
-remna_node_control_port: 48540
 remna_node_external_ports: []
 remna_node_use_dns01_cloudflare: false
 
@@ -73,3 +72,9 @@ systemd_unit_configs:
       Persistent: "true"
     Install:
       WantedBy: "timers.target"
+
+# The Remnawave panel this node connects to, resolved by the playbook with
+# kwtoolset/resolve_host_relations (vpn_server_remnawave/remna), and the
+# SECRET_KEY it issues to its nodes.
+install_vpn_caddy_remna_panel: "{{ resolve_host_relations_host | default('') }}"
+remna_node_ssl_cert_from_panel: "{{ hostvars[install_vpn_caddy_remna_panel].vpn_server_remnawave_node_secret_key }}"

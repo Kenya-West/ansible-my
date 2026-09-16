@@ -1,0 +1,6 @@
+---
+proxy_client:
+  project:
+    root: proxy-client
+    paths:
+      frp: "{{ proxy_client.project.root }}/frp"

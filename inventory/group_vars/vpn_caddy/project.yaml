@@ -1,0 +1,18 @@
+---
+vpn_caddy:
+  project:
+    root: vpn-caddy
+    paths:
+      frps: "{{ vpn_caddy.project.root }}/frps"
+      remna: "{{ vpn_caddy.project.root }}/remna"
+      tblocker: "{{ vpn_caddy.project.root }}/tblocker"
+      zapret: "{{ vpn_caddy.project.root }}/zapret"
+      wg: "{{ vpn_caddy.project.root }}/wg"
+      caddy: "{{ vpn_caddy.project.root }}/caddy"
+
+webfeatures:
+  project:
+    root: web-features-caddy
+    paths:
+      main: "{{ webfeatures.project.root }}/certcopy"
+      certcopy: "{{ webfeatures.project.root }}/certcopy"

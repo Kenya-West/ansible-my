@@ -1,0 +1,21 @@
+# Protocols a Remnawave node can serve. The nodes pick one
+# (remna_node_primary_protocol_type, group_vars/vpn_caddy/remna.yaml) and the
+# panels derive their snippets and serverNames from all of them, so it lives
+# where both see it.
+remna_protocol_types:
+  vless_reality_tcp:
+    parts:
+      - vless
+      - reality
+      - tcp
+    root: vless
+    short: reality-tcp
+    full: vless-reality-tcp
+  vless_reality_xhttp:
+    parts:
+      - vless
+      - reality
+      - xhttp
+    root: vless
+    short: reality-xhttp
+    full: vless-reality-xhttp

@@ -1,0 +1,207 @@
+---
+# Plans (never mutates) the group-wide DNS sync: compares what EVERY host of the
+# domain_management group declares with the Ansible-managed records of the
+# current environment, and produces the create / update / delete calls that make
+# Cloudflare match the inventory.
+#
+# Requires:
+#   * dns_resolve_context.yml    — dns_hosting_record_types_resolved, dns_primary_filter
+#   * read_cloudflare_records.yml — cloudflare_records, cf_zones
+#   * dns_sync_desired            — every host's cf_set_targets, each tagged with `_host`
+#   * dns_sync_scope_tags_resolved — tags a record must carry to be in scope
+# Produces (run_once, on localhost):
+#   * dns_sync_actual     (in-scope managed records)
+#   * dns_sync_foreign    (managed records of an allowed type without the scope tags)
+#   * dns_sync_foreign_untouched (the foreign records on names no host declares:
+#                          another environment's, reported only)
+#   * dns_sync_violations (declared name + type over its records_limit)
+#   * dns_sync_plan       ({create, update, delete}; every entry carries a `reason`)
+#
+# A name declared by a host of this environment belongs to this environment, so
+# EVERY managed record of that name is reconciled, scope tags or not (e.g. records
+# tagged with an old `inventory=staging` comment). Foreign records on undeclared
+# names are never changed.
+#
+# Per (name, type):
+#   1. a record whose content is declared is kept (PATCHed when ttl / proxied /
+#      comment drifted; a foreign one is adopted by rewriting its comment);
+#   2. a declared content with no record is served by re-pointing a leftover
+#      record of that name (least recently modified first), else created;
+#   3. every remaining record is deleted, with the reason:
+#        - `no host declares this name`   (domain with no host linked)
+#        - `no host declares this value`  (e.g. the IP of a removed host)
+#        - `value declared for another name` (IP of a host, wrong name)
+#        - `duplicate`                     (same content twice)
+
+- name: Split the managed records into in-scope and foreign
+  ansible.builtin.set_fact:
+    dns_sync_actual: "{{ _split['in'] }}"
+    dns_sync_foreign: "{{ _split['out'] }}"
+  vars:
+    _split: >-
+      {%- set out = {'in': [], 'out': []} -%}
+      {%- for r in cloudflare_records | default([]) if r.type in dns_hosting_record_types_resolved -%}
+        {%- set ns = namespace(ok=true) -%}
+        {%- for tag in dns_sync_scope_tags_resolved -%}
+          {%- if not (r.comment is search('(^|[^A-Za-z0-9_.=-])' ~ (tag | regex_escape) ~ '($|[^A-Za-z0-9_.=-])')) -%}
+            {%- set ns.ok = false -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- set _ = out['in' if ns.ok else 'out'].append(r) -%}
+      {%- endfor -%}
+      {{ out }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Collect the (name, type) pairs that are declared or exist
+  ansible.builtin.set_fact:
+    dns_sync_keys: >-
+      {{ ((dns_sync_desired | community.general.json_query('[].{name: record, type: type}'))
+          + (dns_sync_actual | community.general.json_query('[].{name: name, type: type}')))
+         | unique }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Fail when a declared record's zone is not accessible in Cloudflare
+  ansible.builtin.assert:
+    that:
+      - _missing_zones | length == 0
+    fail_msg: >-
+      Declared records are in zone(s) not accessible with the configured
+      Cloudflare token(s): {{ _missing_zones }}
+    quiet: true
+  vars:
+    _missing_zones: >-
+      {{ dns_sync_desired | map(attribute='zone') | unique
+         | difference(cf_zones | default([]) | map(attribute='name')) }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Find declared names over their domains_settings records_limit
+  ansible.builtin.set_fact:
+    dns_sync_violations: "{{ _violations }}"
+  vars:
+    # When hosts disagree on the limit of a shared name, the strictest one wins.
+    _violations: >-
+      {%- set out = [] -%}
+      {%- for k in dns_sync_keys -%}
+        {%- set desired = dns_sync_desired | selectattr('record', 'equalto', k.name)
+                          | selectattr('type', 'equalto', k.type) | list -%}
+        {%- set limits = desired | map(attribute='records_limit') | map('int')
+                         | reject('equalto', -1) | list -%}
+        {%- set values = desired | map(attribute='value') | unique | list -%}
+        {%- if limits | length > 0 and values | length > limits | min -%}
+          {%- set _ = out.append({'name': k.name, 'type': k.type, 'limit': limits | min,
+                                  'declared': values,
+                                  'hosts': desired | map(attribute='_host') | unique | list}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Plan the group-wide create / update / delete calls
+  ansible.builtin.set_fact:
+    dns_sync_plan: "{{ _plan }}"
+  vars:
+    # Subscript access (`plan['update']`) on purpose: `plan.update` would resolve
+    # to the dict's own update() method.
+    _plan: >-
+      {%- set plan = {'create': [], 'update': [], 'delete': []} -%}
+      {%- set all_values = dns_sync_desired | map(attribute='value') | unique | list -%}
+      {%- for k in dns_sync_keys -%}
+        {%- set desired = dns_sync_desired | selectattr('record', 'equalto', k.name)
+                          | selectattr('type', 'equalto', k.type) | list -%}
+        {#- Foreign records join in only on names this environment declares. -#}
+        {%- set candidates = dns_sync_actual + (dns_sync_foreign if desired | length > 0 else []) -%}
+        {%- set existing = candidates | selectattr('name', 'equalto', k.name)
+                           | selectattr('type', 'equalto', k.type)
+                           | sort(attribute='modified_on') | list -%}
+        {%- set foreign_ids = dns_sync_foreign | map(attribute='id') | list -%}
+        {%- set zone_name = (existing | first)._zone if existing | length > 0 else (desired | first).zone -%}
+        {%- set zone = cf_zones | selectattr('name', 'equalto', zone_name) | first -%}
+        {%- set call = {'zone_id': zone.id, 'api_token': zone._cf_provider.api_token} -%}
+        {%- set declared_values = desired | map(attribute='value') | unique | list -%}
+        {%- set used = [] -%}
+        {%- set pending = [] -%}
+        {%- for value in declared_values -%}
+          {%- set d = desired | selectattr('value', 'equalto', value) | first -%}
+          {%- set hosts = desired | selectattr('value', 'equalto', value)
+                          | map(attribute='_host') | unique | list -%}
+          {%- set body = {'type': d.type, 'name': d.record, 'content': d.value,
+                          'ttl': d.ttl, 'proxied': d.proxied, 'comment': d.comment} -%}
+          {%- set same = existing | rejectattr('id', 'in', used)
+                         | selectattr('content', 'equalto', value) | list -%}
+          {%- if same | length > 0 -%}
+            {%- set e = same | first -%}
+            {%- set _ = used.append(e.id) -%}
+            {%- if e.proxied != d.proxied or e.comment != d.comment or (not d.proxied and e.ttl != d.ttl) -%}
+              {%- set _ = plan['update'].append(call | combine({'id': e.id, 'from': e.content, 'body': body,
+                                                                'from_comment': e.comment, 'hosts': hosts,
+                                                                'reason': 'adopt' if e.id in foreign_ids else 'drift'})) -%}
+            {%- endif -%}
+          {%- else -%}
+            {%- set _ = pending.append({'body': body, 'hosts': hosts}) -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- set leftover = existing | rejectattr('id', 'in', used) | list -%}
+        {%- for p in pending -%}
+          {%- if loop.index0 < leftover | length -%}
+            {%- set e = leftover[loop.index0] -%}
+            {%- set _ = plan['update'].append(call | combine({'id': e.id, 'from': e.content, 'body': p.body,
+                                                              'from_comment': e.comment,
+                                                              'hosts': p.hosts, 'reason': 'repoint'})) -%}
+          {%- else -%}
+            {%- set _ = plan['create'].append(call | combine({'body': p.body, 'hosts': p.hosts,
+                                                              'reason': 'missing'})) -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- for e in leftover[pending | length:] -%}
+          {%- if desired | length == 0 -%}
+            {%- set reason = 'no host declares this name' -%}
+          {%- elif e.content in declared_values -%}
+            {%- set reason = 'duplicate' -%}
+          {%- elif e.content in all_values -%}
+            {%- set reason = 'value declared for another name' -%}
+          {%- else -%}
+            {%- set reason = 'no host declares this value' -%}
+          {%- endif -%}
+          {%- set _ = plan['delete'].append(call | combine({
+                'id': e.id, 'name': e.name, 'type': e.type, 'content': e.content, 'reason': reason,
+                'comment': e.comment,
+                'value_owners': dns_sync_desired | selectattr('value', 'equalto', e.content)
+                                | map(attribute='_host') | unique | list})) -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {{ plan }}
+  no_log: true # entries carry the api_token
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Keep the foreign records on undeclared names (left untouched)
+  ansible.builtin.set_fact:
+    dns_sync_foreign_untouched: "{{ _untouched }}"
+  vars:
+    _untouched: >-
+      {%- set out = [] -%}
+      {%- for r in dns_sync_foreign -%}
+        {%- if not (dns_sync_desired | selectattr('record', 'equalto', r.name)
+                    | selectattr('type', 'equalto', r.type) | list) -%}
+          {%- set _ = out.append(r) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always

@@ -4,12 +4,16 @@
   become: false
   become_user: "{{ standard_user }}"
   vars:
-    project_dir: "{{ vpn_server_remnawave_project_structure_end_dirs.panel | ansible.builtin.basename }}"
-    project_root_dir: "{{ vpn_server_remnawave_project_structure_root }}"
+    project_dir: "{{ vpn_server_remnawave.project.paths.panel | ansible.builtin.basename }}"
+    project_root_dir: "{{ vpn_server_remnawave.project.root }}"
     source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
     source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
     install_vpn_server_remnawave_source_paths__base:
       - "{{ source_asset_fullpath_project }}"
 
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: vpn_server_remnawave
+        resolve_host_relations_component: panel
     - install_vpn_server_remnawave

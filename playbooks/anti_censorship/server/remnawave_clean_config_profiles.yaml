@@ -1,0 +1,18 @@
+---
+# Deletes every Remnawave config profile carrying the primary tags of
+# vpn_server_remnawave_tags from the panel of each vpn_server_remnawave host,
+# after listing them and asking for confirmation. Profiles without those tags
+# are left alone.
+#
+#   -e vpn_server_remnawave_config_profiles_clean_confirm=true   do not ask
+- name: Clean the Ansible-managed Remnawave config profiles
+  hosts: vpn_server_remnawave
+  become: false
+  become_user: "{{ standard_user }}"
+  gather_facts: false
+
+  tasks:
+    - name: Clean the config profiles carrying the primary tags
+      ansible.builtin.include_role:
+        name: configure_remnawave_panel_generate_setup
+        tasks_from: clean_config_profiles

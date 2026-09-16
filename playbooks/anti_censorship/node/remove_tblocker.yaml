@@ -8,7 +8,7 @@
       vars:
         filename_pattern: "*.env"
         substring_pattern: "PORT"
-        files_path: "/home/{{ standard_user }}/{{ vpn_project_structure_end_dirs.tblocker }}"
+        files_path: "/home/{{ standard_user }}/{{ vpn_caddy.project.paths.tblocker }}"
         skip_if_not_found: true
     - name: remove_ufw_rules
       become: true
@@ -19,7 +19,7 @@
     - name: remove_project_dirs
       vars:
         remove_project_dirs:
-          - "/home/{{ standard_user }}/{{ vpn_project_structure_end_dirs.tblocker }}"
+          - "/home/{{ standard_user }}/{{ vpn_caddy.project.paths.tblocker }}"
   
   pre_tasks:
     - name: Stop and disable TBlocker SystemD service

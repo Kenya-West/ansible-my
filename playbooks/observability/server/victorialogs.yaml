@@ -4,4 +4,8 @@
   become: false
   become_user: "{{ standard_user }}"
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: analytics_server
+        resolve_host_relations_component: victorialogs
     - install_analytics_server_victorialogs

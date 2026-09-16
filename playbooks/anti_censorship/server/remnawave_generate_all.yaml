@@ -1,0 +1,32 @@
+---
+# Generates the whole Remnawave setup of each vpn_server_remnawave panel in one
+# run: the snippets, the config profiles that embed them, the nodes, and the
+# hosts that attach to the profiles' inbounds and bind to the nodes - the same
+# four stages remnawave_generate_snippets.yaml, remnawave_generate_config_profiles.yaml,
+# remnawave_generate_nodes.yaml and remnawave_generate_hosts.yaml run one each,
+# in the order they depend on each other. The model every stage is built from
+# is derived once, so the hosts' route ids, the rules and the outbounds of one
+# run cannot disagree. The run ends by reading the panel back and verifying it
+# (remnawave_verify.yaml): every host's route id must reach the exit it is
+# named after, which fails the play otherwise.
+#
+# --check --diff shows everything that would be written; nothing is sent, and
+# the verification then reports the drift a real run would fix without failing.
+#
+#   -e vpn_server_remnawave_generate_stages='[snippets,hosts]'   a subset, in this order
+#   -e vpn_server_remnawave_verify_fail=false                    report only
+- name: Generate the Remnawave setup (snippets, config profiles, nodes and hosts)
+  hosts: vpn_server_remnawave
+  become: false
+  become_user: "{{ standard_user }}"
+  gather_facts: false
+  vars:
+    vpn_server_remnawave_generate_stages:
+      - snippets
+      - config_profiles
+      - nodes
+      - hosts
+      - verify
+
+  roles:
+    - configure_remnawave_panel_generate_setup

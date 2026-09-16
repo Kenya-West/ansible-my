@@ -1,74 +1,71 @@
 ---
-# Render one outbound per chained exit from the protocol template that exit's
-# nodes declare, and one routing rule pointing at it, then write both into the
-# panel's snippets without disturbing what the role does not own.
+# Write the panel's snippets. Their contents are built in the inventory
+# (group_vars/vpn_server_remnawave/snippets.yaml); this does only what
+# inventory variables cannot:
+#
+#   - outbounds_all: every planned outbound rendered from its protocol
+#     template with node_address set to its exit, merged into the panel's;
+#   - rules_all: one rule per chained exit, routing its route id to that exit's
+#     outbound (crpgs_model, build_model.yml), merged into the panel's;
+#   - vpn_server_remnawave_snippets_whole (balancers, defaults): written as
+#     they are.
+#
+# Snippets carry no tags in Remnawave, so what the role owns inside
+# outbounds_all and rules_all is told apart by the outbound tag prefix and the
+# route id range instead.
 
 - name: Start from an empty set of rendered outbounds
   ansible.builtin.set_fact:
     crpgs_outbounds: []
 
-- name: Map each protocol type to the snippet template that renders it
-  ansible.builtin.set_fact:
-    crpgs_protocol_templates: >-
-      {%- set templates = {} -%}
-      {%- for key, value in remna_protocol_types.items() -%}
-      {%-   set _ = templates.update({
-              value: key ~ '_' ~ vpn_server_remnawave_snippets_template_revision
-            }) -%}
-      {%- endfor -%}
-      {{ templates }}
-
-- name: Every protocol in use must have a snippet template
+- name: Every planned outbound must have a snippet template
   ansible.builtin.assert:
     that:
-      - item.protocol in crpgs_protocol_templates
-      - crpgs_protocol_templates[item.protocol] in vars
+      - item.template in query('varnames', '.*')
     fail_msg: >-
       No snippet template for protocol '{{ item.protocol }}' of exit
-      {{ item.address }}. Expected a variable named
-      '{{ crpgs_protocol_templates[item.protocol] | default(item.protocol) }}',
-      normally defined in
-      group_vars/{{ vpn_server_remnawave_panel_group }}/snippet_*.yaml.
-  loop: "{{ crpgs_model.outbounds }}"
+      {{ item.address }}. Expected a variable named '{{ item.template }}',
+      normally defined in group_vars/vpn_server_remnawave/snippet_*.yaml.
+    quiet: true
+  loop: "{{ crpgs_outbounds_plan }}"
   loop_control:
     label: "{{ item.tag }}"
 
-- name: Render the outbound of each chained exit
+- name: Render the outbound of each exit
   ansible.builtin.set_fact:
     crpgs_outbounds: >-
       {{
         crpgs_outbounds
-        + [lookup('ansible.builtin.vars', crpgs_template) | combine({'tag': item.tag})]
+        + [lookup('ansible.builtin.vars', item.template) | combine({'tag': item.tag})]
       }}
   vars:
-    # The templates are written against these two names; node_address is what
-    # makes one template serve every exit.
+    # The templates are written against this name; it is what makes one
+    # template serve every exit.
     node_address: "{{ item.address }}"
-    crpgs_template: "{{ crpgs_protocol_templates[item.protocol] }}"
-  loop: "{{ crpgs_model.outbounds }}"
+  loop: "{{ crpgs_outbounds_plan }}"
   loop_control:
     label: "{{ item.tag }} -> {{ item.address }}"
 
 - name: Read the snippets currently in the panel
-  kenyawest.remnawave.snippet_info:
-    name: "{{ item }}"
-  loop:
-    - "{{ vpn_server_remnawave_snippets_key_outbounds_all }}"
-    - "{{ vpn_server_remnawave_snippets_key_rules_all }}"
-  register: crpgs_snippets_before
+  ansible.builtin.include_tasks: read_panel.yml
+  vars:
+    crpgs_gather:
+      snippets: {}
 
 - name: Keep the parts of the snippets the role does not own
   ansible.builtin.set_fact:
-    crpgs_outbounds_existing: "{{ crpgs_content[0] }}"
-    crpgs_rules_existing: "{{ crpgs_content[1] }}"
-  vars:
-    crpgs_content: >-
-      {%- set found = [] -%}
-      {%- for result in crpgs_snippets_before.results -%}
-      {%-   set snippet = result.snippets | default([]) | first | default({}) -%}
-      {%-   set _ = found.append(snippet.snippet | default([], true)) -%}
-      {%- endfor -%}
-      {{ found }}
+    crpgs_outbounds_existing: >-
+      {{
+        (remnawave_gathered.snippets
+         | selectattr('name', 'equalto', vpn_server_remnawave_snippets_key_outbounds_all)
+         | first | default({})).snippet | default([], true)
+      }}
+    crpgs_rules_existing: >-
+      {{
+        (remnawave_gathered.snippets
+         | selectattr('name', 'equalto', vpn_server_remnawave_snippets_key_rules_all)
+         | first | default({})).snippet | default([], true)
+      }}
 
 - name: Write the outbounds snippet
   kenyawest.remnawave.snippet:
@@ -81,6 +78,7 @@
             vpn_server_remnawave_snippets_outbound_tag_prefix)
       }}
     sync: "{{ vpn_server_remnawave_snippets_sync }}"
+  delegate_to: localhost
   register: crpgs_outbounds_snippet
 
 - name: Write the rules snippet
@@ -94,4 +92,17 @@
             vpn_server_remnawave_snippets_vless_route_id_range)
       }}
     sync: "{{ vpn_server_remnawave_snippets_sync }}"
+  delegate_to: localhost
   register: crpgs_rules_snippet
+
+# After outbounds_all: a balancer selects outbounds by tag.
+- name: Write the snippets kept whole
+  kenyawest.remnawave.snippet:
+    name: "{{ item.name }}"
+    snippet: "{{ item.snippet }}"
+    sync: "{{ vpn_server_remnawave_snippets_sync }}"
+  loop: "{{ vpn_server_remnawave_snippets_whole }}"
+  loop_control:
+    label: "{{ item.name }}"
+  delegate_to: localhost
+  register: crpgs_whole_snippets

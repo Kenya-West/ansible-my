@@ -1,11 +1,11 @@
 ---
-# Computes the DNS records the CURRENT host declares, as a list of
-# `community.general.cloudflare_dns` argument dicts (`cf_set_targets`). Shared by
-# the set + host-validation scenarios so "which records belong to this host" is
-# defined in exactly one place.
+# Computes the DNS records the CURRENT host declares (`cf_set_targets`). Shared by
+# the set, delete and host-validation scenarios so "which records belong to this
+# host" is defined in exactly one place.
 #
 # Requires (from dns_resolve_context.yml):
-#   provider_tokens, dns_hosting_record_types_resolved.
+#   provider_tokens, dns_hosting_record_types_resolved, dns_hosting_record_ttl_resolved,
+#   dns_hosting_record_proxied_resolved, dns_records_comment.
 # Produces (per host, on localhost): selected_dns_records, cf_set_targets.
 #
 # Source records (mutually exclusive):
@@ -15,10 +15,18 @@
 #
 # Entry keys mirror `community.general.cloudflare_dns`, except:
 #   * `dns_provider` selects the provider whose api_token is used (dropped after);
-#   * `state` is forced to `present`;
+#   * `state` is ignored (dropped);
 #   * `name` becomes `record` and `zone` is derived from it (left-most label
 #     stripped, mirroring remap_dns_records_root_domains);
-#   * a missing `value` defaults to the host's address (`ansible_host`).
+#   * a missing `value` defaults to the host's address (`ansible_host`);
+#   * `proxied` defaults to `dns_hosting_record_proxied`;
+#   * `ttl` resolves as: the `domains_settings.explicit` entry for the name >
+#     the record's own `ttl` > `domains_settings.defaults` > `dns_hosting_record_ttl`
+#     (`auto` means Cloudflare's automatic TTL, i.e. 1);
+#   * `records_limit` is the policy limit for the name + type, from the matching
+#     `domains_settings.explicit` entry, else `domains_settings.defaults`, else -1
+#     (unlimited);
+#   * `comment` is always the `dns_hosting_tags` comment (marks the record as managed).
 
 - name: Produce records from domains_keys via the reusable remap_dns_records role
   ansible.builtin.include_role:
@@ -61,7 +69,7 @@
   tags:
     - always
 
-- name: Build the community.general.cloudflare_dns argument sets
+- name: Build the declared record entries
   ansible.builtin.set_fact:
     cf_set_targets: "{{ cf_set_targets + [_args] }}"
   loop: "{{ selected_dns_records }}"
@@ -72,6 +80,21 @@
     # Zone = record name minus its left-most label (mirrors remap_dns_records).
     _zone: "{{ rec.name | regex_replace('^[^.]+[.]', '') }}"
     _value: "{{ rec.value | default(dns_hosting_record_value | default(ansible_host | default(inventory_hostname))) }}"
+    _settings_defaults: "{{ domains_settings.defaults | default({}) }}"
+    _settings_explicit: >-
+      {{ domains_settings.explicit | default([])
+         | selectattr('name', 'equalto', rec.name) | first | default({}) }}
+    _limit: >-
+      {{ _settings_explicit.records_limit | default([])
+         | selectattr('type', 'equalto', rec.type) | map(attribute='limit') | first
+         | default(_settings_defaults.records_limit | default([])
+                   | selectattr('type', 'equalto', rec.type) | map(attribute='limit') | first
+                   | default(-1)) }}
+    _ttl: >-
+      {{ _settings_explicit.ttl
+         | default(rec.ttl
+         | default(_settings_defaults.ttl
+         | default(dns_hosting_record_ttl_resolved))) }}
     _args: >-
       {{
         rec
@@ -79,11 +102,14 @@
             'record': rec.name,
             'zone': _zone,
             'value': _value,
-            'state': 'present',
+            'ttl': 1 if (_ttl | string) == 'auto' else (_ttl | int),
+            'proxied': rec.proxied | default(dns_hosting_record_proxied_resolved) | bool,
+            'records_limit': _limit | int,
+            'comment': dns_records_comment,
             'api_token': provider_tokens[rec.dns_provider],
           })
         | dict2items
-        | rejectattr('key', 'in', ['name', 'dns_provider'])
+        | rejectattr('key', 'in', ['name', 'dns_provider', 'state'])
         | items2dict
       }}
   delegate_to: localhost

@@ -1,19 +1,25 @@
-remna_protocol_types:
-  vless_reality_tcp:
-    parts:
-      - vless
-      - reality
-      - tcp
-    root: vless
-    short: reality-tcp
-    full: vless-reality-tcp
-  vless_reality_xhttp:
-    parts:
-      - vless
-      - reality
-      - xhttp
-    root: vless
-    short: reality-xhttp
-    full: vless-reality-xhttp
-
+# A value of remna_protocol_types (group_vars/all/0_defaults/protocols.yaml).
 remna_node_primary_protocol_type: "{{ remna_protocol_types.vless_reality_tcp }}"
+
+remna_node_use_dns01_cloudflare: true
+
+remna_node_control_port: 48540
+remna_node_name_in_panel: "{{ inventory_hostname }}"
+
+# Address and port the panel reaches the node at. The port follows the compose:
+# EXTERNAL_PORT when one is published, NODE_PORT otherwise.
+remna_node_panel_address: >-
+  {{
+    (domains_keys.remna_node
+     | selectattr('type', 'equalto', remna_node_domain_types_allowlist.unique.type)
+     | map(attribute='domain')
+     | first
+     | mandatory('remna_node_panel_address: no domain found in domains_keys.remna_node for type ' ~ remna_node_domain_types_allowlist.unique.type))
+  }}
+
+# Two-letter country code shown in the panel, or XX for none.
+remna_node_panel_country_code: "{{ country_code_upper }}"
+
+# Inbounds of the config profile activated on this node. Empty means the
+# panel's vpn_server_remnawave_nodes_inbounds.
+remna_node_panel_inbounds: []

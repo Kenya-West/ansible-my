@@ -1,4 +1,7 @@
 ---
+# Adds add_domains_to_list_caddy_new_domain to domains_node.remna_node_extra of
+# the host's 0_all/1_domains.yaml. group_vars/vpn_caddy/domain_generator.yaml
+# appends those entries to the generated domains_keys.remna_node.
 
 - name: "{{ __host_name }}: check domains file exists"
   ansible.builtin.stat:
@@ -24,61 +27,60 @@
         src: "{{ __host_domains_file }}"
       register: __host_slurp
 
-    - name: "{{ __host_name }}: decode and parse the domains file"
+    - name: "{{ __host_name }}: parse the domains file and the current domains"
       ansible.builtin.set_fact:
-        __host_content: "{{ __host_slurp.content | b64decode }}"
         __host_parsed: "{{ (__host_slurp.content | b64decode) | from_yaml }}"
+        __host_current_domains: >-
+          {{ (hostvars[__host_name].domains_keys | default({})).remna_node | default([])
+             | map(attribute='domain') | list }}
 
     - name: "{{ __host_name }}: validate expected schema"
       ansible.builtin.assert:
         that:
-          - __host_parsed.domains_keys is defined
-          - __host_parsed.domains_keys.remna_node is defined
-          - __host_parsed.domains_keys.remna_node is sequence
-          - "__host_content is search('(?m)^\\s*remna_node:\\s*(\\[\\]\\s*)?$')"
-        fail_msg: "Unexpected schema for domains_keys.remna_node in {{ __host_domains_file }}"
+          - __host_parsed is mapping
+          - __host_parsed.domains_node is defined
+          - __host_parsed.domains_node is mapping
+          - __host_parsed.domains_node.remna_node_extra | default([], true) is sequence
+        fail_msg: "{{ __host_domains_file }} has no domains_node (not a generated node)"
 
     - name: "{{ __host_name }}: add domain when not already present"
-      when: add_domains_to_list_caddy_new_domain not in (__host_parsed.domains_keys.remna_node | map(attribute='domain') | list)
+      when: add_domains_to_list_caddy_new_domain not in __host_current_domains
       block:
+        # The key of vpn_deployment_domain_prefix the domain's first label looks like.
         - name: "{{ __host_name }}: classify the new domain's type"
           ansible.builtin.set_fact:
             __new_domain_type_key: >-
               {{
-                __add_domains_to_list_caddy_exact_map[__new_domain_label]
-                if __new_domain_label in __add_domains_to_list_caddy_exact_map
-                else ('location_net' if (__new_domain_label is match('^net-(?!global-)[a-z0-9]+-[0-9]+$'))
-                else ('location_chain' if (__new_domain_label is match('^chain-(?!global-)[a-z0-9]+-[0-9]+$'))
-                else 'other'))
+                'unique' if __new_domain_label == __host_name
+                else 'net_all' if __new_domain_label is match('^net-[a-z0-9]+-all$')
+                else 'chain_all' if __new_domain_label is match('^chain-[a-z0-9]+-all$')
+                else 'net_protocol' if __new_domain_label is match('^net-[a-z0-9]+-[a-z]+-[a-z]+$')
+                else 'chain_protocol' if __new_domain_label is match('^chain-[a-z0-9]+-[a-z]+-[a-z]+$')
+                else 'net_location' if __new_domain_label is match('^net-[a-z0-9]+-[0-9]+$')
+                else 'chain_location' if __new_domain_label is match('^chain-[a-z0-9]+-[0-9]+$')
+                else 'other'
               }}
           vars:
             __new_domain_label: "{{ add_domains_to_list_caddy_new_domain.split('.')[0] }}"
 
-        - name: "{{ __host_name }}: build the new remna_node entry lines"
-          ansible.builtin.set_fact:
-            __new_domain_line: "{{ '    - domain: ' ~ add_domains_to_list_caddy_new_domain }}"
-            __new_type_line: "{{ '      type: \"' ~ '{{' ~ ' remna_domain_types.' ~ __new_domain_type_key ~ ' ' ~ '}}' ~ '\"' }}"
-
-        - name: "{{ __host_name }}: insert the new entry right after remna_node:"
-          ansible.builtin.set_fact:
-            __host_content_final: >-
-              {{
-                __host_content
-                | regex_replace('(?m)^([ \t]*remna_node:[ \t]*)$', '\1\n' ~ __new_domain_line ~ '\n' ~ __new_type_line)
-                | regex_replace('(?m)^([ \t]*remna_node:[ \t]*)\[\][ \t]*$', '\1\n' ~ __new_domain_line ~ '\n' ~ __new_type_line)
-              }}
-
         - name: "{{ __host_name }}: write the updated domains file"
           ansible.builtin.copy:
             dest: "{{ __host_domains_file }}"
-            content: "{{ __host_content_final }}"
+            mode: preserve
+            content: >-
+              {{ __host_parsed
+                 | combine({'domains_node': __host_parsed.domains_node
+                            | combine({'remna_node_extra': (__host_parsed.domains_node.remna_node_extra | default([], true))
+                                       + [{'domain': add_domains_to_list_caddy_new_domain,
+                                           'type': '{{ vpn_deployment_domain_prefix.' ~ __new_domain_type_key ~ '.type }}'}]})})
+                 | to_nice_yaml(indent=2, sort_keys=false) }}
 
         - name: "{{ __host_name }}: append report entry (added)"
           ansible.builtin.set_fact:
             __report: "{{ __report + [{'host': __host_name, 'status': 'added'}] }}"
 
     - name: "{{ __host_name }}: append report entry (already present)"
-      when: add_domains_to_list_caddy_new_domain in (__host_parsed.domains_keys.remna_node | map(attribute='domain') | list)
+      when: add_domains_to_list_caddy_new_domain in __host_current_domains
       ansible.builtin.set_fact:
         __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'already present'}] }}"
   rescue:

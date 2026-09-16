@@ -1,0 +1,11 @@
+---
+vpn_server_remnawave:
+  project:
+    root: vpn-server-remnawave
+    paths:
+      panel: "{{ vpn_server_remnawave.project.root }}/panel"
+      subpage: "{{ vpn_server_remnawave.project.root }}/subpage"
+      tg_miniapp: "{{ vpn_server_remnawave.project.root }}/tg-miniapp"
+      tgbot_jolymmiels: "{{ vpn_server_remnawave.project.root }}/tgbot-jolymmiels"
+      tgbot_bedolaga: "{{ vpn_server_remnawave.project.root }}/tgbot-bedolaga"
+      tgbot_bedolaga_cabinet: "{{ vpn_server_remnawave.project.root }}/tgbot-bedolaga-cabinet"

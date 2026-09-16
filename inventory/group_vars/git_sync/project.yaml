@@ -1,0 +1,6 @@
+---
+git_sync:
+  project:
+    root: git-sync
+    paths:
+      mirror: "{{ git_sync.project.root }}/mirror"

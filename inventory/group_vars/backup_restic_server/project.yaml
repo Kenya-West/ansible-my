@@ -1,0 +1,6 @@
+---
+backup_restic_server:
+  project:
+    root: backup-restic-server
+    paths:
+      restic_server: "{{ backup_restic_server.project.root }}/restic-server"

@@ -1,0 +1,8 @@
+# What configure_remnawave_panel_generate_setup renders the chain outbounds of
+# this panel with (group_vars/vpn_server_remnawave/snippet_*.yaml).
+
+# UUID of the panel user the chain outbounds authenticate with.
+service_user_id: <UUID>
+
+# See https://xtls.github.io/en/config/transports/reality.html#realityobject:~:text=also%20be%20empty.-,password%3A%20string,-Required.%20The%20public
+vpn_server_remnawave_xray_reality_password: <PASSWORD>
