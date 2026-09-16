@@ -7,6 +7,7 @@
 - name: Start from no related nodes
   ansible.builtin.set_fact:
     crpgs_related_nodes: []
+    crpgs_domainless_nodes: []
 
 - name: Find the nodes that relate to this panel
   ansible.builtin.include_tasks: resolve_node_relation.yml
@@ -27,6 +28,9 @@
 
 - name: Collect the node facts the setup is built from
   ansible.builtin.set_fact:
+    # panel_address, panel_port, panel_country_code and panel_inbounds are how
+    # the panel reaches the node; read by the nodes stage only. Jinja has no
+    # comments inside an expression, so this note lives here.
     crpgs_nodes: >-
       {%- set collected = [] -%}
       {%- for node in crpgs_related_nodes -%}
@@ -34,7 +38,11 @@
       {%-   set protocol = facts.remna_node_primary_protocol_type | default('', true) -%}
       {%-   set _ = collected.append({
               'name': node,
-              'panel_name': facts.remna_node_panel_name | default(node, true),
+              'panel_name': facts.remna_node_name_in_panel | default(node, true),
+              'panel_address': facts.remna_node_panel_address | default(facts.ansible_host | default(node), true),
+              'panel_port': facts.remna_node_control_port | default(0, true),
+              'panel_country_code': facts.remna_node_panel_country_code | default('XX', true),
+              'panel_inbounds': facts.remna_node_panel_inbounds | default([], true),
               'country': facts.country_code_upper | default('', true),
               'protocol': (protocol.full | default('', true) if protocol is mapping else protocol)
                           | default(vpn_server_remnawave_snippets_default_protocol_type, true),
@@ -43,12 +51,18 @@
             }) -%}
       {%- endfor -%}
       {{ collected }}
-    # Protocol types are defined for the nodes, not for the panel.
-    crpgs_protocol_types: "{{ hostvars[crpgs_related_nodes | first].remna_protocol_types | default({}) }}"
+    # Every exit's outbound and its tag, planned once in the inventory
+    # (group_vars/vpn_server_remnawave/snippets.yaml) for the model and the
+    # snippets stage alike.
+    crpgs_outbounds_plan: "{{ vpn_server_remnawave_snippets_outbounds_plan }}"
 
 - name: Report the nodes this panel is built from
   ansible.builtin.debug:
-    msg: "{{ crpgs_related_nodes | length }} nodes relate to {{ inventory_hostname }}: {{ crpgs_related_nodes | join(', ') }}"
+    msg: >-
+      {{ crpgs_related_nodes | length }} nodes relate to {{ inventory_hostname }}:
+      {{ crpgs_related_nodes | join(', ') }}{{
+        ('. Skipped, publishing no ' ~ vpn_server_remnawave_hosts_node_manage_key ~ ' domains: '
+         ~ crpgs_domainless_nodes | join(', ')) if crpgs_domainless_nodes | length > 0 else '' }}
 
 - name: Build the desired setup
   ansible.builtin.set_fact:
@@ -62,9 +76,11 @@
       skip_same_country: "{{ vpn_server_remnawave_hosts_chain.skip_same_country | default(true) }}"
       exclude: "{{ vpn_server_remnawave_hosts_chain.exclude | default([]) }}"
       labels: "{{ vpn_server_remnawave_hosts_labels }}"
-      region_codes: "{{ vpn_server_remnawave_snippets_region_codes }}"
-      outbound_tag_prefix: "{{ vpn_server_remnawave_snippets_outbound_tag_prefix }}"
-      outbound_tag_index_width: "{{ vpn_server_remnawave_snippets_outbound_tag_index_width }}"
+      # Naming: a domain is published as "<flag> <REGION CODE>-<n>", built from
+      # the region maps of group_vars/all/0_defaults/regions.yaml.
+      region_codes: "{{ vpn_deployments_region_codes }}"
+      flag_symbols: "{{ vpn_deployments_regional_indicator_symbols }}"
+      outbounds: "{{ crpgs_outbounds_plan }}"
       route_id_base: "{{ vpn_server_remnawave_hosts_vless_route_id_base }}"
       route_id_range: "{{ vpn_server_remnawave_snippets_vless_route_id_range }}"
       direct_route_id: "{{ vpn_server_remnawave_hosts_vless_route_id_direct }}"
@@ -78,7 +94,8 @@
       ({{ crpgs_model.chained | length }} of them chained),
       {{ crpgs_model.entries | length }} chain entries,
       {{ crpgs_model.hosts | length }} hosts,
-      {{ crpgs_model.outbounds | length }} outbounds,
+      {{ crpgs_outbounds_plan | length }} outbounds,
+      {{ crpgs_model.rules | length }} chain rules,
       route ids
       {{ crpgs_model.chained | map(attribute='route_id') | min | default('-') }}-{{
          crpgs_model.chained | map(attribute='route_id') | max | default('-') }}

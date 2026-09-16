@@ -1,5 +1,13 @@
 {% set o = '{{' %}
 {% set c = '}}' %}
+{% if 'vpn_server_remnawave' in setup_server_groups %}
+# Base domains of the nodes whose host_relations resolve to this panel
+# (group_vars/vpn_caddy/domain_generator.yaml builds their domains_keys from them).
+vpn_server_remnawave_node_base_domains:
+  main: {{ initial_configure_server_base_domain_name }}
+  xray: {{ initial_configure_server_node_xray_base_domain_name }}
+
+{% endif %}
 domains_keys:
   main: "{{ o }} inventory_hostname {{ c }}.{{ initial_configure_server_base_domain_name }}"
 {% for group in setup_server_groups if group in setup_server_service_domains %}
@@ -8,7 +16,6 @@ domains_keys:
 {% endfor %}
 {% endfor %}
   remna_node: []
-domains: "{{ o }} ((domains_keys | dict2items | rejectattr('key', 'equalto', 'remna_node') | map(attribute='value') | list) + (domains_keys.remna_node | map(attribute='domain') | list)) | unique {{ c }}"
 
 {% if initial_configure_server_default_relation_host | default('', true) | length > 0 %}
 host_relations:

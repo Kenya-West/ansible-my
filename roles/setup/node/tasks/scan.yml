@@ -45,22 +45,21 @@
       {%- endfor -%}
       {{ ips | to_json }}
 
-# One entry per domain of every host: which host and region it belongs to,
-# the base domain (the string after the first label, Jinja included), and for
-# the net-<region>-N / chain-<region>-N domains their kind and index.
+# One entry per fact a host's domain file holds, with the host and its region:
+#   key main  - the base domain of a literal domains_keys.main (Jinja included,
+#               filtered out later), or vpn_server_remnawave_node_base_domains.main
+#               of a panel;
+#   key xray  - vpn_server_remnawave_node_base_domains.xray of a panel;
+#   key net_location / chain_location - domains_node.<key>_index of a node.
 - name: Collect the domains of every host
   ansible.builtin.set_fact:
     __setup_node_domain_entries_json: >-
       {%- set host = item.item.path | dirname | dirname | basename -%}
       {%- set data = item.content | b64decode | from_yaml -%}
-      {%- set dk = (data.domains_keys | default({})) if data is mapping else {} -%}
-      {%- set domains = [] -%}
-      {%- if dk.main is defined and dk.main is string -%}
-      {%-   set _ = domains.append({'key': 'main', 'domain': dk.main}) -%}
-      {%- endif -%}
-      {%- for e in dk.remna_node | default([]) if e is mapping and e.domain is defined and e.domain is string -%}
-      {%-   set _ = domains.append({'key': 'remna_node', 'domain': e.domain}) -%}
-      {%- endfor -%}
+      {%- set data = data if data is mapping else {} -%}
+      {%- set dk = data.domains_keys | default({}, true) -%}
+      {%- set bases = data.vpn_server_remnawave_node_base_domains | default({}, true) -%}
+      {%- set node = data.domains_node | default({}, true) -%}
       {%- set parts = host.split('-') -%}
       {%- set cc = '' -%}
       {%- if parts | length >= 3 -%}
@@ -68,13 +67,15 @@
       {%- endif -%}
       {%- set region = vpn_deployments_country_to_censorship_region_matcher.get(cc, vpn_deployments_country_to_regions_matcher.get(cc, 'unknown')) -%}
       {%- set entries = [] -%}
-      {%- for d in domains -%}
-      {%-   set kind = 'net_location' if 'net_location.value' in d.domain else ('chain_location' if 'chain_location.value' in d.domain else 'other') -%}
-      {%-   set index = d.domain | regex_search('-[0-9]+\.') -%}
-      {%-   set _ = entries.append({'host': host, 'region': region, 'key': d.key, 'domain': d.domain,
-                                    'base': d.domain | regex_replace('^(?:\{\{[^}]*\}\}|[^.]+)[^.]*\.', ''),
-                                    'kind': kind,
-                                    'index': (index | regex_replace('[^0-9]', '') | int) if (index and kind != 'other') else none}) -%}
+      {%- if dk is mapping and dk.main is defined and dk.main is string -%}
+      {%-   set _ = entries.append({'host': host, 'region': region, 'key': 'main',
+                                    'base': dk.main | regex_replace('^(?:\{\{[^}]*\}\}|[^.]+)[^.]*\.', '')}) -%}
+      {%- endif -%}
+      {%- for key in ['main', 'xray'] if bases is mapping and bases[key] is defined and bases[key] is string -%}
+      {%-   set _ = entries.append({'host': host, 'region': region, 'key': key, 'base': bases[key]}) -%}
+      {%- endfor -%}
+      {%- for kind in ['net_location', 'chain_location'] if node is mapping and node[kind ~ '_index'] is defined -%}
+      {%-   set _ = entries.append({'host': host, 'region': region, 'key': kind, 'index': node[kind ~ '_index'] | int}) -%}
       {%- endfor -%}
       {{ ((__setup_node_domain_entries_json | default('[]') | from_json) + entries) | to_json }}
   loop: "{{ __setup_node_domain_slurp.results }}"
@@ -103,24 +104,24 @@
          if __setup_node_xray_bases | length > 0 else (__setup_node_bases | first | default('')) }}
     __setup_node_location_indexes_json: >-
       {%- set idx = {} -%}
-      {%- for e in setup_node_scan_domain_entries if e.kind != 'other' and e.index is not none -%}
+      {%- for e in setup_node_scan_domain_entries if e.index is defined -%}
       {%-   if e.region not in idx -%}
       {%-     set _ = idx.update({e.region: {'net_location': [], 'chain_location': []}}) -%}
       {%-   endif -%}
-      {%-   set _ = idx[e.region][e.kind].append(e.index) -%}
+      {%-   set _ = idx[e.region][e.key].append(e.index) -%}
       {%- endfor -%}
       {{ idx | to_json }}
   vars:
     __setup_node_domain_pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
+    __setup_node_based_entries: "{{ setup_node_scan_domain_entries | selectattr('base', 'defined') | list }}"
     __setup_node_bases: >-
-      {{ setup_node_scan_domain_entries | map(attribute='base')
+      {{ __setup_node_based_entries | map(attribute='base')
          | select('match', __setup_node_domain_pattern) | list }}
     __setup_node_main_bases: >-
-      {{ setup_node_scan_domain_entries | selectattr('key', 'equalto', 'main')
+      {{ __setup_node_based_entries | selectattr('key', 'equalto', 'main')
          | map(attribute='base') | select('match', __setup_node_domain_pattern) | list }}
     __setup_node_xray_bases: >-
-      {{ setup_node_scan_domain_entries | selectattr('key', 'equalto', 'remna_node')
-         | rejectattr('domain', 'search', 'unique.value')
+      {{ __setup_node_based_entries | selectattr('key', 'equalto', 'xray')
          | map(attribute='base') | select('match', __setup_node_domain_pattern) | list }}
 
 # The hosts the new one can relate to by default: those of the groups of

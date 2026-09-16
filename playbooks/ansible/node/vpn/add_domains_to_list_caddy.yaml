@@ -1,6 +1,6 @@
 ---
 
-- name: Add a domain to domains_keys.remna_node for selected hosts
+- name: Add a domain to domains_node.remna_node_extra for selected hosts
   hosts: all
   connection: local
   become: false
@@ -8,30 +8,11 @@
 
   vars_prompt:
     - name: add_domains_to_list_caddy_new_domain
-      prompt: "Enter the domain to add to domains_keys.remna_node for the selected host(s)"
+      prompt: "Enter the domain to add to domains_node.remna_node_extra for the selected host(s)"
       private: false
 
   vars:
     __report: []
-
-    # Exact-match domain-label -> remna_domain_types key, for labels that carry an
-    # explicit variant (all / reality-tcp / reality-xhttp) under the "global" or
-    # "russia" scope. See inventory/group_vars/vpn_caddy/remna.yaml for the type
-    # list. Anything not matched here, and not a plain "<net|chain>-<location>-<number>"
-    # domain, becomes type "other".
-    __add_domains_to_list_caddy_exact_map:
-      net-global-all: global_net_all
-      net-global-reality-tcp: global_net_reality_tcp
-      net-global-reality-xhttp: global_net_reality_xhttp
-      chain-global-all: global_chain_all
-      chain-global-reality-tcp: global_chain_reality_tcp
-      chain-global-reality-xhttp: global_chain_reality_xhttp
-      net-russia-all: russia_net_all
-      net-russia-reality-tcp: russia_net_reality_tcp
-      net-russia-reality-xhttp: russia_net_reality_xhttp
-      chain-russia-all: russia_chain_all
-      chain-russia-reality-tcp: russia_chain_reality_tcp
-      chain-russia-reality-xhttp: russia_chain_reality_xhttp
 
   tasks:
     - name: Fail if no domain was provided

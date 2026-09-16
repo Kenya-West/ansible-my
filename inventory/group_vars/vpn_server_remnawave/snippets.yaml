@@ -1,33 +1,188 @@
-# Names of the two panel snippets the generated configuration is written into.
+# Names of the panel snippets the generated configuration is written into.
 # Override them per panel in host_vars.
-vpn_server_remnawave_snippets_key_rules_all: rules_all_prod_1
 vpn_server_remnawave_snippets_key_outbounds_all: outbounds_all_prod_1
+vpn_server_remnawave_snippets_key_rules_all: rules_all_prod_1
+vpn_server_remnawave_snippets_key_balancers_all: balancers_all_prod_1
+vpn_server_remnawave_snippets_key_outbounds_default: outbounds_default_prod_1
+vpn_server_remnawave_snippets_key_rules_default: rules_default_prod_1
+
+# Whether to push the regenerated snippets into the config profiles that embed
+# them. It can be: on_change, never, always.
+vpn_server_remnawave_snippets_sync: on_change
+
+# ---------------------------------------------------------------------------
+# Snippets written as they are
+# ---------------------------------------------------------------------------
+
+# Every snippet here replaces the panel's content of that name as a whole.
+# outbounds_all and rules_all are not among them: their outbounds need the
+# protocol templates rendered per exit, and their rules the route ids the hosts
+# carry, so the role builds and merges those two (see below).
+vpn_server_remnawave_snippets_whole:
+  - name: "{{ vpn_server_remnawave_snippets_key_balancers_all }}"
+    snippet: "{{ vpn_server_remnawave_snippets_balancers_all }}"
+  - name: "{{ vpn_server_remnawave_snippets_key_outbounds_default }}"
+    snippet: "{{ vpn_server_remnawave_snippets_outbounds_default }}"
+  - name: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
+    snippet: "{{ vpn_server_remnawave_snippets_rules_default }}"
+
+vpn_server_remnawave_snippets_outbounds_default:
+  - tag: DIRECT
+    protocol: freedom
+  - tag: BLOCK
+    protocol: blackhole
+
+vpn_server_remnawave_snippets_rules_default:
+  - ip:
+      - "geoip:private"
+    outboundTag: BLOCK
+  - domain:
+      - "geosite:private"
+    outboundTag: BLOCK
+
+# ---------------------------------------------------------------------------
+# Exits
+# ---------------------------------------------------------------------------
+
+# The nodes of vpn_server_remnawave_hosts_node_group (hosts.yaml) whose panel -
+# domains_node_panel, group_vars/vpn_caddy/domain_generator.yaml - is this host.
+vpn_server_remnawave_snippets_nodes: >-
+  {%- set out = [] -%}
+  {%- for node in groups[vpn_server_remnawave_hosts_node_group] | default([]) -%}
+  {%-   if hostvars[node].domains_node_panel | default('') == inventory_hostname -%}
+  {%-     set _ = out.append(node) -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ out }}
 
 # Snippet templates live beside this file as snippet_<protocol key>_<revision>.yaml
 # and define one variable of the same name, e.g. vless_reality_tcp_001. The
 # protocol key is the key of remna_protocol_types whose value a node declares in
 # remna_node_primary_protocol_type; a node that declares nothing gets the
-# default below, a remna_protocol_types.<key>.full value. remna_protocol_types
-# belongs to the nodes (vpn_caddy), so it is written out here.
+# default below, a remna_protocol_types.<key>.full value
+# (group_vars/all/0_defaults/protocols.yaml).
 vpn_server_remnawave_snippets_template_revision: '001'
-vpn_server_remnawave_snippets_default_protocol_type: vless-reality-tcp
+vpn_server_remnawave_snippets_default_protocol_type: "{{ remna_protocol_types.vless_reality_tcp.full }}"
 
-# Generated outbound tags are
-#   <prefix>-<region code>-<protocol type>-<NNN>
-# for example out-chain-auto-eu-tcp-001, numbered per region and protocol.
+# Position of every deployment region, and of every censorship geo (at its
+# first region), in vpn_deployments_region_codes: the order outbounds are
+# listed and numbered in - europe, asia, ..., russia, ...
+vpn_server_remnawave_snippets_region_order: >-
+  {%- set order = {} -%}
+  {%- for region in vpn_deployments_region_codes -%}
+  {%-   set _ = order.update({region: loop.index0}) -%}
+  {%- endfor -%}
+  {%- for region, geo in vpn_deployments_region_to_censorship_geo_mapping.items() -%}
+  {%-   if geo not in order -%}
+  {%-     set _ = order.update({geo: order.get(region, 999)}) -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ order }}
+
+# One exit per distinct domain the nodes publish of type
+#   net-location  (net-<region>-<n>)      kind location, one node's own exit
+#   net-protocol  (net-<geo>-<protocol>)  kind all, every node of a geo and protocol
+# A domain several nodes publish is one exit, taking the protocol of the first.
+vpn_server_remnawave_snippets_exits: >-
+  {%- set kinds = {
+        vpn_deployment_domain_prefix.net_location.type: 'location',
+        vpn_deployment_domain_prefix.net_protocol.type: 'all',
+      } -%}
+  {%- set protocols = {} -%}
+  {%- for key, value in remna_protocol_types.items() -%}
+  {%-   set _ = protocols.update({value.full: {
+          'template': key ~ '_' ~ vpn_server_remnawave_snippets_template_revision,
+          'token': value.parts | last,
+        }}) -%}
+  {%- endfor -%}
+  {%- set seen = {} -%}
+  {%- set out = [] -%}
+  {%- for node in vpn_server_remnawave_snippets_nodes -%}
+  {%-   set facts = hostvars[node] -%}
+  {%-   set declared = facts.remna_node_primary_protocol_type | default('', true) -%}
+  {%-   set full = (declared.full | default('', true) if declared is mapping else declared)
+                   | default(vpn_server_remnawave_snippets_default_protocol_type, true) -%}
+  {%-   set protocol = protocols[full]
+                       | mandatory('vpn_server_remnawave_snippets_exits: ' ~ node ~ ' declares protocol ' ~ full ~ ', which is not in remna_protocol_types') -%}
+  {%-   for entry in facts.domains_keys.remna_node | default([], true) -%}
+  {%-     if entry.type in kinds and entry.domain not in seen -%}
+  {%-       set _ = seen.update({entry.domain: node}) -%}
+  {%-       set kind = kinds[entry.type] -%}
+  {%-       set region = facts.vpn_deployment_region if kind == 'location' else facts.vpn_deployment_censorship_geo -%}
+  {%-       set _ = out.append({
+                'kind': kind,
+                'kind_order': 0 if kind == 'location' else 1,
+                'address': entry.domain,
+                'region': region,
+                'region_code': vpn_deployments_region_codes.get(region, region),
+                'region_order': vpn_server_remnawave_snippets_region_order.get(region, 999),
+                'protocol': full,
+                'token': protocol.token,
+                'template': protocol.template,
+                'index': (entry.domain.split('.') | first).split('-') | last | int if kind == 'location' else 0,
+              }) -%}
+  {%-     endif -%}
+  {%-   endfor -%}
+  {%- endfor -%}
+  {{ out }}
+
+# ---------------------------------------------------------------------------
+# outbounds_all
+# ---------------------------------------------------------------------------
+
+# Outbound tags are
+#   <prefix>-<region code>-<protocol>-<NNN>   location exits, numbered per region
+#                                            and protocol in domain index order
+#   <prefix>-<geo code>-<protocol>-all       all exits
+# where <protocol> is the last of remna_protocol_types.<key>.parts, e.g.
+# out-chain-eu-tcp-001, out-chain-ru-xhttp-001, out-chain-global-tcp-all,
+# out-chain-ru-tcp-all. A geo without a region code of its own keeps its name.
 #
-# The role owns exactly the outbounds whose tag starts with this prefix, and
-# exactly the rules whose vlessRoute is a single number inside the owned range
-# below. Everything else in both snippets is read back and written out again
-# untouched, so hand-written outbounds and rules - the geo-targeted families,
-# the balancers, the catch-all ranges - survive a regeneration.
-#
-# The default prefix is deliberately distinct from the hand-written out-chain-*
-# tags. Set it to out-chain only once the role is meant to own that namespace.
-vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain-auto
+# The role owns exactly the outbounds whose tag starts with "<prefix>-" and the
+# rules whose vlessRoute is a single number inside the owned range. Everything
+# else in outbounds_all and rules_all is read back and written out again
+# untouched, so hand-written outbounds and rules survive a regeneration.
+vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain
 vpn_server_remnawave_snippets_outbound_tag_index_width: 3
+vpn_server_remnawave_snippets_outbound_tag_all_suffix: all
 vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]
 
-# Whether to push the regenerated snippets into the config profiles that embed
-# them. It can be: on_change, never, always.
-vpn_server_remnawave_snippets_sync: on_change
+# Every exit with its outbound tag, in the order written. The role renders each
+# from its template with node_address set to the exit's address.
+vpn_server_remnawave_snippets_outbounds_plan: >-
+  {%- set counters = {} -%}
+  {%- set out = [] -%}
+  {%- for exit in vpn_server_remnawave_snippets_exits | sort(attribute='kind_order,region_order,region_code,token,index,address') -%}
+  {%-   set group = exit.region_code ~ '-' ~ exit.token -%}
+  {%-   if exit.kind == 'location' -%}
+  {%-     set _ = counters.update({group: counters.get(group, 0) + 1}) -%}
+  {%-     set suffix = ('%0' ~ vpn_server_remnawave_snippets_outbound_tag_index_width ~ 'd') | format(counters[group]) -%}
+  {%-   else -%}
+  {%-     set suffix = vpn_server_remnawave_snippets_outbound_tag_all_suffix -%}
+  {%-   endif -%}
+  {%-   set _ = out.append(exit | combine({
+          'tag': vpn_server_remnawave_snippets_outbound_tag_prefix ~ '-' ~ group ~ '-' ~ suffix,
+        })) -%}
+  {%- endfor -%}
+  {{ out }}
+
+# ---------------------------------------------------------------------------
+# balancers_all
+# ---------------------------------------------------------------------------
+
+# One balancer per censorship geo some node publishes an all exit for,
+# selecting every all outbound of that geo:
+#   bal-global-all-001: [out-chain-global-tcp-all, out-chain-global-xhttp-all]
+#   bal-russia-all-001: [out-chain-ru-tcp-all, out-chain-ru-xhttp-all]
+vpn_server_remnawave_snippets_balancer_tag_prefix: bal
+vpn_server_remnawave_snippets_balancer_tag_suffix: all-001
+vpn_server_remnawave_snippets_balancers_all: >-
+  {%- set pooled = vpn_server_remnawave_snippets_outbounds_plan | selectattr('kind', 'equalto', 'all') | list -%}
+  {%- set out = [] -%}
+  {%- for geo in pooled | map(attribute='region') | unique -%}
+  {%-   set _ = out.append({
+          'tag': vpn_server_remnawave_snippets_balancer_tag_prefix ~ '-' ~ geo ~ '-' ~ vpn_server_remnawave_snippets_balancer_tag_suffix,
+          'selector': pooled | selectattr('region', 'equalto', geo) | map(attribute='tag') | list,
+        }) -%}
+  {%- endfor -%}
+  {{ out }}

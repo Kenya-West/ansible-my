@@ -1,0 +1,50 @@
+# Every domain a node relating to this panel can be entered through, for the
+# serverNames of the XRay REALITY inbounds. Built on the Xray base domain of the
+# panel (vpn_server_remnawave_node_base_domains.xray, host_vars/<panel>/0_all/1_domains.yaml),
+# the names group_vars/vpn_caddy/domain_generator.yaml gives the nodes, for
+# every node that could exist:
+#
+#   - <kind>-<region>-<index>, index 1 to vpn_server_remnawave_server_names_location_index_max,
+#     for every *_location type of remna_node_domain_types_allowlist and every
+#     deployment region (the keys of vpn_deployments_region_to_censorship_geo_mapping
+#     but vpn_server_remnawave_server_names_regions_exclude);
+#   - <kind>-<geo>-all for every *_all type and <kind>-<geo>-<protocol> for
+#     every *_protocol type and remna_protocol_types.<key>.short, for every
+#     censorship geo of those regions.
+#
+# <kind> is the first word of the type key (net_location -> net).
+
+vpn_server_remnawave_server_names_location_index_max: 50
+
+# Regions left out: unknown is the region of a country no matcher knows, not a
+# deployment target.
+vpn_server_remnawave_server_names_regions_exclude:
+  - unknown
+
+vpn_server_remnawave_server_names: >-
+  {%- set base = vpn_server_remnawave_node_base_domains.xray
+                 | mandatory('vpn_server_remnawave_server_names: ' ~ inventory_hostname ~ ' has no vpn_server_remnawave_node_base_domains.xray') -%}
+  {%- set types = remna_node_domain_types_allowlist | list -%}
+  {%- set regions = vpn_deployments_region_to_censorship_geo_mapping | reject('in', vpn_server_remnawave_server_names_regions_exclude) | list -%}
+  {%- set geos = regions | map('extract', vpn_deployments_region_to_censorship_geo_mapping) | unique | list -%}
+  {%- set protocols = remna_protocol_types.values() | map(attribute='short') | unique | list -%}
+  {%- set out = [] -%}
+  {%- for type in types if type is match('.*_location$') -%}
+  {%-   for region in regions -%}
+  {%-     for index in range(1, (vpn_server_remnawave_server_names_location_index_max | int) + 1) -%}
+  {%-       set _ = out.append((type.split('_') | first) ~ '-' ~ region ~ '-' ~ index ~ '.' ~ base) -%}
+  {%-     endfor -%}
+  {%-   endfor -%}
+  {%- endfor -%}
+  {%- for type in types -%}
+  {%-   for geo in geos -%}
+  {%-     if type is match('.*_all$') -%}
+  {%-       set _ = out.append((type.split('_') | first) ~ '-' ~ geo ~ '-all.' ~ base) -%}
+  {%-     elif type is match('.*_protocol$') -%}
+  {%-       for protocol in protocols -%}
+  {%-         set _ = out.append((type.split('_') | first) ~ '-' ~ geo ~ '-' ~ protocol ~ '.' ~ base) -%}
+  {%-       endfor -%}
+  {%-     endif -%}
+  {%-   endfor -%}
+  {%- endfor -%}
+  {{ out | unique | list }}

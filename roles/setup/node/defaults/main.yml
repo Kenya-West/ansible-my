@@ -44,31 +44,8 @@ setup_node_groups_by_region:
 setup_node_templates_always:
   - 0_all
 
-# The remna_node domains of a vpn_caddy host, written to 0_all/1_domains.yaml.
-# `key` is a key of remna_node_domain_types_allowlist (see
-# inventory/group_vars/all/0_defaults/regions.yaml), `base` picks the base
-# domain (main or xray) and `index` appends the location index (net or chain)
-# chosen at the prompt.
-setup_node_remna_node_domains:
-  - key: unique
-    base: main
-  - key: net_location
-    base: xray
-    index: net
-  - key: chain_location
-    base: xray
-    index: chain
-  - key: net_all
-    base: xray
-  - key: net_protocol
-    base: xray
-  - key: chain_all
-    base: xray
-  - key: chain_protocol
-    base: xray
-
 # Protocols of the Remnawave node offered at the prompt: keys of
-# remna_protocol_types (inventory/group_vars/vpn_caddy/remna.yaml).
+# remna_protocol_types (inventory/group_vars/all/0_defaults/protocols.yaml).
 setup_node_remna_protocol_types:
   - vless_reality_tcp
   - vless_reality_xhttp

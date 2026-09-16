@@ -1,0 +1,193 @@
+---
+# Publish the config profiles of vpn_server_remnawave_config_profiles. A profile
+# is found in the panel by the tag of its identifying inbound, and failing that
+# by its name, so a profile of that name is taken over rather than duplicated.
+# The role's profiles are the ones carrying every primary tag; profiles without
+# them are never updated, retired or counted as the role's.
+#
+# The collection has no bulk module for config profiles, so they are written one
+# task run each - on the controller, since the module only speaks HTTP to the
+# panel.
+
+- name: Describe the config profiles to publish
+  ansible.builtin.set_fact:
+    crpgs_profiles_desired: >-
+      {%- set desired = [] -%}
+      {%- for profile in vpn_server_remnawave_config_profiles -%}
+      {%-   set declared = (profile.config | default({}, true)).inbounds | default([], true)
+                           | map(attribute='tag', default='') | select | list -%}
+      {%-   set _ = desired.append({
+              'name': profile.name | default('', true),
+              'inbound': profile.inbound | default((declared | first) if declared else '', true),
+              'declared': declared,
+              'config': profile.config | default({}, true),
+            }) -%}
+      {%- endfor -%}
+      {{ desired }}
+
+- name: Every config profile needs a name and an inbound identifying it
+  ansible.builtin.assert:
+    that:
+      - crpgs_profiles_incomplete | length == 0
+      - >-
+        crpgs_profiles_desired | map(attribute='name') | unique | list | length
+        == crpgs_profiles_desired | length
+      - crpgs_profiles_declared | unique | list | length == crpgs_profiles_declared | length
+    fail_msg: >-
+      Every item of vpn_server_remnawave_config_profiles needs a name and a
+      config declaring the inbound it is identified by (its first inbound, or
+      the tag in inbound); these do not: {{ crpgs_profiles_incomplete | join(', ') | default('-', true) }}.
+      Names must be unique, and so must inbound tags across all profiles - the
+      panel refuses a tag another profile has. Got names
+      {{ crpgs_profiles_desired | map(attribute='name') | join(', ') }} and
+      inbounds {{ crpgs_profiles_declared | join(', ') }}.
+    quiet: true
+  vars:
+    crpgs_profiles_declared: "{{ crpgs_profiles_desired | map(attribute='declared') | flatten }}"
+    crpgs_profiles_incomplete: >-
+      {%- set found = [] -%}
+      {%- for profile in crpgs_profiles_desired -%}
+      {%-   if not profile.name or profile.inbound not in profile.declared -%}
+      {%-     set _ = found.append(profile.name or '(unnamed)') -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ found }}
+
+# The nodes too: a profile a node still activates is never retired.
+- name: Read the config profiles and nodes already in the panel
+  ansible.builtin.include_tasks: read_panel.yml
+  vars:
+    crpgs_gather:
+      config_profiles: {}
+      nodes: {}
+
+# Each desired profile is matched to the panel's profile holding its inbound,
+# else the one of its name. It is written addressed by its inbound when that
+# already identifies it (or nothing does yet), and by its name otherwise - the
+# module refuses to look a profile up by an inbound it does not have yet.
+- name: Match the config profiles to the panel's
+  ansible.builtin.set_fact:
+    crpgs_profiles_plan: >-
+      {%- set profiles = remnawave_gathered.config_profiles -%}
+      {%- set managed = profiles | remnawave_select_tagged(crpgs_primary_tags) | map(attribute='uuid') | list -%}
+      {%- set plan = [] -%}
+      {%- for want in crpgs_profiles_desired -%}
+      {%-   set holder = [] -%}
+      {%-   set named = [] -%}
+      {%-   for profile in profiles -%}
+      {%-     if want.inbound in (profile.inbounds | default([], true) | map(attribute='tag') | list) -%}
+      {%-       set _ = holder.append(profile) -%}
+      {%-     endif -%}
+      {%-     if profile.name == want.name -%}
+      {%-       set _ = named.append(profile) -%}
+      {%-     endif -%}
+      {%-   endfor -%}
+      {%-   set current = (holder + named) | first if (holder + named) else {} -%}
+      {%-   if not current -%}
+      {%-     set left_out = '' -%}
+      {%-   elif current.uuid not in managed and not vpn_server_remnawave_config_profiles_adopt_untagged | bool -%}
+      {%-     set left_out = 'untagged' -%}
+      {%-   elif holder and named and holder[0].uuid != named[0].uuid -%}
+      {%-     set left_out = 'name_taken' -%}
+      {%-   else -%}
+      {%-     set left_out = '' -%}
+      {%-   endif -%}
+      {%-   set _ = plan.append(want | combine({
+              'uuid': current.uuid | default(''),
+              'current_name': current.name | default(''),
+              'address': 'name' if named and not holder else 'inbound',
+              'left_out': left_out,
+            })) -%}
+      {%- endfor -%}
+      {{ plan }}
+
+- name: Report the generated config profiles left out to spare hand-made ones
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        ['Not published:']
+        + crpgs_profiles_plan | selectattr('left_out', 'equalto', 'untagged')
+          | map(attribute='name')
+          | map('regex_replace', '$', ', because the profile in the panel holding its inbound or name does not carry '
+                                     ~ crpgs_primary_tags | join(', ')
+                                     ~ '; set vpn_server_remnawave_config_profiles_adopt_untagged to true to take it over')
+          | list
+        + crpgs_profiles_plan | selectattr('left_out', 'equalto', 'name_taken')
+          | map(attribute='name')
+          | map('regex_replace', '$', ', because another profile of the panel than the one holding its inbound has that name')
+          | list
+      }}
+  when: crpgs_profiles_plan | selectattr('left_out') | list | length > 0
+
+- name: Publish the generated config profiles
+  kenyawest.remnawave.config_profile:
+    name: "{{ item.name }}"
+    inbound: "{{ item.inbound if item.address == 'inbound' else omit }}"
+    config: "{{ item.config }}"
+    tags: "{{ crpgs_tags }}"
+  loop: "{{ crpgs_profiles_plan | rejectattr('left_out') | list }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.inbound }})"
+  delegate_to: localhost
+  register: crpgs_profiles_applied
+
+# Never a profile a node still activates, nor one of a protected name: the
+# panel reserves some names (Default-Profile), so it could not be created again.
+- name: Retire the config profiles the inventory no longer produces
+  kenyawest.remnawave.config_profile:
+    name: "{{ item.uuid }}"
+    state: absent
+  loop: "{{ crpgs_profiles_stale }}"
+  loop_control:
+    label: "{{ item.name }}"
+  vars:
+    crpgs_profiles_unproduced: >-
+      {{
+        remnawave_gathered.config_profiles
+        | remnawave_select_tagged(crpgs_primary_tags)
+        | rejectattr('uuid', 'in', crpgs_profiles_plan | map(attribute='uuid') | list)
+        | list
+      }}
+    crpgs_profiles_stale: >-
+      {{
+        crpgs_profiles_unproduced
+        | rejectattr('uuid', 'in',
+            crpgs_profiles_unproduced
+            | remnawave_select_profiles_kept(remnawave_gathered.nodes, vpn_server_remnawave_config_profiles_protected)
+            | map(attribute='uuid') | list)
+        | list
+      }}
+  delegate_to: localhost
+  when: vpn_server_remnawave_config_profiles_prune == 'delete'
+  register: crpgs_profiles_pruned
+
+# A changed profile is told added or modified by whether the panel had it
+# before this run. Accurate in --check, where the module predicts each change
+# without writing anything. The msg is one expression evaluating to a list, so
+# each name gets a line of its own.
+- name: Report what was applied
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        ['%d added:' | format(crpgs_profiles_added | length)] + crpgs_profiles_added
+        + ['%d modified:' | format(crpgs_profiles_modified | length)] + crpgs_profiles_modified
+        + ['%d left out:' | format(crpgs_profiles_left_out | length)] + crpgs_profiles_left_out
+        + ['%d retired:' | format(crpgs_profiles_retired | length)] + crpgs_profiles_retired
+      }}
+  vars:
+    crpgs_profiles_changed: "{{ crpgs_profiles_applied.results | default([]) | selectattr('changed') | map(attribute='item') | list }}"
+    crpgs_profiles_added: "{{ crpgs_profiles_changed | rejectattr('uuid') | map(attribute='name') | list }}"
+    crpgs_profiles_modified: >-
+      {%- set out = [] -%}
+      {%- for profile in crpgs_profiles_changed if profile.uuid -%}
+      {%-   set _ = out.append(profile.name ~ (' (renamed from ' ~ profile.current_name ~ ')'
+                                              if profile.current_name != profile.name else '')) -%}
+      {%- endfor -%}
+      {{ out }}
+    crpgs_profiles_left_out: "{{ crpgs_profiles_plan | selectattr('left_out') | map(attribute='name') | list }}"
+    crpgs_profiles_retired: >-
+      {{
+        crpgs_profiles_pruned.results | default([])
+        | selectattr('changed')
+        | map(attribute='item.name') | list
+      }}

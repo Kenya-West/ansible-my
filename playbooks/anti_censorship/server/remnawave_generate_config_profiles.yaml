@@ -1,0 +1,16 @@
+---
+# Creates or updates the config profiles of vpn_server_remnawave_config_profiles
+# (group_vars/vpn_server_remnawave/config_profiles.yaml). Run after
+# remnawave_generate_snippets.yaml - the profiles embed the snippets - and
+# before the nodes and hosts, which attach to the profiles' inbounds.
+- name: Generate Remnawave config profiles
+  hosts: vpn_server_remnawave
+  become: false
+  become_user: "{{ standard_user }}"
+  gather_facts: false
+  vars:
+    vpn_server_remnawave_generate_stages:
+      - config_profiles
+
+  roles:
+    - configure_remnawave_panel_generate_setup

@@ -79,38 +79,24 @@ prompts:
     default: "{{ setup_node_groups_optional_default }}"
     required: false
 
+  # A vpn_caddy host takes its base domains from the panel it relates to
+  # (vpn_server_remnawave_node_base_domains, see
+  # group_vars/vpn_caddy/domain_generator.yaml); any other host names its own.
   - id: base_domain_name_choice
     prompt: "Base domain of the host's own domain: {{ setup_node_hostname }}.<base domain>"
     help: The base domains the hosts of this inventory already use.
     type: choice
     choices: "{{ setup_node_scan_base_domain_choices }}"
     default: "{{ setup_node_scan_base_domain_default }}"
-    when: setup_node_scan_base_domains | length > 0
+    when:
+      - "'vpn_caddy' not in answers.groups | default([], true)"
+      - setup_node_scan_base_domains | length > 0
 
   - id: base_domain_name_custom
     prompt: "Base domain of the host's own domain: {{ setup_node_hostname }}.<base domain>"
-    when: answers.base_domain_name_choice | default(setup_node_other_choice, true) == setup_node_other_choice
-    validate:
-      - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
-        msg: "'{{ answer }}' does not look like a domain."
-
-  - id: xray_base_domain_name_choice
-    prompt: Base domain of the Remnawave node (Xray) domains
-    help: >-
-      The domains shared by the nodes of a region, net-{{ setup_node_region }}-<index>.<base domain>
-      and the like. The base domains the hosts of this inventory already use.
-    type: choice
-    choices: "{{ setup_node_scan_base_domain_choices }}"
-    default: "{{ setup_node_scan_xray_base_domain_default }}"
     when:
-      - "'vpn_caddy' in answers.groups | default([], true)"
-      - setup_node_scan_base_domains | length > 0
-
-  - id: xray_base_domain_name_custom
-    prompt: Base domain of the Remnawave node (Xray) domains
-    when:
-      - "'vpn_caddy' in answers.groups | default([], true)"
-      - answers.xray_base_domain_name_choice | default(setup_node_other_choice, true) == setup_node_other_choice
+      - "'vpn_caddy' not in answers.groups | default([], true)"
+      - answers.base_domain_name_choice | default(setup_node_other_choice, true) == setup_node_other_choice
     validate:
       - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
         msg: "'{{ answer }}' does not look like a domain."
@@ -118,6 +104,7 @@ prompts:
   - id: net_location_index
     prompt: "Index of the exit domain: net-{{ setup_node_region }}-<index>.{{ setup_node_xray_base_domain }}"
     help: >-
+      Written to domains_node of 0_all/1_domains.yaml.
       Hosts sharing an index share the domain (a round-robin DNS record).
       Indexes in use for {{ setup_node_region }}:
       {{ setup_node_region_indexes.net_location | unique | sort | join(', ') if setup_node_region_indexes.net_location | length > 0 else 'none' }}.
@@ -160,6 +147,8 @@ prompts:
       host_relations.default of 0_all/1_domains.yaml: the upstream a component
       of the host falls back to. The hosts of
       {{ setup_node_relation_host_groups | join(' and ') }} in this inventory.
+      A vpn_caddy host takes its base domains from this panel
+      (vpn_server_remnawave_node_base_domains).
     type: choice
     choices: "{{ setup_node_scan_relation_host_choices }}"
     default: "{{ setup_node_scan_relation_hosts | first }}"

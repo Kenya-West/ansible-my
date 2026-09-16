@@ -32,6 +32,10 @@ What it does
      (`prometheus.<base>`, `rw.<base>`, `matrix.<base>` ..., see
      `setup_server_service_domains`), the server's own base domain by
      default;
+   - for `vpn_server_remnawave`, the base domain of the Xray domains of the
+     nodes relating to the panel (`vpn_server_remnawave_node_base_domains.xray`,
+     next to `.main`, the server's own base domain), from which
+     `group_vars/vpn_caddy/domain_generator.yaml` builds their `domains_keys`;
    - for `matrix_server`, the admin account; for `analytics_server`, the
      Telepush bot token (optional, hidden);
    - the host the server relates to by default (`host_relations.default`):
@@ -70,7 +74,8 @@ Unattended, e.g. an analytics and Remnawave server in the Netherlands:
       -e '{"setup_server_prompt_answers": {"provider": "play2go", "country_code": "nl", "index": 4,
            "ip_address": "203.0.113.20", "groups": ["analytics_server", "vpn_server_remnawave"],
            "base_domain_name_choice": "accessto.page", "analytics_base_domain_name": "kenyawest.me",
-           "remnawave_base_domain_name": "accessto.page", "default_relation_host_choice": "play2go-nl-4"}}'
+           "remnawave_base_domain_name": "accessto.page", "node_xray_base_domain_name": "123987465.xyz",
+           "default_relation_host_choice": "play2go-nl-4"}}'
 
 Role variables
 --------------

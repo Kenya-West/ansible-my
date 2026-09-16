@@ -2,9 +2,10 @@
 ---
 # tasks file for roles/configure_remnawave_panel_generate_setup
 #
-# Generates the Remnawave setup - outbounds, routing rules and hosts - of the
-# panel on the host the role runs against, out of the facts of the nodes
-# relating to it, and applies it through the kenyawest.remnawave collection.
+# Generates the Remnawave setup - outbounds, routing rules, config profiles, nodes
+# and hosts - of the panel on the host the role runs against, out of the facts
+# of the nodes relating to it, applies it through the kenyawest.remnawave
+# collection, and verifies what the panel holds afterwards.
 
 - name: Check the tags the role marks and filters by
   ansible.builtin.include_tasks: validate_tags.yml
@@ -31,8 +32,31 @@
       tags:
         - remnawave_snippets
 
+    # After the snippets, which the profiles embed, and before the nodes and
+    # hosts, which attach to the profiles' inbounds.
+    - name: Generate the config profiles
+      ansible.builtin.include_tasks: config_profiles.yml
+      when: "'config_profiles' in vpn_server_remnawave_generate_stages"
+      tags:
+        - remnawave_config_profiles
+
+    # Before the hosts: a host is bound to nodes by name, so they must exist.
+    - name: Generate the nodes
+      ansible.builtin.include_tasks: nodes.yml
+      when: "'nodes' in vpn_server_remnawave_generate_stages"
+      tags:
+        - remnawave_nodes
+
     - name: Generate the hosts
       ansible.builtin.include_tasks: hosts.yml
       when: "'hosts' in vpn_server_remnawave_generate_stages"
       tags:
         - remnawave_hosts
+
+    # Last, and writing nothing: follow what the panel now holds from every
+    # host's route id to the exit it reaches, and fail on what would misroute.
+    - name: Verify the panel
+      ansible.builtin.include_tasks: verify.yml
+      when: "'verify' in vpn_server_remnawave_generate_stages"
+      tags:
+        - remnawave_verify

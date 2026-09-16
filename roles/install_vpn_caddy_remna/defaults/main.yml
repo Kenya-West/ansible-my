@@ -17,7 +17,6 @@ dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 compose_project_name: "{{ project_dir }}"
 
 remna_node_app_port: 2220
-remna_node_control_port: 48540
 remna_node_external_ports: []
 remna_node_use_dns01_cloudflare: false
 

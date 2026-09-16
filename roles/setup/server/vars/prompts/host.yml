@@ -105,6 +105,18 @@ prompts:
       - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
         msg: "'{{ answer }}' does not look like a domain."
 
+  - id: node_xray_base_domain_name
+    prompt: Base domain of the Remnawave node (Xray) domains
+    help: >-
+      vpn_server_remnawave_node_base_domains.xray of 0_all/1_domains.yaml. The
+      nodes relating to this panel get net-<region>-<index>.<base domain> and
+      the like; their own domain is <hostname>.{{ setup_server_base_domain }}.
+    default: "{{ setup_node_scan_xray_base_domain_default | default(setup_server_base_domain, true) }}"
+    when: "'vpn_server_remnawave' in answers.groups | default([], true)"
+    validate:
+      - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
+        msg: "'{{ answer }}' does not look like a domain."
+
   - id: matrix_base_domain_name
     prompt: Base domain of the Matrix server
     help: >-

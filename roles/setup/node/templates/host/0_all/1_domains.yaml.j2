@@ -1,19 +1,14 @@
 {% set o = '{{' %}
 {% set c = '}}' %}
+{% if setup_node_remna_node_enabled %}
+domains_node:
+  net_location_index: {{ initial_configure_host_net_location_index }}
+  chain_location_index: {{ initial_configure_host_chain_location_index }}
+{% else %}
 domains_keys:
   main: "{{ o }} inventory_hostname {{ c }}.{{ initial_configure_host_base_domain_name }}"
-{% if setup_node_remna_node_enabled %}
-  remna_node:
-{% for entry in setup_node_remna_node_domains %}
-{% set base = initial_configure_host_xray_base_domain_name if entry.base | default('xray') == 'xray' else initial_configure_host_base_domain_name %}
-{% set suffix = ('-' ~ initial_configure_host_net_location_index) if entry.index | default('') == 'net' else (('-' ~ initial_configure_host_chain_location_index) if entry.index | default('') == 'chain' else '') %}
-    - domain: "{{ o }} remna_node_domain_types_allowlist.{{ entry.key }}.value {{ c }}{{ suffix }}.{{ base }}"
-      type: "{{ o }} remna_node_domain_types_allowlist.{{ entry.key }}.type {{ c }}"
-{% endfor %}
-{% else %}
   remna_node: []
 {% endif %}
-domains: "{{ o }} ((domains_keys | dict2items | rejectattr('key', 'equalto', 'remna_node') | map(attribute='value') | list) + (domains_keys.remna_node | map(attribute='domain') | list)) | unique {{ c }}"
 
 {% if initial_configure_host_default_relation_host | default('', true) | length > 0 %}
 host_relations:

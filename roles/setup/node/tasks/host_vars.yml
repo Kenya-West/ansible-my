@@ -5,9 +5,6 @@
     initial_configure_host_base_domain_name: >-
       {{ initial_configure_host_base_domain_name_custom
          | default(initial_configure_host_base_domain_name_choice | default('', true), true) }}
-    initial_configure_host_xray_base_domain_name: >-
-      {{ initial_configure_host_xray_base_domain_name_custom
-         | default(initial_configure_host_xray_base_domain_name_choice | default('', true), true) }}
     initial_configure_host_default_relation_host: >-
       {{ initial_configure_host_default_relation_host_custom
          | default(initial_configure_host_default_relation_host_choice | default('', true), true) }}
@@ -31,9 +28,16 @@
 - name: Check the answers the templates rely on
   ansible.builtin.assert:
     that:
-      - initial_configure_host_base_domain_name | length > 0
-      - not setup_node_remna_node_enabled or initial_configure_host_xray_base_domain_name | length > 0
-    fail_msg: A base domain is needed for the domains of the host.
+      - setup_node_remna_node_enabled or initial_configure_host_base_domain_name | length > 0
+      - not setup_node_remna_node_enabled or initial_configure_host_default_relation_host | length > 0
+      - >-
+        not setup_node_remna_node_enabled
+        or initial_configure_host_default_relation_host not in hostvars
+        or hostvars[initial_configure_host_default_relation_host].vpn_server_remnawave_node_base_domains is defined
+    fail_msg: >-
+      A host outside vpn_caddy needs a base domain. A vpn_caddy host needs the
+      panel it relates to, holding vpn_server_remnawave_node_base_domains: its
+      domains are built on those base domains.
     quiet: true
 
 - name: Check whether host_vars/{{ initial_configure_host_hostname }} exists
