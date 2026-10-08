@@ -8,22 +8,22 @@
             | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
             | list
           )
-        + (source_paths_add_repo_dirs | default([]))
-        + (source_paths_add_user_dirs | default([]))
+        + (
+            (
+              (source_paths_add_repo_dirs | default([]))
+              + (source_paths_add_user_dirs | default([]))
+            )
+            | map('regex_replace', '/+$', '')
+            | map('regex_replace', '$', '/' ~ (current_index | string) ~ '/')
+            | list
+          )
       }}
   tags:
     - always
 
 - name: Add to install_vpn_server_remnawave_subpage_source_paths the current role templates directory
   ansible.builtin.set_fact:
-    install_vpn_server_remnawave_tgbot_bedolaga_source_paths_currentindex: >-
-      {{
-        (
-            source_paths
-            | map('regex_replace', '$', '/' ~ (current_index | string) ~ '/')
-            | list
-          )
-      }}
+    install_vpn_server_remnawave_tgbot_bedolaga_source_paths_currentindex: "{{ source_paths }}"
   tags:
     - always
 
