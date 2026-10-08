@@ -1,0 +1,159 @@
+---
+# Register one Remnawave Node per Ansible host relating to this panel, named
+# after its inventory hostname (remna_node_name_in_panel) and reached at the port
+# its compose publishes. The role's nodes are the ones carrying every primary
+# tag; nodes without them are never updated, retired or counted as the role's.
+#
+# The collection has no bulk module for nodes, so they are written one task run
+# each - on the controller, since the module only speaks HTTP to the panel.
+
+- name: Describe the nodes to publish
+  ansible.builtin.set_fact:
+    crpgs_nodes_desired: >-
+      {%- set desired = [] -%}
+      {%- for node in crpgs_nodes | sort(attribute='panel_name') -%}
+      {%-   set _ = desired.append({
+              'name': node.panel_name,
+              'address': node.panel_address,
+              'port': node.panel_port | int,
+              'country_code': node.panel_country_code | upper,
+              'inbounds': node.panel_inbounds or vpn_server_remnawave_nodes_inbounds,
+            }) -%}
+      {%- endfor -%}
+      {{ desired }}
+
+- name: The generated nodes need a config profile, an address, a port and inbounds
+  ansible.builtin.assert:
+    that:
+      - vpn_server_remnawave_nodes_config_profile | length > 0
+      - crpgs_nodes_incomplete | length == 0
+      - >-
+        crpgs_nodes_desired | map(attribute='name') | unique | list | length
+        == crpgs_nodes_desired | length
+    fail_msg: >-
+      Set vpn_server_remnawave_nodes_config_profile - the panel cannot create a
+      node without it. Every node needs remna_node_panel_address,
+      remna_node_control_port above 0 and at least one inbound (its own
+      remna_node_panel_inbounds or vpn_server_remnawave_nodes_inbounds); these
+      do not: {{ crpgs_nodes_incomplete | join(', ') | default('-', true) }}.
+      Names come from remna_node_name_in_panel and must be unique; got
+      {{ crpgs_nodes_desired | map(attribute='name') | join(', ') }}.
+    quiet: true
+  vars:
+    crpgs_nodes_incomplete: >-
+      {%- set found = [] -%}
+      {%- for node in crpgs_nodes_desired -%}
+      {%-   if not node.address or node.port <= 0 or not node.inbounds -%}
+      {%-     set _ = found.append(node.name) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ found }}
+
+- name: Read the nodes already in the panel
+  ansible.builtin.include_tasks: read_panel.yml
+  vars:
+    crpgs_gather:
+      nodes: {}
+
+- name: Tell the role's nodes from the hand-made ones
+  ansible.builtin.set_fact:
+    crpgs_node_existing_names: "{{ remnawave_gathered.nodes | map(attribute='name') | list }}"
+    crpgs_node_managed_names: >-
+      {{
+        remnawave_gathered.nodes
+        | remnawave_select_tagged(crpgs_primary_tags)
+        | map(attribute='name') | list
+      }}
+    crpgs_node_untagged_names: >-
+      {{
+        remnawave_gathered.nodes
+        | remnawave_select_tagged(crpgs_primary_tags, false)
+        | map(attribute='name') | list
+      }}
+
+- name: Find the generated nodes whose name a hand-made node already has
+  ansible.builtin.set_fact:
+    crpgs_nodes_colliding: >-
+      {{
+        []
+        if vpn_server_remnawave_nodes_adopt_untagged | bool
+        else crpgs_nodes_desired | map(attribute='name') | select('in', crpgs_node_untagged_names) | list
+      }}
+
+- name: Report the generated nodes left out to spare hand-made ones
+  ansible.builtin.debug:
+    msg: >-
+      Not published, because a node of the same name in the panel does not
+      carry {{ crpgs_primary_tags | join(', ') }}:
+      {{ crpgs_nodes_colliding | join('; ') }}. Give them other names through
+      remna_node_name_in_panel, or set vpn_server_remnawave_nodes_adopt_untagged
+      to true to take those nodes over.
+  when: crpgs_nodes_colliding | length > 0
+
+- name: Publish the generated nodes
+  kenyawest.remnawave.node:
+    name: "{{ item.name }}"
+    # A node the panel does not have yet is created disabled, so it serves no
+    # one before it is reviewed; 'present' then leaves the panel's switch
+    # alone, so a node enabled by hand stays enabled.
+    state: >-
+      {{
+        vpn_server_remnawave_nodes_publish_state
+        if vpn_server_remnawave_nodes_publish_state != 'present'
+        else ('present' if item.name in crpgs_node_existing_names else 'disabled')
+      }}
+    address: "{{ item.address }}"
+    port: "{{ item.port }}"
+    config_profile: "{{ vpn_server_remnawave_nodes_config_profile }}"
+    inbounds: "{{ item.inbounds }}"
+    country_code: "{{ item.country_code }}"
+    tags: "{{ crpgs_tags }}"
+  loop: "{{ crpgs_nodes_desired | rejectattr('name', 'in', crpgs_nodes_colliding) | list }}"
+  loop_control:
+    label: "{{ item.name }} ({{ item.address }}:{{ item.port }})"
+  delegate_to: localhost
+  register: crpgs_nodes_applied
+
+- name: Retire the nodes the inventory no longer produces
+  kenyawest.remnawave.node:
+    name: "{{ item }}"
+    state: "{{ 'absent' if vpn_server_remnawave_nodes_prune == 'delete' else 'disabled' }}"
+  loop: "{{ crpgs_nodes_stale }}"
+  vars:
+    crpgs_nodes_stale: >-
+      {{
+        crpgs_node_managed_names
+        | difference(crpgs_nodes_desired | map(attribute='name') | list)
+      }}
+  delegate_to: localhost
+  when: vpn_server_remnawave_nodes_prune in ['disable', 'delete']
+  register: crpgs_nodes_pruned
+
+# The node module reports no action, so a changed node is told added or
+# modified by whether the panel had it before this run. Accurate in --check,
+# where the module predicts each change without writing anything. The msg is
+# one expression evaluating to a list, so each name gets a line of its own.
+- name: Report what was applied
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        ['%d added:' | format(crpgs_nodes_added | length)] + crpgs_nodes_added
+        + ['%d modified:' | format(crpgs_nodes_modified | length)] + crpgs_nodes_modified
+        + ['%d left out:' | format(crpgs_nodes_colliding | length)] + crpgs_nodes_colliding
+        + ['%d retired:' | format(crpgs_nodes_retired | length)] + crpgs_nodes_retired
+      }}
+  vars:
+    crpgs_nodes_changed: >-
+      {{
+        crpgs_nodes_applied.results | default([])
+        | selectattr('changed')
+        | map(attribute='item.name') | list
+      }}
+    crpgs_nodes_added: "{{ crpgs_nodes_changed | reject('in', crpgs_node_existing_names) | list }}"
+    crpgs_nodes_modified: "{{ crpgs_nodes_changed | select('in', crpgs_node_existing_names) | list }}"
+    crpgs_nodes_retired: >-
+      {{
+        crpgs_nodes_pruned.results | default([])
+        | selectattr('changed')
+        | map(attribute='item') | list
+      }}

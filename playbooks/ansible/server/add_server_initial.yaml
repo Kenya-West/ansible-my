@@ -1,0 +1,15 @@
+---
+# Add a server to the inventory: asks for its name parts, address, server
+# groups and domains, generates its own secrets, then writes
+# inventory/host_vars/<hostname>/ and the server's inventory sections.
+# See roles/setup/server.
+#
+#   ansible-playbook -i inventory/production.ini playbooks/ansible/server/add_server_initial.yaml
+
+- name: Create basic server configuration
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  roles:
+    - role: setup/server

@@ -1,0 +1,62 @@
+---
+# Usage: ansible-playbook -i ./inventory/production.ini ./playbooks/ansible/node/find_domain_host.yaml -e search_domain=example.com
+# Searches every host's `domains_keys` for a full or partial match and
+# reports the hostname and the path within `domains_keys` where it was found.
+# Read-only: makes no changes.
+
+- name: Collect domains_keys entries from every host
+  hosts: "{{ target_hosts | default('all') }}"
+  gather_facts: false
+
+  tasks:
+    - name: Ensure search_domain was provided
+      ansible.builtin.assert:
+        that:
+          - search_domain is defined
+          - search_domain | length > 0
+        fail_msg: "Pass -e search_domain=<full-or-partial-domain> to search for."
+      run_once: true
+      delegate_to: localhost
+
+    - name: Initialize domain entries for this host
+      ansible.builtin.set_fact:
+        _domain_entries: []
+
+    - name: Add domains_keys.main entry
+      ansible.builtin.set_fact:
+        _domain_entries: "{{ _domain_entries + [{'path': 'domains_keys.main', 'domain': domains_keys.main}] }}"
+      when: (domains_keys | default({})).main is defined
+
+    - name: Add domains_keys.remna_node entries
+      ansible.builtin.set_fact:
+        _domain_entries: >-
+          {{ _domain_entries + [{'path': 'domains_keys.remna_node[' ~ idx ~ '] (' ~ item.type ~ ')', 'domain': item.domain}] }}
+      loop: "{{ (domains_keys | default({})).remna_node | default([]) }}"
+      loop_control:
+        index_var: idx
+
+    - name: Filter entries matching search_domain
+      ansible.builtin.set_fact:
+        _domain_matches: "{{ _domain_entries | selectattr('domain', 'search', search_domain | regex_escape) | list }}"
+
+- name: Report matches
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    _searched_hosts: "{{ groups[target_hosts | default('all')] }}"
+
+  tasks:
+    - name: Print hostname and path for each match
+      ansible.builtin.debug:
+        msg: "{{ item }} -> {{ hostvars[item]._domain_matches | map(attribute='path') | list }}"
+      loop: "{{ _searched_hosts }}"
+      when:
+        - hostvars[item]._domain_matches is defined
+        - hostvars[item]._domain_matches | length > 0
+      register: _match_results
+
+    - name: Notify when nothing matched
+      ansible.builtin.debug:
+        msg: "No host found with a domain matching '{{ search_domain }}'."
+      when: _match_results.results | selectattr('skipped', 'undefined') | list | length == 0

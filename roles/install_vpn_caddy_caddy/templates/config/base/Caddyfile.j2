@@ -79,7 +79,7 @@
 (observability) {
     handle_path /{{ path_to_internal_services_predefined_full }}/node_exporter/* {
         basic_auth {
-{% for user in node_exporter_basic_auth_users_for_caddy %}
+{% for user in install_vpn_caddy_caddy_node_exporter_users %}
             {{user.name}} {{ user.password | ansible.builtin.password_hash(user.hash_scheme) }}
 {% endfor %}
         }
@@ -88,7 +88,7 @@
 
     handle_path /{{ path_to_internal_services_predefined_full }}/docker_exporter/* {
         basic_auth {
-{% for user in docker_exporter_server_users %}
+{% for user in install_vpn_caddy_caddy_docker_exporter_users %}
             {{user.name}} {{ user.password | ansible.builtin.password_hash(user.hash_scheme) }}
 {% endfor %}
         }

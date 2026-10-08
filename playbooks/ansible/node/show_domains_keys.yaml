@@ -1,0 +1,9 @@
+---
+- name: Show domains_keys for target host
+  hosts: "{{ target_hosts | default('all') }}"
+  gather_facts: false
+
+  tasks:
+    - name: Display domains_keys
+      ansible.builtin.debug:
+        var: domains_keys

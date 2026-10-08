@@ -5,5 +5,9 @@
   become_user: "{{ standard_user }}"
 
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: analytics_server
+        resolve_host_relations_component: fail2ban_exporter
     - install_analytics_node_fail2ban_exporter
 

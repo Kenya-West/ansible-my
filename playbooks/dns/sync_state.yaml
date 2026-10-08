@@ -1,0 +1,15 @@
+---
+# Make the Cloudflare DNS state of this environment match the inventory:
+# create missing records, delete records no host declares (orphaned names,
+# leftover IPs, duplicates). Must run against the whole group (no --limit).
+#
+#   ansible-playbook -i inventory/staging.ini playbooks/dns/sync_state.yaml -e dns_sync_dry_run=true
+- name: Sync the Cloudflare DNS records of the environment to the inventory
+  hosts: domain_management
+  gather_facts: false
+
+  roles:
+    - role: domain_management
+      vars:
+        scenarios:
+          - cloudflare_sync_state

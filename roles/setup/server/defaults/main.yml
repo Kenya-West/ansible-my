@@ -1,0 +1,92 @@
+---
+# defaults file for roles/setup/server
+
+# Where the inventory lives: the directory of the inventory the play runs with,
+# otherwise inventory/ of the project.
+setup_server_project_dir: "{{ (role_path ~ '/../../..') | realpath }}"
+setup_server_inventory_dir: "{{ inventory_dir | default(setup_server_project_dir ~ '/inventory', true) }}"
+setup_server_host_vars_dir: "{{ setup_server_inventory_dir }}/host_vars"
+
+# The inventory files that get the new server: every INI file the play was
+# started with (-i ...).
+setup_server_inventory_files: >-
+  {{ ansible_inventory_sources | default([]) | select('search', '\.ini$') | list }}
+
+# Groups every new server joins, the server groups offered at the prompt
+# (value: label) and the ones chosen when Enter is pressed.
+setup_server_groups_required:
+  - general_vps_prepare
+  - domain_management
+setup_server_groups_optional:
+  analytics_server: "analytics_server - Prometheus, Grafana, VictoriaMetrics/Logs, PushGateway, alerts"
+  vpn_server_remnawave: "vpn_server_remnawave - Remnawave panel, subscription page and bots"
+  backup_restic_server: "backup_restic_server - Restic REST server the nodes back up to"
+  matrix_server: "matrix_server - Matrix Synapse"
+setup_server_groups_optional_default:
+  - analytics_server
+
+# Directories of templates/host/ rendered into host_vars/<hostname>/. The ones
+# listed here always are; any other is when the server joins the group of the
+# same name.
+setup_server_templates_always:
+  - 0_all
+
+# The service domains of each group, written to domains_keys of
+# 0_all/1_domains.yaml as <label>.<base domain of the group>: key: label.
+setup_server_service_domains:
+  analytics_server:
+    prometheus: prometheus
+    grafana: grafana
+    victoriametrics: victoriametrics
+    victorialogs: victorialogs
+    pushgateway: pushgateway
+  vpn_server_remnawave:
+    remnawave: rw
+    remnawave_subpage: sub
+    remnawave_tg_miniapp: miniapp
+    remnawave_tgbot_jolymmiels: bot
+    remnawave_tgbot_bedolaga: bot
+    remnawave_tgbot_bedolaga_cabinet: account
+  matrix_server:
+    matrix_server: matrix
+
+# Groups whose hosts are offered at the prompt as the default relation host of
+# the new server, besides the server itself.
+setup_server_relation_host_groups:
+  - analytics_server
+  - vpn_server_remnawave
+
+# The choice that stands for "another one, typed next". The base domain
+# choices come from the scan of setup/node, which uses the same value.
+setup_server_other_choice: __other__
+
+# Passwords generated for this server only: one
+# initial_configure_generated_password_<name> fact per entry. `length`
+# overrides the default length.
+setup_server_password_length: 50
+setup_server_password_special_chars: "-=+!#$()[]"
+setup_server_generated_passwords:
+  - name: analytics_server_mongodb_exporter
+  - name: analytics_server_prometheus_grafana
+  - name: analytics_server_prometheus_user
+  - name: analytics_server_pushgateway_client
+  - name: analytics_server_pushgateway_prometheus
+  - name: analytics_server_victorialogs
+  - name: analytics_server_victoriametrics
+  - name: analytics_server_scrape_logporter
+  - name: analytics_server_scrape_docker_exporter
+  - name: analytics_server_scrape_vector
+  - name: analytics_server_scrape_node_exporter
+  - name: analytics_server_scrape_fail2ban_exporter
+  - name: analytics_server_scrape_caddy
+  - name: analytics_server_xray_checker_user
+  - name: analytics_server_xray_checker_prometheus
+  - name: backup_restic_server
+  - name: vpn_server_remnawave_metrics
+  - name: vpn_server_remnawave_custom_login_route
+  - name: vpn_server_remnawave_custom_login_route_path
+  - name: matrix_server_db_password
+
+# Preset answers for the prompts, by prompt id (see vars/prompts/host.yml),
+# for unattended runs together with prompting_engine_interactive=false.
+setup_server_prompt_answers: {}

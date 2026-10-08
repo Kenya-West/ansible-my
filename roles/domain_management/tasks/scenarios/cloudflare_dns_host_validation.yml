@@ -7,16 +7,25 @@
 # within the per-host policy defined in `domains_settings`. It only reports — it
 # never changes anything.
 #
+# Only Ansible-managed records (comment carries the `dns_hosting_tags` primary
+# filter) are considered: a declared record that exists without the tag is
+# reported as missing, and record limits count managed records only.
+#
 # Shared logic (identical to the other scenarios):
 #   * ../dns_resolve_context.yml      — providers, tokens, record types, managed_domains
 #   * ../read_cloudflare_records.yml   — the actual Cloudflare state (run_once, shared)
 #   * ../compute_host_dns_records.yml  — the host's declared records -> cf_set_targets
 #
-# Policy — `domains_settings` (per host, optional):
-#   - name: <domain>
+# Policy — `domains_settings` (optional):
+#   defaults:
 #     records_limit:
-#       - { type: A, limit: 1 }     # at most 1 A record for <domain>; -1 = unlimited
-#   The default policy (no entry, or limit -1) is "no limitation".
+#       - { type: A, limit: -1 }    # -1 = unlimited
+#   explicit:
+#     - name: <domain>
+#       records_limit:
+#         - { type: A, limit: 1 }   # at most 1 A record for <domain>
+#   Each declared name + type uses its explicit entry, else the defaults, else
+#   "no limitation" (resolved in compute_host_dns_records.yml as `records_limit`).
 #
 # Everything runs on the control node (delegate_to: localhost).
 
@@ -80,24 +89,27 @@
   ansible.builtin.set_fact:
     limit_violations: >-
       {{ limit_violations + [{
-           'domain': limit_rule.0.name,
-           'type': limit_rule.1.type,
-           'limit': limit_rule.1.limit | int,
+           'domain': limit_rule.record,
+           'type': limit_rule.type,
+           'limit': limit_rule.records_limit | int,
            'actual': _count | int,
          }] }}
-  loop: "{{ domains_settings | default([]) | subelements('records_limit', skip_missing=true) }}"
+  loop: >-
+    {{ cf_set_targets | default([])
+       | community.general.json_query('[].{record: record, type: type, records_limit: records_limit}')
+       | unique }}
   loop_control:
     loop_var: limit_rule
-    label: "{{ limit_rule.0.name }} {{ limit_rule.1.type }} (limit {{ limit_rule.1.limit }})"
+    label: "{{ limit_rule.record }} {{ limit_rule.type }} (limit {{ limit_rule.records_limit }})"
   vars:
     _count: >-
       {{ cloudflare_records | default([])
-         | selectattr('name', 'equalto', limit_rule.0.name)
-         | selectattr('type', 'equalto', limit_rule.1.type)
+         | selectattr('name', 'equalto', limit_rule.record)
+         | selectattr('type', 'equalto', limit_rule.type)
          | list | length }}
   when:
-    - (limit_rule.1.limit | int) != -1
-    - (_count | int) > (limit_rule.1.limit | int)
+    - (limit_rule.records_limit | int) != -1
+    - (_count | int) > (limit_rule.records_limit | int)
   delegate_to: localhost
   tags:
     - cloudflare_dns_host_validation

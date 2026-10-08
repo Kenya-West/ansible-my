@@ -1,74 +1,87 @@
 # It can be: api_token, caddy_custom_path
 vpn_server_remnawave_access_mode: caddy_custom_path
 
-# It can be: autoselect_if_single, manual_set
-# autoselect_if_single: if there is only one panel, it will be selected automatically
-# manual_set: you need to set the panel manually in the configuration
-vpn_server_remnawave_choose_panel_strategy: autoselect_if_single
+# The panel configured is always the vpn_server_remnawave host the playbook
+# runs against, with the nodes whose host_relations resolve to it.
 
-# Set pre-configured panel hostname if manual_set is used in vpn_server_remnawave_choose_panel_strategy
-# vpn_server_remnawave_selected_panel_hostname: ''
+# Which Ansible group the nodes are taken from.
+vpn_server_remnawave_hosts_node_group: vpn_caddy
+
+# The relation a node names its panel by, the one its remna playbook resolves:
+# host_relations.<group>.components.<component>, then host_relations.<group>,
+# then host_relations.default. A node is published on the panel it registers with.
+vpn_server_remnawave_hosts_node_relation_group: vpn_server_remnawave
+vpn_server_remnawave_hosts_node_relation_component: remna
 
 # What property of domains_keys to use for the remna_node domain type. It can be: main, remna_node, or else
 vpn_server_remnawave_hosts_node_manage_key: remna_node
 
-# Which domain types to use for the remna_node domain type. Taken from remna_domain_types.
+# Which domain types to use for the remna_node domain type. Taken from vpn_deployment_domain_prefix.
 # These are the domains a node is entered through when it relays for someone else,
 # so they are what the generated chain hosts are addressed by.
 vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter:
-  - "{{ remna_domain_types.location_chain }}"
+  - "{{ vpn_deployment_domain_prefix.chain_location.type }}"
 
 # Which domain types a node's own, direct Remnawave Host is published on.
 # One Remnawave Host is generated per distinct domain here, bound to every
 # Ansible host that publishes it - several nodes behind one round-robin
 # domain stay a single Host in the panel.
 vpn_server_remnawave_hosts_node_manage_domain_types_direct_filter:
-  - "{{ remna_domain_types.location_net }}"
-
-# Only those hosts are managed that have this tag.
-# Everything is being created, searched for, managed and deleted only for hosts that have this tag.
-# The panel restricts tags to A-Z, 0-9, _ and : - lowercase or hyphens are rejected.
-vpn_server_remnawave_hosts_tag: ANSIBLE_MANAGED
-
-# Which Ansible group the nodes are taken from.
-vpn_server_remnawave_hosts_node_group: vpn_caddy
+  - "{{ vpn_deployment_domain_prefix.net_location.type }}"
 
 # ---------------------------------------------------------------------------
 # Publishing
 # ---------------------------------------------------------------------------
 
-# The state generated Remnawave Hosts are published in. It can be:
-#   disabled: created disabled and disabled again on every run, so a generated
-#             host never carries traffic until it is reviewed (the default)
-#   enabled:  created enabled and re-enabled on every run
+# Generated hosts carry every tag of vpn_server_remnawave_tags (main.yaml), and
+# only hosts carrying all its primary_filter tags are the role's: those are the
+# ones it updates, retires and cleans.
+#
+# A generated host whose remark a host without those tags already has is left
+# out and reported. Set this to true to take such hosts over (and tag them),
+# e.g. once, to adopt hosts published before the tags existed.
+vpn_server_remnawave_hosts_adopt_untagged: false
+
+# The state generated Remnawave Hosts are published in. A host the panel does
+# not have yet is always created disabled, except with enabled. It can be:
 #   present:  created disabled, then left in whatever state the panel has, so a
-#             host switched on by hand in the panel stays on
-vpn_server_remnawave_hosts_publish_state: disabled
+#             host switched on by hand in the panel stays on (the default)
+#   disabled: created disabled and disabled again on every run
+#   enabled:  created enabled and re-enabled on every run
+vpn_server_remnawave_hosts_publish_state: present
 
 # The config profile and inbound generated hosts are attached to. Both are
 # required - the panel cannot create a host without them. The inbound may be
-# chosen per protocol type; the plain value is the fallback.
+# chosen per protocol type (remna_protocol_types.<key>.full); the plain value
+# is the fallback.
 vpn_server_remnawave_hosts_config_profile: ''
 vpn_server_remnawave_hosts_inbound: ''
 vpn_server_remnawave_hosts_inbound_by_protocol: {}
-#  "{{ remna_protocol_types.vless_reality_tcp.full }}": vless-reality-tcp
-#  "{{ remna_protocol_types.vless_reality_xhttp.full }}": vless-reality-xhttp
+#  vless-reality-tcp: vless-reality-tcp
+#  vless-reality-xhttp: vless-reality-xhttp
 
 vpn_server_remnawave_hosts_port: 443
 vpn_server_remnawave_hosts_fingerprint: chrome
 
 # Human labels used to build host remarks, keyed by the domain label
-# (net-europe-1, chain-russia-1). A domain that is not listed uses its own
-# label, so the panel stays readable without this being filled in.
+# (net-europe-1, chain-russia-1). A domain that is not listed is named
+# "<flag> <REGION CODE>-<n>" - the flag of the country its nodes are in, the
+# region code of vpn_deployments_region_codes and its position among the
+# domains of that region, counted from one in domain-index order
+# (net-asia-2 -> 🇰🇿 AS-1, net-asia-4 -> 🇰🇿 AS-2). So the panel is readable
+# without this being filled in at all.
 #
 # Remarks are how the role finds the hosts it owns again. Point a label at the
 # remark an existing host already has to make the role adopt that host instead
-# of creating a second one beside it.
+# of creating a second one beside it (see vpn_server_remnawave_hosts_adopt_untagged
+# for a host without the primary tags). A domain that must keep its name
+# through the renumbering of its region belongs here too.
 vpn_server_remnawave_hosts_labels: {}
 #  net-europe-1: "🇩🇪 EU-1"
 #  chain-russia-1: "RU-1"
 
-# A chain host's remark is "<exit label><separator><entry label>".
+# A chain host's remark is "<exit name><separator><entry name>"
+# (🇰🇿 AS-1 | by 🇷🇺 RU-1).
 vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
 
 # ---------------------------------------------------------------------------

@@ -4,4 +4,8 @@
   become: false
   become_user: "{{ standard_user }}"
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: git_sync
+        resolve_host_relations_component: mirror
     - git_sync

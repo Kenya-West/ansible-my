@@ -5,4 +5,8 @@
   become_user: "{{ standard_user }}"
 
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: webfeatures
+        resolve_host_relations_component: certcopy
     - install_webfeatures_certcopy

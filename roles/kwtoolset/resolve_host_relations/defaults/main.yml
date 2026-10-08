@@ -1,0 +1,17 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/kwtoolset/resolve_host_relations
+
+# The relation group (a key of host_relations, e.g. analytics_server) and its
+# component (a key of host_relations.<group>.components, e.g. pushgateway) to
+# resolve. Provided by the playbook that deploys the solution. Either may be
+# empty: an empty component skips the component level, an empty group skips
+# both the component and the group levels.
+resolve_host_relations_group: ""
+resolve_host_relations_component: ""
+
+# The relations to resolve, host_relations of the host the role runs against.
+resolve_host_relations_source: "{{ host_relations | default({}, true) }}"
+
+# The priority of a relation host without one; the lowest value wins.
+resolve_host_relations_default_priority: 100

@@ -1,10 +1,16 @@
 setup/secrets
 =============
 
-Writes the shared secrets of the inventory, on the controller. It was
+Writes the secrets the nodes share, on the controller. It was
 `playbooks/ansible/secrets/*.yaml` before; the playbooks
 `playbooks/ansible/initial_configure_step2.yaml` and
 `playbooks/ansible/initial_configure_group.yaml` are now only its launchers.
+
+The secrets of a server (`analytics_server`, `vpn_server_remnawave`,
+`backup_restic_server`, `matrix_server`) are not written here: under
+`group_vars/all/` every host would load them. They belong to that server
+alone, and `setup/server` generates them into its `host_vars/` when it adds
+the server; the nodes read them through `host_relations`.
 
 `setup_secrets_scope` decides how much of the tree a run writes.
 
@@ -100,14 +106,14 @@ Role variables
 | `setup_secrets_dir` | `group_vars/all/z_common_hosts_secrets` in it | Where the secrets are written. |
 | `setup_secrets_keep_files` | `.gitkeep`, `user.yaml` | Files that do not count as existing secrets. |
 | `setup_secrets_template_dir` | `group_vars/all/z_common_hosts_secrets` | The tree rendered, relative to `templates/`. |
-| `setup_secrets_generated_passwords` | 35 entries | The passwords to generate: `name`, optional `length`. |
+| `setup_secrets_generated_passwords` | 18 entries | The passwords to generate: `name`, optional `length`. |
 | `setup_secrets_password_length` | `50` | Length of a generated password. |
 | `setup_secrets_password_special_chars` | `-=+!#$()[]` | Special characters allowed in a password. |
 | `setup_secrets_scope` | `all` | `all` writes the whole tree, `group` one inventory group. |
 | `setup_secrets_group` | `""` | The group to write; only the default of the prompt. |
 | `setup_secrets_group_vars_dir` | `group_vars/` of the inventory | Where the groups to choose from are looked up. |
 | `setup_secrets_group_vars_exclude` | `[]` | Directories of that scan that name no deployable group. |
-| `setup_secrets_group_template_dirs` | `all`, `general_vps_prepare`, `vpn_server_remnawave` | The template directories of a group whose directory is not named after it. |
+| `setup_secrets_group_template_dirs` | `all`, `general_vps_prepare` | The template directories of a group whose directory is not named after it. |
 | `setup_secrets_keep_existing` | `true` | Default of the prompt that keeps the values already written. |
 | `setup_secrets_preserve_id_keys` | `name`, `id`, `username`, ... | The keys that pair the items of two lists of mappings. |
 | `setup_secrets_prompt_answers` | `{}` | Preset answers by prompt id, for unattended runs. |

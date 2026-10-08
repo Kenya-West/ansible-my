@@ -1,0 +1,29 @@
+---
+# Add a host to sections of INI inventory files, on the controller.
+#
+# Inputs:
+#   setup_inventory_add_host_files    the INI inventory files
+#   setup_inventory_add_host_name     the inventory hostname
+#   setup_inventory_add_host_address  its ansible_host
+#   setup_inventory_add_host_groups   the sections it is added to; each file is
+#                                     backed up once, on the first section
+
+- name: Check that an INI inventory file is known
+  ansible.builtin.assert:
+    that: setup_inventory_add_host_files | length > 0
+    fail_msg: >-
+      No INI inventory file to write to. Run the play with
+      -i inventory/production.ini.
+    quiet: true
+
+- name: Add {{ setup_inventory_add_host_name }} to its groups in the inventory file(s)
+  community.general.ini_file:
+    path: "{{ item.0 }}"
+    section: "{{ item.1 }}"
+    option: "{{ setup_inventory_add_host_name }} ansible_host"
+    value: "{{ setup_inventory_add_host_address }}"
+    no_extra_spaces: true
+    backup: "{{ item.1 == setup_inventory_add_host_groups[0] }}"
+  loop: "{{ setup_inventory_add_host_files | product(setup_inventory_add_host_groups) | list }}"
+  loop_control:
+    label: "{{ item.0 | basename }} [{{ item.1 }}]"

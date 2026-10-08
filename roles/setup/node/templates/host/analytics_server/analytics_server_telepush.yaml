@@ -1,3 +1,0 @@
-telepush_bot_token: <Telegram bot token>
-telepush_whitelist:
-  - <Telegram user ID>

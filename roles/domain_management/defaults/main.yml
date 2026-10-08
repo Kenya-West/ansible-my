@@ -9,3 +9,20 @@ source_paths_add_role_dirs:
 source_paths_add_repo_dirs:
   - "{{ source_asset_fullpath_project }}"
 source_paths_add_user_dirs: []
+
+# Cloudflare limits record comments to 100 characters on the Free plan.
+dns_hosting_comment_max_length: 100
+
+# --- cloudflare_sync_state ----------------------------------------------------
+# Print the plan only; make no changes (same as --check for the API calls).
+dns_sync_dry_run: false
+# Read every accessible zone, not only zones hosting a currently declared domain,
+# so records left in a zone no host uses any more are found too.
+dns_sync_scan_all_zones: true
+# Refuse to delete records when no host declares any record at all (protects
+# against an empty or broken inventory wiping the environment).
+dns_sync_allow_delete_all: false
+# Tags (besides the primary filter) a record must carry to be synced. Unset means
+# every other `dns_hosting_tags` value (e.g. `environment=production`), so a run
+# never touches another environment's records.
+# dns_sync_scope_tags: []

@@ -5,9 +5,9 @@
     initial_configure_host_base_domain_name: >-
       {{ initial_configure_host_base_domain_name_custom
          | default(initial_configure_host_base_domain_name_choice | default('', true), true) }}
-    initial_configure_host_xray_base_domain_name: >-
-      {{ initial_configure_host_xray_base_domain_name_custom
-         | default(initial_configure_host_xray_base_domain_name_choice | default('', true), true) }}
+    initial_configure_host_default_relation_host: >-
+      {{ initial_configure_host_default_relation_host_custom
+         | default(initial_configure_host_default_relation_host_choice | default('', true), true) }}
     setup_node_region: >-
       {{ vpn_deployments_country_to_censorship_region_matcher.get(initial_configure_host_country_code,
            vpn_deployments_country_to_regions_matcher.get(initial_configure_host_country_code, 'unknown')) }}
@@ -28,9 +28,16 @@
 - name: Check the answers the templates rely on
   ansible.builtin.assert:
     that:
-      - initial_configure_host_base_domain_name | length > 0
-      - not setup_node_remna_node_enabled or initial_configure_host_xray_base_domain_name | length > 0
-    fail_msg: A base domain is needed for the domains of the host.
+      - setup_node_remna_node_enabled or initial_configure_host_base_domain_name | length > 0
+      - not setup_node_remna_node_enabled or initial_configure_host_default_relation_host | length > 0
+      - >-
+        not setup_node_remna_node_enabled
+        or initial_configure_host_default_relation_host not in hostvars
+        or hostvars[initial_configure_host_default_relation_host].vpn_server_remnawave_node_base_domains is defined
+    fail_msg: >-
+      A host outside vpn_caddy needs a base domain. A vpn_caddy host needs the
+      panel it relates to, holding vpn_server_remnawave_node_base_domains: its
+      domains are built on those base domains.
     quiet: true
 
 - name: Check whether host_vars/{{ initial_configure_host_hostname }} exists
@@ -50,6 +57,14 @@
     file_type: directory
     recurse: false
   register: __setup_node_template_dirs
+
+- name: Render the files every host gets into host_vars/{{ initial_configure_host_hostname }}/0_all
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: render_tree
+  vars:
+    setup_render_tree_src: "{{ (setup_node_role_path ~ '/../common/templates/host/0_all') | realpath }}"
+    setup_render_tree_dest: "{{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}/0_all"
 
 - name: Render host_vars/{{ initial_configure_host_hostname }}
   ansible.builtin.include_role:

@@ -1,0 +1,20 @@
+---
+# Read entities of the panel through kenyawest.remnawave.remnawave, which
+# applies nothing when only remnawave_gather is given. Takes crpgs_gather, a
+# remnawave_gather mapping; the result is the remnawave_gathered fact.
+#
+# The reads only speak HTTP to the panel, so they run on the controller rather
+# than over SSH on the panel host; the fact still lands on the panel host.
+
+- name: Read from the panel
+  ansible.builtin.include_role:
+    name: kenyawest.remnawave.remnawave
+    apply:
+      delegate_to: localhost
+  vars:
+    remnawave_panel_url: "{{ crpgs_panel.panel_url }}"
+    remnawave_token: "{{ crpgs_panel.token }}"
+    remnawave_api_key: "{{ crpgs_panel.api_key }}"
+    remnawave_validate_certs: "{{ crpgs_panel.validate_certs }}"
+    remnawave_timeout: "{{ crpgs_panel.timeout }}"
+    remnawave_gather: "{{ crpgs_gather }}"

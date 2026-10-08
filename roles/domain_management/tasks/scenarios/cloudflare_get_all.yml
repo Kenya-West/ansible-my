@@ -2,7 +2,8 @@
 # Scenario: cloudflare_get_all
 #
 # Reads (never mutates) the Cloudflare zones that host any managed domain and
-# prints every record whose type is in `dns_hosting_record_types`.
+# prints every Ansible-managed record (comment carries the `dns_hosting_tags`
+# primary filter) whose type is in `dns_hosting_record_types`.
 #
 # The heavy lifting is shared with the other scenarios:
 #   * ../dns_resolve_context.yml   — providers, tokens, record types, managed_domains
@@ -37,7 +38,7 @@
       {{
         cloudflare_records | default([])
         | selectattr('type', 'in', dns_hosting_record_types_resolved)
-        | community.general.json_query('[].{provider: _provider, zone: _zone, name: name, type: type, content: content, proxied: proxied, ttl: ttl}')
+        | community.general.json_query('[].{provider: _provider, zone: _zone, name: name, type: type, content: content, proxied: proxied, ttl: ttl, comment: comment}')
       }}
   run_once: true
   delegate_to: localhost

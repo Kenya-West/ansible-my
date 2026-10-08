@@ -6,6 +6,18 @@
   tags:
     - always
 
+- name: Assert the Remnawave panel of this host is resolved
+  ansible.builtin.assert:
+    that:
+      - install_vpn_caddy_remna_panel | length > 0
+    fail_msg: >-
+      No vpn_server_remnawave resolved for {{ inventory_hostname }}: set host_relations
+      (vpn_server_remnawave.components.remna, vpn_server_remnawave or default) in its host_vars; the
+      playbook resolves it with kwtoolset/resolve_host_relations before this role.
+    quiet: true
+  tags:
+    - always
+
 - name: Add to source_paths the current role templates directory
   ansible.builtin.set_fact:
     source_paths: >-
@@ -18,6 +30,28 @@
           )
         + (source_paths_add_repo_dirs | default([]))
         + (source_paths_add_user_dirs | default([]))
+      }}
+  tags:
+    - always
+
+- name: Check which source_paths actually exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ source_paths }}"
+  delegate_to: localhost
+  become: false
+  register: source_paths_stat
+  tags:
+    - always
+
+- name: Exclude non-existing paths from source_paths
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        source_paths_stat.results
+        | selectattr('stat.exists')
+        | map(attribute='item')
+        | list
       }}
   tags:
     - always

@@ -287,6 +287,16 @@ vpn_deployments_region_codes_censorship:
   iran: ir
   turkmenistan: tm
 
+# Combined region-code lookup: every deployment region's full name mapped to
+# its short code, censorship regions and global regions together.
+#
+# Examples:
+#   africa -> af
+#   asia   -> as
+#   russia -> ru
+#   china  -> cn
+vpn_deployments_region_codes: "{{ vpn_deployments_region_codes_global | combine(vpn_deployments_region_codes_censorship) }}"
+
 
 # Domain naming associated with each resulting deployment region.
 vpn_deployments_region_to_censorship_geo_mapping:
@@ -333,8 +343,6 @@ vpn_deployment_region: >-
 
 # Resolve the deployment region into its short region code.
 #
-# Dedicated censorship regions are checked first, then global regions.
-#
 # Examples:
 #   russia       -> ru
 #   china        -> cn
@@ -342,16 +350,7 @@ vpn_deployment_region: >-
 #   asia         -> as
 #   northamerica -> na
 #   unknown      -> zz
-vpn_deployment_region_code: >-
-  {{
-    vpn_deployments_region_codes_censorship.get(
-      vpn_deployment_region,
-      vpn_deployments_region_codes_global.get(
-        vpn_deployment_region,
-        'zz'
-      )
-    )
-  }}
+vpn_deployment_region_code: "{{ vpn_deployments_region_codes.get(vpn_deployment_region, 'zz') }}"
 
 # Resolve the deployment region into its censorship geo naming category.
 #
@@ -367,6 +366,56 @@ vpn_deployment_censorship_geo: >-
       'global'
     )
   }}
+
+# Maps a lowercase latin letter to its regional indicator symbol,
+# used to compose a country's flag emoji from its ISO 3166-1 alpha-2 code.
+vpn_deployments_regional_indicator_symbols:
+  a: "🇦"
+  b: "🇧"
+  c: "🇨"
+  d: "🇩"
+  e: "🇪"
+  f: "🇫"
+  g: "🇬"
+  h: "🇭"
+  i: "🇮"
+  j: "🇯"
+  k: "🇰"
+  l: "🇱"
+  m: "🇲"
+  n: "🇳"
+  o: "🇴"
+  p: "🇵"
+  q: "🇶"
+  r: "🇷"
+  s: "🇸"
+  t: "🇹"
+  u: "🇺"
+  v: "🇻"
+  w: "🇼"
+  x: "🇽"
+  y: "🇾"
+  z: "🇿"
+
+# Compose the flag emoji for `country_code`.
+#
+# Examples:
+#   de -> 🇩🇪
+#   us -> 🇺🇸
+#   th -> 🇹🇭
+vpn_deployment_country_flag_emoji: >-
+  {{
+    vpn_deployments_regional_indicator_symbols[(country_code | lower)[0]]
+    ~ vpn_deployments_regional_indicator_symbols[(country_code | lower)[1]]
+  }}
+
+# Compose the flag emoji and uppercase short region code for `country_code`.
+#
+# Examples:
+#   de -> 🇩🇪 EU
+#   ru -> 🇷🇺 RU
+#   kz -> 🇰🇿 AS
+vpn_deployment_country_flag_with_region_code: "{{ vpn_deployment_country_flag_emoji }} {{ vpn_deployment_region_code | upper }}"
 
 vpn_deployment_domain_prefix:
   unique:

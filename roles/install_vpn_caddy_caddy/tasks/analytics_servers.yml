@@ -1,0 +1,26 @@
+---
+# Resolves the analytics server scraping install_vpn_caddy_caddy_analytics_component of this host
+# and keeps it in install_vpn_caddy_caddy_analytics_servers, by component. It overwrites the
+# resolve_host_relations_* facts the playbook resolved.
+- name: Resolve the analytics server of {{ install_vpn_caddy_caddy_analytics_component }}
+  ansible.builtin.include_role:
+    name: kwtoolset/resolve_host_relations
+  vars:
+    resolve_host_relations_group: analytics_server
+    resolve_host_relations_component: "{{ install_vpn_caddy_caddy_analytics_component }}"
+
+- name: Assert the analytics server of {{ install_vpn_caddy_caddy_analytics_component }} is resolved
+  ansible.builtin.assert:
+    that:
+      - resolve_host_relations_host | length > 0
+    fail_msg: >-
+      No analytics_server resolved for {{ inventory_hostname }}: set host_relations
+      (analytics_server.components.{{ install_vpn_caddy_caddy_analytics_component }}, analytics_server or
+      default) in its host_vars.
+    quiet: true
+
+- name: Keep the analytics server of {{ install_vpn_caddy_caddy_analytics_component }}
+  ansible.builtin.set_fact:
+    install_vpn_caddy_caddy_analytics_servers: >-
+      {{ install_vpn_caddy_caddy_analytics_servers | default({})
+         | combine({install_vpn_caddy_caddy_analytics_component: resolve_host_relations_host}) }}

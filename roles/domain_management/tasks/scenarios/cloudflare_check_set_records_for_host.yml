@@ -1,14 +1,29 @@
 ---
 # Scenario: cloudflare_check_set_records_for_host
 #
-# Ensures (creates/updates) the Cloudflare DNS records for the *current* host.
-# It talks to Cloudflare only through `community.general.cloudflare_dns` (no direct
-# API calls); the record's zone is derived from the record name.
+# Reconciles the Cloudflare DNS records of the *current* host (create, update,
+# delete) through the Cloudflare v4 REST API. It only ever sees and changes
+# records whose comment carries the `dns_hosting_tags` primary filter
+# (e.g. `managed-by=ansible`); every record it writes gets the full tag comment.
+#
+# Per declared (name, type):
+#   1. a managed record with the declared content is kept, and PATCHed when its
+#      ttl / proxied / comment drifted;
+#   2. a declared content with no such record is created (POST);
+#   3. the `records_limit` policy from `domains_settings` (explicit entry for the
+#      name, else defaults) caps the managed records of that name + type. Only
+#      when the result would exceed the limit, leftover managed records (least
+#      recently modified first) are PATCHed to a new content instead of creating
+#      one, then deleted until the limit holds. `limit: -1` (unlimited) never
+#      re-points or deletes, so several hosts can share a name (round-robin).
+#   A host declaring more contents than the limit for a name + type fails.
 #
 # Shared logic:
-#   * ../dns_resolve_context.yml      — providers, tokens, record types
-#   * ../compute_host_dns_records.yml — the host's declared records -> cf_set_targets
-#   * ../validate_record_ips.yml      — A -> IPv4 / AAAA -> IPv6 pre-flight check
+#   * ../dns_resolve_context.yml          — providers, tokens, record types, tags
+#   * ../compute_host_dns_records.yml     — the host's declared records -> cf_set_targets
+#   * ../validate_record_ips.yml          — A -> IPv4 / AAAA -> IPv6 pre-flight check
+#   * ../read_cloudflare_zones.yml        — zone name -> zone id
+#   * ../lookup_host_managed_records.yml  — managed records per declared name + type
 #
 # Everything runs on the control node (delegate_to: localhost); nothing connects
 # to the managed host. See compute_host_dns_records.yml for how the record list
@@ -49,25 +64,214 @@
   tags:
     - cloudflare_check_set_records_for_host
 
-- name: Ensure the Cloudflare DNS records for this host
-  community.general.cloudflare_dns:
-  args: "{{ target }}"
-  loop: "{{ cf_set_targets | default([]) }}"
-  loop_control:
-    loop_var: target
-    label: "{{ target.type }} {{ target.record }} -> {{ target.value }} (zone {{ target.zone }})"
-  register: cf_set_results
+- name: List the accessible Cloudflare zones
+  ansible.builtin.include_tasks: ../read_cloudflare_zones.yml
+  when: cf_set_targets | default([]) | length > 0
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Look up the managed records for this host's declared names
+  ansible.builtin.include_tasks: ../lookup_host_managed_records.yml
+  when: cf_set_targets | default([]) | length > 0
+  tags:
+    - cloudflare_check_set_records_for_host
+
+# --- Plan (per host) --------------------------------------------------------
+
+- name: Fail when this host declares more records than its domains_settings limit allows
+  ansible.builtin.assert:
+    that:
+      - _over_limit | length == 0
+    fail_msg: >-
+      {{ inventory_hostname }} declares more records than `domains_settings.records_limit`
+      allows: {{ _over_limit }}
+    quiet: true
+  vars:
+    _over_limit: >-
+      {%- set out = [] -%}
+      {%- for group in cf_host_record_groups | default([]) -%}
+        {%- set limit = (group.desired | first).records_limit -%}
+        {%- if limit != -1 and (group.desired | map(attribute='value') | unique | list | length) > limit -%}
+          {%- set _ = out.append({'name': group.record, 'type': group.type, 'limit': limit,
+                                  'declared': group.desired | map(attribute='value') | unique | list}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+  when: cf_set_targets | default([]) | length > 0
   delegate_to: localhost
   tags:
     - cloudflare_check_set_records_for_host
 
-- name: Summarise the records ensured for this host
+- name: Reset the per-host change plan
+  ansible.builtin.set_fact:
+    cf_plan_create: []
+    cf_plan_update: []
+    cf_plan_delete: []
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Plan the create / update / delete calls for each declared name and type
+  ansible.builtin.set_fact:
+    cf_plan_create: "{{ cf_plan_create + _plan['create'] }}"
+    cf_plan_update: "{{ cf_plan_update + _plan['update'] }}"
+    cf_plan_delete: "{{ cf_plan_delete + _plan['delete'] }}"
+  loop: "{{ cf_host_record_groups | default([]) if (cf_set_targets | default([]) | length > 0) else [] }}"
+  loop_control:
+    loop_var: group
+    label: "{{ group.type }} {{ group.record }}"
+  vars:
+    # Subscript access (`plan['update']`) on purpose: `plan.update` would resolve
+    # to the dict's own update() method.
+    _plan: >-
+      {%- set plan = {'create': [], 'update': [], 'delete': []} -%}
+      {%- set used = [] -%}
+      {%- set pending = [] -%}
+      {%- set call = {'zone_id': group.zone_id, 'api_token': group.api_token} -%}
+      {%- set limit = (group.desired | first).records_limit -%}
+      {%- for d in group.desired -%}
+        {%- set body = {'type': d.type, 'name': d.record, 'content': d.value,
+                        'ttl': d.ttl, 'proxied': d.proxied, 'comment': d.comment} -%}
+        {%- set same = group.existing | rejectattr('id', 'in', used)
+                       | selectattr('content', 'equalto', d.value) | list -%}
+        {%- if same | length > 0 -%}
+          {%- set e = same | first -%}
+          {%- set _ = used.append(e.id) -%}
+          {%- if e.proxied != d.proxied or e.comment != d.comment or (not d.proxied and e.ttl != d.ttl) -%}
+            {%- set _ = plan['update'].append(call | combine({'id': e.id, 'from': e.content, 'body': body})) -%}
+          {%- endif -%}
+        {%- else -%}
+          {%- set _ = pending.append(body) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {#- Leftovers are sacrificed least recently modified first. -#}
+      {%- set leftover = group.existing | rejectattr('id', 'in', used)
+                         | sort(attribute='modified_on') | list -%}
+      {%- set ns = namespace(excess=0, reused=0) -%}
+      {%- if limit != -1 -%}
+        {%- set ns.excess = (used | length) + (pending | length) + (leftover | length) - limit -%}
+      {%- endif -%}
+      {%- for body in pending -%}
+        {%- if ns.excess > 0 and ns.reused < (leftover | length) -%}
+          {%- set _ = plan['update'].append(call | combine({'id': leftover[ns.reused].id,
+                                                            'from': leftover[ns.reused].content,
+                                                            'body': body})) -%}
+          {%- set ns.reused = ns.reused + 1 -%}
+          {%- set ns.excess = ns.excess - 1 -%}
+        {%- else -%}
+          {%- set _ = plan['create'].append(call | combine({'body': body})) -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- for e in leftover[ns.reused:] -%}
+        {%- if ns.excess > 0 -%}
+          {%- set _ = plan['delete'].append(call | combine({'id': e.id, 'name': e.name,
+                                                            'type': e.type, 'content': e.content})) -%}
+          {%- set ns.excess = ns.excess - 1 -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ plan }}
+  no_log: true # entries carry the api_token
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Report the change plan for this host
+  ansible.builtin.debug:
+    msg:
+      host: "{{ inventory_hostname }}"
+      managed_by: "{{ dns_primary_filter }}"
+      declared: "{{ cf_set_targets | default([]) | length }}"
+      create: "{{ cf_plan_create | community.general.json_query('[].body.{name: name, type: type, content: content}') }}"
+      update: "{{ cf_plan_update | community.general.json_query('[].{name: body.name, type: body.type, from: from, content: body.content, ttl: body.ttl, proxied: body.proxied}') }}"
+      delete: "{{ cf_plan_delete | community.general.json_query('[].{name: name, type: type, content: content}') }}"
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+# --- Apply (per host) -------------------------------------------------------
+
+- name: Update the managed records that drifted
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ call.zone_id }}/dns_records/{{ call.id }}"
+    method: PATCH
+    headers:
+      Authorization: "Bearer {{ call.api_token }}"
+    body_format: json
+    body: "{{ call.body }}"
+  loop: "{{ cf_plan_update }}"
+  loop_control:
+    loop_var: call
+    label: "{{ call.body.type }} {{ call.body.name }}: {{ call.from }} -> {{ call.body.content }}"
+  register: cf_update_results
+  changed_when: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Create the missing managed records
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ call.zone_id }}/dns_records"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ call.api_token }}"
+    body_format: json
+    body: "{{ call.body }}"
+    # 400 is inspected below to explain conflicts with unmanaged records.
+    status_code: [200, 400]
+  loop: "{{ cf_plan_create }}"
+  loop_control:
+    loop_var: call
+    label: "{{ call.body.type }} {{ call.body.name }} -> {{ call.body.content }}"
+  register: cf_create_results
+  changed_when: cf_create_results.status | default(0) == 200
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Fail when Cloudflare rejected a record creation
+  ansible.builtin.assert:
+    that:
+      - _rejected | length == 0
+    fail_msg: >-
+      Cloudflare rejected {{ _rejected | length }} record creation(s): {{ _rejected }}.
+      Error 81058 ("An identical record already exists") or 81053 usually means a
+      record NOT managed by Ansible already exists for that name. This role never
+      touches such records: delete it in Cloudflare, or adopt it by adding
+      `{{ dns_primary_filter }}` to its comment, then re-run.
+    quiet: true
+  vars:
+    _rejected: >-
+      {{ cf_create_results.results | default([])
+         | selectattr('status', 'defined')
+         | rejectattr('status', 'equalto', 200)
+         | community.general.json_query('[].{name: call.body.name, type: call.body.type, content: call.body.content, errors: json.errors}') }}
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Delete the leftover managed records
+  ansible.builtin.uri:
+    url: "https://api.cloudflare.com/client/v4/zones/{{ call.zone_id }}/dns_records/{{ call.id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ call.api_token }}"
+  loop: "{{ cf_plan_delete }}"
+  loop_control:
+    loop_var: call
+    label: "{{ call.type }} {{ call.name }} -> {{ call.content }}"
+  register: cf_delete_results
+  changed_when: true
+  delegate_to: localhost
+  tags:
+    - cloudflare_check_set_records_for_host
+
+- name: Summarise the reconciliation for this host
   ansible.builtin.debug:
     msg: >-
-      {{
-        cf_set_results.results | default([])
-        | community.general.json_query('[].{record: target.record, type: target.type, value: target.value, zone: target.zone, changed: changed}')
-      }}
+      {{ inventory_hostname }}: {{ cf_plan_create | length }} created,
+      {{ cf_plan_update | length }} updated, {{ cf_plan_delete | length }} deleted,
+      {{ (cf_set_targets | default([]) | length) - (cf_plan_create | length) - (cf_plan_update | length) }}
+      already up to date (records tagged `{{ dns_primary_filter }}` only).
   when: cf_set_targets | default([]) | length > 0
   delegate_to: localhost
   tags:

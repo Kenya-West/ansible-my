@@ -1,20 +1,10 @@
 ---
-- name: Check that an INI inventory file is known
-  ansible.builtin.assert:
-    that: setup_node_inventory_files | length > 0
-    fail_msg: >-
-      No INI inventory file to write to. Run the play with
-      -i inventory/production.ini, or set setup_node_inventory_files.
-    quiet: true
-
-- name: Add {{ initial_configure_host_hostname }} to its groups in the inventory file(s)
-  community.general.ini_file:
-    path: "{{ item.0 }}"
-    section: "{{ item.1 }}"
-    option: "{{ initial_configure_host_hostname }} ansible_host"
-    value: "{{ initial_configure_host_ip_address }}"
-    no_extra_spaces: true
-    backup: "{{ item.1 == setup_node_groups[0] }}"
-  loop: "{{ setup_node_inventory_files | product(setup_node_groups) | list }}"
-  loop_control:
-    label: "{{ item.0 | basename }} [{{ item.1 }}]"
+- name: Add {{ initial_configure_host_hostname }} to the inventory file(s)
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: inventory_add_host
+  vars:
+    setup_inventory_add_host_files: "{{ setup_node_inventory_files }}"
+    setup_inventory_add_host_name: "{{ initial_configure_host_hostname }}"
+    setup_inventory_add_host_address: "{{ initial_configure_host_ip_address }}"
+    setup_inventory_add_host_groups: "{{ setup_node_groups }}"

@@ -14,6 +14,28 @@
   tags:
     - always
 
+- name: Check which source_paths actually exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ source_paths }}"
+  delegate_to: localhost
+  become: false
+  register: source_paths_stat
+  tags:
+    - always
+
+- name: Exclude non-existing paths from source_paths
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        source_paths_stat.results
+        | selectattr('stat.exists')
+        | map(attribute='item')
+        | list
+      }}
+  tags:
+    - always
+
 - name: Add to install_vpn_server_remnawave_tgbot_bedolaga_cabinet_source_paths the current role templates directory
   ansible.builtin.set_fact:
     install_vpn_server_remnawave_tgbot_bedolaga_cabinet_source_paths_currentindex: >-

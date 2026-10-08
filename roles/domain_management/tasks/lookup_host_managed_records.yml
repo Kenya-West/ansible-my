@@ -1,0 +1,125 @@
+---
+# Looks up, for the CURRENT host, the Ansible-managed Cloudflare records that
+# share a name + type with a record the host declares. Only records carrying the
+# `dns_hosting_tags` primary filter in their comment are read, so records created
+# by hand (or by other tools) are never seen and therefore never modified.
+#
+#   GET /zones/{zone_id}/dns_records?type=A&name.exact=<fqdn>&comment.contains=managed-by%3Dansible
+#
+# Requires:
+#   * dns_resolve_context.yml    — dns_primary_filter_query, dns_primary_filter_regex
+#   * compute_host_dns_records.yml — cf_set_targets
+#   * read_cloudflare_zones.yml  — cf_zones
+# Produces (per host, on localhost):
+#   * cf_host_record_groups: one entry per declared (zone, name, type) with
+#       zone, zone_id, record, type, api_token,
+#       desired  (the host's cf_set_targets for that name + type)
+#       existing (the managed Cloudflare records for that name + type)
+
+- name: Fail when a declared record's zone is not accessible in Cloudflare
+  ansible.builtin.assert:
+    that:
+      - _missing_zones | length == 0
+    fail_msg: >-
+      {{ inventory_hostname }} declares records in zone(s) not accessible with the
+      configured Cloudflare token(s): {{ _missing_zones }}
+    quiet: true
+  vars:
+    _missing_zones: >-
+      {{ cf_set_targets | default([]) | map(attribute='zone') | unique
+         | difference(cf_zones | default([]) | map(attribute='name')) }}
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Reset the per-host record groups
+  ansible.builtin.set_fact:
+    cf_host_record_groups: []
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Group this host's declared records by zone, name and type
+  ansible.builtin.set_fact:
+    cf_host_record_groups: >-
+      {{ cf_host_record_groups + [{
+           'zone': key.zone,
+           'zone_id': (cf_zones | selectattr('name', 'equalto', key.zone) | first).id,
+           'record': key.record,
+           'type': key.type,
+           'api_token': key.api_token,
+           'desired': cf_set_targets
+                      | selectattr('record', 'equalto', key.record)
+                      | selectattr('type', 'equalto', key.type)
+                      | list,
+         }] }}
+  loop: >-
+    {{ cf_set_targets | default([])
+       | community.general.json_query('[].{zone: zone, record: record, type: type, api_token: api_token}')
+       | unique }}
+  loop_control:
+    loop_var: key
+    label: "{{ key.type }} {{ key.record }}"
+  no_log: true # entries carry the api_token
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Read the Ansible-managed records for each declared name and type
+  ansible.builtin.uri:
+    url: >-
+      https://api.cloudflare.com/client/v4/zones/{{ group.zone_id }}/dns_records?{{ _query }}
+    method: GET
+    headers:
+      Authorization: "Bearer {{ group.api_token }}"
+    return_content: false
+  loop: "{{ cf_host_record_groups }}"
+  loop_control:
+    loop_var: group
+    label: "{{ group.type }} {{ group.record }}"
+  vars:
+    _query: >-
+      type={{ group.type | urlencode }}&name.exact={{ group.record | urlencode
+      }}&{{ dns_primary_filter_query }}&per_page=100
+  register: cf_managed_lookup
+  changed_when: false
+  check_mode: false
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Fail when a lookup returned more records than a single page holds
+  ansible.builtin.assert:
+    that:
+      - (r.json.result_info.total_pages | default(1) | int) <= 1
+    fail_msg: "More than 100 managed {{ r.group.type }} records named {{ r.group.record }}; refusing to reconcile a partial view."
+    quiet: true
+  loop: "{{ cf_managed_lookup.results | default([]) }}"
+  loop_control:
+    loop_var: r
+    label: "{{ r.group.type }} {{ r.group.record }}"
+  delegate_to: localhost
+  tags:
+    - always
+
+- name: Attach the existing managed records to each group
+  ansible.builtin.set_fact:
+    # `comment.contains` is a substring match; keep only records whose comment
+    # holds the primary filter as a whole tag (e.g. not `managed-by=ansible-old`).
+    cf_host_record_groups: "{{ _groups }}"
+  vars:
+    _groups: >-
+      {%- set out = [] -%}
+      {%- for r in cf_managed_lookup.results | default([]) -%}
+        {%- set _ = out.append(r.group | combine({
+              'existing': r.json.result
+                          | selectattr('comment', 'string')
+                          | selectattr('comment', 'search', dns_primary_filter_regex)
+                          | list
+            })) -%}
+      {%- endfor -%}
+      {{ out }}
+  no_log: true # entries carry the api_token
+  delegate_to: localhost
+  tags:
+    - always
