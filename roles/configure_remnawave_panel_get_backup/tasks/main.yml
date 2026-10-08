@@ -1,0 +1,77 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/configure_remnawave_panel_get_backup
+- name: Assert that host is in backup_restic_node group
+  ansible.builtin.assert:
+    that:
+      - "'backup_restic_node' in group_names"
+    fail_msg: "This host is not in the backup_restic_node group, cannot proceed with Remnawave backup retrieval."
+  tags:
+    - always
+
+- name: Check if backup script exists on the host
+  ansible.builtin.stat:
+    path: "{{ vpn_server_remnawave_backup_project_full_path }}"
+  register: backup_script_stat
+  tags:
+    - always
+
+- name: Fail if backup script does not exist
+  ansible.builtin.assert:
+    that:
+      - backup_script_stat.stat.exists
+    fail_msg: "Backup script not found on path {{ vpn_server_remnawave_backup_project_full_path }}, cannot proceed with Remnawave backup retrieval."
+  tags:
+    - always
+
+- name: Run backup script to retrieve Remnawave backup
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    cmd: "bash {{ vpn_server_remnawave_backup_project_full_path }}"
+    creates: "{{ pgdump_backup_location_root_path }}/remnawave-panel/dump_remnawave_panel.sql"
+  tags:
+    - update_image_hard
+    - update_image_soft
+
+- name: Stat Remnawave backup dump on the host
+  become: true
+  become_user: root
+  ansible.builtin.stat:
+    path: "{{ remnawave_backup_remote_path }}"
+    checksum_algorithm: sha256
+    get_checksum: true
+  register: remnawave_backup_stat
+  tags:
+    - update_image_hard
+    - update_image_soft
+
+- name: Fail if Remnawave backup dump does not exist
+  ansible.builtin.assert:
+    that:
+      - remnawave_backup_stat.stat.exists
+      - remnawave_backup_stat.stat.isreg
+    fail_msg: "Remnawave backup dump {{ remnawave_backup_remote_path }} not found, cannot download it."
+  tags:
+    - update_image_hard
+    - update_image_soft
+
+- name: Build unique local name for Remnawave backup dump
+  ansible.builtin.set_fact:
+    remnawave_backup_local_name: >-
+      {{ remnawave_backup_remote_path | basename | splitext | first }}_{{ now(utc=true, fmt='%Y%m%d-%H%M%S') }}_{{ remnawave_backup_stat.stat.checksum[:8] }}{{ remnawave_backup_remote_path | splitext | last }}
+  tags:
+    - update_image_hard
+    - update_image_soft
+
+- name: Download Remnawave backup dump to controller temp directory
+  become: true
+  become_user: root
+  ansible.builtin.fetch:
+    src: "{{ remnawave_backup_remote_path }}"
+    dest: "{{ remnawave_backup_local_dir }}/{{ remnawave_backup_local_name }}"
+    flat: true
+  tags:
+    - update_image_hard
+    - update_image_soft
+

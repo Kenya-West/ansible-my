@@ -1,0 +1,8 @@
+---
+- name: Get the Remnawave setup
+  hosts: vpn_server_remnawave
+  become: true
+  become_user: "{{ standard_user }}"
+
+  roles:
+    - configure_remnawave_panel_get_backup
