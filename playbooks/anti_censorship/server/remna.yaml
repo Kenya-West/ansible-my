@@ -12,7 +12,11 @@
       - "{{ source_asset_fullpath_project }}"
 
   roles:
-    - name: kwtoolset/resolve_host_relations
+    - role: configure_remnawave_panel_get_backup
+      tags:
+        - never
+        - backup_controller
+    - role: kwtoolset/resolve_host_relations
       vars:
         resolve_host_relations_group: vpn_server_remnawave
         resolve_host_relations_component: panel
