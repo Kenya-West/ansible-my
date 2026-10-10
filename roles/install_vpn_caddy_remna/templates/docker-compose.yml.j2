@@ -39,6 +39,8 @@ services:
       caddy.@not_internal: "not path /{$$INTERNAL_PATH_BASE}*"
       caddy.root: "@not_internal /var/www/public"
       caddy.file_server: "@not_internal"
+      UFW_MANAGED: "TRUE"
+      UFW_ALLOW_FROM: "${UFW_ALLOW_FROM}"
 {% endif %}
 
     networks:

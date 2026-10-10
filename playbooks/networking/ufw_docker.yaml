@@ -1,0 +1,11 @@
+---
+- name: Install ufw-docker and ufw-docker-automated
+  hosts: vpn_caddy
+  # Rewrites /etc/ufw rules, writes to /usr/local/bin and /etc/systemd/system, manages a root service
+  become: true
+
+  environment:
+    EGET_GITHUB_TOKEN: "{{ github_api_token_eget | default(omit) }}"
+
+  roles:
+    - name: install_ufw_docker

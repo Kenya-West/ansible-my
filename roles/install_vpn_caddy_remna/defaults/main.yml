@@ -75,6 +75,10 @@ systemd_unit_configs:
 
 # The Remnawave panel this node connects to, resolved by the playbook with
 # kwtoolset/resolve_host_relations (vpn_server_remnawave/remna), and the
-# SECRET_KEY it issues to its nodes.
+# SECRET_KEY it issues to its nodes (the first panel's, a node has one). The IPs of all the related panels
+# are the only ones UFW lets reach the node control port.
 install_vpn_caddy_remna_panel: "{{ resolve_host_relations_host | default('') }}"
+install_vpn_caddy_remna_panels: "{{ resolve_host_relations_hosts | default([]) }}"
+install_vpn_caddy_remna_panel_ips: >-
+  {{ install_vpn_caddy_remna_panels | map('extract', hostvars, 'ansible_host') | map('default', '', true) | unique | list }}
 remna_node_ssl_cert_from_panel: "{{ hostvars[install_vpn_caddy_remna_panel].vpn_server_remnawave_node_secret_key }}"

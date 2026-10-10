@@ -104,3 +104,5 @@ packages_binary_list:
     assets:
       - ^REG:minisig
     dest_loc: /usr/sbin
+  - repo: https://raw.githubusercontent.com/chaifeng/ufw-docker/master/ufw-docker
+  - repo: shinebayar-g/ufw-docker-automated

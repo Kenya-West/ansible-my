@@ -18,6 +18,19 @@
   tags:
     - always
 
+- name: Assert the addresses of all the related Remnawave panels are IPv4 addresses, UFW allows them to reach the node
+  ansible.builtin.assert:
+    that:
+      - install_vpn_caddy_remna_panel_ips | length > 0
+      - install_vpn_caddy_remna_panel_ips | reject('match', '^[0-9]{1,3}([.][0-9]{1,3}){3}$') | list | length == 0
+    fail_msg: >-
+      ansible_host of every panel of {{ inventory_hostname }} ({{ install_vpn_caddy_remna_panels | join(', ') }})
+      must be an IPv4 address, got {{ install_vpn_caddy_remna_panel_ips }}. Override
+      install_vpn_caddy_remna_panel_ips otherwise.
+    quiet: true
+  tags:
+    - always
+
 - name: Add to source_paths the current role templates directory
   ansible.builtin.set_fact:
     source_paths: >-

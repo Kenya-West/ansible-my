@@ -1,0 +1,120 @@
+---
+# Removes every UFW rule except the SSH ones, so ufw-docker/ufw-docker-automated start from a clean list.
+# Run it BEFORE ufw_docker.yaml (the wrapper ufw_docker_full.yaml does that): afterwards it would
+# delete the route rules ufw-docker-automated has created.
+# Supports --check: only reads state, then reports what would be backed up, deleted and added.
+- name: Migrate UFW to simple rules
+  hosts: vpn_caddy
+  become: false
+
+  vars:
+    ufw_migrate_backup_dir: /var/backups/ufw
+    ufw_migrate_backup_files:
+      - /etc/ufw/user.rules
+      - /etc/ufw/user6.rules
+
+  pre_tasks:
+    # SSH ports: 22 and every "Port N" in sshd_config, same detection idea as playbooks/networking/ufw.yaml
+    - name: Read sshd_config
+      ansible.builtin.slurp:
+        src: /etc/ssh/sshd_config
+      become: true
+      register: ufw_migrate_sshd_config
+
+    - name: Collect SSH ports
+      ansible.builtin.set_fact:
+        ufw_migrate_ssh_ports: >-
+          {{
+            (['22'] + (ufw_migrate_sshd_config.content | b64decode | regex_findall('(?m)^Port ([0-9]{1,5})$')))
+            | unique | list
+          }}
+
+    - name: Read numbered UFW rules
+      ansible.builtin.command: ufw status numbered
+      become: true
+      register: ufw_status_numbered
+      changed_when: false
+      check_mode: false
+
+    # Highest number first, so deleting a rule does not renumber the ones still pending.
+    # Both IPv4 and "(v6)" entries are listed in the same numbering.
+    - name: Split UFW rules into the SSH ones to keep and the rest to delete
+      ansible.builtin.set_fact:
+        ufw_migrate_ssh_pattern: "^. *[0-9]+[]] +(OpenSSH|ssh|{{ ufw_migrate_ssh_ports | join('|') }})(/(tcp|udp))?( |$)"
+        ufw_migrate_rule_lines: "{{ ufw_status_numbered.stdout_lines | select('match', '^. *[0-9]+[]] ') | list }}"
+
+    - name: Collect numbers of non-SSH UFW rules
+      ansible.builtin.set_fact:
+        ufw_rule_numbers_to_delete: >-
+          {{
+            ufw_migrate_rule_lines
+            | reject('match', ufw_migrate_ssh_pattern)
+            | map('regex_search', '[0-9]+')
+            | map('int')
+            | sort(reverse=true)
+            | list
+          }}
+        ufw_migrate_kept_rules: "{{ ufw_migrate_rule_lines | select('match', ufw_migrate_ssh_pattern) | list }}"
+
+    - name: Show what will happen
+      ansible.builtin.debug:
+        msg:
+          - "SSH ports kept: {{ ufw_migrate_ssh_ports }}"
+          - "Rules kept: {{ ufw_migrate_kept_rules }}"
+          - "Rule numbers to delete: {{ ufw_rule_numbers_to_delete }}"
+
+    - name: Create UFW rules backup directory
+      ansible.builtin.file:
+        path: "{{ ufw_migrate_backup_dir }}"
+        state: directory
+        mode: "0700"
+      become: true
+      when: ufw_rule_numbers_to_delete | length > 0
+      register: ufw_migrate_backup_dir_result
+
+    - name: Back up UFW rules before deleting anything
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ item }}"
+        dest: "{{ ufw_migrate_backup_dir }}/{{ item | basename }}.{{ ansible_facts.date_time.iso8601_basic_short }}"
+        mode: "0600"
+      become: true
+      loop: "{{ ufw_migrate_backup_files }}"
+      # In --check mode the directory above is only simulated, so the copy would fail on it
+      when:
+        - ufw_rule_numbers_to_delete | length > 0
+        - not (ansible_check_mode and ufw_migrate_backup_dir_result is changed)
+
+    # One task, one SSH round trip: a per-rule Ansible loop costs seconds per item.
+    # Numbers are sorted descending, so deleting one never renumbers the ones still pending.
+    # The shell module is skipped in --check mode, the plan is shown above.
+    - name: Delete all UFW rules except SSH/OpenSSH
+      ansible.builtin.shell:
+        cmd: |
+          set -e
+          for n in {{ ufw_rule_numbers_to_delete | join(' ') }}; do
+            ufw --force delete "$n"
+          done
+        executable: /bin/bash
+      become: true
+      when: ufw_rule_numbers_to_delete | length > 0
+      changed_when: true
+
+  tasks:
+    # Only when no SSH rule survived (UFW inactive or SSH was never allowed): add rate-limited SSH
+    # and enable UFW. Existing SSH rules are never replaced, so their action (allow/limit) is preserved.
+    - name: Add SSH rules and enable UFW when there are none
+      ansible.builtin.include_role:
+        name: install_ufw
+        apply:
+          become: true
+      vars:
+        input_mode: complex
+        ufw_rules: >-
+          {{
+            ufw_migrate_ssh_ports
+            | map('community.general.dict_kv', 'port')
+            | map('combine', {'rule': 'limit', 'proto': 'tcp'})
+            | list
+          }}
+      when: ufw_migrate_kept_rules | length == 0
