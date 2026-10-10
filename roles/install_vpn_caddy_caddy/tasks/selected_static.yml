@@ -1,0 +1,78 @@
+# Picks the fake-site template served by Caddy and points the stable
+# `sni-templates/current` symlink at it, so the Caddyfile does not depend on
+# the (randomly chosen) template name.
+- name: Set the SNI templates directory fact
+  ansible.builtin.set_fact:
+    install_vpn_caddy_caddy_sni_dir: "{{ dest_path_full }}/static/sni-templates"
+
+- name: Check if selected-template.txt exists in the destination path
+  ansible.builtin.stat:
+    path: "{{ install_vpn_caddy_caddy_sni_dir }}/selected-template.txt"
+  register: install_vpn_caddy_caddy_selected_template_stat
+
+- name: Read the selected template name from selected-template.txt
+  ansible.builtin.slurp:
+    src: "{{ install_vpn_caddy_caddy_sni_dir }}/selected-template.txt"
+  register: install_vpn_caddy_caddy_selected_template_slurp
+  when: install_vpn_caddy_caddy_selected_template_stat.stat.exists
+
+- name: Determine the candidate template name (user pin first, then stored)
+  ansible.builtin.set_fact:
+    install_vpn_caddy_caddy_template_candidate: >-
+      {{
+        (caddy_fake_static_files_template_name | default('') | trim)
+        or (
+          (install_vpn_caddy_caddy_selected_template_slurp.content | b64decode | trim)
+          if install_vpn_caddy_caddy_selected_template_stat.stat.exists
+          else ''
+        )
+      }}
+
+- name: Check that the candidate template directory exists
+  ansible.builtin.stat:
+    path: "{{ install_vpn_caddy_caddy_sni_dir }}/{{ install_vpn_caddy_caddy_template_candidate }}"
+  register: install_vpn_caddy_caddy_candidate_stat
+  when: install_vpn_caddy_caddy_template_candidate | length > 0
+
+- name: Get list of template directories
+  ansible.builtin.find:
+    paths: "{{ install_vpn_caddy_caddy_sni_dir }}"
+    file_type: directory
+    depth: 1
+  register: install_vpn_caddy_caddy_sni_templates_dirs
+  when: not (install_vpn_caddy_caddy_candidate_stat.stat.isdir | default(false))
+
+- name: Fail if there is no template to select
+  ansible.builtin.assert:
+    that:
+      - install_vpn_caddy_caddy_sni_templates_dirs.files | length > 0
+    fail_msg: "No SNI template directories found in {{ install_vpn_caddy_caddy_sni_dir }}"
+  when: not (install_vpn_caddy_caddy_candidate_stat.stat.isdir | default(false))
+
+- name: Select the template (keep the candidate if valid, otherwise random)
+  ansible.builtin.set_fact:
+    install_vpn_caddy_caddy_template_selected: >-
+      {{
+        install_vpn_caddy_caddy_template_candidate
+        if (install_vpn_caddy_caddy_candidate_stat.stat.isdir | default(false))
+        else (
+          install_vpn_caddy_caddy_sni_templates_dirs.files
+          | map(attribute='path')
+          | map('basename')
+          | list
+          | random
+        )
+      }}
+
+- name: Write the selected template name to selected-template.txt
+  ansible.builtin.copy:
+    dest: "{{ install_vpn_caddy_caddy_sni_dir }}/selected-template.txt"
+    content: "{{ install_vpn_caddy_caddy_template_selected }}\n"
+    mode: "0664"
+
+- name: Point the current symlink at the selected template
+  ansible.builtin.file:
+    src: "{{ install_vpn_caddy_caddy_template_selected }}"
+    dest: "{{ install_vpn_caddy_caddy_sni_dir }}/current"
+    state: link
+    force: true

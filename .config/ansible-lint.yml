@@ -15,6 +15,7 @@ exclude_paths:
   - test/fixtures/formatting-prettier/
   - tests/
   - roles/install_vpn_caddy_caddy/templates/static/sni-templates-main.tar.gz
+  - roles/install_vpn_caddy_caddy/templates/static/sni-templates-legacy.tar.gz
 # parseable: true
 # quiet: true
 # strict: true

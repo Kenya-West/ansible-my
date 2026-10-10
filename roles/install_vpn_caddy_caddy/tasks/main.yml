@@ -96,6 +96,14 @@
   tags:
     - update_config_hard
 
+- name: Remove sni-templates directory if it exists
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}/static/sni-templates"
+    state: absent
+  tags:
+    - never
+    - update_config_hard
+
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
@@ -132,11 +140,29 @@
 - name: unzip
   ansible.builtin.include_role:
     name: kwtoolset/unzip
+    apply:
+      tags:
+        - update_config_soft
+        - update_config_hard
   vars:
     unzip_source: "{{ dest_path_full }}/static/sni-templates-main.tar.gz"
     unzip_dest: "{{ dest_path_full }}/static/sni-templates"
     unzip_remove_source: true
     unzip_checksum: true
+  tags:
+    - update_config_soft
+    - update_config_hard
+
+- name: Determine the selected template name
+  ansible.builtin.include_tasks:
+    file: selected_static.yml
+    apply:
+      tags:
+        - update_config_soft
+        - update_config_hard
+  tags:
+    - update_config_soft
+    - update_config_hard
 
 - name: compose_pull
   ansible.builtin.include_role:
@@ -191,3 +217,5 @@
     mode: "0644"
   with_items: "{{ source_paths }}"
   failed_when: false
+  tags:
+    - update_config_hard

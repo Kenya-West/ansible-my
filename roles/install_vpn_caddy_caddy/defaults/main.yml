@@ -16,7 +16,9 @@ dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
 
-caddy_fake_static_files_template_name: 503 error page v2
+# Pin a fake-site template directory name; empty = pick one at random once
+# and remember it in static/sni-templates/selected-template.txt.
+caddy_fake_static_files_template_name: ""
 
 # The analytics servers scraping this host by component (caddy, and for an
 # analytics_node node_exporter and docker_exporter), resolved by
