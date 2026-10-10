@@ -8,6 +8,7 @@ vpn_caddy:
       tblocker: "{{ vpn_caddy.project.root }}/tblocker"
       zapret: "{{ vpn_caddy.project.root }}/zapret"
       wg: "{{ vpn_caddy.project.root }}/wg"
+      microwarp: "{{ vpn_caddy.project.root }}/microwarp"
       caddy: "{{ vpn_caddy.project.root }}/caddy"
 
 webfeatures:
