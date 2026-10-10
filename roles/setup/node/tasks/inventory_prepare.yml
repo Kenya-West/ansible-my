@@ -1,0 +1,10 @@
+---
+- name: Add {{ initial_configure_host_hostname }} to the inventory file(s)
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: inventory_add_host
+  vars:
+    setup_inventory_add_host_files: "{{ setup_node_inventory_files }}"
+    setup_inventory_add_host_name: "{{ initial_configure_host_hostname }}"
+    setup_inventory_add_host_address: "{{ initial_configure_host_ip_address }}"
+    setup_inventory_add_host_groups: "{{ setup_node_groups }}"

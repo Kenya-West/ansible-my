@@ -1,6 +1,6 @@
 ---
 
-- name: Remove a domain from domains_keys.remna_node for selected hosts
+- name: Remove a domain from domains_node.remna_node_extra for selected hosts
   hosts: all
   connection: local
   become: false
@@ -8,7 +8,7 @@
 
   vars_prompt:
     - name: remove_domains_from_list_caddy_new_domain
-      prompt: "Enter the domain to remove from domains_keys.remna_node for the selected host(s)"
+      prompt: "Enter the domain to remove from domains_node.remna_node_extra for the selected host(s)"
       private: false
 
   vars:

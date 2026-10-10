@@ -37,8 +37,10 @@ services:
 {% endif %}
       caddy.import: "logging ${LOG_FILE_NAME}-remna"
       caddy.@not_internal: "not path /{$$INTERNAL_PATH_BASE}*"
-      caddy.root: "@not_internal /var/www/public"
+      caddy.root: "@not_internal /var/www/public/sni-templates/current"
       caddy.file_server: "@not_internal"
+      UFW_MANAGED: "TRUE"
+      UFW_ALLOW_FROM: "${UFW_ALLOW_FROM}"
 {% endif %}
 
     networks:

@@ -1,0 +1,77 @@
+# Builds domains_keys of a node from domains_node of its host_vars and the base
+# domains of the panel its host_relations resolve to
+# (vpn_server_remnawave_node_base_domains of that panel's host_vars).
+#
+# A host defining domains_keys in its host_vars (a panel) replaces all of this.
+#
+# domains_node of a node:
+#   net_location_index    - N of net-<region>-N.<xray base>
+#   chain_location_index  - N of chain-<region>-N.<xray base>
+#   remna_node_types      - optional, keys of domains_node_remna_node_spec;
+#                           all of them by default
+#   remna_node_extra      - optional, more {domain, type} entries appended to
+#                           domains_keys.remna_node
+
+# The remna_node domains of a node, in order. `key` is a key of
+# remna_node_domain_types_allowlist (group_vars/all/0_defaults/regions.yaml),
+# `base` a key of the panel's vpn_server_remnawave_node_base_domains, `index`
+# appends domains_node.<index>_location_index.
+domains_node_remna_node_spec:
+  - key: unique
+    base: main
+  - key: net_location
+    base: xray
+    index: net
+  - key: chain_location
+    base: xray
+    index: chain
+  - key: net_all
+    base: xray
+  - key: net_protocol
+    base: xray
+  - key: chain_all
+    base: xray
+  - key: chain_protocol
+    base: xray
+
+# The panel of this node: the first host of host_relations.vpn_server_remnawave.components.remna,
+# host_relations.vpn_server_remnawave, then host_relations.default, by priority
+# - the resolution of kwtoolset/resolve_host_relations, which playbooks run
+# and inventory variables cannot.
+domains_node_panel: >-
+  {%- set rel = host_relations | default({}, true) -%}
+  {%- set grp = rel.vpn_server_remnawave | default({}, true) -%}
+  {%- set chain = [
+        ((grp.components | default({}, true)).remna | default({}, true)).hosts | default([], true),
+        grp.hosts | default([], true),
+        (rel.default | default({}, true)).hosts | default([], true)] -%}
+  {%- set entries = [] -%}
+  {%- for entry in chain | select | first | default([], true) -%}
+  {%-   set _ = entries.append({'host': entry.host, 'priority': entry.priority | default(100) | int}) -%}
+  {%- endfor -%}
+  {{ (entries | sort(attribute='priority') | map(attribute='host') | first | default(''))
+     | mandatory('domains_node_panel: host_relations of ' ~ inventory_hostname ~ ' resolve to no panel') }}
+
+# Read from the panel's 0_all/1_domains.yaml, not through hostvars: hostvars is
+# missing when another host templates this node's variables
+# (hostvars['<node>'].domains_keys on the panel or the controller).
+domains_node_base_domains_file: "{{ inventory_dir }}/host_vars/{{ domains_node_panel }}/0_all/1_domains.yaml"
+domains_node_base_domains: >-
+  {{ ((lookup('ansible.builtin.file', domains_node_base_domains_file, errors='ignore') | default('', true)
+       | from_yaml | default({}, true)).vpn_server_remnawave_node_base_domains
+     | mandatory('domains_node_base_domains: ' ~ domains_node_base_domains_file ~ ' has no vpn_server_remnawave_node_base_domains')) }}
+
+domains_keys:
+  main: "{{ inventory_hostname }}.{{ domains_node_base_domains.main }}"
+  remna_node: >-
+    {%- set types = domains_node.remna_node_types | default(domains_node_remna_node_spec | map(attribute='key') | list, true) -%}
+    {%- set out = [] -%}
+    {%- for spec in domains_node_remna_node_spec if spec.key in types -%}
+    {%-   set prefix = remna_node_domain_types_allowlist[spec.key] -%}
+    {%-   set suffix = ('-' ~ (domains_node[spec.index ~ '_location_index']
+                               | mandatory('domains_node.' ~ spec.index ~ '_location_index of ' ~ inventory_hostname ~ ' is needed for ' ~ spec.key)))
+                       if spec.index is defined else '' -%}
+    {%-   set _ = out.append({'domain': prefix.value ~ suffix ~ '.' ~ domains_node_base_domains[spec.base],
+                              'type': prefix.type}) -%}
+    {%- endfor -%}
+    {{ out + (domains_node.remna_node_extra | default([], true)) }}

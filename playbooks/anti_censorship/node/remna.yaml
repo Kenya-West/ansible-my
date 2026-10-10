@@ -5,4 +5,8 @@
   become_user: "{{ standard_user }}"
   
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: vpn_server_remnawave
+        resolve_host_relations_component: remna
     - install_vpn_caddy_remna

@@ -1,0 +1,18 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: Resolve {{ case.name }}
+  ansible.builtin.include_role:
+    name: kwtoolset/resolve_host_relations
+  vars:
+    resolve_host_relations_group: "{{ case.group }}"
+    resolve_host_relations_component: "{{ case.component }}"
+    resolve_host_relations_source: "{{ case.source | default(host_relations) }}"
+
+- name: Check {{ case.name }}
+  ansible.builtin.assert:
+    that:
+      - resolve_host_relations_host == case.host
+      - resolve_host_relations_hosts == case.hosts
+    fail_msg: >-
+      Expected {{ case.host }} / {{ case.hosts }}, got
+      {{ resolve_host_relations_host }} / {{ resolve_host_relations_hosts }}

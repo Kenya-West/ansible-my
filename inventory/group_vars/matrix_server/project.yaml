@@ -1,0 +1,6 @@
+---
+matrix_server:
+  project:
+    root: matrix-server
+    paths:
+      synapse: "{{ matrix_server.project.root }}/synapse"

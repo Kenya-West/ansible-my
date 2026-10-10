@@ -1,0 +1,83 @@
+---
+# Entry point (tasks_from: clean_config_profiles). Deletes every config profile
+# of the panel on the host the role runs against that carries all the primary
+# tags of vpn_server_remnawave_tags. Profiles without them are never touched,
+# and neither are the ones a node still activates or whose name is in
+# vpn_server_remnawave_config_profiles_protected: the panel reserves some names
+# (Default-Profile), so such a profile could not be created again.
+
+- name: Check the tags the role filters by
+  ansible.builtin.include_tasks: validate_tags.yml
+
+- name: Clean the panel of this host
+  module_defaults:
+    group/kenyawest.remnawave.remnawave:
+      panel_url: "{{ crpgs_panel.panel_url }}"
+      token: "{{ crpgs_panel.token }}"
+      api_key: "{{ crpgs_panel.api_key }}"
+      validate_certs: "{{ crpgs_panel.validate_certs }}"
+      timeout: "{{ crpgs_panel.timeout }}"
+  block:
+    - name: Read the config profiles and nodes in the panel
+      ansible.builtin.include_tasks: read_panel.yml
+      vars:
+        crpgs_gather:
+          config_profiles: {}
+          nodes: {}
+
+    - name: Pick the config profiles carrying the primary tags
+      ansible.builtin.set_fact:
+        crpgs_clean_tagged: "{{ remnawave_gathered.config_profiles | remnawave_select_tagged(crpgs_primary_tags) }}"
+        crpgs_clean_kept: >-
+          {{
+            remnawave_gathered.config_profiles
+            | remnawave_select_tagged(crpgs_primary_tags)
+            | remnawave_select_profiles_kept(remnawave_gathered.nodes, vpn_server_remnawave_config_profiles_protected)
+          }}
+
+    - name: Leave out the config profiles in use or protected
+      ansible.builtin.set_fact:
+        crpgs_clean_profiles: "{{ crpgs_clean_tagged | rejectattr('uuid', 'in', crpgs_clean_kept | map(attribute='uuid') | list) | list }}"
+
+    - name: Report the config profiles to clean
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            ['%d config profiles of %s carry %s and will be deleted:' | format(
+                crpgs_clean_profiles | length, inventory_hostname,
+                crpgs_primary_tags | join(', '))]
+            + crpgs_clean_profiles | map(attribute='name') | list
+            + ['%d kept, because a node uses them or their name is protected:' | format(crpgs_clean_kept | length)]
+            + crpgs_clean_kept | map(attribute='name') | list
+          }}
+
+    - name: Confirm the cleaning
+      ansible.builtin.pause:
+        prompt: Type 'yes' to delete the config profiles listed above
+      register: crpgs_clean_answer
+      when:
+        - crpgs_clean_profiles | length > 0
+        - not ansible_check_mode
+        - not vpn_server_remnawave_config_profiles_clean_confirm | bool
+
+    - name: The cleaning must be confirmed
+      ansible.builtin.assert:
+        that:
+          - >-
+            ansible_check_mode
+            or vpn_server_remnawave_config_profiles_clean_confirm | bool
+            or crpgs_clean_answer.user_input | default('') | trim | lower == 'yes'
+        fail_msg: Not confirmed. Nothing was changed.
+        quiet: true
+      when: crpgs_clean_profiles | length > 0
+
+    # By UUID: a profile renamed by hand since it was read is still the one
+    # listed above.
+    - name: Clean the config profiles
+      kenyawest.remnawave.config_profile:
+        name: "{{ item.uuid }}"
+        state: absent
+      loop: "{{ crpgs_clean_profiles }}"
+      loop_control:
+        label: "{{ item.name }}"
+      delegate_to: localhost

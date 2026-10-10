@@ -1,0 +1,103 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: Test kwtoolset/resolve_host_relations
+  hosts: localhost
+  gather_facts: false
+  vars:
+    host_relations:
+      default:
+        hosts:
+          - host: somehosting-zz-2
+            priority: 20
+          - host: somehosting-zz-1
+            priority: 10
+
+      analytics_server:
+        hosts:
+          - host: somehosting-zz-4
+          - host: somehosting-zz-1
+            priority: 5
+
+        components:
+          pushgateway:
+            hosts:
+              - host: somehosting-zz-3
+
+      vpn_server_remnawave:
+
+    cases:
+      - name: component level
+        group: analytics_server
+        component: pushgateway
+        host: somehosting-zz-3
+        hosts: [somehosting-zz-3]
+      - name: group level, missing priority sorts after explicit ones
+        group: analytics_server
+        component: grafana
+        host: somehosting-zz-1
+        hosts: [somehosting-zz-1, somehosting-zz-4]
+      - name: default level through an empty group, sorted by priority
+        group: vpn_server_remnawave
+        component: panel
+        host: somehosting-zz-1
+        hosts: [somehosting-zz-1, somehosting-zz-2]
+      - name: default level without a group
+        group: ""
+        component: ""
+        host: somehosting-zz-1
+        hosts: [somehosting-zz-1, somehosting-zz-2]
+      - name: no host_relations
+        group: analytics_server
+        component: pushgateway
+        source: {}
+        host: ""
+        hosts: []
+
+  tasks:
+    - name: Add the relation hosts to the inventory
+      ansible.builtin.add_host:
+        name: "somehosting-zz-{{ item }}"
+        ansible_connection: local
+      loop: [1, 2, 3, 4]
+
+    - name: Resolve and check every case
+      ansible.builtin.include_tasks: test_case.yml
+      loop: "{{ cases }}"
+      loop_control:
+        loop_var: case
+        label: "{{ case.name }}"
+
+    - name: Resolve a bare list relation
+      block:
+        - name: Resolve a bare list relation
+          ansible.builtin.include_role:
+            name: kwtoolset/resolve_host_relations
+          vars:
+            resolve_host_relations_source:
+              default:
+                - host: somehosting-zz-1
+        - name: Fail, a bare list relation resolved
+          ansible.builtin.fail:
+            msg: A bare list relation must not resolve.
+      rescue:
+        - name: Check the bare list relation failed on its shape
+          ansible.builtin.assert:
+            that: "'must map every relation' in ansible_failed_result.msg"
+
+    - name: Resolve a relation host outside the inventory
+      block:
+        - name: Resolve a relation host outside the inventory
+          ansible.builtin.include_role:
+            name: kwtoolset/resolve_host_relations
+          vars:
+            resolve_host_relations_source:
+              default:
+                hosts:
+                  - host: somehosting-zz-99
+        - name: Fail, a relation host outside the inventory resolved
+          ansible.builtin.fail:
+            msg: A relation host outside the inventory must not resolve.
+      rescue:
+        - name: Check the relation host outside the inventory failed
+          ansible.builtin.assert:
+            that: "'whose hosts are in the inventory' in ansible_failed_result.msg"

@@ -22,6 +22,28 @@
   tags:
     - always
 
+- name: Check which source_paths actually exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ source_paths }}"
+  delegate_to: localhost
+  become: false
+  register: source_paths_stat
+  tags:
+    - always
+
+- name: Exclude non-existing paths from source_paths
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        source_paths_stat.results
+        | selectattr('stat.exists')
+        | map(attribute='item')
+        | list
+      }}
+  tags:
+    - always
+
 - name: Fail if role_state is not 'present' or 'absent'
   ansible.builtin.fail:
     msg: "Invalid role_state '{{ role_state }}'. Must be 'present' or 'absent'."

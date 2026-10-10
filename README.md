@@ -222,6 +222,19 @@ Luckily, [there are playbooks](https://github.com/Kenya-West/ansible-my/wiki/Ini
 
 Dive into wiki for detailed configuration steps.
 
+The steps are launchers of the roles under `roles/setup/`; each role's README has the details:
+
+```bash
+# 1. inventory file, localhost in its sections, standard user
+ansible-playbook -i inventory/production.ini playbooks/scenarios/initial_configure_step1.yaml
+# 2. secrets the nodes share, in inventory/group_vars/all/z_common_hosts_secrets
+ansible-playbook -i inventory/production.ini playbooks/scenarios/initial_configure_step2.yaml
+# 3. a new host: its inventory record and inventory/host_vars/<hostname>/
+ansible-playbook -i inventory/production.ini playbooks/ansible/node/add_host_initial.yaml
+# 4. a new server: its inventory record and inventory/host_vars/<hostname>/ with its own secrets
+ansible-playbook -i inventory/production.ini playbooks/ansible/server/add_server_initial.yaml
+```
+
 ## 📖 Usage
 
 The usage process of this Ansible project is quite complex, and because it is designed for modularity, there are several ways to run it.
@@ -255,6 +268,7 @@ Playbooks:
    - `0_start_step_*.yaml`: contains automated steps to run base and bootstrap playbooks, decomposed to smaller steps to make it easier to debug and run;
    - `base/*.yaml`: concise playbooks for basic node setup, like installing packages, configuring shell/profile, and system hardening;
     - `install_vpn_caddy*.yaml`, `install_vpnremna_on_server_*.yaml`, `install_analytics_on_node*.yaml`, `install_analytics_on_server*.yaml`, `install_backup_on_node*.yaml`: playbooks that install specific services on the node and server, like VPN, analytics, and backup;
+   - `scenarios/initial_configure_step1.yaml`, `scenarios/initial_configure_step2.yaml` `ansible/node/add_host_initial.yaml` and `ansible/server/add_server_initial.yaml`: launchers of the roles under `roles/setup/`, which configure this project itself: the inventory file and the standard user, the secrets the nodes share, and a new node or server record with its `host_vars/` (a server's secrets included);
 
 `inventory/group_vars`:
 - `all/`: Variables applied to all hosts
@@ -269,7 +283,7 @@ Playbooks:
 - `vpn_caddy/`: Variables for the vpn_caddy group
 - `vpn_remna_server_caddy/`: Variables for the vpn_remna_server_caddy group
 
-The `inventory/group_vars/all/z_common_hosts_secrets/` contains shared variables with for all roles that are considered secrets but should be shared to every host.
+The `inventory/group_vars/all/z_common_hosts_secrets/` contains shared variables with for all roles that are considered secrets but should be shared to every host. The secrets of a server are not there: they live in that server's `host_vars/`, and the nodes read them through `host_relations`.
 
 `inventory/host_vars`:
 - `hostname-1`: Any variables that are specific to `hostname-1` a single host can be placed in `host_vars/` directory. This allows you to define host-specific configurations without cluttering the main playbooks. `hostname-1` is a placeholder for any hostname you want to configure.
@@ -366,6 +380,7 @@ ansible-my/
 ├── host_vars/                    # Host-specific variables
 ├── roles/                        # Ansible custom roles
 │   ├── kwtoolset/               # Custom utility roles
+│   ├── setup/                   # Roles that configure this project itself (inventory, secrets, hosts)
 │   ├── install_*/               # Installation roles
 │   └── requirements.yaml        # Role dependencies
 ├── assets/                       # Static files and templates

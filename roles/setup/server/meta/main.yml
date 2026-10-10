@@ -1,0 +1,15 @@
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: Kenya-West
+  description: >-
+    Add a server to the inventory: ask for its name parts, address, server
+    groups and domains, generate its own secrets, then write
+    host_vars/<hostname>/ and the inventory sections.
+  license: MIT
+  min_ansible_version: '2.19'
+  galaxy_tags:
+    - setup
+    - inventory
+    - secrets
+
+dependencies: []

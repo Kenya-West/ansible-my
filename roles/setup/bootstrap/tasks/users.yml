@@ -1,0 +1,40 @@
+---
+- name: Ask for the standard user
+  ansible.builtin.include_role:
+    name: ansible-prompting-engine
+  vars:
+    prompting_engine_spec_file: "{{ setup_bootstrap_role_path }}/vars/prompts/users.yml"
+    prompting_engine_answers: "{{ setup_bootstrap_prompt_answers }}"
+
+- name: Read {{ setup_bootstrap_users_file }}
+  ansible.builtin.slurp:
+    src: "{{ setup_bootstrap_users_file }}"
+  register: __setup_bootstrap_users_slurp
+
+- name: Name the first user of users_to_set {{ standard_user }}
+  ansible.builtin.set_fact:
+    __setup_bootstrap_users: >-
+      {{ __setup_bootstrap_users_data
+         | combine({'users_to_set': [__setup_bootstrap_users_data.users_to_set[0] | combine({'name': standard_user})]
+                                    + __setup_bootstrap_users_data.users_to_set[1:]}) }}
+  vars:
+    __setup_bootstrap_users_data: "{{ __setup_bootstrap_users_slurp.content | b64decode | from_yaml }}"
+
+- name: Write {{ setup_bootstrap_users_file }}
+  ansible.builtin.copy:
+    dest: "{{ setup_bootstrap_users_file }}"
+    content: "{{ __setup_bootstrap_users | to_nice_yaml(indent=2) }}"
+    mode: "0664"
+    backup: true
+
+- name: Render the initial group_vars
+  ansible.builtin.include_role:
+    name: setup/common
+    tasks_from: render_tree
+  vars:
+    setup_render_tree_src: "{{ setup_bootstrap_role_path }}/templates/{{ setup_bootstrap_render_item.src }}"
+    setup_render_tree_dest: "{{ setup_bootstrap_inventory_dir }}/{{ setup_bootstrap_render_item.dest }}"
+  loop: "{{ setup_bootstrap_render }}"
+  loop_control:
+    loop_var: setup_bootstrap_render_item
+    label: "{{ setup_bootstrap_render_item.dest }}"

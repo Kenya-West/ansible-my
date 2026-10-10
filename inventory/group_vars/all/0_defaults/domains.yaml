@@ -1,0 +1,10 @@
+# Every domain of the host, flattened from domains_keys: a string value is
+# one domain, a list holds domains or {domain, type} entries (remna_node).
+domains: >-
+  {%- set out = [] -%}
+  {%- for value in domains_keys.values() -%}
+  {%-   for item in ([value] if value is string or value is mapping else value) -%}
+  {%-     set _ = out.append(item.domain if item is mapping else item) -%}
+  {%-   endfor -%}
+  {%- endfor -%}
+  {{ out | unique | list }}

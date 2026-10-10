@@ -5,4 +5,8 @@
   become_user: root
 
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: vpn_server_remnawave
+        resolve_host_relations_component: tblocker
     - role: install_vpn_caddy_tblocker

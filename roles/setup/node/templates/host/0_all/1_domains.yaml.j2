@@ -1,0 +1,19 @@
+{% set o = '{{' %}
+{% set c = '}}' %}
+{% if setup_node_remna_node_enabled %}
+domains_node:
+  net_location_index: {{ initial_configure_host_net_location_index }}
+  chain_location_index: {{ initial_configure_host_chain_location_index }}
+{% else %}
+domains_keys:
+  main: "{{ o }} inventory_hostname {{ c }}.{{ initial_configure_host_base_domain_name }}"
+  remna_node: []
+{% endif %}
+
+{% if initial_configure_host_default_relation_host | default('', true) | length > 0 %}
+host_relations:
+  default:
+    hosts:
+      - host: {{ initial_configure_host_default_relation_host }}
+
+{% endif %}

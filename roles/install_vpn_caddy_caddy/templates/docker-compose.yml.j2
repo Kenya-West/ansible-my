@@ -36,6 +36,7 @@ services:
       caddy.handle_path.basic_auth.prometheus: "${METRICS_PROMETHEUS_USER_PASSWORD}"
       caddy.handle_path.basic_auth.client: "${METRICS_CLIENT_USER_PASSWORD}"
       caddy.handle_path.metrics: ""
+      UFW_MANAGED: "TRUE"
     restart: unless-stopped
 
 networks:

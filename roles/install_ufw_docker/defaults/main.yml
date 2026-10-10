@@ -1,0 +1,40 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/install_ufw_docker
+ufw_docker_bin_dir: /usr/local/bin
+
+ufw_docker_url: https://raw.githubusercontent.com/chaifeng/ufw-docker/master/ufw-docker
+ufw_docker_bin: "{{ ufw_docker_bin_dir }}/ufw-docker"
+# Extra arguments for `ufw-docker install`, e.g. "--docker-subnets" to use the subnets of all Docker networks
+ufw_docker_install_args: ""
+
+ufw_docker_automated_repo: shinebayar-g/ufw-docker-automated
+ufw_docker_automated_bin: "{{ ufw_docker_bin_dir }}/ufw-docker-automated"
+ufw_docker_automated_service_name: ufw-docker-automated
+
+# Installed with eget when missing on the host, `repo` is what goes to packages_binary_list
+ufw_docker_binaries:
+  - repo: "{{ ufw_docker_url }}"
+    path: "{{ ufw_docker_bin }}"
+  - repo: "{{ ufw_docker_automated_repo }}"
+    path: "{{ ufw_docker_automated_bin }}"
+
+ufw_docker_systemd_unit_configs:
+  - name: "{{ ufw_docker_automated_service_name }}"
+    type: service
+    enabled: true
+    state: started
+    Unit:
+      Description: Ufw docker automated
+      Documentation: https://github.com/shinebayar-g/ufw-docker-automated
+      After: network-online.target ufw.service docker.service containerd.service
+      Wants: network-online.target
+      Requires: ufw.service
+    Service:
+      # Manages ufw rules, so it has to run as root
+      User: root
+      ExecStart: "{{ ufw_docker_automated_bin }}"
+      Restart: always
+      RestartSec: "5s"
+    Install:
+      WantedBy: multi-user.target

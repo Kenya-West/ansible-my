@@ -1,0 +1,12 @@
+xray_checker_subscription_urls:
+  - <subscription URL of the Remnawave panel to check>
+
+xray_checker_web_public: false
+
+xray_checker_server_users:
+  - name: {{ standard_user }}
+    password: "{{ initial_configure_generated_password_analytics_server_xray_checker_user }}"
+    hash_scheme: bcrypt
+  - name: prometheus
+    password: "{{ initial_configure_generated_password_analytics_server_xray_checker_prometheus }}"
+    hash_scheme: bcrypt

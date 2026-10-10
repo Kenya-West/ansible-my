@@ -1,0 +1,40 @@
+{% set o = '{{' %}
+{% set c = '}}' %}
+{% if setup_node_backup_restic_remotes | length > 0 %}
+backup_restic_node_locations_additional:
+  postgres:
+    from: "{{ o }} pgdump_backup_location_root_path {{ c }}"
+    to:
+{% for remote in setup_node_backup_restic_remotes %}
+      - {{ remote }}
+{% endfor %}
+    cron: 0 0 * * FRI
+    options:
+      tobereplacedwith: complete_options
+
+# The restic repository password of this host on every remote of
+# backup_restic_node_remotes_base. Generated once, here; keep it safe.
+backup_restic_node_remotes_additional:
+{% for remote in setup_node_backup_restic_remotes %}
+  {{ remote }}:
+    key: {{ lookup('community.general.random_string', length=86, special=false) }}
+{% endfor %}
+{% else %}
+# No remote is known to the controller (backup_restic_node_remotes_base is not
+# defined for it). Fill in the remotes of this host the way the other hosts do:
+#
+# backup_restic_node_locations_additional:
+#   postgres:
+#     from: "{{ o }} pgdump_backup_location_root_path {{ c }}"
+#     to:
+#       - <remote name>
+#     cron: 0 0 * * FRI
+#     options:
+#       tobereplacedwith: complete_options
+#
+# backup_restic_node_remotes_additional:
+#   <remote name>:
+#     key: <restic repository password>
+backup_restic_node_locations_additional: {}
+backup_restic_node_remotes_additional: {}
+{% endif %}

@@ -7,4 +7,8 @@
     RCLONE_CONFIG_PASS: "{{ rclone_password | default(omit) }}"
 
   roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: backup_restic_server
+        resolve_host_relations_component: rclone
     - install_backup_node_rclone

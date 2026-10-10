@@ -1,0 +1,13 @@
+---
+analytics_node:
+  project:
+    root: analytics-node
+    paths:
+      logporter: "{{ analytics_node.project.root }}/logporter"
+      caddy_exporter: "{{ analytics_node.project.root }}/caddy_exporter"
+      docker_exporter: "{{ analytics_node.project.root }}/docker_exporter"
+      frps_exporter: "{{ analytics_node.project.root }}/frps_exporter"
+      node_exporter: "{{ analytics_node.project.root }}/node_exporter"
+      fail2ban_exporter: "{{ analytics_node.project.root }}/fail2ban_exporter"
+      vector: "{{ analytics_node.project.root }}/vector"
+      pushgateway: "{{ analytics_node.project.root }}/pushgateway"

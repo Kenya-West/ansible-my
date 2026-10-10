@@ -1,0 +1,9 @@
+---
+# Clean UFW down to SSH, then install ufw-docker and ufw-docker-automated.
+# Order matters: the cleanup must come first, see the comment in the migrate playbook.
+# Supports --check.
+- name: Remove UFW rules except SSH
+  ansible.builtin.import_playbook: ufw_migrate_to_ufw_docker_automated.yaml
+
+- name: Install ufw-docker and ufw-docker-automated
+  ansible.builtin.import_playbook: ufw_docker.yaml

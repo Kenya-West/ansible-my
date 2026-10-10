@@ -1,0 +1,8 @@
+---
+backup_restic_node:
+  project:
+    root: backup-restic-node
+    paths:
+      rclone: "{{ backup_restic_node.project.root }}/rclone"
+      autorestic: "{{ backup_restic_node.project.root }}/autorestic"
+      postgres: "{{ backup_restic_node.project.root }}/postgres"

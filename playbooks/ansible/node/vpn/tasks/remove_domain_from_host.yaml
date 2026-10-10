@@ -1,4 +1,8 @@
 ---
+# Removes remove_domains_from_list_caddy_new_domain from domains_node.remna_node_extra
+# of the host's 0_all/1_domains.yaml. A domain generated from domains_node
+# (group_vars/vpn_caddy/domain_generator.yaml) is not removed here: drop its
+# key from domains_node.remna_node_types instead.
 
 - name: "{{ __host_name }}: check domains file exists"
   ansible.builtin.stat:
@@ -24,42 +28,57 @@
         src: "{{ __host_domains_file }}"
       register: __host_slurp
 
-    - name: "{{ __host_name }}: decode and parse the domains file"
+    - name: "{{ __host_name }}: parse the domains file and the current domains"
       ansible.builtin.set_fact:
-        __host_content: "{{ __host_slurp.content | b64decode }}"
         __host_parsed: "{{ (__host_slurp.content | b64decode) | from_yaml }}"
+        __host_current_domains: >-
+          {{ (hostvars[__host_name].domains_keys | default({})).remna_node | default([])
+             | map(attribute='domain') | list }}
 
     - name: "{{ __host_name }}: validate expected schema"
       ansible.builtin.assert:
         that:
-          - __host_parsed.domains_keys is defined
-          - __host_parsed.domains_keys.remna_node is defined
-          - __host_parsed.domains_keys.remna_node is sequence
-          - "__host_content is search('(?m)^\\s*remna_node:\\s*(\\[\\]\\s*)?$')"
-        fail_msg: "Unexpected schema for domains_keys.remna_node in {{ __host_domains_file }}"
+          - __host_parsed is mapping
+          - __host_parsed.domains_node is defined
+          - __host_parsed.domains_node is mapping
+          - __host_parsed.domains_node.remna_node_extra | default([], true) is sequence
+        fail_msg: "{{ __host_domains_file }} has no domains_node (not a generated node)"
 
-    - name: "{{ __host_name }}: remove domain when present"
-      when: remove_domains_from_list_caddy_new_domain in (__host_parsed.domains_keys.remna_node | map(attribute='domain') | list)
+    - name: "{{ __host_name }}: settle the extra entries"
+      ansible.builtin.set_fact:
+        __host_extra: "{{ __host_parsed.domains_node.remna_node_extra | default([], true) }}"
+
+    - name: "{{ __host_name }}: remove the matching entry from remna_node_extra"
+      when: remove_domains_from_list_caddy_new_domain in (__host_extra | map(attribute='domain') | list)
       block:
-        - name: "{{ __host_name }}: remove the matching entry from remna_node"
-          ansible.builtin.set_fact:
-            __host_content_final: >-
-              {{
-                __host_content
-                | regex_replace('(?m)^[ \t]*- domain: "?' ~ (remove_domains_from_list_caddy_new_domain | regex_escape) ~ '"?[ \t]*\n[ \t]*type: [^\n]*\n?', '')
-              }}
-
         - name: "{{ __host_name }}: write the updated domains file"
           ansible.builtin.copy:
             dest: "{{ __host_domains_file }}"
-            content: "{{ __host_content_final }}"
+            mode: preserve
+            content: >-
+              {{ __host_parsed
+                 | combine({'domains_node': (__host_parsed.domains_node
+                            | dict2items | rejectattr('key', 'equalto', 'remna_node_extra') | items2dict)
+                            | combine({'remna_node_extra': __host_rest}
+                                      if __host_rest | length > 0 else {})})
+                 | to_nice_yaml(indent=2, sort_keys=false) }}
+          vars:
+            __host_rest: >-
+              {{ __host_extra | rejectattr('domain', 'equalto', remove_domains_from_list_caddy_new_domain) | list }}
 
         - name: "{{ __host_name }}: append report entry (removed)"
           ansible.builtin.set_fact:
             __report: "{{ __report + [{'host': __host_name, 'status': 'removed'}] }}"
 
+    - name: "{{ __host_name }}: append report entry (generated)"
+      when:
+        - remove_domains_from_list_caddy_new_domain not in (__host_extra | map(attribute='domain') | list)
+        - remove_domains_from_list_caddy_new_domain in __host_current_domains
+      ansible.builtin.set_fact:
+        __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'generated from domains_node, drop its type from domains_node.remna_node_types'}] }}"
+
     - name: "{{ __host_name }}: append report entry (not found)"
-      when: remove_domains_from_list_caddy_new_domain not in (__host_parsed.domains_keys.remna_node | map(attribute='domain') | list)
+      when: remove_domains_from_list_caddy_new_domain not in __host_current_domains
       ansible.builtin.set_fact:
         __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'not found'}] }}"
   rescue:

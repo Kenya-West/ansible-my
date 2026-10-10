@@ -30,4 +30,4 @@ transforms:
       .service = "docker"
 
 # Отправка логов в Loki
-{{ vector_sinks | to_nice_yaml(indent=2, sort_keys=false) }}
+{{ install_analytics_node_vector_sinks | to_nice_yaml(indent=2, sort_keys=false) }}

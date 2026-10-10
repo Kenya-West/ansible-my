@@ -29,4 +29,4 @@ vless_reality_xhttp_001:
     realitySettings:
       password: "{{ vpn_server_remnawave_xray_reality_password }}"
       serverName: "{{ node_address }}"
-      fingerprint: chrome
+      fingerprint: firefox

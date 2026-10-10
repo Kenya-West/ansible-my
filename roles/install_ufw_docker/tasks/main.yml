@@ -1,0 +1,113 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/install_ufw_docker
+- name: Check that UFW is active
+  ansible.builtin.command: ufw status
+  register: ufw_docker_ufw_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags:
+    - always
+
+- name: Check that Docker is installed
+  ansible.builtin.command: docker --version
+  register: ufw_docker_docker_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags:
+    - always
+
+- name: Assert UFW is active
+  ansible.builtin.assert:
+    that:
+      - "'Status: active' in ufw_docker_ufw_status.stdout"
+    fail_msg: >-
+      ufw-docker needs active UFW (playbooks/networking/ufw.yaml) on {{ inventory_hostname }}.
+    quiet: true
+  # In --check mode a preceding play may only have *planned* to enable UFW
+  when: not ansible_check_mode
+  tags:
+    - always
+
+- name: Assert Docker is in place
+  ansible.builtin.assert:
+    that:
+      - ufw_docker_docker_check.rc == 0
+    fail_msg: >-
+      ufw-docker needs Docker (playbooks/base/docker.yaml) on {{ inventory_hostname }}.
+    quiet: true
+  tags:
+    - always
+
+- name: Check which binaries are already in place
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  loop: "{{ ufw_docker_binaries }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: ufw_docker_bins_stat
+  tags:
+    - always
+
+- name: Find the binaries that are not on the host
+  ansible.builtin.set_fact:
+    ufw_docker_binaries_missing: "{{ ufw_docker_bins_stat.results | rejectattr('stat.exists') | map(attribute='item') | list }}"
+  tags:
+    - always
+
+# Downloaded on the controller and synchronized to the host, only what is missing.
+# Skipped in --check mode: the download/sync tasks are shell/command based and would not run
+- name: Report binaries that would be installed (check mode)
+  ansible.builtin.debug:
+    msg: "Would install with eget: {{ ufw_docker_binaries_missing | map(attribute='path') | list }}"
+  when:
+    - ansible_check_mode
+    - ufw_docker_binaries_missing | length > 0
+  tags:
+    - install_binaries
+
+- name: Install the missing binaries using eget
+  ansible.builtin.include_role:
+    name: copy_eget_binaries_from_controller
+    apply:
+      tags:
+        - install_binaries
+  vars:
+    packages_binary_list: "{{ ufw_docker_binaries_missing }}"
+    eget_host_bin_dir: "{{ ufw_docker_bin_dir }}"
+  when:
+    - not ansible_check_mode
+    - ufw_docker_binaries_missing | length > 0
+  tags:
+    - install_binaries
+
+# Idempotent: rewrites /etc/ufw/after.rules and after6.rules (with a backup) only if they differ,
+# and says "Backing up" on stderr when it does. The command module skips it in --check mode.
+- name: Install ufw-docker rules into UFW
+  ansible.builtin.command:
+    argv: "{{ [ufw_docker_bin, 'install'] + ufw_docker_install_args.split() }}"
+  register: ufw_docker_install
+  changed_when: "'Backing up' in ufw_docker_install.stderr"
+  notify: Restart ufw
+  tags:
+    - install_rules
+
+- name: Apply new UFW rules before the service starts managing them
+  ansible.builtin.meta: flush_handlers
+  tags:
+    - install_rules
+
+- name: Install SystemD unit of ufw-docker-automated
+  ansible.builtin.include_role:
+    name: 0x0I.systemd
+    apply:
+      tags:
+        - install_systemd_service
+        - update_systemd_service
+  vars:
+    unit_config: "{{ ufw_docker_systemd_unit_configs }}"
+  tags:
+    - install_systemd_service
+    - update_systemd_service

@@ -1,0 +1,35 @@
+---
+# defaults file for roles/setup/bootstrap
+
+# Where the inventory lives. When the play runs against an inventory
+# (-i inventory/production.ini) its directory and file are used; otherwise the
+# project's inventory/production.ini is created from scratch.
+setup_bootstrap_project_dir: "{{ (role_path ~ '/../../..') | realpath }}"
+setup_bootstrap_inventory_dir: "{{ inventory_dir | default(setup_bootstrap_project_dir ~ '/inventory', true) }}"
+setup_bootstrap_inventory_file: "{{ inventory_file | default(setup_bootstrap_inventory_dir ~ '/production.ini', true) }}"
+
+# Sections of the inventory file that get a localhost entry, so that the
+# controller itself can be a target of the playbooks.
+setup_bootstrap_localhost_sections:
+  - general_vps_prepare
+  - vpn_caddy
+  - analytics_node
+  - analytics_server
+  - proxy_client
+  - backup_restic_server
+  - backup_restic_node
+setup_bootstrap_localhost_option: localhost ansible_connection
+setup_bootstrap_localhost_value: local ansible_become=false
+
+# The group_vars file whose first user gets the name entered at the prompt.
+setup_bootstrap_users_file: "{{ setup_bootstrap_inventory_dir }}/group_vars/general_vps_prepare/users.yaml"
+
+# Trees rendered once the username is known: sources relative to this role's
+# templates/ directory, destinations to the inventory directory.
+setup_bootstrap_render:
+  - src: group_vars_initial/all/z_common_hosts_secrets
+    dest: group_vars/all/z_common_hosts_secrets
+
+# Preset answers for the prompts, by prompt id (see vars/prompts/users.yml),
+# for unattended runs together with prompting_engine_interactive=false.
+setup_bootstrap_prompt_answers: {}

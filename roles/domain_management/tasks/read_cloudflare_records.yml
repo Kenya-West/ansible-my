@@ -1,116 +1,42 @@
 ---
-# Reads (never mutates) every DNS record of the Cloudflare zones that host any of
-# the `managed_domains`. `community.general.cloudflare_dns` only *manages* records,
-# so we call the Cloudflare v4 REST API directly with `ansible.builtin.uri`.
+# Reads (never mutates) the Ansible-managed DNS records of the Cloudflare zones
+# that host any of the `managed_domains`. Only records whose comment carries the
+# `dns_hosting_tags` primary filter are read:
 #
-# Shared by scenarios that need the current DNS state (get_all, host validation).
-# All records are collected regardless of type; callers filter as needed.
+#   GET /zones/{zone_id}/dns_records?comment.contains=managed-by%3Dansible
 #
-# Requires (from dns_resolve_context.yml): cloudflare_providers, managed_domains.
+# Records created outside Ansible (no tag in the comment) are invisible to every
+# scenario built on this file. All matching records are collected regardless of
+# type; callers filter as needed.
+#
+# Requires (from dns_resolve_context.yml):
+#   cloudflare_providers, managed_domains, dns_primary_filter_query, dns_primary_filter_regex.
 # Produces (run_once, group-wide, on localhost):
+#   * cf_zones           (every accessible zone, see read_cloudflare_zones.yml)
 #   * cf_relevant_zones  (zones hosting a managed domain, tagged with _cf_provider/_cf_domains)
-#   * cloudflare_records (every record of those zones, tagged with _zone/_provider)
+#   * cloudflare_records (managed records of those zones, tagged with _zone/_provider)
 
-# --- List zones (paginated) -------------------------------------------------
-
-- name: Fetch the first page of Cloudflare zones for every provider
-  ansible.builtin.uri:
-    url: "https://api.cloudflare.com/client/v4/zones?per_page=50&page=1"
-    method: GET
-    headers:
-      Authorization: "Bearer {{ provider.api_token }}"
-    return_content: false
-  loop: "{{ cloudflare_providers }}"
-  loop_control:
-    loop_var: provider
-    label: "{{ provider.name }}"
-  register: cf_zones_page1
-  changed_when: false
-  check_mode: false
-  run_once: true
-  delegate_to: localhost
-  when: managed_domains | length > 0
-  tags:
-    - always
-
-- name: Compute the remaining zone pages that still need to be fetched
-  ansible.builtin.set_fact:
-    cf_extra_page_requests: >-
-      {{
-        cf_extra_page_requests | default([])
-        + ([r.provider]
-           | product(range(2, (r.json.result_info.total_pages | int) + 1) | list)
-           | list)
-      }}
-  loop: "{{ cf_zones_page1.results | default([]) }}"
-  loop_control:
-    loop_var: r
-    label: "{{ r.provider.name }}"
-  run_once: true
-  delegate_to: localhost
-  when: managed_domains | length > 0
-  tags:
-    - always
-
-- name: Fetch the remaining pages of Cloudflare zones
-  ansible.builtin.uri:
-    url: "https://api.cloudflare.com/client/v4/zones?per_page=50&page={{ item.1 }}"
-    method: GET
-    headers:
-      Authorization: "Bearer {{ item.0.api_token }}"
-    return_content: false
-  loop: "{{ cf_extra_page_requests | default([]) }}"
-  loop_control:
-    loop_var: item
-    label: "{{ item.0.name }} (page {{ item.1 }})"
-  register: cf_zones_extra
-  changed_when: false
-  check_mode: false
-  run_once: true
-  delegate_to: localhost
-  tags:
-    - always
-
-- name: Reset the accumulated zone list
-  ansible.builtin.set_fact:
-    cf_zones: []
-  run_once: true
-  delegate_to: localhost
-  tags:
-    - always
-
-- name: Collect zones from the first page, tagging each with its provider
-  ansible.builtin.set_fact:
-    cf_zones: >-
-      {{ cf_zones + (r.json.result | map('combine', {'_cf_provider': r.provider}) | list) }}
-  loop: "{{ cf_zones_page1.results | default([]) }}"
-  loop_control:
-    loop_var: r
-    label: "{{ r.provider.name }}"
-  run_once: true
-  delegate_to: localhost
-  tags:
-    - always
-
-- name: Collect zones from the remaining pages, tagging each with its provider
-  ansible.builtin.set_fact:
-    cf_zones: >-
-      {{ cf_zones + (r.json.result | map('combine', {'_cf_provider': r.item.0}) | list) }}
-  loop: "{{ cf_zones_extra.results | default([]) }}"
-  loop_control:
-    loop_var: r
-    label: "{{ r.item.0.name }} (page {{ r.item.1 }})"
-  run_once: true
-  delegate_to: localhost
+- name: List the accessible Cloudflare zones
+  ansible.builtin.include_tasks: read_cloudflare_zones.yml
   tags:
     - always
 
 # --- Match zones to managed domains ----------------------------------------
 
+- name: Reset the relevant zone list
+  ansible.builtin.set_fact:
+    cf_relevant_zones: []
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
+# `dns_read_all_zones: true` keeps every accessible zone (used by the sync
+# scenario to find records in zones no declared domain points at any more).
 - name: Keep only zones that host at least one managed domain
   ansible.builtin.set_fact:
     cf_relevant_zones: >-
-      {{ cf_relevant_zones | default([]) + [zone | combine({'_cf_domains': _zone_domains})] }}
+      {{ cf_relevant_zones + [zone | combine({'_cf_domains': _zone_domains})] }}
   loop: "{{ cf_zones | default([]) }}"
   loop_control:
     loop_var: zone
@@ -122,7 +48,7 @@
       {{ managed_domains
          | select('search', '(^|\.)' ~ (zone.name | regex_escape) ~ '$')
          | list }}
-  when: _zone_domains | length > 0
+  when: (dns_read_all_zones | default(false) | bool) or (_zone_domains | length > 0)
   run_once: true
   delegate_to: localhost
   tags:
@@ -132,36 +58,36 @@
   ansible.builtin.debug:
     msg: >-
       These managed domains were not found in any accessible Cloudflare zone:
-      {{ managed_domains | difference(cf_relevant_zones | default([]) | map(attribute='_cf_domains') | flatten | unique) }}
+      {{ managed_domains | difference(cf_relevant_zones | map(attribute='_cf_domains') | flatten | unique) }}
   when:
     - managed_domains | length > 0
-    - (managed_domains | difference(cf_relevant_zones | default([]) | map(attribute='_cf_domains') | flatten | unique)) | length > 0
+    - (managed_domains | difference(cf_relevant_zones | map(attribute='_cf_domains') | flatten | unique)) | length > 0
   run_once: true
   delegate_to: localhost
   tags:
     - always
 
-# --- Read every record of each relevant zone (paginated) --------------------
+# --- Read the managed records of each relevant zone (paginated) -------------
 
 - name: Show the unique root domains (Cloudflare zones) that will be read
   ansible.builtin.debug:
     msg: >-
-      Reading every record from these root domains:
-      {{ cf_relevant_zones | default([]) | map(attribute='name') | unique | list }}
+      Reading records tagged `{{ dns_primary_filter }}` from these root domains:
+      {{ cf_relevant_zones | map(attribute='name') | unique | list }}
   run_once: true
   delegate_to: localhost
   tags:
     - always
 
-- name: Fetch the first page of DNS records for each relevant zone
+- name: Fetch the first page of managed DNS records for each relevant zone
   ansible.builtin.uri:
     url: >-
-      https://api.cloudflare.com/client/v4/zones/{{ zone.id }}/dns_records?per_page=100&page=1
+      https://api.cloudflare.com/client/v4/zones/{{ zone.id }}/dns_records?{{ dns_primary_filter_query }}&per_page=100&page=1
     method: GET
     headers:
       Authorization: "Bearer {{ zone._cf_provider.api_token }}"
     return_content: false
-  loop: "{{ cf_relevant_zones | default([]) }}"
+  loop: "{{ cf_relevant_zones }}"
   loop_control:
     loop_var: zone
     label: "{{ zone.name }}"
@@ -173,11 +99,19 @@
   tags:
     - always
 
+- name: Reset the remaining record page requests
+  ansible.builtin.set_fact:
+    cf_record_extra_requests: []
+  run_once: true
+  delegate_to: localhost
+  tags:
+    - always
+
 - name: Compute the remaining record pages that still need to be fetched
   ansible.builtin.set_fact:
     cf_record_extra_requests: >-
       {{
-        cf_record_extra_requests | default([])
+        cf_record_extra_requests
         + ([r.zone]
            | product(range(2, (r.json.result_info.total_pages | int) + 1) | list)
            | list)
@@ -191,18 +125,18 @@
   tags:
     - always
 
-- name: Fetch the remaining pages of DNS records
+- name: Fetch the remaining pages of managed DNS records
   ansible.builtin.uri:
     url: >-
-      https://api.cloudflare.com/client/v4/zones/{{ item.0.id }}/dns_records?per_page=100&page={{ item.1 }}
+      https://api.cloudflare.com/client/v4/zones/{{ zone.0.id }}/dns_records?{{ dns_primary_filter_query }}&per_page=100&page={{ zone.1 }}
     method: GET
     headers:
-      Authorization: "Bearer {{ item.0._cf_provider.api_token }}"
+      Authorization: "Bearer {{ zone.0._cf_provider.api_token }}"
     return_content: false
-  loop: "{{ cf_record_extra_requests | default([]) }}"
+  loop: "{{ cf_record_extra_requests }}"
   loop_control:
-    loop_var: item
-    label: "{{ item.0.name }} (page {{ item.1 }})"
+    loop_var: zone
+    label: "{{ zone.0.name }} (page {{ zone.1 }})"
   register: cf_records_extra
   changed_when: false
   check_mode: false
@@ -219,37 +153,48 @@
   tags:
     - always
 
-- name: Collect records from the first pages, tagging zone and provider
+# `comment.contains` is a substring match; `_managed` keeps only records whose
+# comment holds the primary filter as a whole tag (e.g. not `managed-by=ansible-old`).
+
+- name: Collect managed records from the first pages, tagging zone and provider
   ansible.builtin.set_fact:
     cloudflare_records: >-
       {{
         cloudflare_records
-        + (r.json.result
-           | map('combine', {'_zone': r.zone.name, '_provider': r.zone._cf_provider.name})
-           | list)
+        + (_managed | map('combine', {'_zone': r.zone.name, '_provider': r.zone._cf_provider.name}) | list)
       }}
   loop: "{{ cf_records_page1.results | default([]) }}"
   loop_control:
     loop_var: r
     label: "{{ r.zone.name }}"
+  vars:
+    _managed: >-
+      {{ r.json.result
+         | selectattr('comment', 'string')
+         | selectattr('comment', 'search', dns_primary_filter_regex)
+         | list }}
   run_once: true
   delegate_to: localhost
   tags:
     - always
 
-- name: Collect records from the remaining pages, tagging zone and provider
+- name: Collect managed records from the remaining pages, tagging zone and provider
   ansible.builtin.set_fact:
     cloudflare_records: >-
       {{
         cloudflare_records
-        + (r.json.result
-           | map('combine', {'_zone': r.item.0.name, '_provider': r.item.0._cf_provider.name})
-           | list)
+        + (_managed | map('combine', {'_zone': r.zone.0.name, '_provider': r.zone.0._cf_provider.name}) | list)
       }}
   loop: "{{ cf_records_extra.results | default([]) }}"
   loop_control:
     loop_var: r
-    label: "{{ r.item.0.name }} (page {{ r.item.1 }})"
+    label: "{{ r.zone.0.name }} (page {{ r.zone.1 }})"
+  vars:
+    _managed: >-
+      {{ r.json.result
+         | selectattr('comment', 'string')
+         | selectattr('comment', 'search', dns_primary_filter_regex)
+         | list }}
   run_once: true
   delegate_to: localhost
   tags:

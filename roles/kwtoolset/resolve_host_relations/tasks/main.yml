@@ -1,0 +1,74 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/kwtoolset/resolve_host_relations
+
+# Takes the first non-empty hosts list of
+#   host_relations.<group>.components.<component>.hosts
+#   host_relations.<group>.hosts
+#   host_relations.default.hosts
+# and sets, for the host the role runs against:
+#   resolve_host_relations_hosts - its hosts, by priority (lowest first; equal
+#                                  priorities keep their order), deduplicated
+#   resolve_host_relations_host  - the first of them, '' when there is none
+- name: Resolve host relations
+  vars:
+    __resolve_host_relations_group: >-
+      {{ resolve_host_relations_source[resolve_host_relations_group] | default({}, true)
+         if resolve_host_relations_group | length > 0 else {} }}
+    __resolve_host_relations_components: "{{ __resolve_host_relations_group.components | default({}, true) }}"
+    __resolve_host_relations_chain:
+      - level: "host_relations.{{ resolve_host_relations_group }}.components.{{ resolve_host_relations_component }}"
+        hosts: >-
+          {{ (__resolve_host_relations_components[resolve_host_relations_component] | default({}, true)).hosts | default([], true)
+             if resolve_host_relations_group | length > 0 and resolve_host_relations_component | length > 0 else [] }}
+      - level: "host_relations.{{ resolve_host_relations_group }}"
+        hosts: "{{ __resolve_host_relations_group.hosts | default([], true) }}"
+      - level: host_relations.default
+        hosts: "{{ (resolve_host_relations_source['default'] | default({}, true)).hosts | default([], true) }}"
+    __resolve_host_relations_resolved: >-
+      {{ __resolve_host_relations_chain | selectattr('hosts') | first
+         | default({'level': 'nothing', 'hosts': []}, true) }}
+    __resolve_host_relations_entries: >-
+      {%- set entries = [] -%}
+      {%- for entry in __resolve_host_relations_resolved.hosts -%}
+      {%-   set _ = entries.append({'host': entry.host, 'priority': entry.priority | default(resolve_host_relations_default_priority) | int}) -%}
+      {%- endfor -%}
+      {{ entries | sort(attribute='priority') }}
+  block:
+    - name: Assert host_relations has the expected shape
+      ansible.builtin.assert:
+        that:
+          - resolve_host_relations_source is mapping
+          - resolve_host_relations_source.values() | reject('none') | reject('mapping') | list | length == 0
+          - __resolve_host_relations_components is mapping
+        fail_msg: >-
+          host_relations of {{ inventory_hostname }} must map every relation (default
+          included) to a mapping of `hosts` and/or `components`, like
+          `default: {hosts: [{host: <inventory_hostname>, priority: 10}]}`, not to a bare list.
+        quiet: true
+
+    - name: Assert the resolved relation hosts are valid
+      ansible.builtin.assert:
+        that:
+          - __resolve_host_relations_resolved.hosts is sequence
+          - __resolve_host_relations_resolved.hosts is not string
+          - __resolve_host_relations_resolved.hosts | reject('mapping') | list | length == 0
+          - __resolve_host_relations_resolved.hosts | rejectattr('host', 'defined') | list | length == 0
+          - __resolve_host_relations_resolved.hosts | map(attribute='host') | difference(groups['all']) | length == 0
+        fail_msg: >-
+          {{ __resolve_host_relations_resolved.level }}.hosts of {{ inventory_hostname }} must be a
+          list of `{host: <inventory_hostname>, priority: <int>}` whose hosts are in the
+          inventory: {{ __resolve_host_relations_resolved.hosts }}
+        quiet: true
+
+    - name: Set the resolved relation hosts
+      ansible.builtin.set_fact:
+        resolve_host_relations_hosts: "{{ __resolve_host_relations_entries | map(attribute='host') | unique | list }}"
+        resolve_host_relations_host: "{{ __resolve_host_relations_entries | map(attribute='host') | list | first | default('') }}"
+
+    - name: Show the resolved relation hosts
+      ansible.builtin.debug:
+        msg: >-
+          {{ resolve_host_relations_group | default('-', true) }}/{{ resolve_host_relations_component | default('-', true) }}
+          resolved from {{ __resolve_host_relations_resolved.level }}:
+          {{ resolve_host_relations_hosts | join(', ') | default('NO HOSTS', true) }}

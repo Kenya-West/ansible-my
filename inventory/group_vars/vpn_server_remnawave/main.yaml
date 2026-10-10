@@ -5,3 +5,9 @@ vpn_server_remnawave_telegram_oauth_enabled: false
 vpn_server_remnawave_metrics_user: prometheus
 
 vpn_server_remnawave_subscription_path: "{{ path_to_internal_services_predefined_full }}/sub"
+
+vpn_server_remnawave_tags:
+  - value: "MANAGED_BY:ANSIBLE"
+    primary_filter: true
+  - value: "ENVIRONMENT:{{ inventory_file | basename | splitext | first | upper }}"
+    primary_filter: true

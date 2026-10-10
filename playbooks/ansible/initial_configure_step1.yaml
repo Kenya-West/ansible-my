@@ -1,0 +1,13 @@
+---
+# Step 1 of the initial configuration, on the controller: the inventory file,
+# localhost in its sections, and the standard user. See roles/setup/bootstrap.
+#
+#   ansible-playbook -i inventory/production.ini playbooks/scenarios/initial_configure_step1.yaml
+
+- name: Run initial configuration tasks (step 1)
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  roles:
+    - role: setup/bootstrap
