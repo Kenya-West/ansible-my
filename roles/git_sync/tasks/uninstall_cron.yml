@@ -11,7 +11,7 @@
   tags:
     - uninstall
 
-- name: Remove cron job for autorestic
+- name: Remove cron job
   ansible.builtin.cron:
     name: "{{ cron_job_name_prefix }}{{ cron_job_name }}"
     state: absent
