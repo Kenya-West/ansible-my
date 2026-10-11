@@ -1,0 +1,6 @@
+---
+- name: Install MicroWARP
+  hosts: vpn_caddy
+
+  roles:
+    - install_vpn_caddy_microwarp

@@ -2,9 +2,9 @@
 # defaults file for roles/install_vpn_caddy_microwarp
 role_state: present
 
-project_dir: "{{ vpn_project_structure_end_dirs.microwarp | ansible.builtin.basename }}"
-project_root_dir: "{{ vpn_project_structure_root }}"
-source_asset_rootpath_project: "{{ location_custom_files_path }}/{{ project_root_dir }}"
+project_dir: "{{ vpn_caddy.project.paths.microwarp | ansible.builtin.basename }}"
+project_root_dir: "{{ vpn_caddy.project.root }}"
+source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
 source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
 
 source_paths_add_role_dirs:
@@ -13,7 +13,7 @@ source_paths_add_repo_dirs:
   - "{{ source_asset_fullpath_project }}"
 source_paths_add_user_dirs: []
 
-dest_path_root: "/home/{{ standard_user }}/{{ vpn_project_structure_root }}"
+dest_path_root: "/home/{{ standard_user }}/{{ vpn_caddy.project.root }}"
 dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
@@ -27,3 +27,56 @@ cron_job_role_suffix: "\""
 cronjob_base_script: "{{ dest_path_full }}/scripts/rotate.sh"
 # fallback. Should be set in role
 cronjob_base_script_with_analytics: "{{ cronjob_base_script }}"
+
+systemd_timer_user: "{{ standard_user }}"
+systemd_timer_name: "microwarp-rotate"
+systemd_timer_script_path: "{{ dest_path_full }}/scripts/rotate.sh"
+
+systemd_user_unit_path: "/home/{{ standard_user }}/.config/systemd/user"
+
+systemd_user: "{{ standard_user }}"
+systemd_group: "{{ standard_user }}"
+
+systemd_unit_configs:
+  - name: "{{ systemd_timer_name }}"
+    type: service
+    scope: user
+    user: "{{ systemd_user }}"
+    group: "{{ systemd_group }}"
+    path: "{{ systemd_user_unit_path }}"
+    Unit:
+      Description: "Run {{ systemd_timer_name }} script"
+      Documentation: "man:systemd.service(5)"
+    Service:
+      Type: oneshot
+      ExecStart: "/usr/bin/bash {{ systemd_timer_script_path }}"
+      WorkingDirectory: "/home/{{ systemd_timer_user }}"
+      Environment:
+        - "TZ=Asia/Yakutsk"
+      TimeoutStartSec: "2m"
+      Nice: "5"
+      IOSchedulingClass: "best-effort"
+      IOSchedulingPriority: "7"
+      NoNewPrivileges: "yes"
+      PrivateTmp: "yes"
+      ProtectSystem: "full"
+
+  - name: "{{ systemd_timer_name }}"
+    type: timer
+    scope: user
+    user: "{{ systemd_user }}"
+    group: "{{ systemd_group }}"
+    path: "{{ systemd_user_unit_path }}"
+    enabled: true
+    state: started
+    Unit:
+      Description: "Timer for {{ systemd_timer_name }}"
+      Documentation: "man:systemd.timer(5)"
+    Timer:
+      Unit: "{{ systemd_timer_name }}.service"
+      OnCalendar: "*-*-* 00:00:00 Asia/Yakutsk"
+      RandomizedDelaySec: "30min"
+      AccuracySec: "1min"
+      Persistent: "true"
+    Install:
+      WantedBy: "timers.target"

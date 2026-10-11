@@ -88,8 +88,8 @@
     - update_image_soft
     - update_config_hard
 
-- name: Create cron jobs per git_sync_configs items
-  ansible.builtin.include_tasks: install_cron.yml
+- name: Create systemd services per git_sync_configs items
+  ansible.builtin.include_tasks: install_systemd.yml
   tags:
     - always
     - update_config_hard
