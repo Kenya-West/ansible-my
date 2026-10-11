@@ -1,0 +1,48 @@
+---
+# tasks file for roles/list_host_domains
+# Each play host (after --limit) collects its own domains_keys; the report is printed once.
+
+- name: Initialize the domain entries of this host
+  ansible.builtin.set_fact:
+    list_host_domains_entries: []
+    list_host_domains_lines: []
+    list_host_domains_report: []
+
+- name: Add string domains_keys entries
+  ansible.builtin.set_fact:
+    list_host_domains_entries: "{{ list_host_domains_entries + [{'source': item.key, 'domain': item.value}] }}"
+  loop: "{{ domains_keys | default({}) | dict2items | selectattr('value', 'string') | list }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Add list domains_keys entries
+  ansible.builtin.set_fact:
+    list_host_domains_entries: >-
+      {{ list_host_domains_entries + [{
+      'source': item.0.key ~ '[' ~ item.0.value.index(item.1) ~ ']' ~ (' (' ~ item.1.type ~ ')' if item.1 is mapping and item.1.type is defined else ''),
+      'domain': item.1.domain if item.1 is mapping else item.1
+      }] }}
+  loop: >-
+    {{ domains_keys | default({}) | dict2items
+    | rejectattr('value', 'string') | rejectattr('value', 'mapping') | selectattr('value', 'sequence')
+    | subelements('value') }}
+  loop_control:
+    label: "{{ item.0.key }}"
+
+- name: Build one line per unique domain of this host
+  ansible.builtin.set_fact:
+    list_host_domains_lines: >-
+      {{ list_host_domains_lines + ['  ' ~ item ~ '  (' ~ (list_host_domains_entries | selectattr('domain', 'equalto', item) | map(attribute='source') | join(', ')) ~ ')'] }}
+  loop: "{{ list_host_domains_entries | map(attribute='domain') | unique | sort }}"
+
+- name: Build the report from every host
+  ansible.builtin.set_fact:
+    list_host_domains_report: "{{ list_host_domains_report + [item] + hostvars[item].list_host_domains_lines }}"
+  loop: "{{ ansible_play_hosts }}"
+  when: hostvars[item].list_host_domains_lines | length > 0
+  run_once: true
+
+- name: Print the domains of each host
+  ansible.builtin.debug:
+    msg: "{{ list_host_domains_report if list_host_domains_report | length > 0 else ['No domains_keys entries found for the selected hosts.'] }}"
+  run_once: true

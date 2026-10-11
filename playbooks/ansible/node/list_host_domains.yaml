@@ -1,0 +1,12 @@
+---
+# Usage: ansible-playbook -i ./inventory/production.ini ./playbooks/ansible/node/list_host_domains.yaml [--limit=<host|group|pattern>] [-e target_hosts=<group|host|pattern>]
+# Prints the unique domains each host has in domains_keys, with the key(s) they came from.
+# Targets the play hosts, so --limit works; defaults to all hosts. Read-only: makes no changes.
+
+- name: List domains of each host
+  hosts: "{{ target_hosts | default('all') }}"
+  gather_facts: false
+  connection: local
+
+  roles:
+    - role: list_host_domains
