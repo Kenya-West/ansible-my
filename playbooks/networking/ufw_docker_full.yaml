@@ -7,3 +7,11 @@
 
 - name: Install ufw-docker and ufw-docker-automated
   ansible.builtin.import_playbook: ufw_docker.yaml
+
+- name: Install caddy
+  ansible.builtin.import_playbook: ../reverse_proxy/caddy.yaml
+  vars:
+    install_vpn_caddy_caddy_prune_sni_templates: true
+
+- name: Install remnanode
+  ansible.builtin.import_playbook: ../anti_censorship/node/remna.yaml
