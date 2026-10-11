@@ -15,3 +15,9 @@
 
 - name: Install remnanode
   ansible.builtin.import_playbook: ../anti_censorship/node/remna.yaml
+
+- name: Install node_exporter again
+  ansible.builtin.import_playbook: ../observability/node/node_exporter.yaml
+
+- name: Install docker_exporter again
+  ansible.builtin.import_playbook: ../observability/node/docker_exporter.yaml
