@@ -1,0 +1,35 @@
+- name: Update ufw-docker-automated and restart its systemd service
+  hosts: vpn_caddy
+  # Replaces the ufw-docker-automated binary and restarts its unit, same paths as roles/install_ufw_docker
+  become: true
+
+  environment:
+    EGET_GITHUB_TOKEN: "{{ github_api_token_eget | default(omit) }}"
+
+  vars:
+    ufw_docker_bin_dir: /usr/local/bin
+    ufw_docker_automated_repo: kevinf100/ufw-docker-automated
+    ufw_docker_automated_bin: "{{ ufw_docker_bin_dir }}/ufw-docker-automated"
+    ufw_docker_automated_service_name: ufw-docker-automated
+
+  tasks:
+    - name: Install the ufw-docker-automated binary using eget
+      ansible.builtin.include_role:
+        name: copy_eget_binaries_from_controller
+        apply:
+          tags:
+            - install_binaries
+      vars:
+        packages_binary_list:
+          - repo: "{{ ufw_docker_automated_repo }}"
+        eget_host_bin_dir: "{{ ufw_docker_bin_dir }}"
+      tags:
+        - install_binaries
+
+    - name: Restart the ufw-docker-automated systemd service
+      ansible.builtin.systemd:
+        name: "{{ ufw_docker_automated_service_name }}"
+        state: restarted
+        daemon_reload: true
+      tags:
+        - restart_systemd_service
