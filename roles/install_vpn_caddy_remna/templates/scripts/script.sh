@@ -1,3 +1,3 @@
 set -euo pipefail
 
-docker compose 
+cd {{ dest_path_full }} && docker compose -p {{ compose_project_name }} down && docker compose -p {{ compose_project_name }} up -d
