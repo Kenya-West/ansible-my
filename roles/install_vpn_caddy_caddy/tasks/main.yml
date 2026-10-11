@@ -96,13 +96,19 @@
   tags:
     - update_config_hard
 
-- name: Remove sni-templates directory if it exists
+- name: Remove sni-templates directory if it exists (by tag)
   ansible.builtin.file:
     path: "{{ dest_path_full }}/static/sni-templates"
     state: absent
   tags:
     - never
     - update_config_hard
+
+- name: Remove sni-templates directory if it exists (by variable)
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}/static/sni-templates"
+    state: absent
+  when: install_vpn_caddy_caddy_prune_sni_templates | bool
 
 - name: copy_files_templating
   ansible.builtin.include_role:

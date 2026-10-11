@@ -20,6 +20,8 @@ compose_project_name: "{{ project_dir }}"
 # and remember it in static/sni-templates/selected-template.txt.
 caddy_fake_static_files_template_name: ""
 
+install_vpn_caddy_caddy_prune_sni_templates: false
+
 # The analytics servers scraping this host by component (caddy, and for an
 # analytics_node node_exporter and docker_exporter), resolved by
 # tasks/analytics_servers.yml from host_relations. The prometheus users of the
