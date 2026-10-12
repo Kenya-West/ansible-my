@@ -6,4 +6,4 @@
 - import_playbook: ../anti_censorship/node/zapret.yaml
 - import_playbook: ../vpn/warp.yaml
 - import_playbook: ../reverse_proxy/certcopy.yaml
-- import_playbook: ../networking/ufw.yaml
+- import_playbook: ../networking/ufw_docker.yaml

@@ -18,4 +18,4 @@
 - import_playbook: ../backup/node/restic.yaml
 
 # Step 4: Final configuration
-- import_playbook: ../networking/ufw.yaml
+- import_playbook: ../networking/ufw_docker.yaml
