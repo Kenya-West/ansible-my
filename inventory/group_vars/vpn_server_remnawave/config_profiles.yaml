@@ -70,11 +70,15 @@ vpn_server_remnawave_config_profiles_private_key_common: "{{ vpn_server_remnawav
 vpn_server_remnawave_config_profiles_outbounds:
   - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_default }}"
   - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_all }}"
+  - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
 
+# Rules are matched in this order. The warp rules come after rules_all, so a
+# chained route id or a geo rule is honoured before a domain goes to WARP.
 vpn_server_remnawave_config_profiles_routing:
   rules:
     - snippet: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
     - snippet: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
+    - snippet: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
   balancers:
     - snippet: "{{ vpn_server_remnawave_snippets_key_balancers_all }}"
 

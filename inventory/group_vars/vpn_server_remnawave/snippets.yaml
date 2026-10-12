@@ -5,6 +5,8 @@ vpn_server_remnawave_snippets_key_rules_all: rules_all_prod_1
 vpn_server_remnawave_snippets_key_balancers_all: balancers_all_prod_1
 vpn_server_remnawave_snippets_key_outbounds_default: outbounds_default_prod_1
 vpn_server_remnawave_snippets_key_rules_default: rules_default_prod_1
+vpn_server_remnawave_snippets_key_outbounds_warp: outbounds_warp_prod_1
+vpn_server_remnawave_snippets_key_rules_warp: rules_warp_prod_1
 
 # Whether to push the regenerated snippets into the config profiles that embed
 # them. It can be: on_change, never, always.
@@ -25,6 +27,11 @@ vpn_server_remnawave_snippets_whole:
     snippet: "{{ vpn_server_remnawave_snippets_outbounds_default }}"
   - name: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
     snippet: "{{ vpn_server_remnawave_snippets_rules_default }}"
+  # snippets_warp.yaml
+  - name: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
+    snippet: "{{ vpn_server_remnawave_snippets_outbounds_warp }}"
+  - name: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
+    snippet: "{{ vpn_server_remnawave_snippets_rules_warp }}"
 
 vpn_server_remnawave_snippets_outbounds_default:
   - tag: DIRECT

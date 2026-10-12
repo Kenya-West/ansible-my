@@ -1,0 +1,31 @@
+# Routing through the microwarp SOCKS5 proxy (roles/install_vpn_caddy_microwarp)
+# that runs beside every node: one outbound and the rule sending some domains
+# to it. Each is a snippet of its own (snippets.yaml,
+# vpn_server_remnawave_snippets_whole), written as it is.
+#
+# The proxy's values come from group_vars/vpn_caddy/warp.yaml, which the role
+# uses as well - the panel hosts are vpn_caddy hosts too. The node's xray reaches
+# the proxy by its container name on the shared docker network.
+
+# <prefix>-<protocol>-<NNN>, as the tags of the chain outbounds are
+# (out-chain-eu-tcp-001), under a prefix of its own so the role never takes it
+# for one of the outbounds it owns.
+vpn_server_remnawave_snippets_outbound_warp_tag: out-warp-socks
+
+vpn_server_remnawave_snippets_outbounds_warp:
+  - tag: "{{ vpn_server_remnawave_snippets_outbound_warp_tag }}"
+    protocol: socks
+    settings:
+      address: "{{ warp_service_name }}"
+      port: "{{ warp_socks5_port | int }}"
+      user: "{{ warp_socks5_user }}"
+      pass: "{{ warp_socks5_pass }}"
+
+vpn_server_remnawave_snippets_rules_warp:
+  - domain:
+      - "geosite:openai"
+      - "geosite:anthropic"
+      - "geosite:google-gemini"
+      - "geosite:spotify"
+      - "whatismyipaddress.com"
+    outboundTag: "{{ vpn_server_remnawave_snippets_outbound_warp_tag }}"

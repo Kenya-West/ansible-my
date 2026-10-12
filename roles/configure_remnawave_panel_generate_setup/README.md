@@ -427,6 +427,8 @@ whose `domains_node_panel` is the panel:
 | `balancers_all` | `balancers_all_prod_1` | One balancer per censorship geo with `all` outbounds |
 | `outbounds_default` | `outbounds_default_prod_1` | `DIRECT` (freedom) and `BLOCK` (blackhole) |
 | `rules_default` | `rules_default_prod_1` | `geoip:private` and `geosite:private` to `BLOCK` |
+| `outbounds_warp` | `outbounds_warp_prod_1` | `out-warp-socks`, the microwarp SOCKS5 proxy beside the node |
+| `rules_warp` | `rules_warp_prod_1` | The domains sent to `out-warp-socks`, after `rules_all` |
 
 Exits and their outbound tags:
 
