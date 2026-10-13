@@ -14,7 +14,7 @@ services:
     networks:
       - {{ docker_vpn_network }}
     ports:
-      - "127.0.0.1:1080:${BIND_PORT:-1080}"
+      - "127.0.0.1:${BIND_PORT}:${BIND_PORT}"
     volumes:
       - warp_data:/etc/wireguard # Keep account data to avoid rate limits
     restart: unless-stopped
