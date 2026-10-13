@@ -20,6 +20,13 @@ remna_node_panel_address: >-
 # Two-letter country code shown in the panel, or XX for none.
 remna_node_panel_country_code: "{{ country_code_upper }}"
 
-# Inbounds of the config profile activated on this node. Empty means the
-# panel's vpn_server_remnawave_nodes_inbounds.
+# Inbounds of the config profile activated on this node, by their base tags
+# (VLESS_TCP_REALITY; the panel derives VLESS_TCP_REALITY_REVERSE_RU and the
+# like from them). Empty means every inbound of the profile.
 remna_node_panel_inbounds: []
+
+# The exclusive config profile of a node of the vps_exclusive group: the name
+# of one of its panel's vpn_server_remnawave_config_profiles_exclusive. Its
+# config profile, hosts and squads are then that profile's rather than the
+# ones of its location.
+remna_node_panel_exclusive_profile: ''

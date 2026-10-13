@@ -1,0 +1,73 @@
+---
+# Grant the internal squads of vpn_server_remnawave_internal_squads_inbounds the
+# inbounds of the config profiles their selectors pick (crpgs_model.squad_grants,
+# build_model.yml). Runs after the config profiles, which create the inbounds,
+# and before the nodes, which switch to them: a squad is how a user gets an
+# inbound, so a node moving to an inbound no squad holds yet would drop every
+# user it serves.
+#
+# Squads hold the users and are made by hand, so this only ever adds: an
+# inbound already in a squad stays whether the inventory grants it or not, a
+# squad missing from the panel is reported rather than created, and its tags
+# are left alone. An inbound the panel deletes - a profile retired, a tag
+# renamed - leaves its squads by itself.
+
+- name: Read the internal squads in the panel
+  ansible.builtin.include_tasks: read_panel.yml
+  vars:
+    crpgs_gather:
+      internal_squads: {}
+
+- name: Work out the inbounds each squad is missing
+  ansible.builtin.set_fact:
+    crpgs_squads_plan: >-
+      {%- set plan = [] -%}
+      {%- for grant in crpgs_model.squad_grants -%}
+      {%-   set found = remnawave_gathered.internal_squads | selectattr('name', 'equalto', grant.squad) | list -%}
+      {%-   set held = (found | first).inbounds | default([], true) | map(attribute='tag') | list if found else [] -%}
+      {%-   set _ = plan.append({
+              'squad': grant.squad,
+              'exists': found | length > 0,
+              'held': held,
+              'missing': grant.inbounds | reject('in', held) | list,
+            }) -%}
+      {%- endfor -%}
+      {{ plan }}
+
+- name: Report the squads missing from the panel
+  ansible.builtin.debug:
+    msg: >-
+      Not granted, because the panel has no internal squad of that name:
+      {{ crpgs_squads_plan | rejectattr('exists') | map(attribute='squad') | join(', ') }}.
+      Create them in the panel, or drop them from
+      vpn_server_remnawave_internal_squads_inbounds.
+  when: crpgs_squads_plan | rejectattr('exists') | list | length > 0
+
+# The module's inbound list is authoritative, so the squad's own inbounds go
+# along with the missing ones. Plain tags: they are unique across profiles.
+- name: Grant the squads their missing inbounds
+  kenyawest.remnawave.internal_squad:
+    name: "{{ item.squad }}"
+    inbounds: "{{ item.held + item.missing }}"
+  loop: "{{ crpgs_squads_plan | selectattr('exists') | selectattr('missing') | list }}"
+  loop_control:
+    label: "{{ item.squad }} (+ {{ item.missing | join(', ') }})"
+  delegate_to: localhost
+  register: crpgs_squads_applied
+
+# One expression evaluating to a list, so each squad gets a line of its own.
+- name: Report what was applied
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        ['%d squads granted inbounds:' | format(crpgs_squads_granted | length)] + crpgs_squads_granted
+        + ['%d squads missing from the panel:' | format(crpgs_squads_absent | length)] + crpgs_squads_absent
+      }}
+  vars:
+    crpgs_squads_granted: >-
+      {%- set out = [] -%}
+      {%- for result in crpgs_squads_applied.results | default([]) if result.changed -%}
+      {%-   set _ = out.append(result.item.squad ~ ': ' ~ result.item.missing | join(', ')) -%}
+      {%- endfor -%}
+      {{ out }}
+    crpgs_squads_absent: "{{ crpgs_squads_plan | rejectattr('exists') | map(attribute='squad') | list }}"

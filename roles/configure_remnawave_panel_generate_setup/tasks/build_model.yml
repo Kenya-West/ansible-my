@@ -29,8 +29,10 @@
 - name: Collect the node facts the setup is built from
   ansible.builtin.set_fact:
     # panel_address, panel_port, panel_country_code and panel_inbounds are how
-    # the panel reaches the node; read by the nodes stage only. Jinja has no
-    # comments inside an expression, so this note lives here.
+    # the panel reaches the node; read by the nodes stage only. geo and the
+    # exclusive pair choose the node's scope, which with its protocol picks the
+    # config profile it activates. Jinja has no comments inside an expression,
+    # so this note lives here.
     crpgs_nodes: >-
       {%- set collected = [] -%}
       {%- for node in crpgs_related_nodes -%}
@@ -44,6 +46,9 @@
               'panel_country_code': facts.remna_node_panel_country_code | default('XX', true),
               'panel_inbounds': facts.remna_node_panel_inbounds | default([], true),
               'country': facts.country_code_upper | default('', true),
+              'geo': facts.vpn_deployment_censorship_geo | default('global', true),
+              'exclusive_member': node in groups[vpn_server_remnawave_config_profiles_exclusive_group] | default([]),
+              'exclusive_profile': facts.remna_node_panel_exclusive_profile | default('', true),
               'protocol': (protocol.full | default('', true) if protocol is mapping else protocol)
                           | default(vpn_server_remnawave_snippets_default_protocol_type, true),
               'domains': (facts.domains_keys | default({}))
@@ -86,10 +91,23 @@
       direct_route_id: "{{ vpn_server_remnawave_hosts_vless_route_id_direct }}"
       chain_bind_nodes: "{{ vpn_server_remnawave_hosts_chain_bind_nodes }}"
       remark_chain_separator: "{{ vpn_server_remnawave_hosts_remark_chain_separator }}"
+      remark_exclusive_format: "{{ vpn_server_remnawave_hosts_remark_exclusive_format }}"
+      # Config profiles: one base per protocol, rendered for every scope in
+      # use, with the addons their selectors pick and the squads granted them.
+      profiles_base: "{{ vpn_server_remnawave_config_profiles_base }}"
+      profiles_location: "{{ vpn_server_remnawave_config_profiles_location }}"
+      profiles_exclusive: "{{ vpn_server_remnawave_config_profiles_exclusive }}"
+      profile_common: "{{ vpn_server_remnawave_config_profiles_common }}"
+      private_keys: "{{ vpn_server_remnawave_config_profiles_private_keys }}"
+      private_key_common: "{{ vpn_server_remnawave_config_profiles_private_key_common }}"
+      addons: "{{ vpn_server_remnawave_config_profiles_addons }}"
+      squads_inbounds: "{{ vpn_server_remnawave_internal_squads_inbounds }}"
 
 - name: Report what the inventory produced
   ansible.builtin.debug:
     msg: >-
+      {{ crpgs_model.profiles | length }} config profiles
+      ({{ crpgs_model.profiles | map(attribute='name') | join(', ') }}),
       {{ crpgs_model.exits | length }} exits
       ({{ crpgs_model.chained | length }} of them chained),
       {{ crpgs_model.entries | length }} chain entries,

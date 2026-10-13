@@ -25,18 +25,10 @@ vpn_server_remnawave_nodes_publish_state: present
 # produces. It can be: ignore, disable, delete.
 vpn_server_remnawave_nodes_prune: disable
 
-# The config profile nodes activate, and the inbounds of it activated on a node
-# that names none of its own (remna_node_panel_inbounds). By default the same
-# profile as the hosts, and every inbound the hosts are published on.
-vpn_server_remnawave_nodes_config_profile: "{{ vpn_server_remnawave_hosts_config_profile }}"
-vpn_server_remnawave_nodes_inbounds: >-
-  {{
-    (
-      (vpn_server_remnawave_hosts_inbound_by_protocol | dict2items | map(attribute='value') | list)
-      + [vpn_server_remnawave_hosts_inbound]
-    )
-    | select | unique | list
-  }}
+# The config profile a node activates is the one of its scope and protocol
+# (config_profiles.yaml): Default-Profile, Reverse-RU, an exclusive one. A
+# node lists a subset of its inbounds, by their base tags, in
+# remna_node_panel_inbounds (group_vars/vpn_caddy/remna.yaml).
 
 # playbooks/anti_censorship/server/remnawave_clean_nodes.yaml. It can be:
 # absent, disabled.

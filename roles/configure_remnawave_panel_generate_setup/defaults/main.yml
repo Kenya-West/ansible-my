@@ -15,6 +15,7 @@
 vpn_server_remnawave_generate_stages:
   - snippets
   - config_profiles
+  - squads
   - nodes
   - hosts
   - verify
@@ -50,20 +51,45 @@ vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter:
   - "{{ vpn_deployment_domain_prefix.chain_location.type }}"
 
 # --- config profiles --------------------------------------------------------
-# The profiles are written in
-# inventory/group_vars/vpn_server_remnawave/config_profiles.yaml, as
-# {name, config, inbound (optional)}.
-vpn_server_remnawave_config_profiles: []
+# Built in inventory/group_vars/vpn_server_remnawave/config_profiles.yaml.
+#
+# One base profile per protocol, as {protocol, name, variant_suffix, inbounds,
+# config (optional)}: rendered as it is for the global scope, and as a variant
+# for every location and exclusive scope some node of that protocol is in.
+vpn_server_remnawave_config_profiles_base: []
+# The variant of a location (a censorship geo; {code} is its region code
+# upper-cased, {geo} its name): Reverse-RU, VLESS_TCP_REALITY_REVERSE_RU.
+vpn_server_remnawave_config_profiles_location:
+  name: Reverse-{code}
+  inbound_suffix: REVERSE_{code}
+# The exclusive profiles of this panel, as {name, inbound_suffix}; a node of
+# the exclusive group names its own in remna_node_panel_exclusive_profile.
+vpn_server_remnawave_config_profiles_exclusive: []
+vpn_server_remnawave_config_profiles_exclusive_group: vps_exclusive
+# What every profile holds besides its inbounds: log, outbounds, routing.
+vpn_server_remnawave_config_profiles_common: {}
+# The REALITY private key of an inbound tag, and the key of every other one.
+vpn_server_remnawave_config_profiles_private_keys: {}
+vpn_server_remnawave_config_profiles_private_key_common: ''
+# Outbounds, rules and balancers added to the profiles a selector picks, as
+# {name, profiles, snippets, outbounds, rules, balancers, inbounds}.
+vpn_server_remnawave_config_profiles_addons: []
 # Whether a generated profile may take over a profile holding its inbound or
 # name that does not carry the primary tags.
 vpn_server_remnawave_config_profiles_adopt_untagged: false
 # What to do with profiles carrying the primary tags that the inventory no
-# longer produces. It can be: ignore, delete.
+# longer produces, once no node it still produces activates them. It can be:
+# ignore, delete.
 vpn_server_remnawave_config_profiles_prune: ignore
 # Profiles never deleted by pruning or cleaning, on top of the ones a node
 # activates. The panel reserves Default-Profile: it cannot be created again.
 vpn_server_remnawave_config_profiles_protected:
   - Default-Profile
+
+# --- internal squads ---------------------------------------------------------
+# The squads granted the inbounds of the profiles a selector picks, as
+# {squad, profiles}. Only ever adds inbounds; squads are never created.
+vpn_server_remnawave_internal_squads_inbounds: []
 
 # --- nodes ------------------------------------------------------------------
 # How each node is named and reached is set on the node side, in
@@ -78,18 +104,6 @@ vpn_server_remnawave_nodes_adopt_untagged: false
 # What to do with nodes carrying the primary tags that the inventory no longer
 # produces. It can be: ignore, disable, delete.
 vpn_server_remnawave_nodes_prune: disable
-vpn_server_remnawave_nodes_config_profile: "{{ vpn_server_remnawave_hosts_config_profile }}"
-# Inbounds activated on a node that names none of its own
-# (remna_node_panel_inbounds): every inbound the hosts are published on, so a
-# chain entry node also accepts the protocols of the exits it relays for.
-vpn_server_remnawave_nodes_inbounds: >-
-  {{
-    (
-      (vpn_server_remnawave_hosts_inbound_by_protocol | dict2items | map(attribute='value') | list)
-      + [vpn_server_remnawave_hosts_inbound]
-    )
-    | select | unique | list
-  }}
 
 # --- hosts ------------------------------------------------------------------
 # A host the panel does not have yet is always created disabled, unless this
@@ -98,21 +112,21 @@ vpn_server_remnawave_hosts_publish_state: present
 # Whether a generated host may take over a host of the same remark that does
 # not carry the primary tags.
 vpn_server_remnawave_hosts_adopt_untagged: false
-vpn_server_remnawave_hosts_config_profile: ''
-vpn_server_remnawave_hosts_inbound: ''
-vpn_server_remnawave_hosts_inbound_by_protocol: {}
 vpn_server_remnawave_hosts_port: 443
 vpn_server_remnawave_hosts_fingerprint: chrome
 vpn_server_remnawave_hosts_labels: {}
 vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
+# The remark of an exit of an exclusive profile, numbered within that profile.
+vpn_server_remnawave_hosts_remark_exclusive_format: '{name} · {profile}'
 
 # What to do with hosts carrying the primary tags that the inventory no longer
 # produces. It can be: ignore, disable, delete.
 vpn_server_remnawave_hosts_prune: disable
 
-# Which nodes a generated chain host is bound to.
-# It can be: exit, entry, both, none.
-vpn_server_remnawave_hosts_chain_bind_nodes: exit
+# Which nodes a generated chain host is bound to. A chain host is attached to
+# its entry's inbound, so only entry nodes activate it.
+# It can be: entry, exit, both, none.
+vpn_server_remnawave_hosts_chain_bind_nodes: entry
 
 vpn_server_remnawave_hosts_chain:
   entry_country_codes:

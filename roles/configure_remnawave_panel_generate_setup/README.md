@@ -61,6 +61,11 @@ An entry is not usable for an exit in its own country - there is no
 `vpn_server_remnawave_hosts_chain.exclude`. An exit with no usable entry gets
 its direct host and nothing else: no route id, no outbound, no rule.
 
+A direct host is attached to the inbound of its exit's config profile. A chain
+host is attached to the inbound of its *entry's* profile - the entry is the node
+the client connects to - and bound to the entry's nodes
+(`vpn_server_remnawave_hosts_chain_bind_nodes: entry`).
+
 For every *chained* exit it also generates one routing rule, sending the
 exit's route id to the exit's outbound. The outbounds themselves, the
 balancers and the default snippets are built in the inventory - see
@@ -72,36 +77,77 @@ domains under `domains_keys.<vpn_server_remnawave_hosts_node_manage_key>`
 for its Caddy, is skipped and reported, and takes no part in anything the
 role generates), named
 `remna_node_name_in_panel` (the inventory hostname) - the same name generated
-hosts bind to - and reached at `remna_node_panel_address`:`remna_node_control_port`,
+hosts bind to - activating the config profile of its [scope](#scopes) and
+protocol, and reached at `remna_node_panel_address`:`remna_node_control_port`,
 which follows the node's compose (`remna_node_control_port`, published onto
 `remna_node_app_port`). They carry the tags, adopt, collide, prune and
 publish-state rules the hosts do. The collection has no bulk module for nodes,
 so each is its own module run. Run the nodes stage before the hosts one.
 
-**Config profiles** are the items of `vpn_server_remnawave_config_profiles`
-(`group_vars/vpn_server_remnawave/config_profiles.yaml`), each written to the
-panel as it is. See [Config profiles](#config-profiles).
+**Config profiles** are rendered from the base profiles of
+`vpn_server_remnawave_config_profiles_base`
+(`group_vars/vpn_server_remnawave/config_profiles.yaml`): every base profile as
+it is, plus a variant of it for every location and exclusive scope some node
+needs it for. See [Config profiles](#config-profiles).
+
+**Internal squads** named in `vpn_server_remnawave_internal_squads_inbounds` are
+granted the inbounds of the profiles their selectors pick. See
+[Internal squads](#internal-squads).
 
 Config profiles
 ---------------
 
-Each profile is `{name, config}`, written in YAML. The config repeats nothing
-the inventory already holds:
+A node activates exactly one config profile, so the profile is chosen per
+node, by its **scope** and the protocol it serves
+(`remna_node_primary_protocol_type`), and every host follows the node it lands
+on.
+
+### Scopes
+
+| Scope | A node is in it when | Profile | Inbound tag |
+| --- | --- | --- | --- |
+| global | its `vpn_deployment_censorship_geo` is `global` | the base profile itself: `Default-Profile`, `Default-xHTTP` | the base tag: `VLESS_TCP_REALITY` |
+| location | its censorship geo is any other (`russia`, `iran`, ...) | `Reverse-<CODE><variant_suffix>`: `Reverse-RU`, `Reverse-RU-xHTTP` | `<tag>_REVERSE_<CODE>`: `VLESS_TCP_REALITY_REVERSE_RU` |
+| exclusive | it is in `vpn_server_remnawave_config_profiles_exclusive_group` (`vps_exclusive`) | the one its `remna_node_panel_exclusive_profile` names, out of the panel's `vpn_server_remnawave_config_profiles_exclusive`: `Xenus-team` | `<tag>_<inbound_suffix>`: `VLESS_TCP_REALITY_XENUS` |
+
+`<CODE>` is the geo's region code upper-cased (`vpn_deployments_region_codes`:
+`russia` -> `RU`); the location naming is `vpn_server_remnawave_config_profiles_location`.
+A node of the exclusive group naming no profile, or one its panel does not
+declare, fails the run.
+
+The global variants are always published. A location or exclusive variant is
+published only for the protocols some related node of that scope serves, and
+retired once none does (`vpn_server_remnawave_config_profiles_prune: delete`).
+Retiring runs after the nodes and hosts stages, and skips a profile any node
+the inventory still produces activates; a role's node the inventory no longer
+produces does not hold it.
+
+### Base profiles
+
+Each item of `vpn_server_remnawave_config_profiles_base` is
+`{protocol, name, variant_suffix, inbounds, config (optional)}`, one per
+protocol. The rest of every profile is `vpn_server_remnawave_config_profiles_common`
+(log, outbounds, routing), then the [addons](#addons) its scope picks. The
+config repeats nothing the inventory already holds:
 
 | Part | Taken from |
 | --- | --- |
 | `serverNames` of the REALITY inbounds | `vpn_server_remnawave_server_names` |
-| `privateKey` | `vpn_server_remnawave_inbounds_private_keys` of the panel's host_vars: the entry of the inbound's tag in `specific`, else `common` |
+| `privateKey` | filled in by the role per final inbound tag, from `vpn_server_remnawave_inbounds_private_keys` of the panel's host_vars: `specific` of the tag, else of the base tag it derives from, else `common` |
 | `outbounds`, `routing.rules`, `routing.balancers` | `{snippet: ...}` references named by `vpn_server_remnawave_snippets_key_*` |
 | `log`, `sniffing`, REALITY `target` | `vpn_server_remnawave_config_profiles_log`, `_sniffing`, `_reality_target` |
 
-A profile is found in the panel by the tag of its **first inbound** (or the
-tag in an `inbound` key), and failing that by its **name**. The panel keeps
-inbound tags unique across profiles, so:
+A profile is found in the panel by the tag of its inbound, and failing that by
+its **name** - never by id. The panel keeps inbound tags unique across
+profiles, so:
 
 - a profile holding the inbound is updated, and renamed when its name differs;
 - otherwise a profile of that name is updated, its config replaced;
 - otherwise the profile is created.
+
+**Never change the inbound tag of a live profile** (a base tag, an
+`inbound_suffix`, the location naming): the panel deletes the old inbound, which
+takes it out of every internal squad and detaches every host from it.
 
 The config is authoritative: what the panel's profile had is replaced, except
 the inbounds' `settings.clients`, which the panel manages. Profiles carry the
@@ -115,7 +161,61 @@ never delete a profile named in `vpn_server_remnawave_config_profiles_protected`
 nor one a node still activates.
 
 Run the config profiles stage after the snippets, which the profiles embed,
-and before the nodes and hosts, which attach to the profiles' inbounds.
+and before the squads, nodes and hosts, which take up the profiles' inbounds.
+
+### Addons
+
+Extra outbounds, rules and balancers are declared once in
+`vpn_server_remnawave_config_profiles_addons`, each with a **profile selector**
+saying which profiles get it, and appended after the common ones in
+declaration order:
+
+```yaml
+vpn_server_remnawave_config_profiles_addons:
+  - name: warp
+    profiles: {geo: global}          # Default-*, and exclusive profiles of global nodes
+    snippets:                        # written by the snippets stage, as they are
+      - {name: outbounds_warp_prod_1, snippet: "{{ ... }}"}
+      - {name: rules_warp_prod_1, snippet: "{{ ... }}"}
+    outbounds: [{snippet: outbounds_warp_prod_1}]
+    rules: [{snippet: rules_warp_prod_1}]
+    # inbounds: [VLESS_TCP_REALITY]  # only these inbounds of a profile; the
+    #                                  rules must then be inline, and get
+    #                                  inboundTag set to the profile's own tags
+```
+
+A selector is a mapping of `kind` (`global`, `location`, `exclusive`), `geo`
+(`global`, `russia`, ...), `scope` (`global`, `RU`, `Xenus-team`, ...),
+`protocol` and `profile` (a name), each a value or a list: every key given has
+to match, any of its values may. `{}` picks every profile; a list of selectors
+picks what any of them picks.
+
+### Internal squads
+
+A user reaches an inbound only through an internal squad, and a new profile's
+inbounds are in none. `vpn_server_remnawave_internal_squads_inbounds` grants the
+squads named in it the inbounds of the profiles a selector picks:
+
+```yaml
+vpn_server_remnawave_internal_squads_inbounds:
+  - {squad: Default-Squad, profiles: {kind: global}}
+  - {squad: Reverse-proxy, profiles: {kind: location, geo: russia}}
+  - {squad: Xenus-team,    profiles: {scope: Xenus-team}}
+```
+
+The `squads` stage runs between the config profiles and the nodes, so the
+squads hold an inbound before any node switches to it. Squads are made by hand
+and hold the users, so it only adds: no inbound is taken out of a squad, a
+squad missing from the panel is reported and not created, and tags are left
+alone.
+
+The direct hosts of an exclusive exit are on its own inbound, which only its
+squads hold. Its chain hosts are entered on the entry's inbound, which every
+squad of the entry's profile holds, so they are shown only to the squads
+granted the exit's profile (`internal_squads: allow_only`). Those squads'
+members need the entry's inbound too - through another squad, or by granting
+it to them (`profiles: [{scope: Xenus-team}, {kind: location}]`); verify notes
+when they lack it.
 
 Route ids
 ---------
@@ -230,9 +330,14 @@ holds the way a client is routed, writing nothing:
   rules snippet and the outbound that rule names, to the exit domain the host
   is named after (`🇰🇿 AS-1 | by 🇷🇺 RU-1` must reach `net-asia-2`); direct
   hosts carry `vpn_server_remnawave_hosts_vless_route_id_direct`;
+- every host is attached to the profile and inbound of the model, and shown to
+  the squads of the model;
 - the nodes a host binds to exist, activate its config profile and its
   inbound;
-- the config profile embeds the outbounds and rules snippets;
+- every generated profile holds its inbounds and embeds exactly the snippets
+  of the model - an addon where it was not declared is a problem;
+- every node activates the profile of its scope and protocol;
+- every granted squad holds its inbounds;
 - the balancers select outbounds that exist.
 
 **Problems** are what would misroute or drop traffic - a route id without a
@@ -263,7 +368,8 @@ Requirements
 - In the panel host's `host_vars`: `domains_keys.remnawave`,
   `vpn_server_remnawave_api_token`, and for the snippets `service_user_id` and
   `vpn_server_remnawave_xray_reality_password` (generated by `setup/server`).
-- A config profile and an inbound that already exist in the panel.
+- The internal squads named in `vpn_server_remnawave_internal_squads_inbounds`,
+  made in the panel by hand.
 - The nodes registered in the panel - by `remnawave_generate_nodes.yaml`, or
   by hand. A host is bound to the node named after its inventory hostname;
   set `remna_node_name_in_panel` in a node's host_vars when the panel calls it
@@ -287,7 +393,7 @@ Set in `inventory/group_vars/vpn_server_remnawave/`, or per panel in its
 | `vpn_server_remnawave_panel_validate_certs` | `true` | Whether TLS certificates are validated |
 | `vpn_server_remnawave_panel_timeout` | `30` | Per-request timeout in seconds |
 | `vpn_server_remnawave_tags` | `[{value: MANAGED_BY:ANSIBLE, primary_filter: true}]` | Tags put on what the role creates; the primary ones mark what it owns |
-| `vpn_server_remnawave_generate_stages` | `[snippets, config_profiles, nodes, hosts, verify]` | Which parts this run generates, in dependency order; `verify` writes nothing |
+| `vpn_server_remnawave_generate_stages` | `[snippets, config_profiles, squads, nodes, hosts, verify]` | Which parts this run generates, in dependency order; `verify` writes nothing |
 | `vpn_server_remnawave_verify_fail` | `true` | Whether a problem found by `verify` fails the play (never in `--check`) |
 
 ### Config profiles
@@ -296,17 +402,23 @@ In `group_vars/vpn_server_remnawave/config_profiles.yaml`:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `vpn_server_remnawave_config_profiles` | the two below | Profiles as `{name, config, inbound (optional)}` |
+| `vpn_server_remnawave_config_profiles_base` | the two below | One base profile per protocol, as `{protocol, name, variant_suffix, inbounds, config}` |
+| `vpn_server_remnawave_config_profiles_common` | | `log`, `outbounds`, `routing` every profile holds |
+| `vpn_server_remnawave_config_profiles_location` | `{name: Reverse-{code}, inbound_suffix: REVERSE_{code}}` | Naming of a location's variant |
+| `vpn_server_remnawave_config_profiles_exclusive` | `[]` | The panel's exclusive profiles, as `{name, inbound_suffix}` (its host_vars) |
+| `vpn_server_remnawave_config_profiles_exclusive_group` | `vps_exclusive` | Group whose nodes are published on an exclusive profile |
+| `vpn_server_remnawave_config_profiles_addons` | WARP | Outbounds and rules added to the profiles a selector picks |
+| `vpn_server_remnawave_internal_squads_inbounds` | | Squads granted the inbounds of the profiles a selector picks |
 | `vpn_server_remnawave_config_profiles_adopt_untagged` | `false` | Whether a generated profile may take over a profile holding its inbound or name without the primary tags |
-| `vpn_server_remnawave_config_profiles_prune` | `ignore` | What to do with primary-tagged profiles the inventory no longer produces: `ignore`, `delete` |
+| `vpn_server_remnawave_config_profiles_prune` | `delete` (role: `ignore`) | What to do with primary-tagged profiles the inventory no longer produces: `ignore`, `delete` |
 | `vpn_server_remnawave_config_profiles_protected` | `[Default-Profile]` | Names never deleted by pruning or cleaning |
 | `vpn_server_remnawave_config_profiles_clean_confirm` | `false` | Skip the confirmation prompt |
 | `vpn_server_remnawave_config_profiles_reality_target` | `caddy:443` | REALITY `target` of the inbounds |
 
-| Profile | Identifying inbound | Transport |
-| --- | --- | --- |
-| `Default-Profile` | `VLESS_TCP_REALITY` | raw |
-| `Default-xHTTP` | `VLESS_REALITY_XHTTP` | xhttp |
+| Base profile | `protocol` | Inbound | Transport | `variant_suffix` |
+| --- | --- | --- | --- | --- |
+| `Default-Profile` | `vless-reality-tcp` | `VLESS_TCP_REALITY` | raw | |
+| `Default-xHTTP` | `vless-reality-xhttp` | `VLESS_REALITY_XHTTP` | xhttp | `-xHTTP` |
 
 ### Nodes
 
@@ -317,8 +429,6 @@ Panel side, in `group_vars/vpn_server_remnawave/nodes.yaml`:
 | `vpn_server_remnawave_nodes_publish_state` | `present` | `present`, `disabled` or `enabled`, as for hosts |
 | `vpn_server_remnawave_nodes_adopt_untagged` | `false` | Whether a generated node may take over a node of its name without the primary tags |
 | `vpn_server_remnawave_nodes_prune` | `disable` | What to do with primary-tagged nodes the inventory no longer produces: `ignore`, `disable`, `delete` |
-| `vpn_server_remnawave_nodes_config_profile` | the hosts' profile | Config profile the nodes activate |
-| `vpn_server_remnawave_nodes_inbounds` | every inbound the hosts use | Inbounds activated on a node naming none of its own |
 | `vpn_server_remnawave_nodes_clean_state` | `absent` | `absent` deletes the primary-tagged nodes, `disabled` switches them off |
 | `vpn_server_remnawave_nodes_clean_confirm` | `false` | Skip the confirmation prompt |
 
@@ -330,7 +440,8 @@ Node side, in `group_vars/vpn_caddy/remna.yaml` or a node's host_vars:
 | `remna_node_panel_address` | `{{ ansible_host }}` | Address the panel reaches the node at |
 | `remna_node_control_port` |  | Port the panel reaches the node at |
 | `remna_node_panel_country_code` | `{{ country_code_upper }}` | Country shown in the panel |
-| `remna_node_panel_inbounds` | `[]` | This node's inbounds; empty uses the panel's list |
+| `remna_node_panel_inbounds` | `[]` | This node's inbounds, by base tag; empty activates every inbound of its profile |
+| `remna_node_panel_exclusive_profile` | `''` | The exclusive profile of a node of `vps_exclusive` |
 
 ### Hosts
 
@@ -345,14 +456,12 @@ Node side, in `group_vars/vpn_caddy/remna.yaml` or a node's host_vars:
 | `vpn_server_remnawave_hosts_publish_state` | `present` | `present`, `disabled` or `enabled`, see [New hosts are disabled](#new-hosts-are-disabled) |
 | `vpn_server_remnawave_hosts_adopt_untagged` | `false` | Whether a generated host may take over a host of its remark without the primary tags |
 | `vpn_server_remnawave_hosts_prune` | `disable` | What to do with primary-tagged hosts the inventory no longer produces: `ignore`, `disable`, `delete` |
-| `vpn_server_remnawave_hosts_config_profile` | `''` | **Required.** Config profile the hosts attach to |
-| `vpn_server_remnawave_hosts_inbound` | `''` | Inbound tag, unless given per protocol below |
-| `vpn_server_remnawave_hosts_inbound_by_protocol` | `{}` | Inbound tag per `remna_protocol_types.<key>.full` value |
 | `vpn_server_remnawave_hosts_port` | `443` | Port advertised to clients |
 | `vpn_server_remnawave_hosts_fingerprint` | `chrome` | uTLS fingerprint |
 | `vpn_server_remnawave_hosts_labels` | `{}` | Display names keyed by domain label, overriding the generated ones |
 | `vpn_server_remnawave_hosts_remark_chain_separator` | `' \| by '` | Joins the two names of a chain host's remark |
-| `vpn_server_remnawave_hosts_chain_bind_nodes` | `exit` | Which nodes a chain host binds to: `exit`, `entry`, `both`, `none` |
+| `vpn_server_remnawave_hosts_remark_exclusive_format` | `'{name} · {profile}'` | Remark of an exclusive profile's exit |
+| `vpn_server_remnawave_hosts_chain_bind_nodes` | `entry` | Which nodes a chain host binds to: `entry`, `exit`, `both`, `none` |
 
 Remarks identify hosts in the panel, so they are how the role finds its own
 work again. A host is named `<flag> <REGION CODE>-<n>` - the flag of the
@@ -370,6 +479,11 @@ The region codes are `vpn_deployments_region_codes` and the flags are built
 from `vpn_deployments_regional_indicator_symbols`, both of
 `group_vars/all/0_defaults/regions.yaml`, so a region renamed there is
 renamed in the panel too.
+
+The exits of an exclusive profile are numbered among themselves and named by
+`vpn_server_remnawave_hosts_remark_exclusive_format`: `🇨🇿 EU-1 · Xenus-team`,
+`🇨🇿 EU-1 · Xenus-team | by 🇷🇺 RU-1`. So the shared numbering has no gaps, and
+neither has an exclusive squad's own list.
 
 The numbering is per region and per collection, counted from one in the order
 of the domains' own indexes: it closes the gaps DNS leaves, so `net-asia-2`
@@ -427,8 +541,8 @@ whose `domains_node_panel` is the panel:
 | `balancers_all` | `balancers_all_prod_1` | One balancer per censorship geo with `all` outbounds |
 | `outbounds_default` | `outbounds_default_prod_1` | `DIRECT` (freedom) and `BLOCK` (blackhole) |
 | `rules_default` | `rules_default_prod_1` | `geoip:private` and `geosite:private` to `BLOCK` |
-| `outbounds_warp` | `outbounds_warp_prod_1` | `out-warp-socks`, the microwarp SOCKS5 proxy beside the node |
-| `rules_warp` | `rules_warp_prod_1` | The domains sent to `out-warp-socks`, after `rules_all` |
+| `outbounds_warp` | `outbounds_warp_prod_1` | `out-warp-socks`, the microwarp SOCKS5 proxy beside the node; written and embedded by the `warp` addon, in global-geo profiles only |
+| `rules_warp` | `rules_warp_prod_1` | The domains sent to `out-warp-socks`, after `rules_all`; `warp` addon |
 
 Exits and their outbound tags:
 
@@ -486,14 +600,15 @@ Example Playbook
 ```
 
 `playbooks/anti_censorship/server/remnawave_generate_snippets.yaml`,
-`remnawave_generate_config_profiles.yaml`, `remnawave_generate_nodes.yaml` and
-`remnawave_generate_hosts.yaml` are exactly this, one stage each. Run them in
+`remnawave_generate_config_profiles.yaml`, `remnawave_generate_squads.yaml`,
+`remnawave_generate_nodes.yaml` and `remnawave_generate_hosts.yaml` are exactly
+this, one stage each. Run them in
 that order, so the snippets a profile embeds, the outbounds a host's route id
 points at and the nodes it binds to already exist. All
 support `--check`, and end with a list of what was (or would be) added,
 modified, left out and retired.
 
-`remnawave_generate_all.yaml` runs the four stages in that order in one play,
+`remnawave_generate_all.yaml` runs the five stages in that order in one play,
 so the model is built once for all of them, and ends with [verify](#verifying):
 
 ```sh
@@ -504,11 +619,31 @@ ansible-playbook -i inventory/production.ini playbooks/anti_censorship/server/re
 
 A run against a panel other than the inventory's - a throwaway one - is a
 matter of extra vars: `vpn_server_remnawave_panel_url`,
-`vpn_server_remnawave_api_token`, `vpn_server_remnawave_access_mode: api_token`,
-the profile by name in `vpn_server_remnawave_hosts_config_profile`, and
-`vpn_server_remnawave_config_profiles_adopt_untagged: true` to take over its
-hand-made `Default-Profile`; override the private keys, the REALITY password
-and `service_user_id` too, so no production secret reaches it.
+`vpn_server_remnawave_api_token`, `vpn_server_remnawave_access_mode: api_token`
+and `vpn_server_remnawave_config_profiles_adopt_untagged: true` to take over
+its hand-made `Default-Profile`; override the private keys, the REALITY
+password, `service_user_id` and `warp_socks5_pass` too, so no production secret
+reaches it. Squads it lacks are reported, not created.
+
+Moving a panel onto per-scope profiles
+--------------------------------------
+
+On a panel whose nodes activate hand-made profiles (a `Reverse` with
+`VLESS_TCP_REALITY_REVERSE`), one `remnawave_generate_all.yaml` run moves them
+over in a safe order:
+
+1. **config_profiles** creates `Reverse-RU` (new inbounds, beside the hand-made
+   profile, which is left alone) and takes over tagged exclusive profiles by
+   their inbound tag;
+2. **squads** grants the new inbounds to the squads that held the old ones, so
+   no user loses a node;
+3. **nodes** switches every node to its profile, **hosts** re-attaches the
+   hosts, and the profiles left with no node are retired.
+
+Afterwards, by hand: enable the new hosts, delete the hand-made profiles and
+hosts verify lists as unused, and make sure `service_user_id` - which chained
+hops log into the exits as - is in a squad holding the exclusive profiles'
+inbounds.
 
 License
 -------

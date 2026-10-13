@@ -2,10 +2,11 @@
 ---
 # tasks file for roles/configure_remnawave_panel_generate_setup
 #
-# Generates the Remnawave setup - outbounds, routing rules, config profiles, nodes
-# and hosts - of the panel on the host the role runs against, out of the facts
-# of the nodes relating to it, applies it through the kenyawest.remnawave
-# collection, and verifies what the panel holds afterwards.
+# Generates the Remnawave setup - outbounds, routing rules, config profiles,
+# internal squad grants, nodes and hosts - of the panel on the host the role
+# runs against, out of the facts of the nodes relating to it, applies it
+# through the kenyawest.remnawave collection, and verifies what the panel
+# holds afterwards.
 
 - name: Check the tags the role marks and filters by
   ansible.builtin.include_tasks: validate_tags.yml
@@ -40,6 +41,14 @@
       tags:
         - remnawave_config_profiles
 
+    # After the config profiles, which create the inbounds, and before the
+    # nodes, which switch to them: users reach an inbound through a squad.
+    - name: Grant the internal squads their inbounds
+      ansible.builtin.include_tasks: squads.yml
+      when: "'squads' in vpn_server_remnawave_generate_stages"
+      tags:
+        - remnawave_squads
+
     # Before the hosts: a host is bound to nodes by name, so they must exist.
     - name: Generate the nodes
       ansible.builtin.include_tasks: nodes.yml
@@ -52,6 +61,14 @@
       when: "'hosts' in vpn_server_remnawave_generate_stages"
       tags:
         - remnawave_hosts
+
+    # After the nodes and hosts, which have moved off the profiles the
+    # inventory no longer produces by now.
+    - name: Retire the config profiles no longer produced
+      ansible.builtin.include_tasks: config_profiles_prune.yml
+      when: "'config_profiles' in vpn_server_remnawave_generate_stages"
+      tags:
+        - remnawave_config_profiles
 
     # Last, and writing nothing: follow what the panel now holds from every
     # host's route id to the exit it reaches, and fail on what would misroute.

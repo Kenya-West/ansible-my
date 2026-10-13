@@ -8,7 +8,9 @@
 #   - rules_all: one rule per chained exit, routing its route id to that exit's
 #     outbound (crpgs_model, build_model.yml), merged into the panel's;
 #   - vpn_server_remnawave_snippets_whole (balancers, defaults): written as
-#     they are.
+#     they are;
+#   - the snippets of every addon of vpn_server_remnawave_config_profiles_addons
+#     (WARP): written as they are, whichever profiles embed them.
 #
 # Snippets carry no tags in Remnawave, so what the role owns inside
 # outbounds_all and rules_all is told apart by the outbound tag prefix and the
@@ -106,3 +108,22 @@
     label: "{{ item.name }}"
   delegate_to: localhost
   register: crpgs_whole_snippets
+
+# After outbounds_all too: an addon's rules may name its outbounds or balancers.
+- name: Write the snippets of the config profile addons
+  kenyawest.remnawave.snippet:
+    name: "{{ item.name }}"
+    snippet: "{{ item.snippet }}"
+    sync: "{{ vpn_server_remnawave_snippets_sync }}"
+  loop: "{{ crpgs_addon_snippets }}"
+  loop_control:
+    label: "{{ item.name }}"
+  vars:
+    crpgs_addon_snippets: >-
+      {{
+        vpn_server_remnawave_config_profiles_addons
+        | map(attribute='snippets', default=[])
+        | flatten
+      }}
+  delegate_to: localhost
+  register: crpgs_addon_snippets_applied

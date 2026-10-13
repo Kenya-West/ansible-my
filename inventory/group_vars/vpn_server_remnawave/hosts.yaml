@@ -50,15 +50,9 @@ vpn_server_remnawave_hosts_adopt_untagged: false
 #   enabled:  created enabled and re-enabled on every run
 vpn_server_remnawave_hosts_publish_state: present
 
-# The config profile and inbound generated hosts are attached to. Both are
-# required - the panel cannot create a host without them. The inbound may be
-# chosen per protocol type (remna_protocol_types.<key>.full); the plain value
-# is the fallback.
-vpn_server_remnawave_hosts_config_profile: ''
-vpn_server_remnawave_hosts_inbound: ''
-vpn_server_remnawave_hosts_inbound_by_protocol: {}
-#  vless-reality-tcp: vless-reality-tcp
-#  vless-reality-xhttp: vless-reality-xhttp
+# The config profile and inbound of a generated host are not set here: a
+# direct host takes the ones of its exit's profile, a chain host the ones of
+# its entry's (config_profiles.yaml), so each lands on a node that serves it.
 
 vpn_server_remnawave_hosts_port: 443
 vpn_server_remnawave_hosts_fingerprint: chrome
@@ -83,6 +77,12 @@ vpn_server_remnawave_hosts_labels: {}
 # A chain host's remark is "<exit name><separator><entry name>"
 # (🇰🇿 AS-1 | by 🇷🇺 RU-1).
 vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
+
+# The exits of an exclusive profile are numbered among themselves, per profile,
+# and named by this format, {name} being the generated "<flag> <CODE>-<n>" and
+# {profile} the exclusive profile: "🇨🇿 EU-1 · Xenus-team". A remark has to be
+# unique panel-wide, and an exclusive squad sees only its own exits.
+vpn_server_remnawave_hosts_remark_exclusive_format: '{name} · {profile}'
 
 # ---------------------------------------------------------------------------
 # Chains
@@ -111,6 +111,11 @@ vpn_server_remnawave_hosts_chain:
   #  - exit: net-asia-1.123987465.xyz
   #    entries:
   #      - chain-russia-7.123987465.xyz
+
+# Which nodes a chain host is bound to. A chain host is attached to the inbound
+# of its entry's config profile - the client connects to the entry - so only
+# the entry nodes activate it. It can be: entry, exit, both, none.
+vpn_server_remnawave_hosts_chain_bind_nodes: entry
 
 # ---------------------------------------------------------------------------
 # VLESS route ids

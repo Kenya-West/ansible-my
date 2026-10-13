@@ -1,8 +1,11 @@
 ---
-# Creates or updates the config profiles of vpn_server_remnawave_config_profiles
-# (group_vars/vpn_server_remnawave/config_profiles.yaml). Run after
+# Creates or updates the config profiles the nodes need: every base profile of
+# vpn_server_remnawave_config_profiles_base for the global scope, and its
+# Reverse-<LOCATION> and exclusive variants for the scopes some node is in
+# (group_vars/vpn_server_remnawave/config_profiles.yaml), and retires the ones
+# no node the inventory produces activates any more. Run after
 # remnawave_generate_snippets.yaml - the profiles embed the snippets - and
-# before the nodes and hosts, which attach to the profiles' inbounds.
+# before the squads, nodes and hosts, which take up the profiles' inbounds.
 - name: Generate Remnawave config profiles
   hosts: vpn_server_remnawave
   become: false

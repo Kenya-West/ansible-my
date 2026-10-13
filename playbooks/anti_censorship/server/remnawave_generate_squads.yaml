@@ -1,0 +1,17 @@
+---
+# Grants the internal squads of vpn_server_remnawave_internal_squads_inbounds
+# the inbounds of the config profiles their selectors pick. Only adds: no
+# inbound is taken out of a squad and no squad is created. Run it after
+# remnawave_generate_config_profiles.yaml, which creates the inbounds, and
+# before remnawave_generate_nodes.yaml, which switches nodes to them.
+- name: Grant Remnawave internal squads their inbounds
+  hosts: vpn_server_remnawave
+  become: false
+  become_user: "{{ standard_user }}"
+  gather_facts: false
+  vars:
+    vpn_server_remnawave_generate_stages:
+      - squads
+
+  roles:
+    - configure_remnawave_panel_generate_setup

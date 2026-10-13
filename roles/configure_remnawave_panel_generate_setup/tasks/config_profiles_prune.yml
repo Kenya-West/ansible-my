@@ -1,0 +1,64 @@
+---
+# Retire the config profiles carrying every primary tag that the model no
+# longer produces - a Reverse-<LOCATION> whose last node is gone, an exclusive
+# profile nobody is in any more. Runs after the nodes and hosts stages, so the
+# nodes the inventory still produces have already moved to their new profile
+# and the hosts to its inbound.
+#
+# Never a profile a node still activates - unless that node is the role's own
+# and the inventory no longer produces it, which is what is left behind when
+# a location loses its last node - nor one of a protected name: the panel
+# reserves some names (Default-Profile), so it could not be created again.
+
+- name: Read the config profiles and nodes in the panel
+  ansible.builtin.include_tasks: read_panel.yml
+  vars:
+    crpgs_gather:
+      config_profiles: {}
+      nodes: {}
+
+- name: Retire the config profiles the inventory no longer produces
+  kenyawest.remnawave.config_profile:
+    name: "{{ item.uuid }}"
+    state: absent
+  loop: "{{ crpgs_profiles_stale }}"
+  loop_control:
+    label: "{{ item.name }}"
+  vars:
+    crpgs_profiles_unproduced: >-
+      {{
+        remnawave_gathered.config_profiles
+        | remnawave_select_tagged(crpgs_primary_tags)
+        | rejectattr('name', 'in', crpgs_model.profiles | map(attribute='name') | list)
+        | list
+      }}
+    crpgs_profiles_stale: >-
+      {{
+        crpgs_profiles_unproduced
+        | rejectattr('uuid', 'in',
+            crpgs_profiles_unproduced
+            | remnawave_select_profiles_kept(
+                remnawave_gathered.nodes,
+                vpn_server_remnawave_config_profiles_protected,
+                crpgs_primary_tags,
+                crpgs_model.node_profiles | list)
+            | map(attribute='uuid') | list)
+        | list
+      }}
+  delegate_to: localhost
+  when: vpn_server_remnawave_config_profiles_prune == 'delete'
+  register: crpgs_profiles_pruned
+
+- name: Report the retired config profiles
+  ansible.builtin.debug:
+    msg: >-
+      {{
+        ['%d retired:' | format(crpgs_profiles_retired | length)] + crpgs_profiles_retired
+      }}
+  vars:
+    crpgs_profiles_retired: >-
+      {{
+        crpgs_profiles_pruned.results | default([])
+        | selectattr('changed')
+        | map(attribute='item.name') | list
+      }}
