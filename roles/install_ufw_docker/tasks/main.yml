@@ -1,12 +1,17 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # tasks file for roles/install_ufw_docker
-- name: Check that UFW is active
-  ansible.builtin.command: ufw status
-  register: ufw_docker_ufw_status
-  changed_when: false
-  failed_when: false
-  check_mode: false
+- name: Ensure UFW is installed
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+  tags:
+    - always
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    policy: deny
   tags:
     - always
 
@@ -16,18 +21,6 @@
   changed_when: false
   failed_when: false
   check_mode: false
-  tags:
-    - always
-
-- name: Assert UFW is active
-  ansible.builtin.assert:
-    that:
-      - "'Status: active' in ufw_docker_ufw_status.stdout"
-    fail_msg: >-
-      ufw-docker needs active UFW (playbooks/networking/ufw.yaml) on {{ inventory_hostname }}.
-    quiet: true
-  # In --check mode a preceding play may only have *planned* to enable UFW
-  when: not ansible_check_mode
   tags:
     - always
 
