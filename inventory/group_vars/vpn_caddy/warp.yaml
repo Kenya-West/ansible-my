@@ -1,4 +1,6 @@
 warp_service_name: microwarp
+warp_bind_addr: 0.0.0.0
+warp_enable_ipv6: 0
 warp_socks5_port: 1080
 warp_udp_port: 51920
 warp_socks5_user: socks5
