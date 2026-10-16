@@ -1,0 +1,45 @@
+---
+# Usage: ansible-playbook -i ./inventory/production.ini ./playbooks/ansible/node/list_domains_all_nodes_by_type.yaml [--limit=<host|group|pattern>] [-e domain_type=<type>]
+# Prints, for every host, the domains of one type from domains_keys.remna_node.
+# The type is one of vpn_deployment_domain_prefix.*.type, chosen in the prompting engine
+# menu unless passed with -e domain_type=<type>. Read-only: makes no changes.
+
+- name: List domains of all nodes by type
+  hosts: "{{ target_hosts | default('all') }}"
+  gather_facts: false
+  connection: local
+
+  tasks:
+    - name: Ask which domain type to list
+      ansible.builtin.include_role:
+        name: ansible-prompting-engine
+      run_once: true
+      vars:
+        prompting_engine_answers: "{{ {'type': domain_type} if domain_type is defined else {} }}"
+        prompting_engine_spec:
+          settings:
+            var_prefix: list_domains_by_type_
+            intro: Lists the domains of one type from every host's domains_keys.remna_node.
+          prompts:
+            - id: type
+              prompt: Domain type to list
+              type: choice
+              choices: "{{ vpn_deployment_domain_prefix.values() | map(attribute='type') | list }}"
+
+    - name: Collect the domains of this host with the chosen type
+      ansible.builtin.set_fact:
+        list_domains_by_type_domains: >-
+          {{ (domains_keys | default({}, true)).remna_node | default([], true)
+             | selectattr('type', 'equalto', list_domains_by_type_type) | map(attribute='domain') | list }}
+
+    - name: Build the report from every host
+      ansible.builtin.set_fact:
+        list_domains_by_type_report: "{{ list_domains_by_type_report | default([]) + [item ~ ': ' ~ hostvars[item].list_domains_by_type_domains | join(', ')] }}"
+      loop: "{{ ansible_play_hosts }}"
+      when: hostvars[item].list_domains_by_type_domains | length > 0
+      run_once: true
+
+    - name: Print the domains
+      ansible.builtin.debug:
+        msg: "{{ ['Domains of type ' ~ list_domains_by_type_type ~ ':'] + (list_domains_by_type_report | default(['  none found'])) }}"
+      run_once: true
