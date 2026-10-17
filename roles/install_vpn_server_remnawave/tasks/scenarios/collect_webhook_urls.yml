@@ -1,0 +1,73 @@
+---
+# Scenario: collect_webhook_urls
+#
+# Resolves and prints the value `vpn_server_remnawave_webhook_url` would get
+# during the install scenario (which includes this file). Read-only: nothing
+# is deployed or changed.
+
+- name: Assert that the webhook URL is set for the supported projects
+  ansible.builtin.assert:
+    that:
+      - vpn_server_remnawave_webhook_url_supported_projects_paths is defined
+      - vpn_server_remnawave_webhook_url_supported_projects_paths | length > 0
+    fail_msg: "The webhook URL must be set for the supported projects."
+  tags:
+    - always
+
+- name: Check which supported project paths exist
+  ansible.builtin.stat:
+    path: "/home/{{ standard_user }}/{{ webhook_project.path }}"
+  loop: "{{ vpn_server_remnawave_webhook_url_supported_projects_paths | selectattr('path', 'string') | list }}"
+  loop_control:
+    loop_var: webhook_project
+    label: "{{ webhook_project.path }}"
+  register: webhook_projects_stat
+  tags:
+    - always
+
+- name: Find deployed instance indexes of indexable projects
+  ansible.builtin.find:
+    paths: "/home/{{ standard_user }}/{{ webhook_stat.webhook_project.path }}"
+    file_type: directory
+    patterns: '^[0-9]+$'
+    use_regex: true
+  loop: "{{ webhook_projects_stat.results | selectattr('stat.exists') | selectattr('webhook_project.indexable', 'defined') | selectattr('webhook_project.indexable') | list }}"
+  loop_control:
+    loop_var: webhook_stat
+    label: "{{ webhook_stat.webhook_project.path }}"
+  register: webhook_projects_instances
+  tags:
+    - always
+
+- name: Build webhook URLs from the existing project paths
+  ansible.builtin.set_fact:
+    vpn_server_remnawave_webhook_url: >-
+      {%- set urls = ([vpn_server_remnawave_webhook_url | default('')] if (vpn_server_remnawave_webhook_url | default('') | length) > 0 else []) -%}
+      {%- for res in webhook_projects_stat.results if res.stat.exists -%}
+      {%- set p = res.webhook_project -%}
+      {%- set domain = (domains_keys | default({}))[p.domain_path | regex_replace('^domains_keys\.', '')] | default('', true) -%}
+      {%- if domain | length > 0 -%}
+      {%- if p.indexable | default(false) -%}
+      {%- for inst in webhook_projects_instances.results if inst.webhook_stat.webhook_project.path == p.path -%}
+      {%- set bots = lookup('ansible.builtin.vars', p.settings_var, default=[]) if p.settings_var is defined else [] -%}
+      {%- for idx in inst.files | map(attribute='path') | map('basename') | map('int') | sort -%}
+      {%- set bot = bots[idx] if idx < (bots | length) else {} -%}
+      {%- if p.settings_var is not defined or (bot.remnawave_webhook_enabled | default(false) | bool) -%}
+      {%- set _ = urls.append('https://' ~ domain ~ '/' ~ path_to_internal_services_predefined_full ~ '/' ~ (p.service_name_prefix | default(p.path | basename)) ~ '-' ~ idx ~ (bot.remnawave_webhook_path | default(p.webhook_path | default('')))) -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- else -%}
+      {%- set _ = urls.append('https://' ~ domain ~ '/' ~ path_to_internal_services_predefined_full ~ (p.webhook_path | default(''))) -%}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ urls | join(',') }}
+  tags:
+    - always
+
+- name: Show the resulting webhook URL value
+  ansible.builtin.debug:
+    msg: "vpn_server_remnawave_webhook_url: '{{ vpn_server_remnawave_webhook_url | default('') }}'"
+  tags:
+    - always

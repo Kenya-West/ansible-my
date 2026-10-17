@@ -32,6 +32,9 @@ vpn_server_remnawave_tgbot_bedolaga_settings:
     remnawave_api_key: ""
     # remnawave_auth_type: caddy # uncomment if remnawave_caddy_token is set
     remnawave_caddy_token: ""
+    remnawave_webhook_enabled: true
+    remnawave_webhook_path: /remnawave-webhook
+    remnawave_webhook_secret: "{{ vpn_server_remnawave_webhook_secret_header }}"
 
     sales_mode: tariffs # or classic
     multi_tariff_enabled: false

@@ -1,0 +1,158 @@
+---
+# Scenario: install (default)
+#
+# Full deployment of the Remnawave panel.
+
+- name: Add to source_paths the current role templates directory
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        (
+            source_paths_add_role_dirs
+            | default([])
+            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
+            | list
+          )
+        + (source_paths_add_repo_dirs | default([]))
+        + (source_paths_add_user_dirs | default([]))
+      }}
+  tags:
+    - always
+
+- name: Check which source_paths actually exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ source_paths }}"
+  delegate_to: localhost
+  become: false
+  register: source_paths_stat
+  tags:
+    - always
+
+- name: Exclude non-existing paths from source_paths
+  ansible.builtin.set_fact:
+    source_paths: >-
+      {{
+        source_paths_stat.results
+        | selectattr('stat.exists')
+        | map(attribute='item')
+        | list
+      }}
+  tags:
+    - always
+
+- name: Run backup script if backup is enabled
+  become: true
+  become_user: root
+  ansible.builtin.shell:
+    # TODO: Replace it with value from `backup_locations`
+    cmd: "bash {{ vpn_server_remnawave_backup_project_full_dir }}/remnawave-panel/scripts/backup.sh"
+    creates: "{{ pgdump_backup_location_root_path }}/remnawave-panel/dump_remnawave_panel.sql"
+  when: "'backup_restic_node' in group_names"
+  tags:
+    - never
+    - update_image_hard
+    - update_image_soft
+
+- name: Ensure Docker network {{ docker_vpn_server_remnawave_network }} exists with specific settings
+  community.docker.docker_network:
+    name: "{{ docker_vpn_server_remnawave_network }}"
+    driver: bridge
+    state: present
+
+- name: compose_pull
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_pull
+    apply:
+      tags:
+        - update_image_hard
+        - update_image_soft
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image_hard
+    - update_image_soft
+
+- name: compose_down
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_down
+    apply:
+      tags:
+        - update_image_hard
+        - update_config_hard
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image_hard
+    - update_config_hard
+
+- name: Collect webhook URLs for supported projects
+  ansible.builtin.include_tasks:
+    file: collect_webhook_urls.yml
+  tags:
+    - update_config_hard
+    - update_config_soft
+
+- name: copy_files_templating
+  ansible.builtin.include_role:
+    name: kwtoolset/copy_files_templating
+    apply:
+      tags:
+        - update_config_hard
+        - update_config_soft
+  vars:
+    copy_files_templating_dir_list:
+      - src: "{{ source_path }}"
+        dest: "{{ dest_path_full }}"
+        default_mode: "0775"
+  with_items: "{{ source_paths }}"
+  loop_control:
+    loop_var: source_path
+  tags:
+    - update_config_hard
+    - update_config_soft
+
+- name: compose_restart
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_restart
+    apply:
+      tags:
+        - never
+        - update_config_soft
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - never
+    - update_config_soft
+
+- name: compose_up
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_up
+    apply:
+      tags:
+        - update_image_hard
+        - update_image_soft
+        - update_config_hard
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  tags:
+    - update_image_hard
+    - update_image_soft
+    - update_config_hard
+
+- name: Add port {{ vpn_server_remnawave_external_port | default('undefined') }} to UFW
+  become: true
+  become_user: root
+  community.general.ufw:
+    rule: allow
+    port: "{{ vpn_server_remnawave_external_port }}"
+    proto: tcp
+  when:
+    - vpn_server_remnawave_external_port is defined
+    - vpn_server_remnawave_external_port | string | length > 0
+  tags:
+    - ports_ufw

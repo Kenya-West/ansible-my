@@ -1,0 +1,11 @@
+---
+- name: Show the webhook URL value Remnawave panel would be deployed with
+  hosts: vpn_server_remnawave
+  become: false
+  become_user: "{{ standard_user }}"
+
+  roles:
+    - role: install_vpn_server_remnawave
+      vars:
+        scenarios:
+          - collect_webhook_urls
