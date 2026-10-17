@@ -10,5 +10,5 @@
   ansible.builtin.include_tasks: process.yml
   loop: "{{ project_paths }}"
   loop_control:
-    loop_var: item
+    loop_var: project_path
   when: project_paths | length > 0

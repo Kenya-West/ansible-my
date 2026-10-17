@@ -4,15 +4,15 @@
       ansible.builtin.include_role:
         name: kwtoolset/get_compose_project
       vars:
-        get_compose_project_dir: "{{ item }}"
+        get_compose_project_dir: "{{ project_path }}"
   rescue:
     - name: Show an error if no result
       ansible.builtin.debug:
-        msg: "Could not get compose project name for project at {{ item }}. It could be the missing docker-compose.yml file or project directory. Skipping."
+        msg: "Could not get compose project name for project at {{ project_path }}. It could be the missing docker-compose.yml file or project directory. Skipping."
 
 - name: Docker Compose project - container pull
   community.docker.docker_compose_v2_pull:
-    project_src: "{{ item }}"
+    project_src: "{{ project_path }}"
     project_name: "{{ get_compose_project_name }}"
     files:
       - docker-compose.yml
@@ -21,7 +21,7 @@
 
 - name: Docker Compose project - container up
   community.docker.docker_compose_v2:
-    project_src: "{{ item }}"
+    project_src: "{{ project_path }}"
     project_name: "{{ get_compose_project_name }}"
     files:
       - docker-compose.yml
@@ -37,4 +37,4 @@
     volumes: true
     builder_cache: true
   failed_when: false
-  when: item.prune_unused | default(false)
+  when: project_path.prune_unused | default(false)

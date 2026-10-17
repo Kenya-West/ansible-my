@@ -4,18 +4,18 @@
       ansible.builtin.include_role:
         name: kwtoolset/get_compose_project
       vars:
-        get_compose_project_dir: "{{ item }}"
+        get_compose_project_dir: "{{ project_path }}"
   rescue:
     - name: Show an error if no result
       ansible.builtin.debug:
-        msg: "Could not get compose project name for project at {{ item }}. It could be the missing docker-compose.yml file or project directory. Skipping."
+        msg: "Could not get compose project name for project at {{ project_path }}. It could be the missing docker-compose.yml file or project directory. Skipping."
   when: compose_discover_project_name == true
 
 - name: Restart Docker Compose containers
   block:
     - name: Docker Compose project - container restart
       community.docker.docker_compose_v2:
-        project_src: "{{ item }}"
+        project_src: "{{ project_path }}"
         project_name: >-
           {{
             compose_project_name
@@ -32,7 +32,7 @@
     - name: Docker Compose restart timed out
       ansible.builtin.debug:
         msg: >-
-          WARNING: Docker Compose restart for {{ item }}
+          WARNING: Docker Compose restart for {{ project_path }}
           timed out after {{ compose_timeout }} seconds.
       when:
         - compose_result is defined
@@ -41,7 +41,7 @@
     - name: Docker Compose restart failed for another reason
       ansible.builtin.debug:
         msg: >-
-          ERROR: Docker Compose restart for {{ item }} failed.
+          ERROR: Docker Compose restart for {{ project_path }} failed.
           {{ compose_result.msg | default('No error message returned') }}
       when:
         - compose_result is defined
