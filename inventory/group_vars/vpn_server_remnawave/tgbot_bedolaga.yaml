@@ -1,0 +1,7 @@
+---
+# Identity of a single Bedolaga bot instance. These are resolved lazily, so
+# read them only where `current_index` (the instance index) is set.
+vpn_server_remnawave_tgbot_bedolaga_instance_service_name: "{{ vpn_server_remnawave_tgbot_bedolaga_settings_global.service_name_prefix }}-{{ current_index | string }}"
+vpn_server_remnawave_tgbot_bedolaga_instance_internal_path: "{{ path_to_internal_services_predefined_full }}/{{ vpn_server_remnawave_tgbot_bedolaga_instance_service_name }}"
+# No https:// prefix
+vpn_server_remnawave_tgbot_bedolaga_instance_base_url: "{{ domains_keys.remnawave_tgbot_bedolaga }}/{{ vpn_server_remnawave_tgbot_bedolaga_instance_internal_path }}"

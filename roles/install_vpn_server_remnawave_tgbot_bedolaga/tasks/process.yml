@@ -64,7 +64,7 @@
 
 - name: Set compose_project_name for this bot instance
   ansible.builtin.set_fact:
-    compose_project_name: "{{ vpn_server_remnawave_tgbot_bedolaga_settings_global.service_name_prefix }}-{{ current_index | string }}"
+    compose_project_name: "{{ vpn_server_remnawave_tgbot_bedolaga_instance_service_name }}"
   tags:
     - always
 

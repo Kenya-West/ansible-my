@@ -24,8 +24,7 @@ vpn_server_remnawave_metrics_pass: "{{ initial_configure_generated_password_vpn_
 vpn_server_remnawave_webhook_url_supported_projects_paths:
     - path: "{{ vpn_server_remnawave.project.paths.tgbot_bedolaga | default(omit) }}"
       indexable: true
-      domain_path: "domains_keys.remnawave_tgbot_bedolaga"
-      service_name_prefix: "{{ vpn_server_remnawave_tgbot_bedolaga_settings_global.service_name_prefix }}" # instance URL segment is <prefix>-<index>
+      base_url_var: vpn_server_remnawave_tgbot_bedolaga_instance_base_url # resolved per instance with current_index set
       settings_var: vpn_server_remnawave_tgbot_bedolaga_settings # per-index remnawave_webhook_enabled / remnawave_webhook_path are read from it
       webhook_path: "" # fallback when the instance has no remnawave_webhook_path
 

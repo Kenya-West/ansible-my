@@ -1,4 +1,4 @@
-{%- set service_name_and_index = vpn_server_remnawave_tgbot_bedolaga_settings_global.service_name_prefix ~ '-' ~ (current_index | string) -%}
+{%- set service_name_and_index = vpn_server_remnawave_tgbot_bedolaga_instance_service_name -%}
 #!/usr/bin/env bash
 # Upstream: https://github.com/BEDOLAGA-DEV/remnawave-bedolaga-telegram-bot/raw/refs/heads/main/scripts/pg-upgrade.sh
 # Перенос базы бота с PostgreSQL 15 на PostgreSQL 18 без потери данных.

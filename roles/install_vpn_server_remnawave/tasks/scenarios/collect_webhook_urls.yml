@@ -39,30 +39,50 @@
   tags:
     - always
 
-- name: Build webhook URLs from the existing project paths
+- name: List webhook candidates (one per project, or per deployed instance of indexable ones)
   ansible.builtin.set_fact:
-    vpn_server_remnawave_webhook_url: >-
-      {%- set urls = ([vpn_server_remnawave_webhook_url | default('')] if (vpn_server_remnawave_webhook_url | default('') | length) > 0 else []) -%}
+    webhook_candidates: >-
+      {%- set out = [] -%}
       {%- for res in webhook_projects_stat.results if res.stat.exists -%}
       {%- set p = res.webhook_project -%}
-      {%- set domain = (domains_keys | default({}))[p.domain_path | regex_replace('^domains_keys\.', '')] | default('', true) -%}
-      {%- if domain | length > 0 -%}
       {%- if p.indexable | default(false) -%}
       {%- for inst in webhook_projects_instances.results if inst.webhook_stat.webhook_project.path == p.path -%}
-      {%- set bots = lookup('ansible.builtin.vars', p.settings_var, default=[]) if p.settings_var is defined else [] -%}
       {%- for idx in inst.files | map(attribute='path') | map('basename') | map('int') | sort -%}
-      {%- set bot = bots[idx] if idx < (bots | length) else {} -%}
-      {%- if p.settings_var is not defined or (bot.remnawave_webhook_enabled | default(false) | bool) -%}
-      {%- set _ = urls.append('https://' ~ domain ~ '/' ~ path_to_internal_services_predefined_full ~ '/' ~ (p.service_name_prefix | default(p.path | basename)) ~ '-' ~ idx ~ (bot.remnawave_webhook_path | default(p.webhook_path | default('')))) -%}
-      {%- endif -%}
+      {%- set _ = out.append({'project': p, 'index': idx}) -%}
       {%- endfor -%}
       {%- endfor -%}
       {%- else -%}
-      {%- set _ = urls.append('https://' ~ domain ~ '/' ~ path_to_internal_services_predefined_full ~ (p.webhook_path | default(''))) -%}
-      {%- endif -%}
+      {%- set _ = out.append({'project': p, 'index': none}) -%}
       {%- endif -%}
       {%- endfor -%}
-      {{ urls | join(',') }}
+      {{ out }}
+    webhook_urls: "{{ (vpn_server_remnawave_webhook_url | default('', true)).split(',') | select | list }}"
+  tags:
+    - always
+
+# Per-instance vars (base_url_var) are resolved lazily, so current_index must be
+# a task var here, not a Jinja loop variable.
+- name: Build webhook URLs of the enabled candidates
+  ansible.builtin.set_fact:
+    webhook_urls: >-
+      {{ webhook_urls + ['https://' ~ lookup('ansible.builtin.vars', webhook_candidate.project.base_url_var) ~ (webhook_bot.remnawave_webhook_path | default(webhook_candidate.project.webhook_path | default('')))] }}
+  loop: "{{ webhook_candidates }}"
+  loop_control:
+    loop_var: webhook_candidate
+    label: "{{ webhook_candidate.project.path }}{{ '' if webhook_candidate.index is none else '/' ~ webhook_candidate.index }}"
+  vars:
+    current_index: "{{ webhook_candidate.index }}"
+    webhook_bots: "{{ lookup('ansible.builtin.vars', webhook_candidate.project.settings_var, default=[]) if webhook_candidate.project.settings_var is defined else [] }}"
+    webhook_bot: "{{ webhook_bots[webhook_candidate.index] if (webhook_candidate.index is not none and webhook_candidate.index < (webhook_bots | length)) else {} }}"
+  when: >-
+    webhook_candidate.project.settings_var is not defined
+    or (webhook_bot.remnawave_webhook_enabled | default(false) | bool)
+  tags:
+    - always
+
+- name: Set vpn_server_remnawave_webhook_url
+  ansible.builtin.set_fact:
+    vpn_server_remnawave_webhook_url: "{{ webhook_urls | unique | join(',') }}"
   tags:
     - always
 
