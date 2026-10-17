@@ -14,6 +14,7 @@ packages_list:
       - ncdu
       - tree
       - gpg
+      - git
       - gettext-base
       - snapd
       - locales
