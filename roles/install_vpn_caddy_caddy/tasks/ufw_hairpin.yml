@@ -1,0 +1,71 @@
+---
+# Lets containers reach Caddy's published ports through the host's public IP,
+# and keeps those UFW rules in sync with the published ports.
+# Included from main.yml.
+
+# Containers that call a domain served by this very host (e.g. the Bedolaga
+# cabinet calling its bot) hit the host's public IP. Docker's DNAT skips
+# traffic from Caddy's own bridge, so it lands in INPUT, where UFW drops it.
+#
+# The rules are kept in sync with the published ports: they carry a comment
+# marker, and marked rules whose port is no longer published are deleted.
+# Rules without the marker (other roles use the same subnet) are never touched.
+- name: Work out the hairpin UFW ports that should exist
+  ansible.builtin.set_fact:
+    install_vpn_caddy_caddy_hairpin_ports_desired: >-
+      {{
+        (
+          (
+            caddy_external_ports_allowlist
+            + (['443:443'] if caddy_occupy_HTTPS | default(false) | bool else [])
+          )
+          | map('string')
+          | map('split', ':')
+          | map(attribute=-2)
+          | map('replace', '-', ':')
+          | list
+        )
+        | unique
+      }}
+
+- name: Allow Docker networks to reach Caddy's published ports via the host's public IP (hairpin)
+  become: true
+  become_user: root
+  community.general.ufw:
+    rule: allow
+    direction: in
+    proto: tcp
+    from_ip: 172.16.0.0/12
+    to_port: "{{ item }}"
+    comment: "{{ install_vpn_caddy_caddy_hairpin_ufw_comment }}"
+  loop: "{{ install_vpn_caddy_caddy_hairpin_ports_desired }}"
+
+- name: Read the hairpin UFW rules currently in place
+  become: true
+  become_user: root
+  ansible.builtin.command: ufw status
+  register: install_vpn_caddy_caddy_hairpin_ufw_status
+  changed_when: false
+  check_mode: false
+
+# A status line looks like "443/tcp  ALLOW  172.16.0.0/12  # <marker>"; ranges
+# show up as "8081:8082/tcp", the same spelling the rule was added with.
+- name: Delete hairpin UFW rules for ports Caddy no longer publishes
+  become: true
+  become_user: root
+  community.general.ufw:
+    rule: allow
+    direction: in
+    proto: tcp
+    from_ip: 172.16.0.0/12
+    to_port: "{{ item }}"
+    delete: true
+  loop: >-
+    {{
+      install_vpn_caddy_caddy_hairpin_ufw_status.stdout_lines
+      | select('search', 'ALLOW')
+      | select('search', '# ' ~ install_vpn_caddy_caddy_hairpin_ufw_comment)
+      | map('regex_replace', '/.*$', '')
+      | unique
+      | difference(install_vpn_caddy_caddy_hairpin_ports_desired)
+    }}

@@ -46,3 +46,7 @@ install_vpn_caddy_caddy_docker_exporter_users: >-
      + [{'name': hostvars[install_vpn_caddy_caddy_analytics_servers.docker_exporter].prometheus_server_scrape_credentials.docker_exporter.username,
          'password': hostvars[install_vpn_caddy_caddy_analytics_servers.docker_exporter].prometheus_server_scrape_credentials.docker_exporter.password,
          'hash_scheme': 'bcrypt'}] }}
+
+# Comment on the UFW rules that let Docker networks reach Caddy's published
+# ports; the role deletes marked rules whose port is no longer published.
+install_vpn_caddy_caddy_hairpin_ufw_comment: caddy-hairpin

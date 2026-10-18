@@ -71,6 +71,15 @@
     driver: bridge
     state: present
 
+- name: Allow Docker networks to reach Caddy via the host's public IP (UFW hairpin)
+  ansible.builtin.include_tasks:
+    file: ufw_hairpin.yml
+    apply:
+      tags:
+        - ufw_setup
+  tags:
+    - ufw_setup
+
 - name: Gather service facts
   ansible.builtin.service_facts:
 
