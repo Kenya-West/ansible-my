@@ -5,4 +5,9 @@ vpn_server_remnawave_tgbot_bedolaga_cabinet_settings:
   - name: main
     domain: "{{ domains_keys.remnawave_tgbot_bedolaga_cabinet }}"
     cabinet_jwt_secret: ""
-    backend_api_url: "{{ vpn_server_remnawave_tgbot_bedolaga_instance_base_url }}"
+    backend_api_host: "{{ domains_keys.remnawave_tgbot_bedolaga }}"
+    backend_api_path: "{{ vpn_server_remnawave_tgbot_bedolaga_instance_internal_path }}"
+
+    telegram_oidc_enabled: true
+    telegram_oidc_client_id: <your-telegram-oidc-client-id>
+    telegram_oidc_client_secret: <your-telegram-oidc-client-secret>

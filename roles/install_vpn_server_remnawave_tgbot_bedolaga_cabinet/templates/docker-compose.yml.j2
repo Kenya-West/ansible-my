@@ -5,18 +5,29 @@ services:
   remnawave-telegram-tgbot-bedolaga-cabinet-{{ current_index | string }}-frontend:
     image: ghcr.io/bedolaga-dev/bedolaga-cabinet:latest
     container_name: ${SERVICE_NAME}-cabinet
-    restart: unless-stopped
+    env_file:
+      - .env
     networks:
       - {{ network_name }}
       - {{ docker_vpn_network }}
     labels:
       caddy: "${DOMAIN_FOR_CADDY}{% if vpn_server_remnawave_tgbot_bedolaga_cabinet_external_port is defined and vpn_server_remnawave_tgbot_bedolaga_cabinet_external_port %}:${EXTERNAL_PORT}{% endif %}"
       caddy.import: "logging ${DOMAIN_FOR_CADDY}-remnawave-tgbot-bedolaga-cabinet"
-      {% raw %}caddy.reverse_proxy: "{{ upstreams 80 }}"{% endraw %}
+      caddy.encode: "zstd gzip"
 
+      # API backend: the bot's web API, reached over the Internet through the
+      # bot's own Caddy. Upstreams cannot carry a path, so prepend the bot's
+      # internal path via rewrite and send the bot's Host so its site matches.
       caddy.handle_path: "/api/*"
-      caddy.handle_path.uri: "strip_prefix /api"
-      caddy.handle_path.reverse_proxy: "${BACKEND_API_URL}"
+      caddy.handle_path.rewrite: "* /${BACKEND_API_PATH}{uri}"
+      caddy.handle_path.reverse_proxy: "https://${BACKEND_API_HOST}"
+      caddy.handle_path.reverse_proxy.header_up: "Host {upstream_hostport}"
+
+      # Frontend fallback
+      caddy.handle: ""
+      {% raw %}caddy.handle.reverse_proxy: "{{ upstreams 80 }}"{% endraw %}
+
+    restart: unless-stopped
 
 networks:
   {{ network_name }}:

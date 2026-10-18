@@ -5,3 +5,21 @@ vpn_server_remnawave_tgbot_bedolaga_instance_service_name: "{{ vpn_server_remnaw
 vpn_server_remnawave_tgbot_bedolaga_instance_internal_path: "{{ path_to_internal_services_predefined_full }}/{{ vpn_server_remnawave_tgbot_bedolaga_instance_service_name }}"
 # No https:// prefix
 vpn_server_remnawave_tgbot_bedolaga_instance_base_url: "{{ domains_keys.remnawave_tgbot_bedolaga }}/{{ vpn_server_remnawave_tgbot_bedolaga_instance_internal_path }}"
+
+# Cabinet settings paired with this bot instance (the cabinet at the same index).
+vpn_server_remnawave_tgbot_bedolaga_instance_cabinet_enabled: "{{ (vpn_server_remnawave_tgbot_bedolaga_cabinet_settings | default([])) | length > (current_index | int) }}"
+vpn_server_remnawave_tgbot_bedolaga_instance_cabinet_url: "https://{{ vpn_server_remnawave_tgbot_bedolaga_cabinet_settings[current_index | int].domain }}"
+vpn_server_remnawave_tgbot_bedolaga_instance_cabinet_jwt_secret: "{{ vpn_server_remnawave_tgbot_bedolaga_cabinet_settings[current_index | int].cabinet_jwt_secret }}"
+vpn_server_remnawave_tgbot_bedolaga_instance_cabinet_allowed_origins: >-
+  {{
+    ['https://' ~ domains_keys.remnawave_tgbot_bedolaga_cabinet]
+    if domains_keys.remnawave_tgbot_bedolaga_cabinet is defined
+    else []
+  }}
+
+# Origins allowed to call the bot's web API: the bot itself plus its cabinet.
+vpn_server_remnawave_tgbot_bedolaga_instance_web_api_allowed_origins: >-
+  {{
+    ['https://' ~ domains_keys.remnawave_tgbot_bedolaga]
+    + vpn_server_remnawave_tgbot_bedolaga_instance_cabinet_allowed_origins
+  }}

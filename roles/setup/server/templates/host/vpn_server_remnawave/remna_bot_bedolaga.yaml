@@ -15,17 +15,6 @@ vpn_server_remnawave_tgbot_bedolaga_settings:
 
     web_api_enabled: true
     web_api_port: 8080
-    web_api_allowed_origins: >-
-      {{
-        [
-          domains_keys.remnawave_tgbot_bedolaga
-        ]
-        + (
-          [domains_keys.remnawave_tgbot_bedolaga_cabinet]
-          if domains_keys.remnawave_tgbot_bedolaga_cabinet is defined
-          else []
-        )
-      }}
     web_api_default_token: ""
 
     remnawave_api_url: "your-panel.com" # no https:// prefix
@@ -46,14 +35,3 @@ vpn_server_remnawave_tgbot_bedolaga_settings:
     trial_payment_enabled: false
     trial_activation_price: 0
     trial_add_remaining_days_to_paid: true
-
-    cabinet_enabled: "{{ true if vpn_server_remnawave_tgbot_bedolaga_cabinet_settings | length > 0 else false }}"
-    cabinet_jwt_secret: "{{ vpn_server_remnawave_tgbot_bedolaga_cabinet_settings[0].cabinet_jwt_secret }}"
-    cabinet_allowed_origins: >-
-      {{
-        [
-          domains_keys.remnawave_tgbot_bedolaga_cabinet
-        ]
-        if domains_keys.remnawave_tgbot_bedolaga_cabinet is defined
-        else []
-      }}
