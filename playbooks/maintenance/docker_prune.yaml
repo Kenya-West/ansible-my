@@ -8,5 +8,5 @@
         containers: true
         images: true
         networks: true
-        volumes: true
+        volumes: false
         builder_cache: true
