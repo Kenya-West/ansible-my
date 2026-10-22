@@ -1,0 +1,11 @@
+---
+- name: Install and configure Infra Billing
+  hosts: analytics_server
+  become: false
+  become_user: "{{ standard_user }}"
+  roles:
+    - name: kwtoolset/resolve_host_relations
+      vars:
+        resolve_host_relations_group: analytics_server
+        resolve_host_relations_component: infra_billing
+    - install_analytics_server_infra_billing

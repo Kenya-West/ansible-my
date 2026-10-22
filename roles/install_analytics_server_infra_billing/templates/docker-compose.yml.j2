@@ -1,0 +1,80 @@
+# Upstream: https://github.com/mishkatik/infra-billing/blob/main/docker-compose-prod.yml
+
+x-common: &common
+  ulimits:
+    nofile:
+      soft: 1048576
+      hard: 1048576
+  restart: always
+  networks:
+    - infra-billing-network
+    - {{ analytics_node_network_name }}
+    - {{ docker_vpn_network }}
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 100m
+      max-file: 5
+
+x-env: &env
+  env_file: .env
+
+services:
+  infra-billing:
+    image: ghcr.io/mishkatik/infra-billing:latest
+    container_name: ${SERVICE_NAME}
+    hostname: ${SERVICE_NAME}
+    <<: [*common, *logging, *env]
+    environment:
+      - TZ=UTC+7
+    labels:
+      caddy: "${SERVICE_DOMAIN}"
+      {% raw %}caddy.reverse_proxy: "{{ upstreams ${PORT} }}"{% endraw %}
+
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://127.0.0.1:${PORT:-8080}/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      infra-billing-db:
+        condition: service_healthy
+
+  infra-billing-db:
+    image: postgres:18.6
+    container_name: ${SERVICE_NAME}-db
+    hostname: ${SERVICE_NAME}-db
+    <<: [*common, *logging, *env]
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-infra}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-infra}
+      - POSTGRES_DB=${POSTGRES_DB:-infra_billing}
+      - TZ=UTC
+    volumes:
+      # postgres:18+ keeps the cluster in /var/lib/postgresql/<major>/docker; mounting the parent
+      # is what lets pg_upgrade --link (pgautoupgrade) move between majors in place.
+      - infra-billing-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 3s
+      timeout: 10s
+      retries: 3
+
+networks:
+  infra-billing-network:
+    name: ${SERVICE_NAME}-network
+    driver: bridge
+    external: false
+  {{ analytics_node_network_name }}:
+    external: true
+  {{ docker_vpn_network }}:
+    external: true
+
+volumes:
+  infra-billing-db-data:
+    name: ${SERVICE_NAME}-db-data
+    driver: local
+    external: false

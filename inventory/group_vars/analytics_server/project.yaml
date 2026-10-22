@@ -13,3 +13,4 @@ analytics_server:
       alertmanager: "{{ analytics_server.project.root }}/alertmanager"
       victorialogs: "{{ analytics_server.project.root }}/victorialogs"
       victoriametrics: "{{ analytics_server.project.root }}/victoriametrics"
+      infra_billing: "{{ analytics_server.project.root }}/infra_billing"
