@@ -34,6 +34,8 @@
       {%-   set _ = entries.append({'host': entry.host, 'priority': entry.priority | default(resolve_host_relations_default_priority) | int}) -%}
       {%- endfor -%}
       {{ entries | sort(attribute='priority') }}
+  tags:
+    - always
   block:
     - name: Assert host_relations has the expected shape
       ansible.builtin.assert:
