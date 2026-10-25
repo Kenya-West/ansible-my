@@ -1,0 +1,58 @@
+---
+- name: Resolve host's billing read configuration without guessing a URL
+  ansible.builtin.set_fact:
+    sip_billing: "{{ sip_sources.infra_billing | default({}) }}"
+  no_log: true
+
+- name: Check billing source options
+  ansible.builtin.assert:
+    that: sip_billing is mapping
+    quiet: true
+  no_log: true
+
+- name: Resolve billing access from explicit source or existing host API variables
+  ansible.builtin.set_fact:
+    sip_billing_enabled: >-
+      {{ sip_billing.enabled | default(hostvars[sip_host].infra_billing_api_url is defined) | bool }}
+    sip_billing_url: "{{ sip_billing.url | default(hostvars[sip_host].infra_billing_api_url | default('')) }}"
+    sip_billing_token: "{{ sip_billing.token | default(hostvars[sip_host].infra_billing_api_token | default('')) }}"
+  no_log: true
+
+- name: Report incomplete billing source
+  ansible.builtin.set_fact:
+    sip_status: "{{ sip_status + ['infra_billing: skipped (missing URL or token)'] }}"
+  when: sip_billing_enabled and (sip_billing_url | length == 0 or sip_billing_token | length == 0)
+
+- name: Gather billing provider metadata (GET only, also in check mode)
+  when:
+    - sip_billing_enabled
+    - sip_billing_url | length > 0
+    - sip_billing_token | length > 0
+  block:
+    - name: Read provider list without revealing credentials
+      ansible.builtin.uri:
+        url: "{{ sip_billing_url | regex_replace('/+$', '') }}/api/providers"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ sip_billing_token }}"
+        follow_redirects: none
+        unredirected_headers: [Authorization]
+        validate_certs: "{{ sip_billing.validate_certs | default(true) }}"
+        timeout: "{{ sip_billing.timeout | default(30) }}"
+        return_content: true
+      register: sip_billing_read
+      check_mode: false
+      changed_when: false
+      no_log: true
+
+    - name: Collect independent data and existing stable key bindings
+      ansible.builtin.set_fact:
+        sip_entries: >-
+          {{ sip_entries + [{'kind': 'infra_billing', 'host': sip_host,
+             'data': sip_billing_read.json,
+             'bindings': hostvars[sip_host].infra_billing_provider_bindings | default([]),
+             'provider_keys': sip_billing.provider_keys | default({}),
+             'account_keys': sip_billing.account_keys | default({})}] }}
+        sip_used: true
+        sip_status: "{{ sip_status + ['infra_billing: used'] }}"
+      no_log: true

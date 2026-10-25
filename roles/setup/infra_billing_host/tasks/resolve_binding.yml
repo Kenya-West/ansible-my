@@ -1,0 +1,22 @@
+---
+- name: Resolve explicit or automatically declared binding for the selected account
+  infra_billing:
+    action: resolve_bindings
+    api_url: unused
+    token: unused
+    catalog: "{{ hostvars[sibh_server].infra_providers | default({}) }}"
+    bindings: "{{ hostvars[sibh_server].infra_billing_provider_bindings | default([]) }}"
+    hosts:
+      - name: "{{ setup_infra_billing_host }}"
+        infrastructure: "{{ sibh_infrastructure }}"
+        binding:
+          enabled: true
+  register: sibh_binding_resolution
+  no_log: true
+
+- name: Select this host's provider/account binding
+  ansible.builtin.set_fact:
+    sibh_provider_bindings: >-
+      {{ sibh_binding_resolution.bindings | selectattr('provider', 'equalto', sibh_infrastructure.provider)
+         | selectattr('accounts.' ~ sibh_infrastructure.account, 'defined') | list }}
+  no_log: true

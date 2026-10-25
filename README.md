@@ -32,6 +32,15 @@ Other links:
 
 </div>
 
+## 🧾 Infrastructure providers and billing
+
+Provider/account metadata and flexible host billing/top-up policies are kept as
+private YAML, independent of Remnawave or any billing application. Dedicated
+read/sync playbooks project this data into infra-billing only, with check-mode
+previews and explicit service-export opt-in.
+
+See [the data model, examples and usage](https://github.com/Kenya-West/ansible-my/wiki/Infrastructure-providers-and-billing).
+
 ## 🖼️ Screenshots
 
 <details>

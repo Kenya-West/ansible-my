@@ -1,0 +1,48 @@
+---
+- name: Start with no billing hosts
+  ansible.builtin.set_fact:
+    cib_hosts: []
+  no_log: true
+
+- name: Collect infrastructure of hosts related to this billing server
+  ansible.builtin.include_tasks: collect_host.yml
+  loop: "{{ groups[infra_billing_node_group] | default([]) }}"
+  loop_control:
+    loop_var: cib_node
+  when: infra_billing_action == 'reconcile' and infra_billing_manage_hosts | bool
+
+- name: Read or reconcile only infra-billing from the controller
+  infra_billing:
+    api_url: "{{ infra_billing_api_url }}"
+    token: "{{ infra_billing_api_token }}"
+    action: "{{ infra_billing_action }}"
+    catalog: "{{ infra_providers }}"
+    bindings: "{{ infra_billing_provider_bindings }}"
+    hosts: "{{ cib_hosts }}"
+    domains: "{{ infrastructure_domains }}"
+    domain_bindings: "{{ infra_billing_domain_bindings }}"
+    rotate_credentials: "{{ infra_billing_rotate_credentials }}"
+    sync_missing_services: "{{ infra_billing_sync_missing_services }}"
+    validate_certs: "{{ infra_billing_validate_certs }}"
+    timeout: "{{ infra_billing_timeout }}"
+  delegate_to: localhost
+  register: cib_result
+  no_log: true
+
+- name: Publish private read result
+  ansible.builtin.set_fact:
+    infra_billing_gathered: "{{ cib_result.gathered | default({}) }}"
+  no_log: true
+
+- name: Report billing changes (one operation per line)
+  ansible.builtin.debug:
+    msg: "{{ cib_report }}"
+  vars:
+    cib_counts: "{{ cib_result.counts }}"
+    cib_report: >-
+      {{ ['Billing server: ' ~ inventory_hostname ~ ' | ' ~ cib_result.report.mode]
+         + (['CREATE=' ~ cib_counts.creates ~ ' UPDATE=' ~ cib_counts.updates ~ ' SYNC=' ~ cib_counts.syncs]
+            + (cib_result.report.lines if cib_result.report.lines | length > 0 else ['No changes.'])
+            if infra_billing_action == 'reconcile' else
+            ['Read providers=' ~ cib_result.report.read.providers ~ ' accounts=' ~ cib_result.report.read.accounts
+             ~ ' services=' ~ cib_result.report.read.services ~ ' projects=' ~ cib_result.report.read.projects]) }}

@@ -1,0 +1,10 @@
+---
+setup_infra_providers_inventory_dir: "{{ inventory_dir | default((role_path ~ '/../../../inventory') | realpath, true) }}"
+# localhost is the execution host; catalog owner is an inventory host.
+setup_infra_providers_server: "{{ groups['analytics_server'] | default([]) | first | default('') }}"
+setup_infra_providers_file: "{{ setup_infra_providers_inventory_dir }}/host_vars/{{ setup_infra_providers_server }}/infrastructure/providers.yaml"
+# localhost is the execution host; inventory hosts below are only data sources.
+setup_infra_providers_hosts: "{{ groups['all'] | default([]) | reject('equalto', 'localhost') | sort | list }}"
+# Source variables are opt-in. Existing billing credentials also authorize GETs.
+# Never infer the URL from domains_keys, or use the inherited infra_providers
+# catalog as a host source (that would just read the destination back).

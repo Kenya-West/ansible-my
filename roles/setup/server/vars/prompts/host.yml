@@ -26,6 +26,54 @@ prompts:
       - pattern: '^[a-z0-9]+$'
         msg: "'{{ answer }}' is not valid: lowercase letters and digits only."
 
+  - id: infrastructure_provider
+    prompt: Stable provider key in infra_providers
+    help: Independent of the hostname prefix; create this key in the private provider catalog.
+    default: "{{ answers.provider }}"
+    validate:
+      - pattern: '^[a-z0-9][a-z0-9_-]*$'
+
+  - id: infrastructure_account
+    prompt: Account key at this provider
+    default: main
+    validate:
+      - pattern: '^[a-z0-9][a-z0-9_-]*$'
+
+  - id: infrastructure_billing_known
+    prompt: Enter verified billing amount and interval now?
+    help: Unknown prices are omitted, never exported as zero. Export remains disabled until configured.
+    type: bool
+    default: false
+
+  - id: infrastructure_amount
+    prompt: Amount per billing interval
+    when: answers.infrastructure_billing_known
+    validate:
+      - pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+
+  - id: infrastructure_currency
+    prompt: Billing currency
+    default: USD
+    when: answers.infrastructure_billing_known
+    validate:
+      - pattern: '^[A-Z]{3,4}$'
+
+  - id: infrastructure_every
+    prompt: Number of units between payments
+    type: int
+    default: 1
+    when: answers.infrastructure_billing_known
+    validate:
+      - that: answer in [1, 3]
+        msg: Use 1 for a standard period or 3 for quarterly (months only).
+
+  - id: infrastructure_unit
+    prompt: Billing interval unit
+    type: choice
+    choices: "{{ ['month'] if answers.infrastructure_every | int == 3 else ['hour', 'day', 'month', 'year', 'once'] }}"
+    default: month
+    when: answers.infrastructure_billing_known
+
   - id: country_code
     prompt: Country of the server
     help: >-

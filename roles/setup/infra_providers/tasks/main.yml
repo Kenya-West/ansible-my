@@ -1,0 +1,98 @@
+---
+- name: Check regeneration target and inventory hosts
+  ansible.builtin.assert:
+    that:
+      - setup_infra_providers_hosts is sequence
+      - setup_infra_providers_hosts is not string
+      - setup_infra_providers_hosts | difference(groups['all']) | length == 0
+      - setup_infra_providers_server in groups['all']
+      - setup_infra_providers_server != 'localhost'
+      - setup_infra_providers_file | length > 0
+    quiet: true
+
+- name: Start provider source report
+  ansible.builtin.set_fact:
+    sip_entries: []
+    sip_report: []
+  no_log: true
+
+- name: Read only sources configured in inventory hosts
+  ansible.builtin.include_tasks: collect_host.yml
+  loop: "{{ setup_infra_providers_hosts | unique }}"
+  loop_control:
+    loop_var: sip_host
+
+- name: Report used hosts and hosts without provider sources
+  ansible.builtin.debug:
+    msg:
+      hosts: "{{ sip_report }}"
+      used: "{{ sip_report | selectattr('used', 'equalto', true) | map(attribute='host') | list }}"
+      without_information: "{{ sip_report | selectattr('used', 'equalto', false) | map(attribute='host') | list }}"
+
+- name: Require at least one usable source before touching the catalog
+  ansible.builtin.assert:
+    that: sip_entries | length > 0
+    fail_msg: No usable provider sources. Existing file is untouched; configure infrastructure_provider_definitions or provider API access in host_vars.
+    quiet: true
+
+- name: Inspect existing provider definition file
+  ansible.builtin.stat:
+    path: "{{ setup_infra_providers_file }}"
+  register: sip_stat
+
+- name: Refuse to replace non-regular provider files
+  ansible.builtin.assert:
+    that:
+      - not sip_stat.stat.exists or sip_stat.stat.isreg
+      - not sip_stat.stat.islnk | default(false)
+    quiet: true
+    fail_msg: Provider destination must be a regular file, not a symlink or directory.
+
+- name: Read existing provider file without evaluating stored templates
+  ansible.builtin.slurp:
+    src: "{{ setup_infra_providers_file }}"
+  register: sip_existing
+  when: sip_stat.stat.exists
+  no_log: true
+
+- name: Merge provider sources and preserve existing unrelated data
+  ansible.builtin.set_fact:
+    sip_document: >-
+      {{ ((sip_existing.content | b64decode | from_yaml) if sip_stat.stat.exists else {})
+         | regenerate_infra_providers(sip_entries) }}
+  no_log: true
+
+- name: Create private provider directory on the controller
+  ansible.builtin.file:
+    path: "{{ setup_infra_providers_file | dirname }}"
+    state: directory
+    mode: '0700'
+  when: not ansible_check_mode
+
+- name: Regenerate provider YAML with a backup when changed
+  ansible.builtin.copy:
+    dest: "{{ setup_infra_providers_file }}"
+    content: "{{ sip_document | to_nice_yaml(indent=2, sort_keys=false) }}"
+    mode: '0600'
+    backup: true
+  register: sip_write
+  no_log: true
+  diff: false
+
+- name: Secure a backup of the previous provider file
+  ansible.builtin.file:
+    path: "{{ sip_write.backup_file }}"
+    mode: '0600'
+  when:
+    - not ansible_check_mode
+    - sip_write.backup_file is defined
+  no_log: true
+
+- name: Report provider file result without exposing account data
+  ansible.builtin.debug:
+    msg:
+      file: "{{ setup_infra_providers_file }}"
+      providers: "{{ sip_document.infra_providers | length }}"
+      changed: "{{ sip_write.changed }}"
+      check_mode: "{{ ansible_check_mode }}"
+      backup_file: "{{ sip_write.backup_file | default('none (check mode, new file or unchanged content)') }}"

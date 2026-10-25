@@ -1,0 +1,53 @@
+---
+# Read-only; intentionally prints public billing identifiers and costs (logged
+# by Ansible). Does not print API tokens, passwords or account credential hints.
+- name: Show infra-billing projects and services
+  hosts: analytics_server
+  gather_facts: false
+  become: false
+  roles:
+    - role: configure_infra_billing
+      vars:
+        infra_billing_action: read
+  tasks:
+    - name: Show projects, provider accounts and related VPS records
+      ansible.builtin.debug:
+        var: cib_console
+      vars:
+        cib_console: >-
+          {%- set providers = [] -%}
+          {%- for p in infra_billing_gathered.providers -%}
+          {%- set accounts = [] -%}
+          {%- for a in p.accounts -%}
+          {%- set _ = accounts.append({'uuid': a.uuid, 'label': a.label}) -%}
+          {%- endfor -%}
+          {%- set _ = providers.append({'uuid': p.uuid, 'name': p.name, 'kind': p.kind, 'accounts': accounts}) -%}
+          {%- endfor -%}
+          {%- set projects = [] -%}
+          {%- for p in infra_billing_gathered.projects -%}
+          {%- set services = [] -%}
+          {%- for s in infra_billing_gathered.services if s.projectUuid == p.uuid -%}
+          {%- set hosts = [] -%}
+          {%- for h in groups[infra_billing_node_group] | default([]) -%}
+          {%- set b = hostvars[h].infra_billing_service | default({}) -%}
+          {%- if b.uuid | default('') == s.uuid or b.name | default(h) == s.name -%}
+          {%- set _ = hosts.append(h) -%}
+          {%- endif -%}
+          {%- endfor -%}
+          {%- set _ = services.append({'uuid': s.uuid, 'name': s.name, 'type': s.type,
+            'provider_uuid': s.providerUuid, 'account_uuid': s.accountUuid,
+            'cost': s.cost, 'currency': s.currency, 'period': s.period,
+            'next_billing_at': s.nextBillingAt, 'managed_by_connector': s.isManaged,
+            'inventory_matches': hosts}) -%}
+          {%- endfor -%}
+          {%- set _ = projects.append({'uuid': p.uuid, 'name': p.name, 'services': services}) -%}
+          {%- endfor -%}
+          {%- set domain_records = [] -%}
+          {%- for name, data in infrastructure_domains.items() -%}
+          {%- set binding = infra_billing_domain_bindings.get(name, {}) -%}
+          {%- set _ = domain_records.append({'name': name, 'provider': data.provider, 'account': data.account,
+            'export_enabled': binding.enabled | default(false), 'service_uuid': binding.uuid | default(none),
+            'project_uuid': binding.project_uuid | default(none)}) -%}
+          {%- endfor -%}
+          {{ {'billing_server': inventory_hostname, 'providers': providers, 'projects': projects,
+              'declared_domains': domain_records} }}

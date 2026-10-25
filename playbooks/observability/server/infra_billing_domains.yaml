@@ -1,0 +1,32 @@
+---
+# Domain-only reconciliation: no node collection or unrelated provider writes.
+- name: Reconcile standalone domains in infra-billing
+  hosts: analytics_server
+  gather_facts: false
+  become: false
+  roles:
+    - role: configure_infra_billing
+      vars:
+        infra_billing_action: reconcile
+        infra_billing_manage_hosts: false
+        infra_billing_provider_bindings: >-
+          {%- set used = [] -%}
+          {%- for name, binding in (infra_billing_domain_bindings | default({})).items() -%}
+          {%- if binding.enabled | default(false) -%}
+          {%- set data = infrastructure_domains[name] -%}
+          {%- set _ = used.append({'provider': data.provider, 'account': data.account}) -%}
+          {%- endif -%}
+          {%- endfor -%}
+          {%- set selected = [] -%}
+          {%- for b in hostvars[inventory_hostname].infra_billing_provider_bindings | default([]) -%}
+          {%- set accounts = {} -%}
+          {%- for aid, ab in b.accounts.items() -%}
+          {%- if {'provider': b.provider, 'account': aid} in used -%}
+          {%- set _ = accounts.update({aid: ab}) -%}
+          {%- endif -%}
+          {%- endfor -%}
+          {%- if accounts -%}
+          {%- set _ = selected.append(b | combine({'accounts': accounts})) -%}
+          {%- endif -%}
+          {%- endfor -%}
+          {{ selected }}

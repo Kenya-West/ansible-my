@@ -40,6 +40,7 @@ setup_server_service_domains:
     victoriametrics: victoriametrics
     victorialogs: victorialogs
     pushgateway: pushgateway
+    infra_billing: ib
   vpn_server_remnawave:
     remnawave: rw
     remnawave_subpage: sub
@@ -81,6 +82,7 @@ setup_server_generated_passwords:
   - name: analytics_server_scrape_caddy
   - name: analytics_server_xray_checker_user
   - name: analytics_server_xray_checker_prometheus
+  - name: analytics_server_infra_billing_postgres_password
   - name: backup_restic_server
   - name: vpn_server_remnawave_metrics
   - name: vpn_server_remnawave_custom_login_route

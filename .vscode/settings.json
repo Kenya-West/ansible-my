@@ -14,5 +14,15 @@
         "inventory/production.ini",
         "inventory/staging.ini",
         "inventory/group_vars/all/z_common_hosts_secrets/**"
+    ],
+    "auto-run-command.rules": [
+    {
+        "command": [
+            "workbench.action.terminal.killAll",
+            "workbench.action.terminal.new"
+        ],
+        "delay": 10000,
+        "scope": "folderOpen"
+    }
     ]
 }

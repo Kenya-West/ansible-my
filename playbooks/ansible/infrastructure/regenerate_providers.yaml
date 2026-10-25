@@ -1,0 +1,10 @@
+---
+# Repository maintenance only: API GETs and file writes run on the controller.
+# Source hosts are selected by setup_infra_providers_hosts, NOT --limit.
+- name: Regenerate the private infrastructure provider catalog
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  roles:
+    - role: setup/infra_providers

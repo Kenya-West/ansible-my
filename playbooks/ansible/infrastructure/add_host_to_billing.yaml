@@ -1,0 +1,11 @@
+---
+# Local workflow: choose host, resolve billing relation, choose project by name
+# or UUID, preview/adopt/create one service, save service/project UUIDs locally.
+# --limit is not a node selector; use -e setup_infra_billing_host=<hostname>.
+- name: Add or adopt one inventory host in its related infra-billing
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  roles:
+    - role: setup/infra_billing_host

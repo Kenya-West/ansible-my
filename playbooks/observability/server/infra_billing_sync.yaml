@@ -1,0 +1,10 @@
+---
+# Always preview with --check. This does not deploy or contact Remnawave.
+- name: Reconcile infrastructure records in infra-billing
+  hosts: analytics_server
+  gather_facts: false
+  become: false
+  roles:
+    - role: configure_infra_billing
+      vars:
+        infra_billing_action: reconcile
