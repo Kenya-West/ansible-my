@@ -136,9 +136,10 @@ produces does not hold it.
 
 Each item of `vpn_server_remnawave_config_profiles_base` is
 `{protocol, name, variant_suffix, inbounds, config (optional)}`, one per
-protocol. The rest of every profile is `vpn_server_remnawave_config_profiles_common`
-(log, outbounds, routing), then the [addons](#addons) its scope picks. The
-config repeats nothing the inventory already holds:
+protocol. The rest of every profile comes from the ordered
+`vpn_server_remnawave_config_profiles_composition` fragments its selectors pick
+(see [Configuration composition](#configuration-composition)), followed by
+per-protocol `config` overrides. The config repeats nothing the inventory holds:
 
 | Part | Taken from |
 | --- | --- |
@@ -173,32 +174,75 @@ nor one a node still activates.
 Run the config profiles stage after the snippets, which the profiles embed,
 and before the squads, nodes and hosts, which take up the profiles' inbounds.
 
-### Addons
+### Configuration composition
 
-Extra outbounds, rules and balancers are declared once in
-`vpn_server_remnawave_config_profiles_addons`, each with a **profile selector**
-saying which profiles get it, and appended after the common ones in
-declaration order:
+`vpn_server_remnawave_config_profiles_composition` is the single ordered list
+assembling each profile's config. Every named fragment contributes a normal
+Xray `config` mapping and may select profiles or declare whole snippets:
 
 ```yaml
-vpn_server_remnawave_config_profiles_addons:
+vpn_server_remnawave_config_profiles_composition:
+  - name: defaults
+    config:
+      log: {loglevel: warning}
+      outbounds: [{snippet: outbounds_default_prod_1}]
+      routing:
+        rules: [{snippet: rules_default_prod_1}]
   - name: warp
-    profiles: {geo: global}          # Default-*, and exclusive profiles of global nodes
-    snippets:                        # written by the snippets stage, as they are
+    profiles: {geo: global}   # Default-* and global-geo exclusive profiles
+    snippets:
       - {name: outbounds_warp_prod_1, snippet: "{{ ... }}"}
       - {name: rules_warp_prod_1, snippet: "{{ ... }}"}
-    outbounds: [{snippet: outbounds_warp_prod_1}]
-    rules: [{snippet: rules_warp_prod_1}]
-    # inbounds: [VLESS_TCP_REALITY]  # only these inbounds of a profile; the
-    #                                  rules must then be inline, and get
-    #                                  inboundTag set to the profile's own tags
+    config:
+      outbounds: [{snippet: outbounds_warp_prod_1}]
+      routing:
+        rules: [{snippet: rules_warp_prod_1}]
+  - name: chains
+    config:
+      outbounds: [{snippet: outbounds_all_prod_1}]
+      routing:
+        rules: [{snippet: rules_all_prod_1}]
+        balancers: [{snippet: balancers_all_prod_1}]
 ```
 
-A selector is a mapping of `kind` (`global`, `location`, `exclusive`), `geo`
-(`global`, `russia`, ...), `scope` (`global`, `RU`, `Xenus-team`, ...),
+Nested mappings merge, **lists concatenate in declaration order**, and later
+matching scalar values replace earlier ones. Thus global-geo profiles have
+`rules_default_prod_1 → rules_warp_prod_1 → rules_all_prod_1`; location profiles
+without WARP have `rules_default_prod_1 → rules_all_prod_1`. WARP's domain
+matches now take precedence over chain/geo rules, but private-network blocks
+still come first. Reorder fragments to change precedence; no insertion indexes
+or special WARP handling are needed.
+
+The base profile's optional `config` is merged last, recursively, **replacing
+lists** rather than appending, so protocol-specific overrides can replace a
+section without discarding unrelated routing settings. Generated `inbounds`
+always come from the base profile, not composition fragments.
+
+Whole snippet definitions (`snippets: [{name, snippet}]`) live next to their
+references and are written once by the snippets stage, regardless of selectors.
+Repeated identical definitions are deduplicated; conflicting definitions fail
+before any writes. Generated/merged `rules_all` and `outbounds_all` remain the
+snippets stage's responsibility and are only referenced by the composition.
+`vpn_server_remnawave_snippets_whole` remains available for standalone snippets.
+
+A fragment may also specify `inbounds: [VLESS_TCP_REALITY]` to scope its inline
+`config.routing.rules` to the profile's derived inbound tags. Profiles with no
+matching inbound skip that fragment. Scoped rules must be inline: a snippet
+reference cannot carry an `inboundTag`.
+
+A `profiles` selector is a mapping of `kind` (`global`, `location`, `exclusive`),
+`geo` (`global`, `russia`, ...), `scope` (`global`, `RU`, `Xenus-team`, ...),
 `protocol` and `profile` (a name), each a value or a list: every key given has
-to match, any of its values may. `{}` picks every profile; a list of selectors
-picks what any of them picks.
+to match, any value of a key may. Omitting the selector or using `{}` picks
+every profile; a list of selectors picks what any of them picks.
+
+**Migration:** `vpn_server_remnawave_config_profiles_common` and
+`vpn_server_remnawave_config_profiles_addons` are replaced by composition.
+Move common config into a fragment applying to all profiles; move each former
+addon into a named fragment, put its Xray fields inside `config` (`rules` and
+`balancers` under `config.routing`), and keep its selector/snippet definitions.
+Place the fragments in the required precedence order. Old variables fail with
+migration guidance rather than silently losing config.
 
 ### Internal squads
 
@@ -344,7 +388,7 @@ holds the way a client is routed, writing nothing:
 - the nodes a host binds to exist and activate its inbound (direct) or a
   transport/REALITY-compatible inbound (chain);
 - every generated profile holds its inbounds and embeds exactly the snippets
-  of the model - an addon where it was not declared is a problem;
+  of the model, in order - a fragment where it was not selected is a problem;
 - every node activates the profile of its scope and protocol;
 - every granted squad holds its inbounds;
 - the balancers select outbounds that exist.
@@ -412,11 +456,10 @@ In `group_vars/vpn_server_remnawave/config_profiles.yaml`:
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `vpn_server_remnawave_config_profiles_base` | the two below | One base profile per protocol, as `{protocol, name, variant_suffix, inbounds, config}` |
-| `vpn_server_remnawave_config_profiles_common` | | `log`, `outbounds`, `routing` every profile holds |
+| `vpn_server_remnawave_config_profiles_composition` | defaults, WARP, chains | Ordered named config fragments with profile selectors and whole snippet definitions |
 | `vpn_server_remnawave_config_profiles_location` | `{name: Reverse-{code}, inbound_suffix: REVERSE_{code}}` | Naming of a location's variant |
 | `vpn_server_remnawave_config_profiles_exclusive` | `[]` | The panel's exclusive profiles, as `{name, inbound_suffix}` (its host_vars) |
 | `vpn_server_remnawave_config_profiles_exclusive_group` | `vps_exclusive` | Group whose nodes are published on an exclusive profile |
-| `vpn_server_remnawave_config_profiles_addons` | WARP | Outbounds and rules added to the profiles a selector picks |
 | `vpn_server_remnawave_internal_squads_inbounds` | | Squads granted the inbounds of the profiles a selector picks |
 | `vpn_server_remnawave_config_profiles_adopt_untagged` | `false` | Whether a generated profile may take over a profile holding its inbound or name without the primary tags |
 | `vpn_server_remnawave_config_profiles_prune` | `delete` (role: `ignore`) | What to do with primary-tagged profiles the inventory no longer produces: `ignore`, `delete` |
@@ -550,8 +593,8 @@ whose `domains_node_panel` is the panel:
 | `balancers_all` | `balancers_all_prod_1` | One balancer per censorship geo with `all` outbounds |
 | `outbounds_default` | `outbounds_default_prod_1` | `DIRECT` (freedom) and `BLOCK` (blackhole) |
 | `rules_default` | `rules_default_prod_1` | `geoip:private` and `geosite:private` to `BLOCK` |
-| `outbounds_warp` | `outbounds_warp_prod_1` | `out-warp-socks`, the microwarp SOCKS5 proxy beside the node; written and embedded by the `warp` addon, in global-geo profiles only |
-| `rules_warp` | `rules_warp_prod_1` | The domains sent to `out-warp-socks`, after `rules_all`; `warp` addon |
+| `outbounds_warp` | `outbounds_warp_prod_1` | `out-warp-socks`, the microwarp SOCKS5 proxy beside the node; declared by the `warp` composition fragment and embedded in global-geo profiles only |
+| `rules_warp` | `rules_warp_prod_1` | The domains sent to `out-warp-socks`, immediately after `rules_default` and before `rules_all` |
 
 Exits and their outbound tags:
 
@@ -567,7 +610,7 @@ A domain several nodes publish is one outbound.
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `vpn_server_remnawave_snippets_key_*` | see above | Panel snippet names |
-| `vpn_server_remnawave_snippets_whole` | balancers, defaults | Snippets written as they are, as `{name, snippet}` |
+| `vpn_server_remnawave_snippets_whole` | `[]` | Additional standalone snippets written whole; composition declares defaults, WARP and balancers |
 | `vpn_server_remnawave_snippets_outbounds_plan` | built | Every exit's outbound, as `{kind, address, protocol, template, tag, ...}` |
 | `vpn_server_remnawave_snippets_template_revision` | `'001'` | Suffix of the template variable names |
 | `vpn_server_remnawave_snippets_default_protocol_type` | `vless-reality-tcp` | Used by a node that declares no `remna_node_primary_protocol_type` |

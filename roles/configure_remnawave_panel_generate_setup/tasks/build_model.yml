@@ -4,6 +4,18 @@
 # them together - is derived here in one pass, so the three sides cannot drift
 # apart.
 
+- name: Require the ordered config profile composition
+  ansible.builtin.assert:
+    that:
+      - vpn_server_remnawave_config_profiles_common is not defined
+      - vpn_server_remnawave_config_profiles_addons is not defined
+    fail_msg: >-
+      Replace vpn_server_remnawave_config_profiles_common and
+      vpn_server_remnawave_config_profiles_addons with
+      vpn_server_remnawave_config_profiles_composition: ordered named fragments
+      with config mappings, optional profiles selectors and snippet definitions.
+    quiet: true
+
 - name: Start from no related nodes
   ansible.builtin.set_fact:
     crpgs_related_nodes: []
@@ -93,14 +105,13 @@
       remark_chain_separator: "{{ vpn_server_remnawave_hosts_remark_chain_separator }}"
       remark_exclusive_format: "{{ vpn_server_remnawave_hosts_remark_exclusive_format }}"
       # Config profiles: one base per protocol, rendered for every scope in
-      # use, with the addons their selectors pick and the squads granted them.
+      # use, with ordered composition fragments and the squads granted them.
       profiles_base: "{{ vpn_server_remnawave_config_profiles_base }}"
       profiles_location: "{{ vpn_server_remnawave_config_profiles_location }}"
       profiles_exclusive: "{{ vpn_server_remnawave_config_profiles_exclusive }}"
-      profile_common: "{{ vpn_server_remnawave_config_profiles_common }}"
+      profile_composition: "{{ vpn_server_remnawave_config_profiles_composition }}"
       private_keys: "{{ vpn_server_remnawave_config_profiles_private_keys }}"
       private_key_common: "{{ vpn_server_remnawave_config_profiles_private_key_common }}"
-      addons: "{{ vpn_server_remnawave_config_profiles_addons }}"
       squads_inbounds: "{{ vpn_server_remnawave_internal_squads_inbounds }}"
 
 - name: Report what the inventory produced

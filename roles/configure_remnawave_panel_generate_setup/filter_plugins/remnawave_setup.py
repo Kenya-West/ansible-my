@@ -349,7 +349,72 @@ def _profile_identity(scope, base, location, exclusive_of):
     return str(item['name']) + variant, str(item['inbound_suffix'])
 
 
-def _render_profiles(scopes_in_use, options, warnings):
+def _merge_profile_config(target, fragment, append_lists=True):
+    """Merge nested config mappings; composition lists concatenate in order.
+
+    Per-protocol base config uses the same merge with list replacement, so it
+    can override a composed section without losing unrelated routing fields.
+    """
+    for key, value in fragment.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _merge_profile_config(target[key], value, append_lists)
+        elif append_lists and isinstance(value, list) and isinstance(target.get(key), list):
+            target[key].extend(_plain(value))
+        else:
+            target[key] = _plain(value)
+    return target
+
+
+def _prepare_composition(options):
+    """Validate ordered fragments and collect their snippet definitions once."""
+    if 'addons' in options or 'profile_common' in options:
+        raise AnsibleFilterError('Replace profile_common/addons with profile_composition '
+                                 '(vpn_server_remnawave_config_profiles_composition)')
+    composition = _plain(options.get('profile_composition') or [])
+    if not isinstance(composition, list):
+        raise AnsibleFilterError('Config profile composition must be a list of named fragments')
+    names, snippets = set(), {}
+    for fragment in composition:
+        if not isinstance(fragment, dict) or not fragment.get('name'):
+            raise AnsibleFilterError('Every config profile composition fragment needs a name')
+        name = fragment['name']
+        if name in names:
+            raise AnsibleFilterError('Duplicate config profile composition fragment %s' % name)
+        names.add(name)
+        unknown = set(fragment) - {'name', 'profiles', 'config', 'snippets', 'inbounds'}
+        if unknown:
+            raise AnsibleFilterError('Composition fragment %s has unknown fields %s; put '
+                                     'Xray settings inside config' % (name, ', '.join(sorted(unknown))))
+        # Validate selectors even when this panel has no profile they could match.
+        _matches(fragment.get('profiles'), {k: '' for k in ('name',) + _SELECTOR_KEYS})
+        config = fragment.get('config') or {}
+        if not isinstance(config, dict) or 'inbounds' in config:
+            raise AnsibleFilterError('Composition fragment %s needs a config mapping without '
+                                     'inbounds; define inbounds in profiles_base' % name)
+        routing = config.get('routing') or {}
+        if not isinstance(routing, dict):
+            raise AnsibleFilterError('Composition fragment %s config.routing must be a mapping' % name)
+        for section, value in (('outbounds', config.get('outbounds')),
+                               ('routing.rules', routing.get('rules')),
+                               ('routing.balancers', routing.get('balancers'))):
+            if value is not None and (not isinstance(value, list)
+                                      or any(not isinstance(item, dict) for item in value)):
+                raise AnsibleFilterError('Composition fragment %s config.%s must be a list '
+                                         'of mappings' % (name, section))
+        for snippet in _as_list(fragment.get('snippets')):
+            if (not isinstance(snippet, dict) or not snippet.get('name')
+                    or not isinstance(snippet.get('snippet'), list)):
+                raise AnsibleFilterError('Composition fragment %s snippets need name and '
+                                         'snippet (a list)' % name)
+            previous = snippets.get(snippet['name'])
+            if previous is not None and previous != snippet:
+                raise AnsibleFilterError('Conflicting definitions of composition snippet %s'
+                                         % snippet['name'])
+            snippets[snippet['name']] = snippet
+    return composition, list(snippets.values())
+
+
+def _render_profiles(scopes_in_use, options, composition, warnings):
     """Render every config profile the panel needs.
 
     Every base profile is rendered for the global scope, always. Other scopes
@@ -371,13 +436,6 @@ def _render_profiles(scopes_in_use, options, warnings):
     exclusive_of = dict((str(e['name']), e) for e in options.get('profiles_exclusive') or [])
     keys = options.get('private_keys') or {}
     common_key = options.get('private_key_common') or ''
-    common = options.get('profile_common') or {}
-    addons = list(options.get('addons') or [])
-    seen_addons = set()
-    for addon in addons:
-        if not addon.get('name') or addon['name'] in seen_addons:
-            raise AnsibleFilterError('Every addon needs a unique name, got %r' % (addon.get('name'),))
-        seen_addons.add(addon['name'])
 
     wanted = [({'kind': 'global', 'scope': 'global', 'geo': 'global'}, base['protocol'])
               for base in bases]
@@ -414,43 +472,34 @@ def _render_profiles(scopes_in_use, options, warnings):
             'base': str(base['name']),
             'inbound_tags': [i['tag'] for i in inbounds],
             'inbound_map': inbound_map,
-            'addons': [],
+            'composition': [],
             'squads': [],
         }
 
-        config = _plain(common)
-        config.update(_plain(base.get('config') or {}))
-        config['inbounds'] = inbounds
-        outbounds = list(config.get('outbounds') or [])
-        routing = dict(config.get('routing') or {})
-        rules = list(routing.get('rules') or [])
-        balancers = list(routing.get('balancers') or [])
-        for addon in addons:
-            if not _matches(addon.get('profiles'), profile):
+        config = {}
+        for fragment in composition:
+            if not _matches(fragment.get('profiles'), profile):
                 continue
-            scoped = [inbound_map[t] for t in _as_list(addon.get('inbounds')) if t in inbound_map]
-            if _as_list(addon.get('inbounds')) and not scoped:
+            scoped = [inbound_map[t] for t in _as_list(fragment.get('inbounds')) if t in inbound_map]
+            if _as_list(fragment.get('inbounds')) and not scoped:
                 continue
-            profile['addons'].append(addon['name'])
-            outbounds.extend(_plain(_as_list(addon.get('outbounds'))))
-            balancers.extend(_plain(_as_list(addon.get('balancers'))))
-            for rule in _as_list(addon.get('rules')):
-                rule = _plain(rule)
-                if scoped:
+            contribution = _plain(fragment.get('config') or {})
+            if scoped:
+                for rule in (contribution.get('routing') or {}).get('rules') or []:
                     if 'snippet' in rule:
                         raise AnsibleFilterError(
-                            'Addon %s scopes its rules to inbounds, so they must be '
-                            'written inline: a snippet reference cannot carry an '
-                            'inboundTag' % addon['name'])
+                            'Composition fragment %s scopes its rules to inbounds, so they '
+                            'must be inline: a snippet reference cannot carry an inboundTag'
+                            % fragment['name'])
                     rule['inboundTag'] = scoped
-                rules.append(rule)
-        config['outbounds'] = outbounds
-        routing['rules'] = rules
-        if balancers:
-            routing['balancers'] = balancers
-        else:
-            routing.pop('balancers', None)
-        config['routing'] = routing
+            _merge_profile_config(config, contribution)
+            profile['composition'].append(fragment['name'])
+        _merge_profile_config(config, base.get('config') or {}, append_lists=False)
+        config['inbounds'] = inbounds
+        config.setdefault('outbounds', [])
+        config.setdefault('routing', {}).setdefault('rules', [])
+        if not config['routing'].get('balancers'):
+            config['routing'].pop('balancers', None)
         profile['config'] = config
         profiles.append(profile)
 
@@ -511,6 +560,7 @@ def remnawave_model(nodes, options):
     default_protocol = options['default_protocol']
     labels = options.get('labels') or {}
     warnings = []
+    composition, profile_snippets = _prepare_composition(options)
 
     # --- the config profile of every node ----------------------------------
     # A node activates exactly one profile, chosen by its scope and the
@@ -524,7 +574,7 @@ def remnawave_model(nodes, options):
         scopes_in_use.setdefault(key, set()).add(node['protocol'])
 
     # An exclusive profile is one profile name per protocol, so its nodes have
-    # to agree on the geo that decides which addons it gets.
+    # to agree on the geo that decides which composition fragments it gets.
     exclusive_geos = {}
     for node in nodes:
         if node['scope']['kind'] == 'exclusive':
@@ -558,7 +608,7 @@ def remnawave_model(nodes, options):
             key = (scope['kind'], scope['scope'], scope['geo'])
             scopes_in_use[key].update(e['protocol'] for e in pairs.get(exit_slot['domain'], []))
 
-    profiles = _render_profiles(scopes_in_use, options, warnings)
+    profiles = _render_profiles(scopes_in_use, options, composition, warnings)
     squad_grants = _squad_grants(profiles, options.get('squads_inbounds'))
     profile_by_key = dict(((p['kind'], p['scope'], p['protocol']), p) for p in profiles)
     profile_by_name = dict((p['name'], p) for p in profiles)
@@ -744,6 +794,7 @@ def remnawave_model(nodes, options):
 
     return {
         'profiles': profiles,
+        'profile_snippets': profile_snippets,
         'node_profiles': node_profiles,
         'squad_grants': squad_grants,
         'exits': exits,
@@ -1076,8 +1127,8 @@ def remnawave_verify(panel, model, options):
                              % (describe(have), node.get('name')))
 
     # --- the config profiles: what they embed -------------------------------
-    # The snippets a profile embeds decide what its nodes route; an addon such
-    # as WARP in a profile it was not declared for is as wrong as one missing.
+    # The snippets a profile embeds decide what its nodes route; a fragment
+    # such as WARP in a profile it was not selected for is as wrong as one missing.
     for name, want in sorted(want_profiles.items()):
         have = profiles_by_name.get(name)
         if have is None:

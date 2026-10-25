@@ -66,14 +66,13 @@ vpn_server_remnawave_config_profiles_location:
 # the exclusive group names its own in remna_node_panel_exclusive_profile.
 vpn_server_remnawave_config_profiles_exclusive: []
 vpn_server_remnawave_config_profiles_exclusive_group: vps_exclusive
-# What every profile holds besides its inbounds: log, outbounds, routing.
-vpn_server_remnawave_config_profiles_common: {}
+# Ordered named configuration fragments, each with config, optional profiles
+# selector, snippets and base inbound tags for scoping inline rules. Nested
+# mappings merge; lists concatenate in declaration order; later scalars win.
+vpn_server_remnawave_config_profiles_composition: []
 # The REALITY private key of an inbound tag, and the key of every other one.
 vpn_server_remnawave_config_profiles_private_keys: {}
 vpn_server_remnawave_config_profiles_private_key_common: ''
-# Outbounds, rules and balancers added to the profiles a selector picks, as
-# {name, profiles, snippets, outbounds, rules, balancers, inbounds}.
-vpn_server_remnawave_config_profiles_addons: []
 # Whether a generated profile may take over a profile holding its inbound or
 # name that does not carry the primary tags.
 vpn_server_remnawave_config_profiles_adopt_untagged: false

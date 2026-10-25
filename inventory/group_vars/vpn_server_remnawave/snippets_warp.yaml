@@ -1,8 +1,8 @@
 # Routing through the microwarp SOCKS5 proxy (roles/install_vpn_caddy_microwarp)
 # that runs beside every node: one outbound and the rule sending some domains
 # to it. Each is a snippet of its own, written as it is and embedded only in
-# the profiles of the global geo by the warp addon
-# (vpn_server_remnawave_config_profiles_addons, config_profiles.yaml).
+# the profiles of the global geo by the warp composition fragment
+# (vpn_server_remnawave_config_profiles_composition, config_profiles.yaml).
 #
 # The proxy's values come from group_vars/vpn_caddy/warp.yaml, which the role
 # uses as well - the panel hosts are vpn_caddy hosts too. The node's xray reaches

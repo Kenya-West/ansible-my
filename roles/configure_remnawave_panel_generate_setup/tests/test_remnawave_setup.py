@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 import unittest
 
+from jinja2.nativetypes import NativeEnvironment
 import yaml
 from ansible.errors import AnsibleFilterError
 
@@ -39,10 +40,11 @@ def options():
                           base(XHTTP, 'Default-xHTTP', 'VLESS_REALITY_XHTTP', 'xhttp', '-xHTTP')],
         'profiles_exclusive': [{'name': 'Xenus-team', 'inbound_suffix': 'XENUS'}],
         'private_key_common': 'mock-private-key',
-        'profile_common': {
-            'outbounds': [{'snippet': 'outbounds'}],
-            'routing': {'rules': [{'snippet': 'rules'}]},
-        },
+        'profile_composition': [{
+            'name': 'chains',
+            'config': {'outbounds': [{'snippet': 'outbounds'}],
+                       'routing': {'rules': [{'snippet': 'rules'}]}},
+        }],
         'squads_inbounds': [
             {'squad': 'Default-Squad', 'profiles': {'kind': 'global'}},
             {'squad': 'Reverse-proxy', 'profiles': {'kind': 'location'}},
@@ -240,6 +242,160 @@ class GenerationTests(unittest.TestCase):
         for text in ('inventory wants Default-Profile', 'has fingerprint chrome', 'has SNI',
                      'does not override SNI'):
             self.assertTrue(any(text in p for p in problems), problems)
+
+
+class CompositionTests(unittest.TestCase):
+    def setUp(self):
+        inventory = yaml.safe_load((ROLE.parents[1] /
+                                   'inventory/group_vars/vpn_server_remnawave/config_profiles.yaml').read_text())
+        # Render the actual inventory composition using mock snippet contents.
+        env = NativeEnvironment()
+        env.globals.update({
+            'vpn_server_remnawave_config_profiles_log': {'loglevel': 'warning'},
+            **{'vpn_server_remnawave_snippets_key_' + name: name + '_prod_1'
+               for name in ('outbounds_default', 'rules_default', 'outbounds_warp',
+                            'rules_warp', 'outbounds_all', 'rules_all', 'balancers_all')},
+            **{'vpn_server_remnawave_snippets_' + name: []
+               for name in ('outbounds_default', 'rules_default', 'outbounds_warp',
+                            'rules_warp', 'balancers_all')},
+        })
+
+        def render(value):
+            if isinstance(value, dict):
+                return {k: render(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [render(v) for v in value]
+            return env.from_string(value).render() if isinstance(value, str) else value
+
+        self.options = options()
+        self.options['profile_composition'] = render(inventory['vpn_server_remnawave_config_profiles_composition'])
+        self.nodes = nodes()
+
+    def model(self):
+        return setup.remnawave_model(self.nodes, self.options)
+
+    def test_inventory_rule_order_for_tcp_xhttp_shared_and_exclusive(self):
+        for profile in self.model()['profiles']:
+            expected = ['rules_default_prod_1']
+            if profile['geo'] == 'global':
+                expected.append('rules_warp_prod_1')
+            expected.append('rules_all_prod_1')
+            self.assertEqual(setup._snippet_refs(profile['config']['routing']['rules']), expected)
+            self.assertEqual(profile['composition'],
+                             ['defaults', 'warp', 'chains'] if profile['geo'] == 'global'
+                             else ['defaults', 'chains'])
+
+    def test_outbounds_balancers_and_log_are_preserved(self):
+        for profile in self.model()['profiles']:
+            expected = ['outbounds_default_prod_1']
+            if profile['geo'] == 'global':
+                expected.append('outbounds_warp_prod_1')
+            expected.append('outbounds_all_prod_1')
+            self.assertEqual(setup._snippet_refs(profile['config']['outbounds']), expected)
+            self.assertEqual(profile['config']['routing']['balancers'],
+                             [{'snippet': 'balancers_all_prod_1'}])
+            self.assertEqual(profile['config']['log'], {'loglevel': 'warning'})
+
+    def test_fragment_order_controls_rule_precedence(self):
+        fragments = self.options['profile_composition']
+        fragments[1], fragments[2] = fragments[2], fragments[1]
+        profile = next(p for p in self.model()['profiles'] if p['name'] == 'Default-Profile')
+        self.assertEqual(setup._snippet_refs(profile['config']['routing']['rules']),
+                         ['rules_default_prod_1', 'rules_all_prod_1', 'rules_warp_prod_1'])
+
+    def test_nested_config_merge_and_base_override(self):
+        self.options['profile_composition'].append({
+            'name': 'routing-settings', 'profiles': {'kind': 'global'},
+            'config': {'routing': {'domainStrategy': 'IPIfNonMatch'},
+                       'log': {'access': '/tmp/access.log'}},
+        })
+        self.options['profiles_base'][0]['config'] = {'log': {'loglevel': 'error'},
+                                                     'routing': {'domainStrategy': 'AsIs'}}
+        config = next(p['config'] for p in self.model()['profiles'] if p['name'] == 'Default-Profile')
+        self.assertEqual(config['log'], {'loglevel': 'error', 'access': '/tmp/access.log'})
+        self.assertEqual(config['routing']['domainStrategy'], 'AsIs')
+        self.assertEqual(len(config['routing']['rules']), 3)
+        self.assertIn('balancers', config['routing'])
+
+    def test_base_list_override_replaces_composition_list(self):
+        self.options['profiles_base'][0]['config'] = {'routing': {'rules': [{'outboundTag': 'DIRECT'}]}}
+        config = next(p['config'] for p in self.model()['profiles'] if p['name'] == 'Default-Profile')
+        self.assertEqual(config['routing']['rules'], [{'outboundTag': 'DIRECT'}])
+        self.assertIn('balancers', config['routing'])
+
+    def test_scoped_inline_rules_map_tags_without_mutating_fragments(self):
+        fragment = {
+            'name': 'tcp-inline', 'inbounds': ['VLESS_TCP_REALITY'],
+            'config': {'routing': {'rules': [{'domain': ['example.test'], 'outboundTag': 'DIRECT'}]}},
+        }
+        self.options['profile_composition'].insert(1, fragment)
+        original = copy.deepcopy(self.options)
+        for profile in self.model()['profiles']:
+            if profile['protocol'] == TCP:
+                rule = profile['config']['routing']['rules'][1]
+                self.assertEqual(rule['inboundTag'], [profile['inbound_map']['VLESS_TCP_REALITY']])
+            else:
+                self.assertNotIn('tcp-inline', profile['composition'])
+        self.assertEqual(self.options, original)
+
+    def test_scoped_snippet_rule_is_rejected(self):
+        self.options['profile_composition'][1]['inbounds'] = ['VLESS_TCP_REALITY']
+        with self.assertRaisesRegex(AnsibleFilterError, 'must be inline'):
+            self.model()
+
+    def test_snippet_definitions_are_collected_once(self):
+        duplicate = copy.deepcopy(self.options['profile_composition'][1]['snippets'][0])
+        self.options['profile_composition'].append({'name': 'repeat-definition', 'snippets': [duplicate]})
+        snippets = self.model()['profile_snippets']
+        self.assertEqual(len(snippets), 5)
+        self.assertEqual([s['name'] for s in snippets], [
+            'outbounds_default_prod_1', 'rules_default_prod_1', 'outbounds_warp_prod_1',
+            'rules_warp_prod_1', 'balancers_all_prod_1',
+        ])
+
+    def test_conflicting_snippet_definitions_are_rejected(self):
+        duplicate = copy.deepcopy(self.options['profile_composition'][1]['snippets'][0])
+        duplicate['snippet'] = [{'tag': 'different'}]
+        self.options['profile_composition'].append({'name': 'conflict', 'snippets': [duplicate]})
+        with self.assertRaisesRegex(AnsibleFilterError, 'Conflicting definitions'):
+            self.model()
+
+    def test_bad_composition_shapes_are_rejected(self):
+        for fragment, message in [
+            ({'config': {}}, 'needs a name'),
+            ({'name': 'defaults'}, 'Duplicate'),
+            ({'name': 'bad', 'rules': []}, 'unknown fields'),
+            ({'name': 'bad', 'config': {'inbounds': []}}, 'without inbounds'),
+            ({'name': 'bad', 'config': {'routing': {'rules': 'not-a-list'}}}, 'must be a list'),
+            ({'name': 'bad', 'config': {'routing': {'rules': ['not-a-mapping']}}}, 'of mappings'),
+            ({'name': 'bad', 'profiles': {'typo': 'global'}}, 'Unknown profile selector keys'),
+            ({'name': 'bad', 'snippets': [{'name': 'bad'}]}, 'snippets need'),
+        ]:
+            with self.subTest(fragment=fragment):
+                opts = copy.deepcopy(self.options)
+                opts['profile_composition'].append(fragment)
+                with self.assertRaisesRegex(AnsibleFilterError, message):
+                    setup.remnawave_model(self.nodes, opts)
+
+    def test_legacy_options_fail_with_migration_guidance(self):
+        for key in ('profile_common', 'addons'):
+            self.options[key] = {}
+            with self.assertRaisesRegex(AnsibleFilterError, 'Replace profile_common/addons'):
+                self.model()
+            del self.options[key]
+
+    def test_verify_detects_wrong_snippet_order(self):
+        model = self.model()
+        panel = panel_for(model)
+        profile = next(p for p in panel['config_profiles'] if p['name'] == 'Default-Profile')
+        rules = profile['config']['routing']['rules']
+        rules[1], rules[2] = rules[2], rules[1]
+        report = setup.remnawave_verify(panel, model, {
+            'primary_tags': ['MANAGED_BY:ANSIBLE'], 'separator': ' | by ',
+            'direct_route_id': 2, 'route_id_range': [400, 499],
+            'rules_snippet': 'rules', 'outbounds_snippet': 'outbounds',
+        })
+        self.assertTrue(any("'Default-Profile' embeds rules snippets" in p for p in report['problems']))
 
 
 if __name__ == '__main__':

@@ -20,16 +20,10 @@ vpn_server_remnawave_snippets_sync: on_change
 # outbounds_all and rules_all are not among them: their outbounds need the
 # protocol templates rendered per exit, and their rules the route ids the hosts
 # carry, so the role builds and merges those two (see below).
-vpn_server_remnawave_snippets_whole:
-  - name: "{{ vpn_server_remnawave_snippets_key_balancers_all }}"
-    snippet: "{{ vpn_server_remnawave_snippets_balancers_all }}"
-  - name: "{{ vpn_server_remnawave_snippets_key_outbounds_default }}"
-    snippet: "{{ vpn_server_remnawave_snippets_outbounds_default }}"
-  - name: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
-    snippet: "{{ vpn_server_remnawave_snippets_rules_default }}"
-# The snippets of the config profile addons (WARP, snippets_warp.yaml) are
-# written as they are too, by the addon that declares them
-# (vpn_server_remnawave_config_profiles_addons, config_profiles.yaml).
+# Whole snippet definitions normally live beside their references in the
+# config profile composition (config_profiles.yaml). This list is for extra
+# standalone snippets not part of that composition.
+vpn_server_remnawave_snippets_whole: []
 
 vpn_server_remnawave_snippets_outbounds_default:
   - tag: DIRECT

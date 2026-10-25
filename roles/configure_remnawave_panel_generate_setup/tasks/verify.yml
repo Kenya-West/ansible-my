@@ -9,8 +9,8 @@
 #   - the nodes a host binds to, which must exist and activate its inbound
 #     (direct) or a transport/REALITY-compatible inbound (chain);
 #   - every generated config profile, which must hold its inbounds and embed
-#     exactly the snippets of the model (an addon where it was not declared is
-#     a problem as much as one missing);
+#     exactly the snippets of the model (a fragment where it was not selected
+#     is a problem as much as one missing);
 #   - every node, which must activate the profile of its scope and protocol;
 #   - every internal squad granted inbounds, which must hold them;
 #   - the balancers, whose outbounds must exist;

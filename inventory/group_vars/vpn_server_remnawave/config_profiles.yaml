@@ -14,8 +14,8 @@
 #
 # Every variant holds the base profile's inbounds under tags of its own
 # (VLESS_TCP_REALITY_REVERSE_RU, VLESS_TCP_REALITY_XENUS) - the panel keeps
-# inbound tags unique - and the addons whose selector picks it (WARP for the
-# global geo only).
+# inbound tags unique - and the ordered composition fragments whose selectors
+# pick it (WARP for the global geo only).
 #
 # A profile is found in the panel by the tag of its inbound, and failing that by
 # its name. Never rename the inbound of a live profile: the panel deletes the old
@@ -84,22 +84,6 @@ vpn_server_remnawave_config_profiles_private_keys: >-
   {%- endfor -%}
   {{ out }}
 vpn_server_remnawave_config_profiles_private_key_common: "{{ vpn_server_remnawave_inbounds_private_keys.common | default('') }}"
-
-# Every profile holds these besides its inbounds; the addons below add to its
-# outbounds and rules.
-vpn_server_remnawave_config_profiles_common:
-  log: "{{ vpn_server_remnawave_config_profiles_log }}"
-  outbounds:
-    - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_default }}"
-    - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_all }}"
-  # Rules are matched in this order, the addons' after these, so a chained
-  # route id or a geo rule is honoured before a domain goes to WARP.
-  routing:
-    rules:
-      - snippet: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
-      - snippet: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
-    balancers:
-      - snippet: "{{ vpn_server_remnawave_snippets_key_balancers_all }}"
 
 # ---------------------------------------------------------------------------
 # Base profiles
@@ -186,27 +170,38 @@ vpn_server_remnawave_config_profiles_exclusive: []
 vpn_server_remnawave_config_profiles_exclusive_group: vps_exclusive
 
 # ---------------------------------------------------------------------------
-# Addons
+# Ordered configuration composition
 # ---------------------------------------------------------------------------
 
-# Outbounds, rules and balancers added to the profiles a selector picks, after
-# the common ones, in this order. Each addon is
+# One ordered list assembles the config of every profile. Matching fragments
+# contribute normal Xray config mappings: nested mappings merge, lists append
+# in declaration order, scalar values are replaced by the last matching one.
+# Thus routing precedence is visible here: defaults -> WARP -> chain/geo rules.
+# Per-protocol base.config overrides the result (its lists replace, not append);
+# the role then supplies the generated inbounds.
 #
-#   name:      unique
-#   profiles:  a selector: a mapping of kind (global, location, exclusive), geo
-#              (global, russia, ...), scope (global, RU, Xenus-team, ...),
-#              protocol and profile (a name), each a value or a list; every key
-#              given must match. A list of selectors picks what any one picks.
-#   snippets:  [{name, snippet}] the snippets stage writes as they are
-#   outbounds, rules, balancers: items appended to the profile, usually
-#              {snippet: <name>}
-#   inbounds:  optional base inbound tags (VLESS_TCP_REALITY); the rules then
-#              have to be written inline, and get inboundTag set to the
-#              profile's own tags of those inbounds. A profile holding none of
-#              them does not get the addon.
-vpn_server_remnawave_config_profiles_addons:
-  # snippets_warp.yaml: the microwarp proxy beside every node, used by the
-  # nodes of the global geo only - wherever the profile is exclusive or not.
+# Each fragment has a unique name, an optional profiles selector (kind, geo,
+# scope, protocol, profile), config, and optional snippets: [{name, snippet}].
+# Snippets are written once, even if several profiles/fragments embed them.
+# Optional inbounds lists base inbound tags and scopes inline routing rules
+# to their generated tags; scoped rules cannot be snippet references.
+vpn_server_remnawave_config_profiles_composition:
+  - name: defaults
+    snippets:
+      - name: "{{ vpn_server_remnawave_snippets_key_outbounds_default }}"
+        snippet: "{{ vpn_server_remnawave_snippets_outbounds_default }}"
+      - name: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
+        snippet: "{{ vpn_server_remnawave_snippets_rules_default }}"
+    config:
+      log: "{{ vpn_server_remnawave_config_profiles_log }}"
+      outbounds:
+        - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_default }}"
+      routing:
+        rules:
+          - snippet: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
+
+  # The microwarp proxy beside global-geo nodes, including exclusive ones.
+  # Its domain rules run immediately after defaults, before chain/geo rules.
   - name: warp
     profiles:
       geo: global
@@ -215,10 +210,27 @@ vpn_server_remnawave_config_profiles_addons:
         snippet: "{{ vpn_server_remnawave_snippets_outbounds_warp }}"
       - name: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
         snippet: "{{ vpn_server_remnawave_snippets_rules_warp }}"
-    outbounds:
-      - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
-    rules:
-      - snippet: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
+    config:
+      outbounds:
+        - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
+      routing:
+        rules:
+          - snippet: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
+
+  - name: chains
+    # outbounds_all and rules_all are generated/merged by the snippets stage;
+    # only the balancers are written whole from this fragment.
+    snippets:
+      - name: "{{ vpn_server_remnawave_snippets_key_balancers_all }}"
+        snippet: "{{ vpn_server_remnawave_snippets_balancers_all }}"
+    config:
+      outbounds:
+        - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_all }}"
+      routing:
+        rules:
+          - snippet: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
+        balancers:
+          - snippet: "{{ vpn_server_remnawave_snippets_key_balancers_all }}"
 
 # ---------------------------------------------------------------------------
 # Internal squads
