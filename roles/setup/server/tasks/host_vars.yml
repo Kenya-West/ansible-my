@@ -31,6 +31,19 @@
     fail_msg: A base domain and at least one server group are needed.
     quiet: true
 
+- name: Validate optional billing answers before writing host_vars
+  ansible.builtin.assert:
+    that:
+      - >-
+        (initial_configure_server_infrastructure_every | int == 1
+         and initial_configure_server_infrastructure_unit in ['hour', 'day', 'month', 'year', 'once'])
+        or (initial_configure_server_infrastructure_every | int == 3 and initial_configure_server_infrastructure_unit == 'month')
+      - initial_configure_server_infrastructure_currency is match('^[A-Z]{3,4}$')
+      - initial_configure_server_infrastructure_amount | string is match('^[0-9]+(\.[0-9]{1,2})?$')
+    quiet: true
+    fail_msg: Billing answers must use a supported infra-billing period and a decimal amount/currency.
+  when: initial_configure_server_infrastructure_billing_known | default(false)
+
 - name: Check whether host_vars/{{ initial_configure_server_hostname }} exists
   ansible.builtin.stat:
     path: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}"
@@ -50,6 +63,13 @@
     setup_generate_passwords: "{{ setup_server_generated_passwords }}"
     setup_generate_passwords_length: "{{ setup_server_password_length }}"
     setup_generate_passwords_special_chars: "{{ setup_server_password_special_chars }}"
+
+- name: Generate the AES-256 key for infra-billing on new servers
+  ansible.builtin.set_fact:
+    initial_configure_generated_password_analytics_server_infra_billing_encryption_key: >-
+      {{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) | b64encode }}
+  when: "'analytics_server' in setup_server_groups"
+  no_log: true
 
 - name: Find the host template directories of this role
   ansible.builtin.find:
@@ -74,7 +94,8 @@
     setup_render_tree_src: "{{ setup_server_role_path }}/templates/host/{{ setup_server_template_dir }}"
     setup_render_tree_dest: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/{{ setup_server_template_dir }}"
   loop: >-
-    {{ (setup_server_templates_always + setup_server_groups) | unique
+    {{ (setup_server_templates_always + setup_server_groups
+        + (['infrastructure'] if 'analytics_server' in setup_server_groups else [])) | unique
        | select('in', __setup_server_template_dirs.files | map(attribute='path') | map('basename') | list) | list }}
   loop_control:
     loop_var: setup_server_template_dir

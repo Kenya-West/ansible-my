@@ -1,0 +1,80 @@
+# Provider/account data are independent of Remnawave and infra-billing.
+# Geography comes from the existing runtime country_code/country_code_upper.
+infrastructure:
+  provider: {{ initial_configure_server_infrastructure_provider | default(initial_configure_server_provider) | to_json }}
+  account: {{ initial_configure_server_infrastructure_account | default('main') | to_json }}
+  type: vps
+  # service_id: '1234'
+  # service_url: https://clients.example.com/billmgr?startform=vds.edit&elid=1234
+{% if initial_configure_server_infrastructure_billing_known | default(false) %}
+  billing:
+    amount: {{ initial_configure_server_infrastructure_amount | string | to_json }}
+    currency: {{ initial_configure_server_infrastructure_currency }}
+    interval:
+      every: {{ initial_configure_server_infrastructure_every | int }}
+      unit: {{ initial_configure_server_infrastructure_unit }}
+    # next_due_at: "2027-01-01T00:00:00Z"  # verified renewal, NOT reminder
+{% else %}
+  # billing: {amount: "12.00", currency: USD, interval: {every: 1, unit: month}}
+{% endif %}
+
+  # Optional billing policy: merge into billing above, or uncomment the complete
+  # example below when the amount/interval were not entered during setup.
+  # billing:
+  #   amount: '24.00'
+  #   currency: USD
+  #   interval: {every: 3, unit: month}  # quarterly
+  #   next_due_at: '2027-01-01T00:00:00Z'  # verified renewal, not a reminder
+  #   auto_renew: true
+  #   reminder_before: {every: 7, unit: day}
+  #   top_up:
+  #     amount: '72.00'
+  #     currency: USD
+  #     interval: {every: 6, unit: month}
+  # Service charges support only 1 hour/day/month/year/once or 3 months.
+  # Top-up/reminder intervals are planning data, not service charge periods.
+  # Top-up is planning data, never a transfer or the host's service cost.
+  # Connector-managed service: omit billing/next_due_at/reminders and identify
+  # the existing service via service_id or infra_billing_service.uuid instead.
+
+# Billing relation: analytics_server/components/infra_billing, then group/default.
+# Merge overrides into the EXISTING host_relations mapping in 1_domains.yaml;
+# defining host_relations in another file replaces the entire mapping.
+infra_billing_service:
+  enabled: false
+  # project_uuid: 00000000-0000-0000-0000-000000000001  # replace with real UUID
+  # uuid: ...  # adopt an existing service without name matching
+
+# Optional controller-only provider regeneration sources. Keep definitions on
+# one authoritative server, not every node. These examples are disabled.
+# infrastructure_provider_definitions is input; infra_providers is this server's
+# catalog in infrastructure/providers.yaml. It contains no VPS due dates.
+{% raw %}
+# infrastructure_provider_definitions:
+#   vendor:
+#     name: Example Hosting
+#     website: https://vendor.example
+#     login_url: https://clients.vendor.example
+#     accounts:
+#       main:
+#         connection:
+#           type: manual
+#
+# infrastructure_provider_sources:
+#   infra_billing:
+#     enabled: false  # set true only when you want this source read
+#     url: https://billing.example
+#     token: "{{ vault_billing_token }}"
+#     provider_keys:
+#       Example Hosting: vendor  # API UUID/name -> stable catalog key
+#     account_keys: {}           # API account UUID -> stable account key
+#   remnawave:
+#     enabled: false  # explicit opt-in; collection role performs GETs only
+#     url: https://panel.example
+#     token: "{{ vault_remnawave_token }}"
+#     api_key: "{{ vault_remnawave_api_key }}"  # custom-path protection only
+#     provider_keys:
+#       Example Hosting: vendor
+{% endraw %}
+# Existing infra_billing_api_url/token already authorize billing provider GETs
+# without a source override; enabled: false above can explicitly exclude them.

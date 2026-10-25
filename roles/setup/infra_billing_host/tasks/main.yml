@@ -1,0 +1,269 @@
+---
+- name: Ask which inventory host to add
+  ansible.builtin.pause:
+    prompt: Inventory hostname to add or adopt in infra-billing
+  register: sibh_host_answer
+  when: setup_infra_billing_host | length == 0
+
+- name: Set chosen host
+  ansible.builtin.set_fact:
+    setup_infra_billing_host: "{{ sibh_host_answer.user_input | trim }}"
+  when: setup_infra_billing_host | length == 0
+
+- name: Validate the chosen inventory host
+  ansible.builtin.assert:
+    that:
+      - setup_infra_billing_host in groups['all']
+      - setup_infra_billing_host != 'localhost'
+      - setup_infra_billing_host is match('^[a-z0-9][a-z0-9._-]*$')
+      - hostvars[setup_infra_billing_host].infrastructure is defined
+    fail_msg: Select an inventory host with infrastructure provider/account and manual billing or an existing connector service identity.
+    quiet: true
+
+- name: Resolve the host's existing billing relation
+  ansible.builtin.include_role:
+    name: kwtoolset/resolve_host_relations
+  vars:
+    resolve_host_relations_source: "{{ hostvars[setup_infra_billing_host].host_relations | default({}) }}"
+    resolve_host_relations_group: analytics_server
+    resolve_host_relations_component: infra_billing
+
+- name: Require a related billing server
+  ansible.builtin.assert:
+    that: resolve_host_relations_host | length > 0
+    fail_msg: No billing host relation resolves for this host.
+    quiet: true
+
+- name: Collect related server and host settings
+  ansible.builtin.set_fact:
+    sibh_server: "{{ resolve_host_relations_host }}"
+    sibh_infrastructure: "{{ hostvars[setup_infra_billing_host].infrastructure }}"
+    sibh_binding: "{{ hostvars[setup_infra_billing_host].infra_billing_service | default({}) }}"
+  no_log: true
+
+- name: Read related billing server without SSH
+  infra_billing:
+    api_url: >-
+      {{ hostvars[sibh_server].infra_billing_api_url if hostvars[sibh_server].infra_billing_api_url is defined
+         else 'https://' ~ hostvars[sibh_server].domains_keys.infra_billing }}
+    token: "{{ hostvars[sibh_server].infra_billing_api_token | default(lookup('ansible.builtin.env', 'INFRA_BILLING_API_TOKEN')) }}"
+    action: read
+    validate_certs: "{{ hostvars[sibh_server].infra_billing_validate_certs | default(true) }}"
+    timeout: "{{ hostvars[sibh_server].infra_billing_timeout | default(30) }}"
+  register: sibh_read
+  no_log: true
+
+- name: Show available projects using native YAML output
+  ansible.builtin.debug:
+    var: sibh_project_report
+  vars:
+    sibh_project_report:
+      host: "{{ setup_infra_billing_host }}"
+      billing_server: "{{ sibh_server }}"
+      projects: "{{ sibh_projects }}"
+    sibh_projects: >-
+      {%- set result = [] -%}
+      {%- for p in sibh_read.gathered.projects -%}
+      {%- set _ = result.append({'uuid': p.uuid, 'name': p.name}) -%}
+      {%- endfor -%}
+      {{ result }}
+
+- name: Choose a project by name or UUID
+  ansible.builtin.pause:
+    prompt: "Project name or UUID (Enter keeps {{ sibh_binding.project_uuid | default('no project') }})"
+  register: sibh_project_answer
+  when: setup_infra_billing_project | length == 0
+
+- name: Resolve selected project
+  ansible.builtin.set_fact:
+    sibh_project_choice: >-
+      {{ setup_infra_billing_project if setup_infra_billing_project | length > 0
+         else sibh_project_answer.user_input | trim | default(sibh_binding.project_uuid | default(''), true) }}
+
+- name: Find unambiguous project identity
+  ansible.builtin.set_fact:
+    sibh_projects: >-
+      {{ (sibh_read.gathered.projects | selectattr('uuid', 'equalto', sibh_project_choice) | list)
+         + (sibh_read.gathered.projects | selectattr('name', 'equalto', sibh_project_choice) | list)
+         | unique(attribute='uuid') | list }}
+  no_log: true
+
+- name: Require exactly one project
+  ansible.builtin.assert:
+    that: sibh_projects | length == 1
+    fail_msg: Project not found or name is ambiguous. Select its UUID from the report.
+    quiet: true
+
+- name: Resolve this host's binding from explicit API settings or declared driver
+  ansible.builtin.include_tasks: resolve_binding.yml
+
+- name: Show existing services for optional explicit adoption
+  ansible.builtin.debug:
+    var: sibh_services
+  vars:
+    sibh_services: >-
+      {%- set result = [] -%}
+      {%- for s in sibh_read.gathered.services -%}
+      {%- set _ = result.append({'uuid': s.uuid, 'name': s.name, 'account_uuid': s.accountUuid,
+         'project_uuid': s.projectUuid, 'managed_by_connector': s.isManaged}) -%}
+      {%- endfor -%}
+      {{ result }}
+
+- name: Ask for explicit service adoption or automatic name matching
+  ansible.builtin.pause:
+    prompt: >-
+      Existing service UUID (Enter uses {{ sibh_binding.uuid | default('automatic account/name or service_id matching') }};
+      no match imports through the connector when billing is omitted; verified manual billing creates a manual service)
+  register: sibh_service_answer
+  when: setup_infra_billing_service_uuid | length == 0 and not setup_infra_billing_confirm | bool
+
+- name: Resolve optional service UUID
+  ansible.builtin.set_fact:
+    sibh_service_uuid: >-
+      {{ setup_infra_billing_service_uuid if setup_infra_billing_service_uuid | length > 0
+         else sibh_service_answer.user_input | default('') | trim | default(sibh_binding.uuid | default(''), true) }}
+
+- name: Limit reconciliation to this provider account and service
+  ansible.builtin.set_fact:
+    sibh_selected_bindings: >-
+      {%- set b = sibh_provider_bindings | selectattr('accounts.' ~ sibh_infrastructure.account, 'defined') | first -%}
+      {{ [b | combine({'accounts': {sibh_infrastructure.account: b.accounts[sibh_infrastructure.account]}})] }}
+    sibh_export: >-
+      {{ sibh_binding | combine({'enabled': true, 'project_uuid': sibh_projects[0].uuid})
+         | combine({'uuid': sibh_service_uuid} if sibh_service_uuid | length > 0 else {}) }}
+  no_log: true
+
+# Validate filesystem before even previewing a remote write; never overwrite an
+# encrypted/symlink destination or another file defining the same variable.
+- name: Inspect host infrastructure file
+  ansible.builtin.stat:
+    path: "{{ setup_infra_billing_host_file }}"
+  register: sibh_stat
+
+- name: Require existing regular host infrastructure file
+  ansible.builtin.assert:
+    that:
+      - sibh_stat.stat.exists
+      - sibh_stat.stat.isreg | default(false)
+      - not sibh_stat.stat.islnk | default(false)
+    fail_msg: Host infrastructure file must exist as a regular plaintext YAML file. Override setup_infra_billing_host_file if needed.
+    quiet: true
+
+- name: Read raw host YAML without resolving its templates
+  ansible.builtin.slurp:
+    src: "{{ setup_infra_billing_host_file }}"
+  register: sibh_raw
+  no_log: true
+
+- name: Parse host YAML
+  ansible.builtin.set_fact:
+    sibh_document: "{{ sibh_raw.content | b64decode | from_yaml }}"
+  no_log: true
+
+- name: Require expected host YAML structure
+  ansible.builtin.assert:
+    that:
+      - sibh_document is mapping
+      - sibh_document.infrastructure is mapping
+      - sibh_document.infrastructure.provider == sibh_infrastructure.provider
+      - sibh_document.infrastructure.account == sibh_infrastructure.account
+    quiet: true
+  no_log: true
+
+- name: Find other YAML files in this host's variables
+  ansible.builtin.find:
+    paths: "{{ setup_infra_billing_inventory_dir }}/host_vars/{{ setup_infra_billing_host }}"
+    patterns: ['*.yaml', '*.yml']
+    recurse: true
+  register: sibh_files
+
+- name: Read other raw host YAML files to check conflicting variables
+  ansible.builtin.slurp:
+    src: "{{ item.path }}"
+  loop: "{{ sibh_files.files }}"
+  when: item.path != setup_infra_billing_host_file
+  register: sibh_other_files
+  no_log: true
+
+- name: Refuse split or duplicate billing service definitions
+  ansible.builtin.assert:
+    that: "(item.content | b64decode | from_yaml | default({}, true)).infra_billing_service is not defined"
+    fail_msg: Another host_vars file defines infra_billing_service. Use that file as setup_infra_billing_host_file or consolidate before onboarding.
+    quiet: true
+  loop: "{{ sibh_other_files.results | rejectattr('skipped', 'defined') | list }}"
+  no_log: true
+
+- name: Preview only the selected host's reconciliation
+  ansible.builtin.include_tasks: reconcile.yml
+  vars:
+    sibh_preview: true
+
+- name: Show onboarding preview
+  ansible.builtin.debug:
+    var: sibh_preview_report
+  vars:
+    sibh_preview_report:
+      host: "{{ setup_infra_billing_host }}"
+      server: "{{ sibh_server }}"
+      project: "{{ sibh_projects[0].name }}"
+      project_uuid: "{{ sibh_projects[0].uuid }}"
+      reconciliation: "{{ sibh_reconcile.report }}"
+      service: "{{ sibh_reconcile.records[0] }}"
+
+- name: Confirm writes to infra-billing and local host YAML
+  ansible.builtin.pause:
+    prompt: Type yes to apply this host only and save its UUIDs (project moves are authoritative)
+  register: sibh_confirmation
+  when:
+    - not ansible_check_mode
+    - not setup_infra_billing_confirm | bool
+
+- name: Require explicit apply confirmation
+  ansible.builtin.assert:
+    that: setup_infra_billing_confirm | bool or sibh_confirmation.user_input | default('') | trim == 'yes'
+    fail_msg: Not confirmed; no API or inventory writes were made.
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Apply selected host only
+  ansible.builtin.include_tasks: reconcile.yml
+  vars:
+    sibh_preview: false
+  when: not ansible_check_mode
+
+- name: Prepare host settings with resolved identifiers
+  ansible.builtin.set_fact:
+    sibh_saved_document: >-
+      {{ sibh_document | combine({'infra_billing_service': sibh_export
+         | combine({'uuid': sibh_reconcile.records[0].uuid} if sibh_reconcile.records[0].uuid else {})}) }}
+  no_log: true
+
+- name: Save host UUIDs with backup (preview only in check mode)
+  ansible.builtin.copy:
+    dest: "{{ setup_infra_billing_host_file }}"
+    content: "{{ sibh_saved_document | to_nice_yaml(indent=2, sort_keys=false) }}"
+    mode: '0600'
+    backup: true
+  diff: false
+  register: sibh_write
+  no_log: true
+
+- name: Secure backup of host settings
+  ansible.builtin.file:
+    path: "{{ sibh_write.backup_file }}"
+    mode: '0600'
+  when: sibh_write.backup_file is defined and not ansible_check_mode
+  no_log: true
+
+- name: Report saved host settings
+  ansible.builtin.debug:
+    var: sibh_saved_report
+  vars:
+    sibh_saved_report:
+      host: "{{ setup_infra_billing_host }}"
+      billing_server: "{{ sibh_server }}"
+      service: "{{ sibh_reconcile.records[0] }}"
+      reconciliation: "{{ sibh_reconcile.report }}"
+      file: "{{ setup_infra_billing_host_file }}"
+      check_mode: "{{ ansible_check_mode }}"
+      backup_file: "{{ sibh_write.backup_file | default('none') }}"

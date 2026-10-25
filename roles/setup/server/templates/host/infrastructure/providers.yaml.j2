@@ -1,0 +1,20 @@
+# Private catalog owned by this server, consumed through hostvars[billing_server].
+# No VPS due dates or To Do reminders belong here; keep them in node host_vars.
+infra_providers: {}
+# Example: replace the empty mapping above, do not declare it twice.
+{% raw %}
+# infra_providers:
+#   vendor:
+#     name: Vendor
+#     website: https://vendor.example
+#     login_url: https://panel.vendor.example
+#     accounts:
+#       main:
+#         connection:
+#           type: api
+#           driver: billmgr  # explicit connector, never guessed from API URL
+#           api_url: https://panel.vendor.example/billmgr
+#           credentials:
+#             username: "{{ vault_vendor_login }}"
+#             password: "{{ vault_vendor_password }}"
+{% endraw %}

@@ -1,0 +1,10 @@
+---
+# HTTP runs on the controller; host_vars belong to the billing server.
+- name: Read infra-billing providers, accounts, services and projects
+  hosts: analytics_server
+  gather_facts: false
+  become: false
+  roles:
+    - role: configure_infra_billing
+      vars:
+        infra_billing_action: read

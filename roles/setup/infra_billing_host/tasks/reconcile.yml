@@ -1,0 +1,22 @@
+---
+- name: Reconcile only the selected host on its related billing server
+  infra_billing:
+    api_url: >-
+      {{ hostvars[sibh_server].infra_billing_api_url if hostvars[sibh_server].infra_billing_api_url is defined
+         else 'https://' ~ hostvars[sibh_server].domains_keys.infra_billing }}
+    token: "{{ hostvars[sibh_server].infra_billing_api_token | default(lookup('ansible.builtin.env', 'INFRA_BILLING_API_TOKEN')) }}"
+    action: reconcile
+    catalog: "{{ hostvars[sibh_server].infra_providers | default({}) }}"
+    bindings: "{{ sibh_selected_bindings }}"
+    hosts:
+      - name: "{{ setup_infra_billing_host }}"
+        country_code: "{{ hostvars[setup_infra_billing_host].country_code_upper }}"
+        infrastructure: "{{ sibh_infrastructure }}"
+        binding: "{{ sibh_export }}"
+    return_records: true
+    sync_missing_services: "{{ hostvars[sibh_server].infra_billing_sync_missing_services | default(true) }}"
+    validate_certs: "{{ hostvars[sibh_server].infra_billing_validate_certs | default(true) }}"
+    timeout: "{{ hostvars[sibh_server].infra_billing_timeout | default(30) }}"
+  check_mode: "{{ sibh_preview }}"
+  register: sibh_reconcile
+  no_log: true

@@ -1,0 +1,18 @@
+---
+# Catalog belongs to this billing server; controller workflows use hostvars[server].
+# No VPS due dates/reminders here; use each node's infrastructure instead.
+infra_providers: {}
+infra_billing_api_url: "https://{{ domains_keys.infra_billing }}"
+infra_billing_api_token: "{{ lookup('ansible.builtin.env', 'INFRA_BILLING_API_TOKEN') }}"
+infra_billing_action: read
+infra_billing_provider_bindings: []
+# Standalone registrar services owned by this billing server, never node hosts.
+infrastructure_domains: {}
+infra_billing_domain_bindings: {}
+infra_billing_manage_hosts: true
+infra_billing_node_group: general_vps_prepare
+infra_billing_rotate_credentials: false
+# Account-wide import only if an enabled connector service is missing.
+infra_billing_sync_missing_services: true
+infra_billing_validate_certs: true
+infra_billing_timeout: 30

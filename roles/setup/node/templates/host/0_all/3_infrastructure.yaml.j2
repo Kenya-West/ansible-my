@@ -1,0 +1,46 @@
+# Provider/account data are independent of Remnawave and infra-billing.
+# Geography comes from the existing runtime country_code/country_code_upper.
+infrastructure:
+  provider: {{ initial_configure_host_infrastructure_provider | default(initial_configure_host_provider) | to_json }}
+  account: {{ initial_configure_host_infrastructure_account | default('main') | to_json }}
+  type: vps
+  # service_id: '1234'
+  # service_url: https://clients.example.com/billmgr?startform=vds.edit&elid=1234
+{% if initial_configure_host_infrastructure_billing_known | default(false) %}
+  billing:
+    amount: {{ initial_configure_host_infrastructure_amount | string | to_json }}
+    currency: {{ initial_configure_host_infrastructure_currency }}
+    interval:
+      every: {{ initial_configure_host_infrastructure_every | int }}
+      unit: {{ initial_configure_host_infrastructure_unit }}
+    # next_due_at: "2027-01-01T00:00:00Z"  # verified renewal, NOT reminder
+{% else %}
+  # billing: {amount: "12.00", currency: USD, interval: {every: 1, unit: month}}
+{% endif %}
+
+  # Optional billing policy: merge into billing above, or uncomment the complete
+  # example below when the amount/interval were not entered during setup.
+  # billing:
+  #   amount: '24.00'
+  #   currency: USD
+  #   interval: {every: 3, unit: month}  # quarterly
+  #   next_due_at: '2027-01-01T00:00:00Z'  # verified renewal, not a reminder
+  #   auto_renew: true
+  #   reminder_before: {every: 7, unit: day}
+  #   top_up:
+  #     amount: '72.00'
+  #     currency: USD
+  #     interval: {every: 6, unit: month}
+  # Service charges support only 1 hour/day/month/year/once or 3 months.
+  # Top-up/reminder intervals are planning data, not service charge periods.
+  # Top-up is planning data, never a transfer or the host's service cost.
+  # Connector-managed service: omit billing/next_due_at/reminders and identify
+  # the existing service via service_id or infra_billing_service.uuid instead.
+
+# Configure a project UUID and provider binding on the related billing server
+# before enabling. Relation: analytics_server/components/infra_billing,
+# falling back to host_relations.default (typically play2go-nl-3).
+infra_billing_service:
+  enabled: false
+  # project_uuid: 00000000-0000-0000-0000-000000000001  # replace with real UUID
+  # uuid: ...  # adopt an existing service without name matching

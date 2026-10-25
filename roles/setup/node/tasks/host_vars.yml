@@ -40,6 +40,19 @@
       domains are built on those base domains.
     quiet: true
 
+- name: Validate optional billing answers before writing host_vars
+  ansible.builtin.assert:
+    that:
+      - >-
+        (initial_configure_host_infrastructure_every | int == 1
+         and initial_configure_host_infrastructure_unit in ['hour', 'day', 'month', 'year', 'once'])
+        or (initial_configure_host_infrastructure_every | int == 3 and initial_configure_host_infrastructure_unit == 'month')
+      - initial_configure_host_infrastructure_currency is match('^[A-Z]{3,4}$')
+      - initial_configure_host_infrastructure_amount | string is match('^[0-9]+(\.[0-9]{1,2})?$')
+    quiet: true
+    fail_msg: Billing answers must use a supported infra-billing period and a decimal amount/currency.
+  when: initial_configure_host_infrastructure_billing_known | default(false)
+
 - name: Check whether host_vars/{{ initial_configure_host_hostname }} exists
   ansible.builtin.stat:
     path: "{{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}"

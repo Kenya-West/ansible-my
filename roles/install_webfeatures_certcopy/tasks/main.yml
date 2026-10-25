@@ -35,6 +35,14 @@
     - update_config_hard
     - update_config_soft
 
+- name: Ensure project's directories have recursive permissions set to 0775
+  become: true
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}"
+    state: directory
+    mode: "0775"
+    recurse: true
+
 - name: Change cron job path to monitoring if it is in analytics_node group
   set_fact:
     cronjob_script_path_with_analytics: "{{ cron_wrapped_task_prefix }} --job-name copy_certs -- {{ cronjob_script_path_without_analytics }} {{ cron_wrapped_task_suffix }}"

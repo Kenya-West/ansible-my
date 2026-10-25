@@ -1,0 +1,21 @@
+---
+- name: Resolve the existing host relation convention for billing
+  ansible.builtin.include_role:
+    name: kwtoolset/resolve_host_relations
+  vars:
+    resolve_host_relations_source: "{{ hostvars[cib_node].host_relations | default({}) }}"
+    resolve_host_relations_group: analytics_server
+    resolve_host_relations_component: infra_billing
+  when: hostvars[cib_node].infrastructure is defined
+
+- name: Collect data only for this relation's primary billing server
+  ansible.builtin.set_fact:
+    cib_hosts: >-
+      {{ cib_hosts + [{'name': cib_node,
+         'country_code': hostvars[cib_node].country_code_upper,
+         'infrastructure': hostvars[cib_node].infrastructure,
+         'binding': hostvars[cib_node].infra_billing_service | default({})}] }}
+  when:
+    - hostvars[cib_node].infrastructure is defined
+    - resolve_host_relations_host == inventory_hostname
+  no_log: true

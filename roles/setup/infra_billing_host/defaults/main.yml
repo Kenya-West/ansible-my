@@ -1,0 +1,13 @@
+---
+setup_infra_billing_host: ''
+# A project name or UUID; omitted means prompt, using the host's current project.
+setup_infra_billing_project: ''
+# Optional explicit adoption when the service's API name differs from hostname.
+setup_infra_billing_service_uuid: ''
+# Explicit confirmation for unattended apply. Check mode never needs it.
+setup_infra_billing_confirm: false
+setup_infra_billing_inventory_dir: >-
+  {{ inventory_dir | default((ansible_inventory_sources | first | dirname)
+     if ansible_inventory_sources | default([]) | length > 0
+     else (role_path ~ '/../../../inventory') | realpath, true) }}
+setup_infra_billing_host_file: "{{ setup_infra_billing_inventory_dir }}/host_vars/{{ setup_infra_billing_host }}/0_all/3_infrastructure.yaml"

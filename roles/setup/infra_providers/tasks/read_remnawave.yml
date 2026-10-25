@@ -1,0 +1,65 @@
+---
+- name: Resolve Remnawave read options (disabled unless explicitly configured)
+  ansible.builtin.set_fact:
+    sip_remna: "{{ sip_sources.remnawave | default({}) }}"
+  no_log: true
+
+- name: Check Remnawave source options
+  ansible.builtin.assert:
+    that: sip_remna is mapping
+    quiet: true
+  no_log: true
+
+- name: Resolve panel URL and credentials from this host only
+  ansible.builtin.set_fact:
+    sip_remna_enabled: "{{ sip_remna.enabled | default(false) | bool }}"
+    sip_remna_url: "{{ sip_remna.url | default(hostvars[sip_host].vpn_server_remnawave_panel_url | default('')) }}"
+    sip_remna_token: "{{ sip_remna.token | default(hostvars[sip_host].vpn_server_remnawave_api_token | default('')) }}"
+    sip_remna_api_key: >-
+      {{ sip_remna.api_key | default(hostvars[sip_host].vpn_server_remnawave_custom_login_route_api_token | default('')
+         if hostvars[sip_host].vpn_server_remnawave_access_mode | default('') == 'caddy_custom_path' else '') }}
+  no_log: true
+
+- name: Report incomplete panel source
+  ansible.builtin.set_fact:
+    sip_status: "{{ sip_status + ['remnawave: skipped (missing URL or token)'] }}"
+  when: sip_remna_enabled and (sip_remna_url | length == 0 or sip_remna_token | length == 0)
+
+- name: Gather panel providers with every management stage disabled
+  when:
+    - sip_remna_enabled
+    - sip_remna_url | length > 0
+    - sip_remna_token | length > 0
+  block:
+    - name: Read only through the Remnawave collection role
+      ansible.builtin.include_role:
+        name: kenyawest.remnawave.remnawave
+        apply:
+          no_log: true
+      vars:
+        remnawave_panel_url: "{{ sip_remna_url }}"
+        remnawave_token: "{{ sip_remna_token }}"
+        remnawave_api_key: "{{ sip_remna_api_key }}"
+        remnawave_validate_certs: "{{ sip_remna.validate_certs | default(true) }}"
+        remnawave_timeout: "{{ sip_remna.timeout | default(30) }}"
+        remnawave_snippets: []
+        remnawave_config_profiles: []
+        remnawave_internal_squads: []
+        remnawave_external_squads: []
+        remnawave_infra_providers: []
+        remnawave_nodes: []
+        remnawave_hosts: []
+        remnawave_users: []
+        remnawave_subscription_settings: {}
+        remnawave_gather:
+          infra_providers: {}
+
+    - name: Collect independent panel identity metadata
+      ansible.builtin.set_fact:
+        sip_entries: >-
+          {{ sip_entries + [{'kind': 'remnawave', 'host': sip_host,
+             'data': remnawave_gathered.infra_providers,
+             'provider_keys': sip_remna.provider_keys | default({})}] }}
+        sip_used: true
+        sip_status: "{{ sip_status + ['remnawave: used (read-only)'] }}"
+      no_log: true

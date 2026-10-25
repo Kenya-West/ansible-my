@@ -1,0 +1,37 @@
+---
+- name: Identify provider sources of this inventory host
+  ansible.builtin.set_fact:
+    sip_local: "{{ hostvars[sip_host].infrastructure_provider_definitions | default({}) }}"
+    sip_sources: "{{ hostvars[sip_host].infrastructure_provider_sources | default({}) }}"
+    sip_used: false
+    sip_status: []
+  no_log: true
+
+- name: Require host source declarations to be mappings
+  ansible.builtin.assert:
+    that:
+      - sip_local is mapping
+      - sip_sources is mapping
+      - sip_sources.keys() | difference(['infra_billing', 'remnawave']) | length == 0
+    quiet: true
+  no_log: true
+
+- name: Collect provider definitions explicitly declared by this host
+  ansible.builtin.set_fact:
+    sip_entries: "{{ sip_entries + [{'kind': 'host_vars', 'host': sip_host, 'data': sip_local}] }}"
+    sip_used: true
+    sip_status: "{{ sip_status + ['host_vars: used'] }}"
+  when: sip_local | length > 0
+  no_log: true
+
+- name: Read configured infra-billing provider metadata
+  ansible.builtin.include_tasks: read_billing.yml
+
+- name: Read explicitly enabled Remnawave provider metadata
+  ansible.builtin.include_tasks: read_remnawave.yml
+
+- name: Record safe host source report
+  ansible.builtin.set_fact:
+    sip_report: >-
+      {{ sip_report + [{'host': sip_host, 'used': sip_used,
+         'sources': sip_status if sip_status | length > 0 else ['no provider definitions or API source configuration']}] }}

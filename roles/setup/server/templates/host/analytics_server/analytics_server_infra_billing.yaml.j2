@@ -1,2 +1,40 @@
 infra_billing_encryption_key: "{{ initial_configure_generated_password_analytics_server_infra_billing_encryption_key }}"
 infra_billing_postgres_password: "{{ initial_configure_generated_password_analytics_server_infra_billing_postgres_password }}"
+
+# API token is created in the infra-billing UI, NOT a generated deployment secret.
+# Fill in this ignored host_vars file (prefer ansible-vault) or export the env var.
+infra_billing_api_url: "https://{{ setup_server_service_domains.analytics_server.infra_billing }}.{{ setup_server_service_base_domains.analytics_server }}"
+infra_billing_api_token: "{{ '{{' }} lookup('ansible.builtin.env', 'INFRA_BILLING_API_TOKEN') {{ '}}' }}"
+infra_billing_provider_bindings: []
+# Optional token alternative (keep actual secrets in Ansible Vault):
+{% raw %}
+# infra_billing_api_token: "{{ vault_infra_billing_api_token }}"
+{% endraw %}
+
+# Bindings are API-specific overrides/adoption IDs; omitted bindings derive from
+# the referenced account's connection.driver (e.g. billmgr) in infra_providers.
+# First provisioning needs catalog credentials and VPS service_id, not API UUIDs.
+# Replace the empty list above with bindings for your catalog keys; do not
+# declare infra_billing_provider_bindings twice in the same file.
+# infra_billing_provider_bindings:
+#   - provider: example
+#     kind: billmgr
+#     # uuid: ...  # adopt provider whose existing display name differs
+#     accounts:
+#       personal:
+#         label: Personal
+#         # uuid: ...  # adopt existing account and retain its credentials
+#       business:
+#         label: Business
+#   - provider: botvendor
+#     kind: manual
+#     accounts:
+#       main: {label: Main}
+
+# Service charges support only the API's fixed periods; no normalization.
+# Enable only for a deliberate one-off rotation; otherwise every run writes.
+infra_billing_rotate_credentials: false
+# Import an absent connector service via account sync (never runs in --check).
+# This imports account services/balances/payment history through infra-billing;
+# it does not charge or top up the account and may affect other account services.
+infra_billing_sync_missing_services: true

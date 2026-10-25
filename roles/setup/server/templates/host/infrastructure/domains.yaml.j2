@@ -1,0 +1,23 @@
+# Standalone domains owned by registrar accounts; never inventory hosts.
+infrastructure_domains: {}
+infra_billing_domain_bindings: {}
+# Replace the empty mappings above when configuring your domains.
+# infrastructure_domains:
+#   example.com:
+#     provider: registrar
+#     account: personal
+#     # For manual registrars, supply verified charge data before export:
+#     # billing:
+#     #   amount: '12.00'
+#     #   currency: USD
+#     #   interval: {every: 1, unit: year}
+#     #   next_due_at: '2027-01-01T00:00:00Z'
+# infra_billing_domain_bindings:
+#   example.com:
+#     enabled: false  # enable after supplying billing/project or connector ID
+#     # project_uuid: ...
+#     # uuid: ...  # optional adoption; registrar-account + domain name also matches
+# API-backed registrar: declare connection.driver (e.g. porkbun) in providers.yaml
+# and credentials for first import; omit manual prices/dates for managed domains.
+# Domain key maps to service name/externalId and type: domain at the API boundary.
+# No country/host relation. Stored billing.next_due_at is a verified renewal date.
