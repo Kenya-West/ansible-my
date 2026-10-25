@@ -90,6 +90,7 @@
       direct_domain_types: "{{ vpn_server_remnawave_hosts_node_manage_domain_types_direct_filter }}"
       entry_domain_types: "{{ vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter }}"
       entry_country_codes: "{{ vpn_server_remnawave_hosts_chain.entry_country_codes | default([]) }}"
+      entry_global_for_non_global: "{{ vpn_server_remnawave_hosts_chain.entry_global_for_non_global | default(false) }}"
       skip_same_country: "{{ vpn_server_remnawave_hosts_chain.skip_same_country | default(true) }}"
       exclude: "{{ vpn_server_remnawave_hosts_chain.exclude | default([]) }}"
       labels: "{{ vpn_server_remnawave_hosts_labels }}"

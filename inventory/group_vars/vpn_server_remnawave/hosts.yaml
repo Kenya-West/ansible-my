@@ -50,9 +50,9 @@ vpn_server_remnawave_hosts_adopt_untagged: false
 #   enabled:  created enabled and re-enabled on every run
 vpn_server_remnawave_hosts_publish_state: present
 
-# A direct host takes its exit's profile. A chain host takes the global base
-# (shared exit) or the exit's exclusive scope, using the entry's transport.
-# The entry node still activates its own location profile for server routing.
+# A direct host takes its exit's profile. A chain host takes its exit's access
+# scope (global, location or exclusive), using the entry's transport.
+# The entry node still activates its own scope's profile for server routing.
 
 vpn_server_remnawave_hosts_port: 443
 vpn_server_remnawave_hosts_fingerprint: firefox
@@ -92,11 +92,17 @@ vpn_server_remnawave_hosts_remark_exclusive_format: '{name} · {profile}'
 # again through the chain domain of every node that may act as a chain entry,
 # so the same exit can be reached the long way round.
 vpn_server_remnawave_hosts_chain:
-  # A node may act as a chain entry when its country_code_upper is listed
-  # here and it publishes a domain of a type in
-  # vpn_server_remnawave_hosts_node_manage_domain_types_specific_filter.
+  # Existing direction: entries in these countries can relay to usable exits.
+  # They must publish a domain selected by the specific domain-type filter.
   entry_country_codes:
     - RU
+
+  # Opposite direction: shared global-geo nodes also act as entries, but only
+  # for non-global exits (e.g. RU-1 | by EU-1 or RU-1 | by AS-1). This uses
+  # their chain-location domains; no country allowlist maintenance is needed.
+  # Exclusive global nodes are NOT added as entries, to protect their access.
+  # Set false to restore the country-selected entry pool alone.
+  entry_global_for_non_global: true
 
   # Do not chain an exit through an entry in its own country: there is no
   # "RU-1 by RU-2", only "AS-1 by RU-2".

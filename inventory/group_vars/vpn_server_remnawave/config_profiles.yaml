@@ -92,7 +92,8 @@ vpn_server_remnawave_config_profiles_private_key_common: "{{ vpn_server_remnawav
 # One per protocol, as {protocol, name, variant_suffix, inbounds}: rendered as
 # it is for the global scope, and as "<scope name><variant_suffix>" with
 # "<tag>_<scope suffix>" inbounds for every location and exclusive scope some
-# node of that protocol is in, or an exclusive chain needs that entry protocol.
+# node of that protocol is in, or a location/exclusive chain needs that entry
+# protocol.
 # The REALITY privateKey is filled in per inbound
 # tag (vpn_server_remnawave_config_profiles_private_keys).
 vpn_server_remnawave_config_profiles_base:
@@ -201,7 +202,8 @@ vpn_server_remnawave_config_profiles_composition:
           - snippet: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
 
   # The microwarp proxy beside global-geo nodes, including exclusive ones.
-  # Its domain rules run immediately after defaults, before chain/geo rules.
+  # WARP precedes chain/geo rules, but its rule matches only unmarked/direct
+  # traffic (snippets_warp.yaml); explicit chain routes still reach their exit.
   - name: warp
     profiles:
       geo: global

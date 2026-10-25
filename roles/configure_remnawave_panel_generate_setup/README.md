@@ -45,9 +45,13 @@ domain is one exit no matter how many Ansible hosts sit behind it, so a
 round-robin record in front of two nodes stays a single Host in the panel,
 bound to both.
 
-**Chain entries** are the distinct domains of type `chain-location`
-published by nodes whose `country_code_upper` is listed in
-`vpn_server_remnawave_hosts_chain.entry_country_codes`.
+**Chain entries** are distinct domains of type `chain-location`. Entries in
+`vpn_server_remnawave_hosts_chain.entry_country_codes` (RU by default) keep
+serving the existing direction. With `entry_global_for_non_global: true`,
+shared global-geo nodes also become entries, **only for non-global exits**:
+`RU-1 | by EU-1`, `RU-1 | by AS-1`, etc. This follows censorship geography,
+not a hard-coded country list. Exclusive global nodes are not added to this
+shared entry pool, and nodes without a chain domain cannot act as entries.
 
 For every exit the role generates:
 
@@ -57,18 +61,23 @@ For every exit the role generates:
   long way round.
 
 An entry is not usable for an exit in its own country - there is no
-`RU-1 | by RU-2` - and pairs can be ruled out one by one through
+`RU-1 | by RU-2` - or when the domains share a backing node (no self chains).
+Pairs can be ruled out in either direction through
 `vpn_server_remnawave_hosts_chain.exclude`. An exit with no usable entry gets
-its direct host and nothing else: no route id, no outbound, no rule.
+its direct host and no chain route id/rule. Its outbound may still be planned
+by the inventory.
 
 A direct host is attached to the inbound of its exit's config profile. A chain
-host uses the **entry's transport**, but the **exit's access scope**: shared
-exits use `Default-Profile` (TCP) or `Default-xHTTP`; exclusive exits use their
-own profile or its `-xHTTP` variant. It is addressed by and bound to the entry
+host uses the **entry's transport**, but the **exit's access scope**: global
+exits use `Default-Profile` (TCP) or `Default-xHTTP`; location exits use
+`Reverse-<CODE>` or its `-xHTTP` variant; exclusive exits use their own profile
+or its `-xHTTP` variant. It is addressed by and bound to the entry
 (`vpn_server_remnawave_hosts_chain_bind_nodes: entry`). The entry node still
-activates its location profile (`Reverse-RU` or `Reverse-RU-xHTTP`) for server
-routing; its active inbound must have compatible transport and REALITY settings
-with the host's advertised inbound.
+activates its own scope/transport profile for server routing. Its active
+inbound must have compatible transport and REALITY settings with the host's
+advertised inbound. Thus Russian exits through TCP/xHTTP global entries use
+`Reverse-RU`/`Reverse-RU-xHTTP` in subscriptions, while the global entry runs
+`Default-Profile`/`Default-xHTTP`.
 
 Generated hosts default to the `firefox` fingerprint. SNI is blank when it
 would duplicate the address, with `override_sni_from_address: true` retained.
@@ -122,10 +131,11 @@ hosts select the exit's access scope and the entry's transport instead.
 A node of the exclusive group naming no profile, or one its panel does not
 declare, fails the run.
 
-The global variants are always published. A location variant is published for
-protocols its related nodes serve. An exclusive variant is also published for
-transports used by its usable, planned chain entries, so a TCP-only exclusive
-exit still gets an xHTTP profile when reached through an xHTTP entry. Variants
+The global variants are always published. Location and exclusive variants are
+published for protocols their related nodes serve **or their usable, planned
+chain entries need**. A TCP-only Russian exit therefore still gets
+`Reverse-RU-xHTTP` when reached through an xHTTP global entry, just as an
+exclusive exit gets its xHTTP variant. Variants
 are retired once neither nodes nor chains need them
 (`vpn_server_remnawave_config_profiles_prune: delete`).
 Retiring runs after the nodes and hosts stages, and skips a profile any node
@@ -209,9 +219,11 @@ Nested mappings merge, **lists concatenate in declaration order**, and later
 matching scalar values replace earlier ones. Thus global-geo profiles have
 `rules_default_prod_1 → rules_warp_prod_1 → rules_all_prod_1`; location profiles
 without WARP have `rules_default_prod_1 → rules_all_prod_1`. WARP's domain
-matches now take precedence over chain/geo rules, but private-network blocks
-still come first. Reorder fragments to change precedence; no insertion indexes
-or special WARP handling are needed.
+rules additionally match only **unmarked (route 0) or direct-host traffic**
+(`vlessRoute: "0,2"` with the default direct route). Explicit chain routes
+bypass WARP and reach their selected exit, including Russian exits reached
+through global nodes. Private-network blocks still come first. Reorder
+fragments to change precedence; no insertion indexes are needed.
 
 The base profile's optional `config` is merged last, recursively, **replacing
 lists** rather than appending, so protocol-specific overrides can replace a
@@ -268,7 +280,7 @@ squads hold. Its chain hosts use the exclusive variant matching the entry's
 transport, and are shown only to squads granted the exit's primary profile
 (`internal_squads: allow_only`). Grant the whole exclusive scope to its squad
 (`profiles: {scope: Xenus-team}`) to include both TCP and xHTTP inbounds. The
-entry node's location profile is not the host's subscription access profile.
+entry node's active profile is not necessarily the host's subscription profile.
 
 Route ids
 ---------
@@ -559,17 +571,19 @@ vpn_server_remnawave_hosts_labels:
 
 ```yaml
 vpn_server_remnawave_hosts_chain:
-  entry_country_codes: [RU]   # nodes that may act as chain entries
+  entry_country_codes: [RU]          # existing entry countries
+  entry_global_for_non_global: true  # global entries -> non-global exits only
   skip_same_country: true     # no RU-1 by RU-2
   exclude:                    # pairs to rule out on top of that
     - exit: net-europe-15.123987465.xyz
       entries: '*'            # or a list of entry domains
 ```
 
-| Variable | Default |
-| --- | --- |
-| `vpn_server_remnawave_hosts_vless_route_id_base` | `400` |
-| `vpn_server_remnawave_hosts_vless_route_id_direct` | `2` |
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `vpn_server_remnawave_hosts_chain.entry_global_for_non_global` | `true` | Add shared global chain domains as entries for non-global exits; `false` restores the country-selected pool |
+| `vpn_server_remnawave_hosts_vless_route_id_base` | `400` | First generated chain route id |
+| `vpn_server_remnawave_hosts_vless_route_id_direct` | `2` | Direct-host route id; empty means unmarked |
 
 ### Cleaning
 
@@ -594,7 +608,7 @@ whose `domains_node_panel` is the panel:
 | `outbounds_default` | `outbounds_default_prod_1` | `DIRECT` (freedom) and `BLOCK` (blackhole) |
 | `rules_default` | `rules_default_prod_1` | `geoip:private` and `geosite:private` to `BLOCK` |
 | `outbounds_warp` | `outbounds_warp_prod_1` | `out-warp-socks`, the microwarp SOCKS5 proxy beside the node; declared by the `warp` composition fragment and embedded in global-geo profiles only |
-| `rules_warp` | `rules_warp_prod_1` | The domains sent to `out-warp-socks`, immediately after `rules_default` and before `rules_all` |
+| `rules_warp` | `rules_warp_prod_1` | Selected domains to `out-warp-socks` for unmarked/direct traffic only; after `rules_default` and before `rules_all`, without intercepting explicit chains |
 
 Exits and their outbound tags:
 

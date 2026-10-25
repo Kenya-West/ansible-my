@@ -130,6 +130,8 @@ vpn_server_remnawave_hosts_chain_bind_nodes: entry
 vpn_server_remnawave_hosts_chain:
   entry_country_codes:
     - RU
+  # Additionally offer shared global chain domains to non-global exits only.
+  entry_global_for_non_global: true
   skip_same_country: true
   exclude: []
 

@@ -214,6 +214,17 @@ def _excluded_entries(exclude, exit_domain):
     return []
 
 
+def _chain_entry_allowed(entry, exit_slot, options):
+    """Keep legacy country-selected entries; add shared global -> non-global."""
+    countries = set(str(c).upper() for c in options.get('entry_country_codes') or [])
+    if entry['country'] in countries:
+        return True
+    entry_scope = entry['scopes'][0]
+    return (_as_bool(options.get('entry_global_for_non_global', False))
+            and entry_scope['kind'] == 'global'
+            and exit_slot['scopes'][0]['geo'] != 'global')
+
+
 def _chain_pairs(exits, entries, options):
     """Usable chain entries for each exit, independent of profile rendering."""
     pairs = {}
@@ -223,8 +234,10 @@ def _chain_pairs(exits, entries, options):
         if excluded == '*':
             continue
         usable = [entry for entry in entries
-                  if entry['domain'] not in excluded
+                  if _chain_entry_allowed(entry, exit_slot, options)
+                  and entry['domain'] not in excluded
                   and entry['domain'] != exit_slot['domain']
+                  and not set(entry['nodes']).intersection(exit_slot['nodes'])
                   and not (skip_same_country and entry['country'] == exit_slot['country'])]
         if usable:
             pairs[exit_slot['domain']] = usable
@@ -418,8 +431,8 @@ def _render_profiles(scopes_in_use, options, composition, warnings):
     """Render every config profile the panel needs.
 
     Every base profile is rendered for the global scope, always. Other scopes
-    get the protocols their nodes serve or their exclusive chains need, so a
-    location or exclusive group without nodes produces no profile at all.
+    get the protocols their nodes serve or their location/exclusive chains need,
+    so a scope without nodes produces no profile at all.
     """
     bases = list(options.get('profiles_base') or [])
     base_of = {}
@@ -443,8 +456,8 @@ def _render_profiles(scopes_in_use, options, composition, warnings):
         missing = sorted(p for p in protocols if p not in base_of)
         if missing:
             raise AnsibleFilterError(
-                'No base config profile serves protocol %s, which nodes of scope %s '
-                'declare; add it to vpn_server_remnawave_config_profiles_base'
+                'No base config profile serves protocol %s, required by nodes or chains '
+                'of scope %s; add it to vpn_server_remnawave_config_profiles_base'
                 % (', '.join(missing), scope))
         if kind != 'global':
             wanted.extend(({'kind': kind, 'scope': scope, 'geo': geo}, protocol)
@@ -585,8 +598,8 @@ def remnawave_model(nodes, options):
                                  'geos: %s' % ', '.join(split))
 
     # Plan chains before rendering profiles: their client-facing transport is
-    # the entry's, but access is granted by the exit's scope. Shared chains use
-    # the global base; exclusive chains need a variant for each entry protocol.
+    # the entry's, but access is granted by the exit's scope. Location and
+    # exclusive exits need a profile variant for each usable entry protocol.
     exits = [
         _settle(slot, default_protocol, warnings, 'Direct domain')
         for _, slot in sorted(_collect(nodes, set(options['direct_domain_types'])).items())
@@ -595,8 +608,10 @@ def remnawave_model(nodes, options):
         _settle(slot, default_protocol, warnings, 'Chain domain')
         for _, slot in sorted(_collect(nodes, set(options['entry_domain_types'])).items())
     ]
-    entry_countries = set(str(c).upper() for c in options['entry_country_codes'])
-    entries = [e for e in entries if e['country'] in entry_countries]
+    entry_countries = set(str(c).upper() for c in options.get('entry_country_codes') or [])
+    global_entries = _as_bool(options.get('entry_global_for_non_global', False))
+    entries = [e for e in entries if e['country'] in entry_countries
+               or (global_entries and e['scopes'][0]['kind'] == 'global')]
     pairs = _chain_pairs(exits, entries, options)
     planned_domains = set(o['address'] for o in options.get('outbounds') or []
                           if o.get('kind', 'location') == 'location')
@@ -604,7 +619,7 @@ def remnawave_model(nodes, options):
         if exit_slot['domain'] not in planned_domains:
             continue
         scope = exit_slot['scopes'][0]
-        if scope['kind'] == 'exclusive':
+        if scope['kind'] != 'global':
             key = (scope['kind'], scope['scope'], scope['geo'])
             scopes_in_use[key].update(e['protocol'] for e in pairs.get(exit_slot['domain'], []))
 
@@ -643,8 +658,8 @@ def remnawave_model(nodes, options):
         slot['profiles'] = sorted(set(node_profiles[n]['config_profile'] for n in slot['nodes']))
         _settle(slot, default_protocol, [], 'Domain')
 
-    # Short names are per collection: an entry that no country lets act as one
-    # is gone by now, so it takes no number with it.
+    # Short names are per collection: an entry outside both eligible pools is
+    # gone by now, so it takes no number with it.
     region_codes = options.get('region_codes') or {}
     flag_symbols = options.get('flag_symbols') or {}
     for slot in exits + entries:
@@ -710,8 +725,8 @@ def remnawave_model(nodes, options):
             % (base, highest, lo, hi))
 
     # --- the hosts ----------------------------------------------------------
-    # A direct host uses its exit's profile. A chain host uses the entry's
-    # transport on the global base (shared) or exit's exclusive scope.
+    # A direct host uses its exit's profile. A chain host uses the exit's
+    # access scope and the entry's transport, in either chaining direction.
     bind = options.get('chain_bind_nodes', 'entry')
     separator = options['remark_chain_separator']
     direct_route_id = options.get('direct_route_id')
@@ -736,7 +751,7 @@ def remnawave_model(nodes, options):
         })
 
     for exit_slot in chained:
-        # Visibility follows the exit's access scope, never the RU entry's.
+        # Visibility follows the exit's access scope, never the entry's.
         if exit_slot['scope_kind'] == 'exclusive':
             allowed = sorted(profile_by_name[exit_slot['profile']]['squads'])
             restriction = {'mode': 'allow_only', 'squads': allowed}
@@ -747,9 +762,8 @@ def remnawave_model(nodes, options):
         else:
             restriction = dict(unrestricted)
         for entry in pairs[exit_slot['domain']]:
-            scope_kind = 'exclusive' if exit_slot['scope_kind'] == 'exclusive' else 'global'
-            scope = exit_slot['scope'] if scope_kind == 'exclusive' else 'global'
-            client_profile = profile_by_key[(scope_kind, scope, entry['protocol'])]
+            client_profile = profile_by_key[(exit_slot['scope_kind'], exit_slot['scope'],
+                                             entry['protocol'])]
             if bind == 'exit':
                 bound = list(exit_slot['nodes'])
             elif bind == 'both':
@@ -968,6 +982,14 @@ def remnawave_verify(panel, model, options):
         if name not in snippets:
             problems.append('Snippet %s is not in the panel' % name)
 
+    for definition in model.get('profile_snippets') or []:
+        name = definition['name']
+        if name not in snippets:
+            problems.append('Composition snippet %s is not in the panel' % name)
+        elif snippets[name] != definition['snippet']:
+            problems.append('Composition snippet %s differs from the inventory; its routing '
+                            'conditions or settings may bypass a chain' % name)
+
     rule_of = {}
     for rule in snippets.get(rules_name) or []:
         number = _route_number((rule or {}).get('vlessRoute'))
@@ -1101,7 +1123,7 @@ def remnawave_verify(panel, model, options):
             active = node.get('configProfile') or {}
             if want['kind'] == 'chain' and active.get('activeConfigProfileUuid') != profile_uuid:
                 # A chain's advertised profile controls subscription access;
-                # the entry still runs its location profile and routing. Verify
+                # the entry still runs its own profile and routing. Verify
                 # wire compatibility instead of requiring identical UUIDs.
                 advertised = config_inbound(profile or {}, want.get('inbound'))
                 active_profile = profiles.get(active.get('activeConfigProfileUuid')) or {}

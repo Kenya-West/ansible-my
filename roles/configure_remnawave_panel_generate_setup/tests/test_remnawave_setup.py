@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 import unittest
 
+from jinja2 import Environment
 from jinja2.nativetypes import NativeEnvironment
 import yaml
 from ansible.errors import AnsibleFilterError
@@ -242,6 +243,181 @@ class GenerationTests(unittest.TestCase):
         for text in ('inventory wants Default-Profile', 'has fingerprint chrome', 'has SNI',
                      'does not override SNI'):
             self.assertTrue(any(text in p for p in problems), problems)
+
+
+class ReverseChainTests(unittest.TestCase):
+    def setUp(self):
+        self.options = options()
+        self.options['entry_global_for_non_global'] = True
+        self.nodes = nodes()
+        self.nodes[0]['domains'].append({'domain': 'chain-europe-1.example.test', 'type': 'chain-location'})
+        # Also exercise a shared global xHTTP entry independently of the TCP one.
+        global_xhttp = copy.deepcopy(self.nodes[0])
+        global_xhttp.update(name='global-xhttp', protocol=XHTTP)
+        global_xhttp['domains'] = [{'domain': 'chain-asia-1.example.test', 'type': 'chain-location'}]
+        self.nodes.append(global_xhttp)
+        # Exclusive global domains must not enter the new shared entry pool.
+        self.nodes[1]['domains'].append({'domain': 'chain-europe-2.example.test', 'type': 'chain-location'})
+        for index, node in enumerate(self.nodes[2:4], 1):
+            domain = 'net-russia-%d.example.test' % index
+            node['domains'].append({'domain': domain, 'type': 'net-location'})
+            self.options['outbounds'].append({'address': domain, 'tag': 'out-chain-ru-%d' % index})
+
+    def model(self):
+        return setup.remnawave_model(self.nodes, self.options)
+
+    def test_both_directions_use_exit_scope_entry_transport_and_binding(self):
+        model = self.model()
+        reverse = [h for h in model['hosts'] if h['kind'] == 'chain' and h['exit'].startswith('net-russia')]
+        self.assertEqual(len(reverse), 4)
+        for host in reverse:
+            self.assertEqual(host['config_profile'], 'Reverse-RU' if host['protocol'] == TCP else 'Reverse-RU-xHTTP')
+            self.assertEqual(host['address'], host['entry'])
+            self.assertEqual(host['nodes'], ['shared-exit'] if host['protocol'] == TCP else ['global-xhttp'])
+            self.assertEqual(host['sni'], '')
+            self.assertIs(host['override_sni_from_address'], True)
+            self.assertEqual(host['internal_squads'], {'mode': 'exclude', 'squads': []})
+        forward = [h for h in model['hosts'] if h['kind'] == 'chain' and h['exit'].startswith('net-europe')]
+        self.assertEqual(len(forward), 4)
+        self.assertEqual([h['config_profile'] for h in forward],
+                         ['Default-Profile', 'Default-xHTTP', 'Xenus-team', 'Xenus-team-xHTTP'])
+        self.assertNotIn('chain-europe-2.example.test', [e['domain'] for e in model['entries']])
+        self.assertEqual(setup.remnawave_verify(panel_for(model), model, {
+            'primary_tags': ['MANAGED_BY:ANSIBLE'], 'separator': ' | by ',
+            'direct_route_id': 2, 'route_id_range': [400, 499],
+            'rules_snippet': 'rules', 'outbounds_snippet': 'outbounds',
+        })['problems'], [])
+
+    def test_reverse_routes_reuse_outbounds_and_preserve_forward_ids(self):
+        model = self.model()
+        self.assertEqual(model['rules'], [
+            {'vlessRoute': '400', 'outboundTag': 'out-chain-1'},
+            {'vlessRoute': '401', 'outboundTag': 'out-chain-2'},
+            {'vlessRoute': '402', 'outboundTag': 'out-chain-ru-1'},
+            {'vlessRoute': '403', 'outboundTag': 'out-chain-ru-2'},
+        ])
+        for domain in ('net-russia-1.example.test', 'net-russia-2.example.test'):
+            hosts = [h for h in model['hosts'] if h['kind'] == 'chain' and h['exit'] == domain]
+            self.assertEqual(len(set(h['vless_route_id'] for h in hosts)), 1)
+        old_rules = [{'vlessRoute': '402', 'outboundTag': 'old'},
+                     {'vlessRoute': '100-200', 'outboundTag': 'handmade'}]
+        merged = setup.remnawave_merge_rules(old_rules, model['rules'], [400, 499])
+        self.assertEqual(merged, old_rules[1:] + model['rules'])
+
+    def test_disabling_new_direction_restores_legacy_entry_pool(self):
+        self.options['entry_global_for_non_global'] = 'false'
+        model = self.model()
+        self.assertEqual([e['domain'] for e in model['entries']],
+                         ['chain-russia-1.example.test', 'chain-russia-2.example.test'])
+        self.assertEqual(len(model['rules']), 2)
+        self.assertFalse(any(h['kind'] == 'chain' and h['exit'].startswith('net-russia')
+                             for h in model['hosts']))
+
+    def test_does_not_add_global_to_global_or_self_chains(self):
+        self.options['skip_same_country'] = False
+        for host in self.model()['hosts']:
+            if host['kind'] == 'chain':
+                exit_node = next(n for n in self.nodes if any(d['domain'] == host['exit'] for d in n['domains']))
+                self.assertFalse(set(host['nodes']).intersection([exit_node['name']]))
+                if exit_node['geo'] == 'global':
+                    self.assertTrue(host['entry'].startswith('chain-russia'))
+
+    def test_reverse_pairs_honor_exclusions_and_same_country(self):
+        self.options['exclude'] = [{'exit': 'net-russia-1.example.test',
+                                   'entries': ['chain-europe-1.example.test']},
+                                  {'exit': 'net-russia-2.example.test', 'entries': '*'}]
+        model = self.model()
+        reverse = [h for h in model['hosts'] if h['kind'] == 'chain' and h['exit'].startswith('net-russia')]
+        self.assertEqual(len(reverse), 1)
+        self.assertEqual(reverse[0]['entry'], 'chain-asia-1.example.test')
+        self.nodes[-1]['country'] = 'RU'
+        # Geography, not country, determines the new direction; same-country
+        # suppression still applies even to a global-geo entry located in RU.
+        self.options['entry_country_codes'] = []
+        self.assertFalse(any(h['kind'] == 'chain' for h in self.model()['hosts']))
+
+    def test_new_direction_is_geography_based_not_russia_specific(self):
+        self.options['region_codes']['iran'] = 'IR'
+        for node in self.nodes[2:4]:
+            node.update(country='IR', geo='iran')
+        reverse = [h for h in self.model()['hosts'] if h['kind'] == 'chain'
+                   and h['exit'].startswith('net-russia')]
+        self.assertEqual(len(reverse), 4)
+        self.assertEqual({h['config_profile'] for h in reverse}, {'Reverse-IR', 'Reverse-IR-xHTTP'})
+
+    def test_global_nodes_without_chain_domains_are_not_used_as_entries(self):
+        self.nodes[0]['domains'] = self.nodes[0]['domains'][:1]
+        self.nodes[-1]['domains'] = []
+        model = self.model()
+        self.assertEqual(len(model['entries']), 2)
+        self.assertFalse(any(h['kind'] == 'chain' and h['exit'].startswith('net-russia')
+                             for h in model['hosts']))
+
+    def test_missing_reverse_outbound_is_reported_not_half_published(self):
+        self.options['outbounds'] = self.options['outbounds'][:2]
+        model = self.model()
+        self.assertTrue(any('net-russia-1' in warning and 'no planned outbound' in warning
+                            for warning in model['warnings']))
+        self.assertFalse(any(h['kind'] == 'chain' and h['exit'].startswith('net-russia')
+                             for h in model['hosts']))
+
+    def test_location_variant_generated_for_entry_transport_without_exit_node(self):
+        self.nodes[3]['domains'] = []
+        self.nodes[3]['protocol'] = TCP
+        model = self.model()
+        self.assertIn('Reverse-RU-xHTTP', [p['name'] for p in model['profiles']])
+        self.assertEqual(model['node_profiles']['ru-tcp']['config_profile'], 'Reverse-RU')
+        grant = next(g for g in model['squad_grants'] if g['squad'] == 'Reverse-proxy')
+        self.assertIn('VLESS_REALITY_XHTTP_REVERSE_RU', grant['inbounds'])
+
+    def test_exclusive_non_global_exit_stays_exclusive_in_reverse_direction(self):
+        self.nodes[2].update(exclusive_member=True, exclusive_profile='Xenus-team')
+        self.nodes[1]['geo'] = 'russia'  # exclusive scope must agree on geography
+        model = self.model()
+        reverse = [h for h in model['hosts'] if h['kind'] == 'chain'
+                   and h['exit'] == 'net-russia-1.example.test']
+        self.assertEqual({h['config_profile'] for h in reverse}, {'Xenus-team', 'Xenus-team-xHTTP'})
+        for host in reverse:
+            self.assertEqual(host['internal_squads'], {'mode': 'allow_only', 'squads': ['Xenus-team']})
+
+    def test_global_round_robin_entry_remains_one_host_bound_to_all_nodes(self):
+        node = copy.deepcopy(self.nodes[0])
+        node['name'] = 'global-rr-peer'
+        node['domains'] = [node['domains'][1]]
+        self.nodes.append(node)
+        model = self.model()
+        hosts = [h for h in model['hosts'] if h['kind'] == 'chain'
+                 and h['exit'] == 'net-russia-1.example.test' and h['protocol'] == TCP]
+        self.assertEqual(len(hosts), 1)
+        self.assertEqual(set(hosts[0]['nodes']), {'shared-exit', 'global-rr-peer'})
+
+    def test_verify_detects_stale_warp_snippet_without_route_guard(self):
+        model = self.model()
+        definition = {
+            'name': 'rules-warp',
+            'snippet': [{'vlessRoute': '0,2', 'domain': ['geosite:openai'], 'outboundTag': 'warp'}],
+        }
+        model['profile_snippets'] = [definition]
+        panel = panel_for(model)
+        stale = copy.deepcopy(definition)
+        del stale['snippet'][0]['vlessRoute']
+        panel['snippets'].append(stale)
+        report = setup.remnawave_verify(panel, model, {
+            'primary_tags': ['MANAGED_BY:ANSIBLE'], 'separator': ' | by ',
+            'direct_route_id': 2, 'route_id_range': [400, 499],
+            'rules_snippet': 'rules', 'outbounds_snippet': 'outbounds',
+        })
+        self.assertTrue(any('rules-warp differs from the inventory' in p for p in report['problems']))
+
+    def test_warp_rule_only_matches_unmarked_or_direct_route_ids(self):
+        inventory = yaml.safe_load((ROLE.parents[1] /
+                                   'inventory/group_vars/vpn_server_remnawave/snippets_warp.yaml').read_text())
+        template = inventory['vpn_server_remnawave_snippets_rules_warp'][0]['vlessRoute']
+        env = Environment()
+        for direct_id, expected in ((2, '0,2'), (7, '0,7'), ('', '0'), (None, '0'), (0, '0')):
+            rendered = str(env.from_string(template).render(vpn_server_remnawave_hosts_vless_route_id_direct=direct_id))
+            self.assertEqual(rendered, expected)
+            self.assertNotIn('402', rendered.split(','))
 
 
 class CompositionTests(unittest.TestCase):

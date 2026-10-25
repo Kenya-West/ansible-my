@@ -23,7 +23,14 @@ vpn_server_remnawave_snippets_outbounds_warp:
       pass: "{{ warp_socks5_pass }}"
 
 vpn_server_remnawave_snippets_rules_warp:
-  - domain:
+  # WARP precedes the chain snippet on global nodes. Match only unmarked (0)
+  # or direct-host traffic, never an explicit chain route: otherwise Russian
+  # exits reached through global entries would be bypassed for these domains.
+  - vlessRoute: >-
+      {{ '0,' ~ (vpn_server_remnawave_hosts_vless_route_id_direct | string)
+         if vpn_server_remnawave_hosts_vless_route_id_direct not in [none, '', 0, '0']
+         else '0' }}
+    domain:
       - "geosite:openai"
       - "geosite:anthropic"
       - "geosite:google-gemini"
