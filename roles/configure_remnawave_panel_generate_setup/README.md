@@ -62,9 +62,16 @@ An entry is not usable for an exit in its own country - there is no
 its direct host and nothing else: no route id, no outbound, no rule.
 
 A direct host is attached to the inbound of its exit's config profile. A chain
-host is attached to the inbound of its *entry's* profile - the entry is the node
-the client connects to - and bound to the entry's nodes
-(`vpn_server_remnawave_hosts_chain_bind_nodes: entry`).
+host uses the **entry's transport**, but the **exit's access scope**: shared
+exits use `Default-Profile` (TCP) or `Default-xHTTP`; exclusive exits use their
+own profile or its `-xHTTP` variant. It is addressed by and bound to the entry
+(`vpn_server_remnawave_hosts_chain_bind_nodes: entry`). The entry node still
+activates its location profile (`Reverse-RU` or `Reverse-RU-xHTTP`) for server
+routing; its active inbound must have compatible transport and REALITY settings
+with the host's advertised inbound.
+
+Generated hosts default to the `firefox` fingerprint. SNI is blank when it
+would duplicate the address, with `override_sni_from_address: true` retained.
 
 For every *chained* exit it also generates one routing rule, sending the
 exit's route id to the exit's outbound. The outbounds themselves, the
@@ -99,8 +106,8 @@ Config profiles
 
 A node activates exactly one config profile, so the profile is chosen per
 node, by its **scope** and the protocol it serves
-(`remna_node_primary_protocol_type`), and every host follows the node it lands
-on.
+(`remna_node_primary_protocol_type`). Direct hosts follow that profile; chain
+hosts select the exit's access scope and the entry's transport instead.
 
 ### Scopes
 
@@ -115,9 +122,12 @@ on.
 A node of the exclusive group naming no profile, or one its panel does not
 declare, fails the run.
 
-The global variants are always published. A location or exclusive variant is
-published only for the protocols some related node of that scope serves, and
-retired once none does (`vpn_server_remnawave_config_profiles_prune: delete`).
+The global variants are always published. A location variant is published for
+protocols its related nodes serve. An exclusive variant is also published for
+transports used by its usable, planned chain entries, so a TCP-only exclusive
+exit still gets an xHTTP profile when reached through an xHTTP entry. Variants
+are retired once neither nodes nor chains need them
+(`vpn_server_remnawave_config_profiles_prune: delete`).
 Retiring runs after the nodes and hosts stages, and skips a profile any node
 the inventory still produces activates; a role's node the inventory no longer
 produces does not hold it.
@@ -210,12 +220,11 @@ squad missing from the panel is reported and not created, and tags are left
 alone.
 
 The direct hosts of an exclusive exit are on its own inbound, which only its
-squads hold. Its chain hosts are entered on the entry's inbound, which every
-squad of the entry's profile holds, so they are shown only to the squads
-granted the exit's profile (`internal_squads: allow_only`). Those squads'
-members need the entry's inbound too - through another squad, or by granting
-it to them (`profiles: [{scope: Xenus-team}, {kind: location}]`); verify notes
-when they lack it.
+squads hold. Its chain hosts use the exclusive variant matching the entry's
+transport, and are shown only to squads granted the exit's primary profile
+(`internal_squads: allow_only`). Grant the whole exclusive scope to its squad
+(`profiles: {scope: Xenus-team}`) to include both TCP and xHTTP inbounds. The
+entry node's location profile is not the host's subscription access profile.
 
 Route ids
 ---------
@@ -332,8 +341,8 @@ holds the way a client is routed, writing nothing:
   hosts carry `vpn_server_remnawave_hosts_vless_route_id_direct`;
 - every host is attached to the profile and inbound of the model, and shown to
   the squads of the model;
-- the nodes a host binds to exist, activate its config profile and its
-  inbound;
+- the nodes a host binds to exist and activate its inbound (direct) or a
+  transport/REALITY-compatible inbound (chain);
 - every generated profile holds its inbounds and embeds exactly the snippets
   of the model - an addon where it was not declared is a problem;
 - every node activates the profile of its scope and protocol;
@@ -457,7 +466,7 @@ Node side, in `group_vars/vpn_caddy/remna.yaml` or a node's host_vars:
 | `vpn_server_remnawave_hosts_adopt_untagged` | `false` | Whether a generated host may take over a host of its remark without the primary tags |
 | `vpn_server_remnawave_hosts_prune` | `disable` | What to do with primary-tagged hosts the inventory no longer produces: `ignore`, `disable`, `delete` |
 | `vpn_server_remnawave_hosts_port` | `443` | Port advertised to clients |
-| `vpn_server_remnawave_hosts_fingerprint` | `chrome` | uTLS fingerprint |
+| `vpn_server_remnawave_hosts_fingerprint` | `firefox` | uTLS fingerprint |
 | `vpn_server_remnawave_hosts_labels` | `{}` | Display names keyed by domain label, overriding the generated ones |
 | `vpn_server_remnawave_hosts_remark_chain_separator` | `' \| by '` | Joins the two names of a chain host's remark |
 | `vpn_server_remnawave_hosts_remark_exclusive_format` | `'{name} · {profile}'` | Remark of an exclusive profile's exit |

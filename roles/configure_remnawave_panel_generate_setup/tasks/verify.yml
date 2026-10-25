@@ -6,8 +6,8 @@
 #     and the exit it reaches, which must be the exit the host is named after;
 #   - the config profile and inbound a host is attached to, and the squads it
 #     is shown to, which must be the ones of the model;
-#   - the nodes a host binds to, which must exist and activate its config
-#     profile and inbound;
+#   - the nodes a host binds to, which must exist and activate its inbound
+#     (direct) or a transport/REALITY-compatible inbound (chain);
 #   - every generated config profile, which must hold its inbounds and embed
 #     exactly the snippets of the model (an addon where it was not declared is
 #     a problem as much as one missing);
@@ -38,6 +38,7 @@
     crpgs_verify_options:
       primary_tags: "{{ crpgs_primary_tags }}"
       separator: "{{ vpn_server_remnawave_hosts_remark_chain_separator }}"
+      fingerprint: "{{ vpn_server_remnawave_hosts_fingerprint }}"
       direct_route_id: "{{ vpn_server_remnawave_hosts_vless_route_id_direct }}"
       route_id_range: "{{ vpn_server_remnawave_snippets_vless_route_id_range }}"
       rules_snippet: "{{ vpn_server_remnawave_snippets_key_rules_all }}"

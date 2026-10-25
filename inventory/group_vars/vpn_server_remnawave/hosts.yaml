@@ -50,9 +50,9 @@ vpn_server_remnawave_hosts_adopt_untagged: false
 #   enabled:  created enabled and re-enabled on every run
 vpn_server_remnawave_hosts_publish_state: present
 
-# The config profile and inbound of a generated host are not set here: a
-# direct host takes the ones of its exit's profile, a chain host the ones of
-# its entry's (config_profiles.yaml), so each lands on a node that serves it.
+# A direct host takes its exit's profile. A chain host takes the global base
+# (shared exit) or the exit's exclusive scope, using the entry's transport.
+# The entry node still activates its own location profile for server routing.
 
 vpn_server_remnawave_hosts_port: 443
 vpn_server_remnawave_hosts_fingerprint: chrome
@@ -112,9 +112,9 @@ vpn_server_remnawave_hosts_chain:
   #    entries:
   #      - chain-russia-7.123987465.xyz
 
-# Which nodes a chain host is bound to. A chain host is attached to the inbound
-# of its entry's config profile - the client connects to the entry - so only
-# the entry nodes activate it. It can be: entry, exit, both, none.
+# Which nodes a chain host is bound to. The client connects to the entry,
+# whose active inbound must be transport/REALITY-compatible with the host's
+# advertised profile. It can be: entry, exit, both, none.
 vpn_server_remnawave_hosts_chain_bind_nodes: entry
 
 # ---------------------------------------------------------------------------

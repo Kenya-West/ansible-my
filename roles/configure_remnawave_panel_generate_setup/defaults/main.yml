@@ -113,7 +113,7 @@ vpn_server_remnawave_hosts_publish_state: present
 # not carry the primary tags.
 vpn_server_remnawave_hosts_adopt_untagged: false
 vpn_server_remnawave_hosts_port: 443
-vpn_server_remnawave_hosts_fingerprint: chrome
+vpn_server_remnawave_hosts_fingerprint: firefox
 vpn_server_remnawave_hosts_labels: {}
 vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
 # The remark of an exit of an exclusive profile, numbered within that profile.
@@ -123,8 +123,8 @@ vpn_server_remnawave_hosts_remark_exclusive_format: '{name} · {profile}'
 # produces. It can be: ignore, disable, delete.
 vpn_server_remnawave_hosts_prune: disable
 
-# Which nodes a generated chain host is bound to. A chain host is attached to
-# its entry's inbound, so only entry nodes activate it.
+# Which nodes a generated chain host is bound to. Its client-facing profile
+# follows the exit's access scope and the entry's transport; bind to the entry.
 # It can be: entry, exit, both, none.
 vpn_server_remnawave_hosts_chain_bind_nodes: entry
 

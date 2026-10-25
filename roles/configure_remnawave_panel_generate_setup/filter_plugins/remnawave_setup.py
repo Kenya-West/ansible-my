@@ -148,7 +148,11 @@ def _collect(nodes, wanted_types):
                 'countries': [],
                 'protocols': [],
                 'profiles': [],
+                'scopes': [],
             })
+            scope = node.get('scope')
+            if scope and scope not in slot['scopes']:
+                slot['scopes'].append(scope)
             profile = node.get('profile')
             if profile and profile not in slot['profiles']:
                 slot['profiles'].append(profile)
@@ -189,11 +193,12 @@ def _settle(slot, default_protocol, warnings, kind):
     # A host is attached to one inbound, so every node behind a domain has to
     # activate the same profile; nodes split across profiles cannot be served
     # by one host and are refused rather than half published.
-    if len(slot['profiles']) > 1:
+    if len(slot['profiles']) > 1 or len(slot['scopes']) > 1:
         raise AnsibleFilterError(
-            '%s %s is served by nodes activating different config profiles (%s). '
+            '%s %s is served by nodes with different scopes or protocols (%s; %s). '
             'Nodes behind one domain must share their scope and protocol.'
-            % (kind, slot['domain'], ', '.join(sorted(slot['profiles']))))
+            % (kind, slot['domain'], ', '.join(s['scope'] for s in slot['scopes']),
+               ', '.join(protocols)))
     return slot
 
 
@@ -207,6 +212,23 @@ def _excluded_entries(exclude, exit_domain):
             return '*'
         return list(entries or [])
     return []
+
+
+def _chain_pairs(exits, entries, options):
+    """Usable chain entries for each exit, independent of profile rendering."""
+    pairs = {}
+    skip_same_country = _as_bool(options.get('skip_same_country', True))
+    for exit_slot in exits:
+        excluded = _excluded_entries(options.get('exclude'), exit_slot['domain'])
+        if excluded == '*':
+            continue
+        usable = [entry for entry in entries
+                  if entry['domain'] not in excluded
+                  and entry['domain'] != exit_slot['domain']
+                  and not (skip_same_country and entry['country'] == exit_slot['country'])]
+        if usable:
+            pairs[exit_slot['domain']] = usable
+    return pairs
 
 
 def _remark(slot, labels):
@@ -330,10 +352,9 @@ def _profile_identity(scope, base, location, exclusive_of):
 def _render_profiles(scopes_in_use, options, warnings):
     """Render every config profile the panel needs.
 
-    Every base profile is rendered for the global scope, always. The other
-    scopes get a variant of a base profile only for the protocols their nodes
-    actually serve, so a location or exclusive group without nodes produces
-    no profile at all.
+    Every base profile is rendered for the global scope, always. Other scopes
+    get the protocols their nodes serve or their exclusive chains need, so a
+    location or exclusive group without nodes produces no profile at all.
     """
     bases = list(options.get('profiles_base') or [])
     base_of = {}
@@ -513,6 +534,30 @@ def remnawave_model(nodes, options):
         raise AnsibleFilterError('Exclusive profiles with nodes in different censorship '
                                  'geos: %s' % ', '.join(split))
 
+    # Plan chains before rendering profiles: their client-facing transport is
+    # the entry's, but access is granted by the exit's scope. Shared chains use
+    # the global base; exclusive chains need a variant for each entry protocol.
+    exits = [
+        _settle(slot, default_protocol, warnings, 'Direct domain')
+        for _, slot in sorted(_collect(nodes, set(options['direct_domain_types'])).items())
+    ]
+    entries = [
+        _settle(slot, default_protocol, warnings, 'Chain domain')
+        for _, slot in sorted(_collect(nodes, set(options['entry_domain_types'])).items())
+    ]
+    entry_countries = set(str(c).upper() for c in options['entry_country_codes'])
+    entries = [e for e in entries if e['country'] in entry_countries]
+    pairs = _chain_pairs(exits, entries, options)
+    planned_domains = set(o['address'] for o in options.get('outbounds') or []
+                          if o.get('kind', 'location') == 'location')
+    for exit_slot in exits:
+        if exit_slot['domain'] not in planned_domains:
+            continue
+        scope = exit_slot['scopes'][0]
+        if scope['kind'] == 'exclusive':
+            key = (scope['kind'], scope['scope'], scope['geo'])
+            scopes_in_use[key].update(e['protocol'] for e in pairs.get(exit_slot['domain'], []))
+
     profiles = _render_profiles(scopes_in_use, options, warnings)
     squad_grants = _squad_grants(profiles, options.get('squads_inbounds'))
     profile_by_key = dict(((p['kind'], p['scope'], p['protocol']), p) for p in profiles)
@@ -542,17 +587,11 @@ def remnawave_model(nodes, options):
             warnings.append('Config profile %s is granted to no internal squad, so no '
                             'user can connect through its inbounds' % profile['name'])
 
-    exits = [
-        _settle(slot, default_protocol, warnings, 'Direct domain')
-        for _, slot in sorted(_collect(nodes, set(options['direct_domain_types'])).items())
-    ]
-    entries = [
-        _settle(slot, default_protocol, warnings, 'Chain domain')
-        for _, slot in sorted(_collect(nodes, set(options['entry_domain_types'])).items())
-    ]
-
-    entry_countries = set(str(c).upper() for c in options['entry_country_codes'])
-    entries = [e for e in entries if e['country'] in entry_countries]
+    # Every node behind one domain must activate the same profile, even when
+    # the scope agrees but its primary transports do not.
+    for slot in exits + entries:
+        slot['profiles'] = sorted(set(node_profiles[n]['config_profile'] for n in slot['nodes']))
+        _settle(slot, default_protocol, [], 'Domain')
 
     # Short names are per collection: an entry that no country lets act as one
     # is gone by now, so it takes no number with it.
@@ -580,22 +619,6 @@ def remnawave_model(nodes, options):
                 for slot in members:
                     slot['display'] = exclusive_format.format(
                         name=slot['display'], profile=group)
-
-    # --- which exit is reachable through which entry ------------------------
-    skip_same_country = _as_bool(options.get('skip_same_country', True))
-    pairs = {}
-    for exit_slot in exits:
-        excluded = _excluded_entries(options.get('exclude'), exit_slot['domain'])
-        if excluded == '*':
-            continue
-        usable = [
-            entry for entry in entries
-            if entry['domain'] not in excluded
-            and entry['domain'] != exit_slot['domain']
-            and not (skip_same_country and entry['country'] == exit_slot['country'])
-        ]
-        if usable:
-            pairs[exit_slot['domain']] = usable
 
     # --- number the chained exits ------------------------------------------
     # Every exit's outbound is planned in the inventory, tag included. A
@@ -637,9 +660,8 @@ def remnawave_model(nodes, options):
             % (base, highest, lo, hi))
 
     # --- the hosts ----------------------------------------------------------
-    # A direct host is entered on its exit, so it takes the exit's inbound. A
-    # chain host is entered on its entry - that is the node the client talks
-    # to - so it takes the entry's inbound, whatever protocol the exit speaks.
+    # A direct host uses its exit's profile. A chain host uses the entry's
+    # transport on the global base (shared) or exit's exclusive scope.
     bind = options.get('chain_bind_nodes', 'entry')
     separator = options['remark_chain_separator']
     direct_route_id = options.get('direct_route_id')
@@ -652,7 +674,7 @@ def remnawave_model(nodes, options):
             'kind': 'direct',
             'remark': _remark(exit_slot, labels),
             'address': exit_slot['domain'],
-            'sni': exit_slot['domain'],
+            'sni': '',
             'vless_route_id': direct_route_id,
             'nodes': list(exit_slot['nodes']),
             'protocol': exit_slot['protocol'],
@@ -664,9 +686,7 @@ def remnawave_model(nodes, options):
         })
 
     for exit_slot in chained:
-        # The entry's inbound is held by every squad of the entry's profile,
-        # so a chain into an exclusive exit is shown only to the squads granted
-        # that exit's profile.
+        # Visibility follows the exit's access scope, never the RU entry's.
         if exit_slot['scope_kind'] == 'exclusive':
             allowed = sorted(profile_by_name[exit_slot['profile']]['squads'])
             restriction = {'mode': 'allow_only', 'squads': allowed}
@@ -677,6 +697,9 @@ def remnawave_model(nodes, options):
         else:
             restriction = dict(unrestricted)
         for entry in pairs[exit_slot['domain']]:
+            scope_kind = 'exclusive' if exit_slot['scope_kind'] == 'exclusive' else 'global'
+            scope = exit_slot['scope'] if scope_kind == 'exclusive' else 'global'
+            client_profile = profile_by_key[(scope_kind, scope, entry['protocol'])]
             if bind == 'exit':
                 bound = list(exit_slot['nodes'])
             elif bind == 'both':
@@ -685,13 +708,11 @@ def remnawave_model(nodes, options):
                 bound = []
             else:
                 bound = list(entry['nodes'])
-            if bind in ('exit', 'both') and exit_slot['profile'] != entry['profile']:
+            if bind in ('exit', 'both'):
                 warnings.append(
-                    'Chain host of %s through %s is bound to exit nodes activating %s, '
-                    'not the entry\'s %s it is attached to; set '
-                    'vpn_server_remnawave_hosts_chain_bind_nodes to entry'
-                    % (exit_slot['domain'], entry['domain'], exit_slot['profile'],
-                       entry['profile']))
+                    'Chain host of %s through %s is bound to exit nodes, but the client '
+                    'connects to the entry; set vpn_server_remnawave_hosts_chain_bind_nodes '
+                    'to entry' % (exit_slot['domain'], entry['domain']))
             hosts.append({
                 'kind': 'chain',
                 'remark': _remark(exit_slot, labels) + separator + _remark(entry, labels),
@@ -700,8 +721,8 @@ def remnawave_model(nodes, options):
                 'vless_route_id': exit_slot['route_id'],
                 'nodes': bound,
                 'protocol': entry['protocol'],
-                'config_profile': entry['profile'],
-                'inbound': entry['inbound'],
+                'config_profile': client_profile['name'],
+                'inbound': client_profile['inbound_tags'][0],
                 'internal_squads': restriction,
                 'exit': exit_slot['domain'],
                 'entry': entry['domain'],
@@ -823,6 +844,23 @@ def _snippet_refs(section):
             if isinstance(item, dict) and item.get('snippet')]
 
 
+def _client_transport(inbound):
+    """Settings that must agree when a chain advertises a different profile.
+
+    Tags and server-side routing may differ; the client-facing protocol,
+    transport and REALITY credentials may not.
+    """
+    stream = inbound.get('streamSettings') or {}
+    reality = stream.get('realitySettings') or {}
+    return {
+        'protocol': inbound.get('protocol'),
+        'network': {'tcp': 'raw'}.get(stream.get('network'), stream.get('network')),
+        'security': stream.get('security'),
+        'reality': {k: reality.get(k) for k in ('privateKey', 'shortIds', 'serverNames')},
+        'xhttp': stream.get('xhttpSettings'),
+    }
+
+
 def remnawave_verify(panel, model, options):
     """Check what the panel holds against itself and against the desired setup.
 
@@ -903,6 +941,10 @@ def remnawave_verify(panel, model, options):
                 problems.append('Balancer %s selects outbound %s, which is not in %s'
                                 % (balancer.get('tag'), tag, outbounds_name))
 
+    def config_inbound(profile, tag):
+        return next((i for i in (profile.get('config') or {}).get('inbounds') or []
+                     if i.get('tag') == tag), None)
+
     def describe(host):
         return "'%s'" % host.get('remark')
 
@@ -927,6 +969,15 @@ def remnawave_verify(panel, model, options):
         if have.get('address') != want['address']:
             problems.append('Host %s has address %s, the inventory wants %s'
                             % (describe(have), have.get('address'), want['address']))
+
+        if (have.get('sni') or '') != (want.get('sni') or ''):
+            problems.append('Host %s has SNI %s, the inventory wants %s'
+                            % (describe(have), have.get('sni'), want.get('sni') or 'blank'))
+        if have.get('overrideSniFromAddress') is not True:
+            problems.append('Host %s does not override SNI from address' % describe(have))
+        if options.get('fingerprint') and have.get('fingerprint') != options['fingerprint']:
+            problems.append('Host %s has fingerprint %s, the inventory wants %s'
+                            % (describe(have), have.get('fingerprint'), options['fingerprint']))
 
         if want['kind'] == 'chain':
             if have_id is None:
@@ -981,8 +1032,8 @@ def remnawave_verify(panel, model, options):
             for name in want_restriction[1]:
                 if want.get('inbound') not in squad_tags.get(name, set()):
                     notes.append("Host %s is shown only to squad %s, which does not hold the "
-                                 "entry's inbound %s, so its members are refused at the entry "
-                                 "unless another squad grants it"
+                                 "advertised inbound %s, so its members cannot obtain "
+                                 "this host through that squad alone"
                                  % (describe(have), name, want.get('inbound')))
 
         bound = [nodes_by_uuid.get(uuid, {'name': uuid}) for uuid in have.get('nodes') or []]
@@ -997,7 +1048,22 @@ def remnawave_verify(panel, model, options):
                                 % (describe(have), node.get('name')))
                 continue
             active = node.get('configProfile') or {}
-            if active.get('activeConfigProfileUuid') != profile_uuid:
+            if want['kind'] == 'chain' and active.get('activeConfigProfileUuid') != profile_uuid:
+                # A chain's advertised profile controls subscription access;
+                # the entry still runs its location profile and routing. Verify
+                # wire compatibility instead of requiring identical UUIDs.
+                advertised = config_inbound(profile or {}, want.get('inbound'))
+                active_profile = profiles.get(active.get('activeConfigProfileUuid')) or {}
+                candidates = [config_inbound(active_profile, i.get('tag'))
+                              for i in active.get('activeInbounds') or []]
+                if (advertised is None or not any(
+                        i is not None and _client_transport(i) == _client_transport(advertised)
+                        for i in candidates)):
+                    problems.append('Node %s bound to chain host %s has no active inbound '
+                                    'compatible with %s/%s'
+                                    % (node.get('name'), describe(have),
+                                       want.get('config_profile'), want.get('inbound')))
+            elif active.get('activeConfigProfileUuid') != profile_uuid:
                 problems.append("Node %s bound to host %s activates config profile %s, not "
                                 "the host's %s" % (node.get('name'), describe(have),
                                                    active.get('activeConfigProfileUuid'),

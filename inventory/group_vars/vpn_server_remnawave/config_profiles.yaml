@@ -108,7 +108,8 @@ vpn_server_remnawave_config_profiles_common:
 # One per protocol, as {protocol, name, variant_suffix, inbounds}: rendered as
 # it is for the global scope, and as "<scope name><variant_suffix>" with
 # "<tag>_<scope suffix>" inbounds for every location and exclusive scope some
-# node of that protocol is in. The REALITY privateKey is filled in per inbound
+# node of that protocol is in, or an exclusive chain needs that entry protocol.
+# The REALITY privateKey is filled in per inbound
 # tag (vpn_server_remnawave_config_profiles_private_keys).
 vpn_server_remnawave_config_profiles_base:
   - protocol: "{{ remna_protocol_types.vless_reality_tcp.full }}"
@@ -229,9 +230,9 @@ vpn_server_remnawave_config_profiles_addons:
 # made by hand and hold the users: this only adds inbounds to the squads named
 # here, never removes one, and never creates a squad.
 #
-# A chain into an exclusive exit is shown only to the squads granted that
-# exit's profile, and is entered on the entry's inbound (Reverse-RU): its
-# members need that one too, through this squad or another.
+# A chain into an exclusive exit is shown only to squads granted the exit's
+# primary profile, and advertises its exclusive variant matching the entry's
+# transport. Selecting the whole scope grants both TCP and xHTTP inbounds.
 vpn_server_remnawave_internal_squads_inbounds:
   - squad: Default-Squad
     profiles:
