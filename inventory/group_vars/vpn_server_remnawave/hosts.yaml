@@ -55,7 +55,7 @@ vpn_server_remnawave_hosts_publish_state: present
 # The entry node still activates its own location profile for server routing.
 
 vpn_server_remnawave_hosts_port: 443
-vpn_server_remnawave_hosts_fingerprint: chrome
+vpn_server_remnawave_hosts_fingerprint: firefox
 
 # Human labels used to build host remarks, keyed by the domain label
 # (net-europe-1, chain-russia-1). A domain that is not listed is named
