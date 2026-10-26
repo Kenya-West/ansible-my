@@ -13,8 +13,10 @@
   ignore_errors: "{{ (copy_files_templating_sync_attempt | default(1) | int) < (copy_files_templating_sync_retries | int) }}"
 
 - name: Wait before retrying synchronize to {{ path.dest }}
-  ansible.builtin.pause:
+  ansible.builtin.wait_for:
     seconds: "{{ (copy_files_templating_sync_attempt | default(1) | int) * (copy_files_templating_sync_retry_delay | int) }}"
+  delegate_to: localhost
+  become: false
   when:
     - copy_files_templating_sync_result is failed
     - (copy_files_templating_sync_attempt | default(1) | int) < (copy_files_templating_sync_retries | int)
