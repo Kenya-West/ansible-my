@@ -3,6 +3,7 @@
   hosts: vpn_caddy
   become: false
   become_user: "{{ standard_user }}"
+  strategy: ansible.builtin.host_pinned
 
   roles:
     - name: kwtoolset/resolve_host_relations
