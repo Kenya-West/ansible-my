@@ -137,10 +137,9 @@ vpn_server_remnawave_snippets_exits: >-
 # out-chain-eu-tcp-001, out-chain-ru-xhttp-001, out-chain-global-tcp-all,
 # out-chain-ru-tcp-all. A geo without a region code of its own keeps its name.
 #
-# The role owns exactly the outbounds whose tag starts with "<prefix>-" and the
-# rules whose vlessRoute is a single number inside the owned range. Everything
-# else in outbounds_all and rules_all is read back and written out again
-# untouched, so hand-written outbounds and rules survive a regeneration.
+# The role owns outbounds_all and rules_all whole and replaces their contents
+# on every run, so anything added to them by hand is gone after the next one.
+# Generated route ids must fall inside vpn_server_remnawave_snippets_vless_route_id_range.
 vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain
 vpn_server_remnawave_snippets_outbound_tag_index_width: 3
 vpn_server_remnawave_snippets_outbound_tag_all_suffix: all

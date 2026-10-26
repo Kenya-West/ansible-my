@@ -225,6 +225,14 @@ bypass WARP and reach their selected exit, including Russian exits reached
 through global nodes. Private-network blocks still come first. Reorder
 fragments to change precedence; no insertion indexes are needed.
 
+Snippet names belong to a panel-wide catalog, **not a panel-wide routing
+table**. A node evaluates only rules embedded in its active Config Profile.
+The WARP fragment selects its rule and outbound together: non-global profiles
+embed **neither**. Direct hosts on `Reverse-RU` may therefore keep route ID `2`
+without matching `rules_warp_prod_1`. Verification expands each profile's
+snippets and rejects any rule whose outbound/balancer is absent from that
+same profile, including a stray WARP rule without its outbound.
+
 The base profile's optional `config` is merged last, recursively, **replacing
 lists** rather than appending, so protocol-specific overrides can replace a
 section without discarding unrelated routing settings. Generated `inbounds`
@@ -331,20 +339,12 @@ them, so above, a run with `staging.ini` never touches the hosts a run with
 The tags are checked before anything is sent: at most 10 distinct tags of up
 to 36 characters of `A-Z`, `0-9`, `_` and `:`, at least one of them primary.
 
-Snippets have no tags in Remnawave, so what the role owns inside the outbounds
-and rules snippets is told apart by content. Both are read back before they
-are written, and only the parts the role owns are replaced:
-
-- an **outbound** is the role's when its `tag` starts with
-  `vpn_server_remnawave_snippets_outbound_tag_prefix` and a hyphen
-  (`out-chain-`);
-- a **rule** is the role's when its `vlessRoute` is a single number inside
-  `vpn_server_remnawave_snippets_vless_route_id_range`.
-
-So hand-written outbounds, the geo-targeted rule families and catch-all ranges
-such as `"400-600"` all survive a regeneration. The snippets of
-`vpn_server_remnawave_snippets_whole` - the balancers and the defaults - are
-different: they are written exactly as the inventory builds them.
+The role owns the outbounds and rules snippets whole: each run replaces their
+contents with what the inventory produces, so an outbound or rule added to
+them by hand is gone after the next run. Put hand-written routing in a snippet
+of its own and embed it through the profile composition instead. The snippets
+of `vpn_server_remnawave_snippets_whole` - the balancers and the defaults - are
+written exactly as the inventory builds them too.
 
 New hosts are disabled
 ----------------------
@@ -401,6 +401,8 @@ holds the way a client is routed, writing nothing:
   transport/REALITY-compatible inbound (chain);
 - every generated profile holds its inbounds and embeds exactly the snippets
   of the model, in order - a fragment where it was not selected is a problem;
+- embedded rules target outbounds/balancers present in the same profile after
+  snippet expansion; an outbound existing elsewhere in the panel is not enough;
 - every node activates the profile of its scope and protocol;
 - every granted squad holds its inbounds;
 - the balancers select outbounds that exist.
@@ -628,12 +630,12 @@ A domain several nodes publish is one outbound.
 | `vpn_server_remnawave_snippets_outbounds_plan` | built | Every exit's outbound, as `{kind, address, protocol, template, tag, ...}` |
 | `vpn_server_remnawave_snippets_template_revision` | `'001'` | Suffix of the template variable names |
 | `vpn_server_remnawave_snippets_default_protocol_type` | `vless-reality-tcp` | Used by a node that declares no `remna_node_primary_protocol_type` |
-| `vpn_server_remnawave_snippets_outbound_tag_prefix` | `out-chain` | Prefix of the outbound tags, and of the outbounds the role owns |
+| `vpn_server_remnawave_snippets_outbound_tag_prefix` | `out-chain` | Prefix of the outbound tags |
 | `vpn_server_remnawave_snippets_outbound_tag_index_width` | `3` | Zero padding of the per-region index |
 | `vpn_server_remnawave_snippets_outbound_tag_all_suffix` | `all` | Last part of the tag of an `all` outbound |
 | `vpn_server_remnawave_snippets_balancer_tag_prefix` | `bal` | First part of a balancer tag |
 | `vpn_server_remnawave_snippets_balancer_tag_suffix` | `all-001` | Last part of a balancer tag |
-| `vpn_server_remnawave_snippets_vless_route_id_range` | `[400, 499]` | Route ids the role owns in the rules snippet |
+| `vpn_server_remnawave_snippets_vless_route_id_range` | `[400, 499]` | Range the generated route ids must fall in |
 | `vpn_server_remnawave_snippets_sync` | `on_change` | Whether to push the snippets into the profiles embedding them |
 
 Outbound templates live beside the inventory as

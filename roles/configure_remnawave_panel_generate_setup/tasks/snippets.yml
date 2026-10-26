@@ -4,16 +4,15 @@
 # inventory variables cannot:
 #
 #   - outbounds_all: every planned outbound rendered from its protocol
-#     template with node_address set to its exit, merged into the panel's;
+#     template with node_address set to its exit;
 #   - rules_all: one rule per chained exit, routing its route id to that exit's
-#     outbound (crpgs_model, build_model.yml), merged into the panel's;
+#     outbound (crpgs_model, build_model.yml);
 #   - vpn_server_remnawave_snippets_whole: standalone snippets written whole;
 #   - snippet definitions from config_profiles_composition (defaults, WARP,
 #     balancers): written once as they are, whichever profiles embed them.
 #
-# Snippets carry no tags in Remnawave, so what the role owns inside
-# outbounds_all and rules_all is told apart by the outbound tag prefix and the
-# route id range instead.
+# The role owns these snippets whole: each is replaced by what the inventory
+# produces, so an entry added to them by hand is gone after the next run.
 
 - name: Start from an empty set of rendered outbounds
   ansible.builtin.set_fact:
@@ -47,37 +46,10 @@
   loop_control:
     label: "{{ item.tag }} -> {{ item.address }}"
 
-- name: Read the snippets currently in the panel
-  ansible.builtin.include_tasks: read_panel.yml
-  vars:
-    crpgs_gather:
-      snippets: {}
-
-- name: Keep the parts of the snippets the role does not own
-  ansible.builtin.set_fact:
-    crpgs_outbounds_existing: >-
-      {{
-        (remnawave_gathered.snippets
-         | selectattr('name', 'equalto', vpn_server_remnawave_snippets_key_outbounds_all)
-         | first | default({})).snippet | default([], true)
-      }}
-    crpgs_rules_existing: >-
-      {{
-        (remnawave_gathered.snippets
-         | selectattr('name', 'equalto', vpn_server_remnawave_snippets_key_rules_all)
-         | first | default({})).snippet | default([], true)
-      }}
-
 - name: Write the outbounds snippet
   kenyawest.remnawave.snippet:
     name: "{{ vpn_server_remnawave_snippets_key_outbounds_all }}"
-    snippet: >-
-      {{
-        crpgs_outbounds_existing
-        | remnawave_merge_outbounds(
-            crpgs_outbounds,
-            vpn_server_remnawave_snippets_outbound_tag_prefix)
-      }}
+    snippet: "{{ crpgs_outbounds }}"
     sync: "{{ vpn_server_remnawave_snippets_sync }}"
   delegate_to: localhost
   register: crpgs_outbounds_snippet
@@ -85,13 +57,7 @@
 - name: Write the rules snippet
   kenyawest.remnawave.snippet:
     name: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
-    snippet: >-
-      {{
-        crpgs_rules_existing
-        | remnawave_merge_rules(
-            crpgs_model.rules,
-            vpn_server_remnawave_snippets_vless_route_id_range)
-      }}
+    snippet: "{{ crpgs_model.rules }}"
     sync: "{{ vpn_server_remnawave_snippets_sync }}"
   delegate_to: localhost
   register: crpgs_rules_snippet

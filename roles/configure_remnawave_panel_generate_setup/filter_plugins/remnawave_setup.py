@@ -720,8 +720,8 @@ def remnawave_model(nodes, options):
     lo, hi = _as_pair(options['route_id_range'], 'route_id_range')
     if highest is not None and (base < lo or highest > hi):
         warnings.append(
-            'Generated route ids %d-%d fall outside the owned range %d-%d, so '
-            'regenerating the rules snippet will not clean up after itself'
+            'Generated route ids %d-%d fall outside the route id range %d-%d, so '
+            'verify will not check the rules beyond it'
             % (base, highest, lo, hi))
 
     # --- the hosts ----------------------------------------------------------
@@ -820,36 +820,6 @@ def remnawave_model(nodes, options):
     }
 
 
-def remnawave_merge_outbounds(existing, generated, prefix):
-    """Replace the role's outbounds in a snippet, leaving the rest in place."""
-    marker = '%s-' % prefix
-    kept = [o for o in (existing or [])
-            if not str((o or {}).get('tag', '')).startswith(marker)]
-    return kept + list(generated or [])
-
-
-def remnawave_merge_rules(existing, generated, route_id_range):
-    """Replace the role's routing rules in a snippet, leaving the rest in place.
-
-    A rule is the role's when its vlessRoute is a single number inside the
-    owned range. Ranges such as "400-600" and the hand-written geo families
-    are therefore preserved even when they overlap it.
-    """
-    low, high = _as_pair(route_id_range, 'route_id_range')
-
-    def owned(rule):
-        value = (rule or {}).get('vlessRoute')
-        if value is None:
-            return False
-        try:
-            number = int(str(value).strip())
-        except (TypeError, ValueError):
-            return False
-        return low <= number <= high
-
-    return [r for r in (existing or []) if not owned(r)] + list(generated or [])
-
-
 def remnawave_select_tagged(entities, tags, tagged=True):
     """The panel entities carrying every one of ``tags``, or with ``tagged``
     false, the ones that do not.
@@ -907,6 +877,55 @@ def _snippet_refs(section):
     """The snippet names a config profile section embeds ({snippet: name})."""
     return [item.get('snippet') for item in (section or [])
             if isinstance(item, dict) and item.get('snippet')]
+
+
+def _routing_dependencies(config, snippets):
+    """Check references within one profile, not the panel-wide snippet catalog.
+
+    A snippet existing in the panel does not make it active on every node.
+    Only references embedded in this config contribute rules and outbounds.
+    """
+    problems = []
+
+    def expand(section, path, stack=()):
+        result = []
+        for item in section or []:
+            if not isinstance(item, dict):
+                problems.append('%s contains a non-mapping item' % path)
+                continue
+            name = item.get('snippet')
+            if not name:
+                result.append(item)
+            elif name in stack:
+                problems.append('%s has a cyclic snippet reference %s'
+                                % (path, ' -> '.join(stack + (name,))))
+            elif name not in snippets:
+                problems.append('%s references missing snippet %s' % (path, name))
+            else:
+                result.extend(expand(snippets[name], path, stack + (name,)))
+        return result
+
+    routing = config.get('routing') or {}
+    outbounds = expand(config.get('outbounds'), 'outbounds')
+    rules = expand(routing.get('rules'), 'routing.rules')
+    balancers = expand(routing.get('balancers'), 'routing.balancers')
+    outbound_tags = set(o.get('tag') for o in outbounds if o.get('tag'))
+    balancer_tags = set(b.get('tag') for b in balancers if b.get('tag'))
+    for rule in rules:
+        outbound = rule.get('outboundTag')
+        balancer = rule.get('balancerTag')
+        if outbound and outbound not in outbound_tags:
+            problems.append('routing rule targets outbound %s, which is absent from this profile'
+                            % outbound)
+        if balancer and balancer not in balancer_tags:
+            problems.append('routing rule targets balancer %s, which is absent from this profile'
+                            % balancer)
+    for balancer in balancers:
+        fallback = balancer.get('fallbackTag')
+        if fallback and fallback not in outbound_tags:
+            problems.append('balancer %s targets fallback outbound %s, which is absent from '
+                            'this profile' % (balancer.get('tag'), fallback))
+    return list(dict.fromkeys(problems))
 
 
 def _client_transport(inbound):
@@ -990,14 +1009,22 @@ def remnawave_verify(panel, model, options):
             problems.append('Composition snippet %s differs from the inventory; its routing '
                             'conditions or settings may bypass a chain' % name)
 
+    # Several rules may share a route id when they only split its match
+    # conditions (geoip and geosite of one family); they conflict only when
+    # they send it to different outbounds or balancers.
     rule_of = {}
+    target_of = {}
     for rule in snippets.get(rules_name) or []:
         number = _route_number((rule or {}).get('vlessRoute'))
         if number is None:
             continue
-        if number in rule_of:
-            problems.append('Rules snippet %s has route id %d twice (%s and %s)'
-                            % (rules_name, number, rule_of[number], rule.get('outboundTag')))
+        target = rule.get('outboundTag') or rule.get('balancerTag')
+        if number in target_of:
+            if target_of[number] != target:
+                problems.append('Rules snippet %s has route id %d twice (%s and %s)'
+                                % (rules_name, number, target_of[number], target))
+            continue
+        target_of[number] = target
         rule_of[number] = rule.get('outboundTag')
 
     outbound_address = {}
@@ -1162,6 +1189,8 @@ def remnawave_verify(panel, model, options):
                             % (name, ', '.join(have_tags) or '-', ', '.join(sorted(want['inbound_tags']))))
         have_config = have.get('config') or {}
         want_config = want.get('config') or {}
+        for problem in _routing_dependencies(have_config, snippets):
+            problems.append("Config profile '%s': %s" % (name, problem))
         for part, section in (('outbounds', lambda c: c.get('outbounds')),
                               ('rules', lambda c: (c.get('routing') or {}).get('rules')),
                               ('balancers', lambda c: (c.get('routing') or {}).get('balancers'))):
@@ -1257,8 +1286,6 @@ class FilterModule(object):
     def filters(self):
         return {
             'remnawave_model': remnawave_model,
-            'remnawave_merge_outbounds': remnawave_merge_outbounds,
-            'remnawave_merge_rules': remnawave_merge_rules,
             'remnawave_select_tagged': remnawave_select_tagged,
             'remnawave_select_profiles_kept': remnawave_select_profiles_kept,
             'remnawave_verify': remnawave_verify,

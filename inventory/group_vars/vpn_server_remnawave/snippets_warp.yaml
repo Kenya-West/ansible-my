@@ -4,6 +4,10 @@
 # the profiles of the global geo by the warp composition fragment
 # (vpn_server_remnawave_config_profiles_composition, config_profiles.yaml).
 #
+# The snippet catalog is not a global routing table. Non-global profiles do
+# not embed this rule or its outbound; their direct route id 2 stays local to
+# those profiles and does not activate WARP.
+#
 # The proxy's values come from group_vars/vpn_caddy/warp.yaml, which the role
 # uses as well - the panel hosts are vpn_caddy hosts too. The node's xray reaches
 # the proxy by its container name on the shared docker network.
@@ -31,8 +35,6 @@ vpn_server_remnawave_snippets_rules_warp:
          if vpn_server_remnawave_hosts_vless_route_id_direct not in [none, '', 0, '0']
          else '0' }}
     domain:
-      - "geosite:openai"
-      - "geosite:anthropic"
       - "geosite:google-gemini"
       - "geosite:spotify"
       - "whatismyipaddress.com"

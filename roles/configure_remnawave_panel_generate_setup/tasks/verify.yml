@@ -11,6 +11,8 @@
 #   - every generated config profile, which must hold its inbounds and embed
 #     exactly the snippets of the model (a fragment where it was not selected
 #     is a problem as much as one missing);
+#   - every embedded routing rule must target an outbound or balancer present
+#     in that same profile after snippet expansion, not merely in the panel;
 #   - whole composition snippets, whose contents must match the model (e.g.
 #     WARP must not intercept explicit chain route ids);
 #   - every node, which must activate the profile of its scope and protocol;

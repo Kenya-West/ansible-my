@@ -204,6 +204,8 @@ vpn_server_remnawave_config_profiles_composition:
   # The microwarp proxy beside global-geo nodes, including exclusive ones.
   # WARP precedes chain/geo rules, but its rule matches only unmarked/direct
   # traffic (snippets_warp.yaml); explicit chain routes still reach their exit.
+  # Rule and outbound are selected together: non-global profiles embed neither
+  # snippet. A host's direct route id (2) alone cannot activate the WARP rule.
   - name: warp
     profiles:
       geo: global

@@ -299,10 +299,6 @@ class ReverseChainTests(unittest.TestCase):
         for domain in ('net-russia-1.example.test', 'net-russia-2.example.test'):
             hosts = [h for h in model['hosts'] if h['kind'] == 'chain' and h['exit'] == domain]
             self.assertEqual(len(set(h['vless_route_id'] for h in hosts)), 1)
-        old_rules = [{'vlessRoute': '402', 'outboundTag': 'old'},
-                     {'vlessRoute': '100-200', 'outboundTag': 'handmade'}]
-        merged = setup.remnawave_merge_rules(old_rules, model['rules'], [400, 499])
-        self.assertEqual(merged, old_rules[1:] + model['rules'])
 
     def test_disabling_new_direction_restores_legacy_entry_pool(self):
         self.options['entry_global_for_non_global'] = 'false'
@@ -572,6 +568,129 @@ class CompositionTests(unittest.TestCase):
             'rules_snippet': 'rules', 'outbounds_snippet': 'outbounds',
         })
         self.assertTrue(any("'Default-Profile' embeds rules snippets" in p for p in report['problems']))
+
+
+class RoutingDependencyTests(unittest.TestCase):
+    def setUp(self):
+        fixture = CompositionTests()
+        fixture.setUp()
+        self.options = fixture.options
+        # Populate real targets instead of empty snippet mocks.
+        definitions = {
+            'outbounds_default_prod_1': [{'tag': 'DIRECT'}, {'tag': 'BLOCK'}],
+            'rules_default_prod_1': [{'ip': ['geoip:private'], 'outboundTag': 'BLOCK'}],
+            'outbounds_warp_prod_1': [{'tag': 'out-warp-socks'}],
+            'rules_warp_prod_1': [{'domain': ['geosite:openai'], 'vlessRoute': '0,2',
+                                 'outboundTag': 'out-warp-socks'}],
+        }
+        for fragment in self.options['profile_composition']:
+            for definition in fragment.get('snippets', []):
+                definition['snippet'] = definitions.get(definition['name'], [])
+        self.nodes = nodes()
+        for index, node in enumerate(self.nodes[2:4], 1):
+            domain = 'net-russia-%d.example.test' % index
+            node['domains'].append({'domain': domain, 'type': 'net-location'})
+            self.options['outbounds'].append({'address': domain, 'tag': 'out-chain-ru-%d' % index})
+        self.model = setup.remnawave_model(self.nodes, self.options)
+        self.panel = panel_for(self.model)
+        self.panel['snippets'] = copy.deepcopy(self.model['profile_snippets']) + [
+            {'name': 'rules_all_prod_1', 'snippet': self.model['rules']},
+            {'name': 'outbounds_all_prod_1', 'snippet': [
+                {'tag': o['tag'], 'settings': {'vnext': [{'address': o['address']}]}}
+                for o in self.options['outbounds']
+            ]},
+        ]
+
+    def verify(self):
+        return setup.remnawave_verify(self.panel, self.model, {
+            'primary_tags': ['MANAGED_BY:ANSIBLE'], 'separator': ' | by ',
+            'direct_route_id': 2, 'route_id_range': [400, 499],
+            'rules_snippet': 'rules_all_prod_1', 'outbounds_snippet': 'outbounds_all_prod_1',
+        })['problems']
+
+    def test_non_global_direct_id_2_does_not_activate_catalog_warp_rule(self):
+        self.assertEqual(self.verify(), [])
+        direct = [h for h in self.model['hosts'] if h['kind'] == 'direct'
+                  and h['config_profile'].startswith('Reverse-RU')]
+        self.assertEqual(len(direct), 2)
+        for host in direct:
+            self.assertEqual(host['vless_route_id'], 2)
+            profile = next(p for p in self.model['profiles'] if p['name'] == host['config_profile'])
+            self.assertNotIn('rules_warp_prod_1', setup._snippet_refs(profile['config']['routing']['rules']))
+            self.assertNotIn('outbounds_warp_prod_1', setup._snippet_refs(profile['config']['outbounds']))
+            self.assertEqual(setup._routing_dependencies(
+                profile['config'], {s['name']: s['snippet'] for s in self.panel['snippets']}), [])
+
+    def test_stray_warp_snippet_in_non_global_profile_is_rejected(self):
+        for name in ('Reverse-RU', 'Reverse-RU-xHTTP'):
+            profile = next(p for p in self.panel['config_profiles'] if p['name'] == name)
+            profile['config']['routing']['rules'].insert(1, {'snippet': 'rules_warp_prod_1'})
+        problems = self.verify()
+        for name in ('Reverse-RU', 'Reverse-RU-xHTTP'):
+            self.assertIn("Config profile '%s': routing rule targets outbound out-warp-socks, "
+                          "which is absent from this profile" % name, problems)
+
+    def test_inline_warp_rule_cannot_evade_snippet_reference_check(self):
+        profile = next(p for p in self.panel['config_profiles'] if p['name'] == 'Reverse-RU')
+        profile['config']['routing']['rules'].insert(1, {
+            'domain': ['geosite:openai'], 'vlessRoute': '0,2', 'outboundTag': 'out-warp-socks',
+        })
+        self.assertTrue(any("'Reverse-RU': routing rule targets outbound out-warp-socks" in p
+                            for p in self.verify()))
+
+    def test_global_profile_missing_warp_outbound_is_rejected(self):
+        profile = next(p for p in self.panel['config_profiles'] if p['name'] == 'Default-Profile')
+        profile['config']['outbounds'] = [i for i in profile['config']['outbounds']
+                                        if i.get('snippet') != 'outbounds_warp_prod_1']
+        self.assertTrue(any("'Default-Profile': routing rule targets outbound out-warp-socks" in p
+                            for p in self.verify()))
+
+    def test_route_id_split_across_rules_to_one_target_is_no_conflict(self):
+        rules = next(s for s in self.panel['snippets'] if s['name'] == 'rules_all_prod_1')
+        rules['snippet'][:0] = [
+            {'vlessRoute': '10', 'ip': ['geoip:ru'], 'outboundTag': 'out-chain-ru-1'},
+            {'vlessRoute': '10', 'domain': ['geosite:category-ru'], 'outboundTag': 'out-chain-ru-1'},
+            {'vlessRoute': '100', 'ip': ['geoip:ru'], 'balancerTag': 'bal-ru'},
+            {'vlessRoute': '100', 'domain': ['geosite:category-ru'], 'balancerTag': 'bal-ru'},
+        ]
+        self.assertFalse([p for p in self.verify() if 'twice' in p])
+        rules['snippet'][1]['outboundTag'] = 'out-chain-ru-2'
+        rules['snippet'][3] = {'vlessRoute': '100', 'outboundTag': 'out-chain-ru-2'}
+        self.assertEqual([p for p in self.verify() if 'twice' in p], [
+            'Rules snippet rules_all_prod_1 has route id 10 twice (out-chain-ru-1 and out-chain-ru-2)',
+            'Rules snippet rules_all_prod_1 has route id 100 twice (bal-ru and out-chain-ru-2)'])
+
+    def test_nested_snippet_rules_and_outbounds_are_resolved(self):
+        snippets = {'rules': [{'snippet': 'nested-rules'}],
+                    'nested-rules': [{'outboundTag': 'warp'}],
+                    'outbounds': [{'snippet': 'nested-outbounds'}],
+                    'nested-outbounds': [{'tag': 'warp'}]}
+        config = {'outbounds': [{'snippet': 'outbounds'}],
+                  'routing': {'rules': [{'snippet': 'rules'}]}}
+        self.assertEqual(setup._routing_dependencies(config, snippets), [])
+        snippets['nested-outbounds'] = [{'tag': 'DIRECT'}]
+        self.assertEqual(setup._routing_dependencies(config, snippets), [
+            'routing rule targets outbound warp, which is absent from this profile'])
+
+    def test_missing_and_cyclic_snippets_are_reported(self):
+        config = {'routing': {'rules': [{'snippet': 'rules'}]}}
+        self.assertEqual(setup._routing_dependencies(config, {}), [
+            'routing.rules references missing snippet rules'])
+        self.assertEqual(setup._routing_dependencies(config, {'rules': [{'snippet': 'rules'}]}), [
+            'routing.rules has a cyclic snippet reference rules -> rules'])
+
+    def test_balancer_and_fallback_targets_must_exist_in_same_profile(self):
+        config = {'outbounds': [{'tag': 'DIRECT'}], 'routing': {
+            'rules': [{'balancerTag': 'bal'}],
+            'balancers': [{'tag': 'bal', 'fallbackTag': 'DIRECT'}],
+        }}
+        self.assertEqual(setup._routing_dependencies(config, {}), [])
+        config['routing']['balancers'][0]['fallbackTag'] = 'missing'
+        self.assertTrue(any('fallback outbound missing' in p
+                            for p in setup._routing_dependencies(config, {})))
+        config['routing']['balancers'] = []
+        self.assertEqual(setup._routing_dependencies(config, {}), [
+            'routing rule targets balancer bal, which is absent from this profile'])
 
 
 if __name__ == '__main__':
