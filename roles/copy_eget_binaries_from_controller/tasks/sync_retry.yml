@@ -14,8 +14,10 @@
   ignore_errors: "{{ (eget_sync_attempt | default(1) | int) < (eget_sync_retries | int) }}"
 
 - name: Wait before retrying synchronize to host
-  ansible.builtin.pause:
-    seconds: "{{ (eget_sync_attempt | default(1) | int) * (eget_sync_retry_delay | int) }}"
+  ansible.builtin.wait_for:
+    timeout: "{{ (eget_sync_attempt | default(1) | int) * (eget_sync_retry_delay | int) }}"
+  delegate_to: localhost
+  become: false
   when:
     - eget_sync_result is failed
     - (eget_sync_attempt | default(1) | int) < (eget_sync_retries | int)
