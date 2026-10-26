@@ -82,6 +82,15 @@
   tags:
     - update_config_hard
 
+- name: Ensure internal Docker network {{ warp_docker_network }} exists
+  community.docker.docker_network:
+    name: "{{ warp_docker_network }}"
+    driver: bridge
+    internal: true
+    state: present
+  tags:
+    - always
+
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating

@@ -45,10 +45,13 @@ services:
 
     networks:
       - {{ docker_vpn_network }}
+      - {{ warp_docker_network }}
 
     restart: unless-stopped
 
 
 networks:
   {{ docker_vpn_network }}:
+    external: true
+  {{ warp_docker_network }}:
     external: true

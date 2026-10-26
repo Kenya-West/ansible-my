@@ -1,5 +1,4 @@
 ---
 # Host-side loopback ports published by the zapret (ss-zapret2) container.
-# SOCKS must differ from warp_socks5_port (MicroWARP), both bind 127.0.0.1.
 zapret_ss_port: 8388
 zapret_socks5_port: 1081

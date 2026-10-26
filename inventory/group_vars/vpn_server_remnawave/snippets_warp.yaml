@@ -10,7 +10,7 @@
 #
 # The proxy's values come from group_vars/vpn_caddy/warp.yaml, which the role
 # uses as well - the panel hosts are vpn_caddy hosts too. The node's xray reaches
-# the proxy by its container name on the shared docker network.
+# the proxy by its alias on the internal warp docker network (warp_docker_network).
 
 # <prefix>-<protocol>-<NNN>, as the tags of the chain outbounds are
 # (out-chain-eu-tcp-001), under a prefix of its own so the role never takes it
@@ -21,7 +21,7 @@ vpn_server_remnawave_snippets_outbounds_warp:
   - tag: "{{ vpn_server_remnawave_snippets_outbound_warp_tag }}"
     protocol: socks
     settings:
-      address: "{{ warp_service_name }}"
+      address: "{{ warp_socks5_host }}"
       port: "{{ warp_socks5_port | int }}"
       user: "{{ warp_socks5_user }}"
       pass: "{{ warp_socks5_pass }}"

@@ -12,9 +12,10 @@ services:
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
     networks:
-      - {{ docker_vpn_network }}
-    ports:
-      - "127.0.0.1:${BIND_PORT}:${BIND_PORT}"
+      {{ docker_vpn_network }}:
+      {{ warp_docker_network }}:
+        aliases:
+          - {{ warp_socks5_host }}
     volumes:
       - warp_data:/etc/wireguard # Keep account data to avoid rate limits
     restart: unless-stopped
@@ -27,6 +28,8 @@ services:
 
 networks:
   {{ docker_vpn_network }}:
+    external: true
+  {{ warp_docker_network }}:
     external: true
 
 volumes:
