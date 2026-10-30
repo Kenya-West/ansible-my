@@ -129,9 +129,6 @@
       tags:
         - declare_backups
         - update_config_hard
-        - update_config_soft
-        - update_image_hard
-        - update_image_soft
   vars:
     pgdump_declare_owner: infra-billing
     pgdump_declare_targets: "{{ infra_billing_postgres_backup_targets }}"
@@ -139,6 +136,3 @@
   tags:
     - declare_backups
     - update_config_hard
-    - update_config_soft
-    - update_image_hard
-    - update_image_soft
