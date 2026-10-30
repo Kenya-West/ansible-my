@@ -1,0 +1,11 @@
+---
+- name: Extract legacy Ansible cron names (never remove unrelated jobs)
+  ansible.builtin.set_fact:
+    pgdump_legacy_cron_names: >-
+      {%- set names = [] -%}
+      {%- for subdir in pgdump_legacy_subdirectories | unique -%}
+      {%- set pattern = '(?m)^#Ansible: ([^\n]+)\n[^\n]*' ~
+          ((pgdump_legacy_script_directory ~ subdir ~ '/') | regex_escape) ~ '[^\n]*scripts/backup[.]sh[^\n]*$' -%}
+      {%- set _ = names.extend(pgdump_legacy_crontab.stdout | default('') | regex_findall(pattern)) -%}
+      {%- endfor -%}
+      {{ names | unique | list }}

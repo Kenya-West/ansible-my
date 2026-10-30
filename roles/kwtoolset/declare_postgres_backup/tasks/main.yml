@@ -1,0 +1,62 @@
+---
+- name: Validate producer identity and target list
+  ansible.builtin.assert:
+    that:
+      - pgdump_declare_owner is match('^[a-zA-Z0-9][a-zA-Z0-9_-]*$')
+      - pgdump_declare_state in ['present', 'absent']
+      - pgdump_declare_targets is sequence
+      - pgdump_declare_targets is not string
+      - pgdump_declare_targets is not mapping
+
+- name: Validate all producer targets before publishing
+  ansible.builtin.include_tasks: "{{ role_path }}/../../install_backup_node_postgres/tasks/validate-target.yml"
+  loop: "{{ pgdump_declare_targets }}"
+  loop_control:
+    loop_var: pgdump_validate_target
+  when: pgdump_declare_state == 'present'
+
+- name: Publish this producer's complete current declaration
+  become: true
+  become_user: "{{ pgdump_declare_user }}"
+  block:
+    - name: Preview the producer manifest in check mode
+      ansible.builtin.debug:
+        msg: "Would {{ 'replace' if pgdump_declare_state == 'present' else 'remove' }} {{ pgdump_declare_directory }}/{{ pgdump_declare_owner }}.json ({{ pgdump_declare_targets | length }} targets)."
+      when: ansible_check_mode
+
+    - name: Create private manifest directory
+      ansible.builtin.file:
+        path: "{{ pgdump_declare_directory }}"
+        state: directory
+        mode: "0700"
+      when: not ansible_check_mode
+
+    - name: Atomically replace this producer's manifest
+      ansible.builtin.copy:
+        content: "{{ {'schema_version': 1, 'owner': pgdump_declare_owner, 'targets': pgdump_declare_targets,
+                     'legacy_script_subdirectories': pgdump_declare_legacy_script_subdirectories} | to_nice_json }}\n"
+        dest: "{{ pgdump_declare_directory }}/{{ pgdump_declare_owner }}.json"
+        mode: "0600"
+      when: pgdump_declare_state == 'present' and not ansible_check_mode
+      no_log: true
+
+    - name: Remove only this producer's manifest on uninstall
+      ansible.builtin.file:
+        path: "{{ pgdump_declare_directory }}/{{ pgdump_declare_owner }}.json"
+        state: absent
+      when: pgdump_declare_state == 'absent' and not ansible_check_mode
+
+- name: Reconcile the complete persistent registry
+  ansible.builtin.include_role:
+    name: install_backup_node_postgres
+    public: false
+    apply:
+      tags: [always]
+  vars:
+    pgdump_pending_manifest:
+      schema_version: 1
+      owner: "{{ pgdump_declare_owner }}"
+      targets: "{{ pgdump_declare_targets }}"
+      legacy_script_subdirectories: "{{ pgdump_declare_legacy_script_subdirectories }}"
+    pgdump_pending_state: "{{ pgdump_declare_state }}"
+  when: pgdump_declare_reconcile | bool

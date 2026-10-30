@@ -1,0 +1,34 @@
+---
+- name: Inspect existing user-level backup units
+  ansible.builtin.stat:
+    path: "{{ pgdump_systemd_unit_path }}"
+  register: pgdump_unit_directory_stat
+
+- name: Find backup-role-managed units if the directory exists
+  ansible.builtin.find:
+    paths: "{{ pgdump_systemd_unit_path }}"
+    patterns:
+      - ansible-postgres-backup-*.service
+      - ansible-postgres-backup-*.timer
+  register: pgdump_check_existing_units
+  when: pgdump_unit_directory_stat.stat.exists
+
+- name: Calculate units that would be retired
+  ansible.builtin.set_fact:
+    pgdump_retired_units: >-
+      {{ pgdump_check_existing_units.files | default([]) | map(attribute='path') | map('basename') | list
+         | difference(pgdump_unit_configs | map(attribute='name') | zip(pgdump_unit_configs | map(attribute='type'))
+                      | map('join', '.') | list) }}
+
+- name: Preview PostgreSQL backup changes
+  ansible.builtin.debug:
+    msg:
+      targets: "{{ pgdump_targets | map(attribute='id') | list }}"
+      units_to_configure: "{{ pgdump_unit_configs | map(attribute='name') | zip(pgdump_unit_configs | map(attribute='type')) | map('join', '.') | list }}"
+      units_to_retire: "{{ pgdump_retired_units }}"
+      manifest_directory: "{{ pgdump_manifest_dir }}"
+      output_root: "{{ pgdump_backup_location_root_path }}"
+      note: >-
+        Would install the runner, prepare directories, enable lingering and reconcile user timers.
+        No files, databases or systemd state are changed. Output symlink/permission checks
+        and legacy cron migration are performed when applying the configuration.

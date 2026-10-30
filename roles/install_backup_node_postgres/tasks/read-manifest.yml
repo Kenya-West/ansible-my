@@ -1,0 +1,19 @@
+---
+- name: Read producer manifest
+  ansible.builtin.slurp:
+    src: "{{ pgdump_manifest_file.path }}"
+  register: pgdump_manifest_content
+  no_log: true
+
+- name: Decode producer manifest
+  ansible.builtin.set_fact:
+    pgdump_manifest: "{{ pgdump_manifest_content.content | b64decode | from_json }}"
+  no_log: true
+
+- name: Require the manifest filename to match its owner
+  ansible.builtin.assert:
+    that:
+      - (pgdump_manifest_file.path | basename) == pgdump_manifest.owner ~ '.json'
+
+- name: Validate and collect persisted targets
+  ansible.builtin.include_tasks: collect-manifest.yml

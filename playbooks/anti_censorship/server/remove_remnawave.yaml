@@ -22,6 +22,23 @@
         remove_project_dirs: "{{ remove_project_dirs_remapped }}"
 
   pre_tasks:
+    - name: Retire Remnawave backup declarations before removing projects
+      ansible.builtin.include_role:
+        name: kwtoolset/declare_postgres_backup
+      vars:
+        pgdump_declare_owner: "{{ remnawave_backup_owner }}"
+        pgdump_declare_state: absent
+        pgdump_declare_reconcile: false
+      loop: [remnawave-panel, remnawave-tgbot-jolymmiels, remnawave-tgbot-bedolaga]
+      loop_control:
+        loop_var: remnawave_backup_owner
+      when: "'backup_restic_node' in group_names"
+
+    - name: Stop retired PostgreSQL backup schedules
+      ansible.builtin.include_role:
+        name: install_backup_node_postgres
+      when: "'backup_restic_node' in group_names"
+
     - name: Remap remove_project_dirs variable to contain complete paths - add /home/{{ standard_user }} prefix
       ansible.builtin.set_fact:
         remove_project_dirs_remapped: "{{ vpn_server_remnawave.project.paths.values() | list | map('regex_replace', '^(.*)$', '/home/{{ standard_user }}/\\1') }}"

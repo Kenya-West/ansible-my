@@ -1,0 +1,43 @@
+---
+- name: Build every output directory component for safe ownership migration
+  ansible.builtin.set_fact:
+    pgdump_output_directories: >-
+      {%- set paths = [pgdump_backup_location_root_path] -%}
+      {%- for target in pgdump_targets -%}
+      {%- set parts = target.output.subdirectory.split('/') -%}
+      {%- for count in range(1, parts | length + 1) -%}
+      {%- set _ = paths.append(pgdump_backup_location_root_path ~ '/' ~ (parts[:count] | join('/'))) -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ paths | unique }}
+
+- name: Inspect output directory components without following symlinks
+  become: true
+  become_user: root
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    follow: false
+  loop: "{{ pgdump_output_directories }}"
+  register: pgdump_output_stats
+
+- name: Reject symlinked output directories before privileged ownership changes
+  ansible.builtin.assert:
+    that:
+      - not item.stat.islnk | default(false)
+      - not item.stat.exists or item.stat.isdir
+    fail_msg: PostgreSQL output directories must be real directories, not symlinks.
+  loop: "{{ pgdump_output_stats.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Migrate output directories without deleting previous dumps
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ pgdump_backup_user }}"
+    mode: "0700"
+    follow: false
+  loop: "{{ pgdump_output_directories }}"
+

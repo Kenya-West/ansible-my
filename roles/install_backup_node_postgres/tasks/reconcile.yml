@@ -1,0 +1,93 @@
+---
+- name: Enable persistent user services after logout
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    argv: [loginctl, enable-linger, "{{ pgdump_backup_user }}"]
+    creates: "/var/lib/systemd/linger/{{ pgdump_backup_user }}"
+
+- name: Start the user service manager
+  become: true
+  become_user: root
+  ansible.builtin.systemd_service:
+    name: "user@{{ ansible_facts.getent_passwd[pgdump_backup_user][1] }}.service"
+    state: started
+
+- name: Reconcile user-owned PostgreSQL backups
+  become: true
+  become_user: "{{ pgdump_backup_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "{{ pgdump_runtime_dir }}"
+    DOCKER_HOST: "{{ pgdump_backup_docker_host if pgdump_backup_docker_host | length > 0 else ('' if pgdump_backup_docker_context | length > 0 else omit) }}"
+    DOCKER_CONTEXT: "{{ pgdump_backup_docker_context if pgdump_backup_docker_context | length > 0 else ('' if pgdump_backup_docker_host | length > 0 else omit) }}"
+  block:
+    - name: Create private registry and runner directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0700"
+      loop:
+        - "{{ pgdump_manifest_dir }}"
+        - "{{ pgdump_runner_path | dirname }}"
+
+    - name: Ensure a user-level unit directory exists
+      ansible.builtin.file:
+        path: "{{ pgdump_systemd_unit_path }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install generic PostgreSQL dump runner
+      ansible.builtin.copy:
+        src: postgres_backup.py
+        dest: "{{ pgdump_runner_path }}"
+        mode: "0700"
+
+    - name: Prepare legacy root-owned dump directory permissions
+      ansible.builtin.include_tasks: prepare-output.yml
+      when: pgdump_migrate_legacy | bool
+
+    - name: Validate the complete registry including path traversal and symlinks
+      ansible.builtin.command:
+        argv:
+          - "{{ pgdump_backup_python }}"
+          - "{{ pgdump_runner_path }}"
+          - --manifest-dir
+          - "{{ pgdump_manifest_dir }}"
+          - --output-root
+          - "{{ pgdump_backup_location_root_path }}"
+          - --validate
+      changed_when: false
+      check_mode: false
+      no_log: true
+
+    - name: Create user-owned dump root when legacy migration is disabled
+      ansible.builtin.file:
+        path: "{{ pgdump_backup_location_root_path }}"
+        state: directory
+        mode: "0700"
+      when: not pgdump_migrate_legacy | bool
+
+    - name: Create user-owned dump directories
+      ansible.builtin.file:
+        path: "{{ pgdump_backup_location_root_path }}/{{ pgdump_target.output.subdirectory }}"
+        state: directory
+        mode: "0700"
+      loop: "{{ pgdump_targets }}"
+      loop_control:
+        loop_var: pgdump_target
+        label: "{{ pgdump_target.id }}"
+
+    - name: Retire units for targets no longer declared
+      ansible.builtin.include_tasks: retire-units.yml
+
+    - name: Install user-level services and timers without running dumps on deployment
+      ansible.builtin.include_role:
+        name: 0x0I.systemd
+      vars:
+        unit_config: "{{ pgdump_unit_configs }}"
+        systemd_backup_files: false
+      when: pgdump_unit_configs | length > 0
+
+    - name: Remove legacy cron schedules after new units are reconciled
+      ansible.builtin.include_tasks: migrate-cron.yml
+      when: pgdump_migrate_legacy | bool

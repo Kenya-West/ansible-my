@@ -1,39 +1,24 @@
 ---
-# defaults file for roles/install_backup_node_postgres
-project_dir: "{{ backup_restic_node_project_structure_end_dirs.postgres | ansible.builtin.basename }}"
-project_root_dir: "{{ backup_restic_node.project.root }}"
-source_asset_rootpath_project: "{{ location_custom_files_path_hostname }}/{{ project_root_dir }}"
-source_asset_fullpath_project: "{{ source_asset_rootpath_project }}/{{ project_dir }}/"
+pgdump_backup_user: "{{ standard_user }}"
+pgdump_backup_home: "/home/{{ pgdump_backup_user }}"
+pgdump_manifest_dir: "{{ pgdump_backup_home }}/.config/ansible-backup/postgres.d"
+pgdump_runner_path: "{{ pgdump_backup_home }}/.local/lib/ansible-backup/postgres_backup.py"
+pgdump_systemd_unit_path: "{{ pgdump_backup_home }}/.config/systemd/user"
+pgdump_backup_location_root_path: /etc/postgres/db_backup
+pgdump_backup_python: /usr/bin/python3
+pgdump_backup_calendar: "*-*-* 00:00:00 UTC"
+pgdump_backup_randomized_delay: 15min
+pgdump_backup_timeout: 1h
+# Empty means use the user's normal Docker CLI configuration/current context.
+# Set only one of these if the interactive shell selects an endpoint via env.
+pgdump_backup_docker_host: ""
+pgdump_backup_docker_context: ""
 
-source_paths_add_role_dirs:
-  - templates
-source_paths_add_repo_dirs:
-  - "{{ source_asset_fullpath_project }}"
-source_paths_add_user_dirs: []
-
-dest_path_root: "/home/{{ standard_user }}/{{ backup_restic_node.project.root }}"
-dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
-
-pgdump_backup_access_group: "pgdump"
-pgdump_backup_access_group_users: "{{ standard_user }}"
-pgdump_backup_location_root_owner: "root"
-pgdump_backup_location_root_permissions: "0755"
-pgdump_backup_location_files_permissions: "0644"
-pgdump_backup_cron_job_name_prefix: ""
-pgdump_backup_cron_job_name_suffix: ""
-
-backup_locations:
-  - name: remnawave_panel
-    type: static
-    source_path: remnawave-panel
-    dest_path: remnawave-panel
-    cron_job_name: remnawave_panel_db
-  - name: tgbot_jolymmiels
-    type: dynamic_list
-    count: "{{ (vpn_server_remnawave_tgbot_jolymmiels_settings | default([])) | length }}"
-    source_path: jolymmiels-bot
-    dest_path: jolymmiels-bot
-    cron_job_name_template_prefix: jolymmiels_bot_db_
-
-cronjob_script_path_without_analytics_suffix: "scripts/backup.sh"
-cronjob_script_path_with_analytics: "{{ cronjob_script_path_without_analytics_suffix }}"
+# Optional dependency in the user's systemd manager. Rootless does not imply
+# a unit named docker.service; normally connect directly to the Docker socket.
+pgdump_backup_docker_unit: ""
+# Optional monitoring command as an argv list (not shell syntax).
+pgdump_backup_monitor_argv: []
+# Required only to migrate the old root-owned cron jobs/dump directory.
+pgdump_migrate_legacy: true
+pgdump_legacy_script_directory: "{{ pgdump_backup_home }}/{{ (backup_restic_node | default({'project': {'root': 'backup-restic-node'}})).project.root }}/postgres/"

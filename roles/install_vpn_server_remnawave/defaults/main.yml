@@ -16,6 +16,23 @@ dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
 
-# For backup script
-vpn_server_remnawave_backup_project_root_dir: "{{ backup_restic_node.project.root }}"
-vpn_server_remnawave_backup_project_full_dir: "{{ backup_restic_node.project.paths.postgres }}"
+# Set false to fail backups when this project's database container is stopped.
+vpn_server_remnawave_postgres_backup_skip_if_unavailable: true
+
+# Service-owned declaration; credentials are read inside the database container.
+vpn_server_remnawave_postgres_backup_targets:
+  - id: remnawave-panel-db
+    project_path: "{{ dest_path_full }}"
+    execution:
+      driver: compose_exec
+      skip_if_unavailable: "{{ vpn_server_remnawave_postgres_backup_skip_if_unavailable }}"
+      service: remnawave-db
+      project_name: "{{ compose_project_name }}"
+    connection:
+      source: container_environment
+    dump:
+      scope: cluster
+      format: plain
+    output:
+      subdirectory: remnawave-panel
+      filename: dump_remnawave_panel.sql

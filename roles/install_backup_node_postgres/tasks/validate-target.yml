@@ -1,0 +1,20 @@
+---
+- name: Validate PostgreSQL target has the required sections
+  ansible.builtin.assert:
+    that:
+      - pgdump_validate_target is mapping
+      - pgdump_validate_target.id is defined
+      - pgdump_validate_target.execution is mapping
+      - pgdump_validate_target.output is mapping
+
+- name: Validate PostgreSQL target
+  ansible.builtin.assert:
+    that:
+      - pgdump_validate_target is mapping
+      - pgdump_validate_target.id is match('^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$')
+      - pgdump_validate_target.execution.get('skip_if_unavailable', true) is boolean
+      - pgdump_validate_target.execution.driver in ['compose_exec', 'direct']
+      - pgdump_validate_target.output.subdirectory is match('^[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$')
+      - pgdump_validate_target.output.filename is match('^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$')
+      - pgdump_validate_target.output.filename not in ['.', '..']
+    fail_msg: Invalid PostgreSQL target id, execution driver or output path.

@@ -1,0 +1,8 @@
+---
+pgdump_declare_user: "{{ pgdump_backup_user | default(standard_user) }}"
+pgdump_declare_directory: "{{ pgdump_manifest_dir | default('/home/' ~ pgdump_declare_user ~ '/.config/ansible-backup/postgres.d') }}"
+pgdump_declare_state: present
+pgdump_declare_targets: []
+# Optional old script subdirectories retired only after this producer enrolls.
+pgdump_declare_legacy_script_subdirectories: []
+pgdump_declare_reconcile: true

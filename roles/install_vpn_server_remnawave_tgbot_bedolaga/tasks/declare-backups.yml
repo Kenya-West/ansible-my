@@ -1,0 +1,35 @@
+---
+- name: Build this bot producer's current PostgreSQL targets
+  ansible.builtin.set_fact:
+    pgdump_bedolaga_targets: []
+
+- name: Add each configured database instance
+  ansible.builtin.set_fact:
+    pgdump_bedolaga_targets: "{{ pgdump_bedolaga_targets + [pgdump_bedolaga_target] }}"
+  vars:
+    pgdump_bedolaga_target:
+      id: "bedolaga-bot-db-{{ pgdump_bot_index }}"
+      project_path: "{{ dest_path_full }}/{{ pgdump_bot_index }}"
+      execution:
+        driver: compose_exec
+        skip_if_unavailable: "{{ (vpn_server_remnawave_tgbot_bedolaga_settings[pgdump_bot_index]).postgres_backup_skip_if_unavailable | default(vpn_server_remnawave_tgbot_bedolaga_postgres_backup_skip_if_unavailable) }}"
+        service: "remnawave-telegram-tgbot-bedolaga-{{ pgdump_bot_index }}-bot-db"
+        project_name: "{{ vpn_server_remnawave_tgbot_bedolaga_settings_global.service_name_prefix }}-{{ pgdump_bot_index }}"
+      connection:
+        source: container_environment
+      dump:
+        scope: cluster
+        format: plain
+      output:
+        subdirectory: "bedolaga-bot/{{ pgdump_bot_index }}"
+        filename: "dump_tgbot_bedolaga_{{ pgdump_bot_index }}.sql"
+  loop: "{{ range(vpn_server_remnawave_tgbot_bedolaga_settings | default([]) | length) | list }}"
+  loop_control:
+    loop_var: pgdump_bot_index
+
+- name: Publish and reconcile bot PostgreSQL backups
+  ansible.builtin.include_role:
+    name: kwtoolset/declare_postgres_backup
+  vars:
+    pgdump_declare_owner: remnawave-tgbot-bedolaga
+    pgdump_declare_targets: "{{ vpn_server_remnawave_tgbot_bedolaga_postgres_backup_targets | default(pgdump_bedolaga_targets) }}"

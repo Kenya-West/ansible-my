@@ -41,13 +41,23 @@
   tags:
     - always
 
-- name: Run backup script if backup is enabled
+- name: Run a fresh backup before updating the panel image
   become: true
-  become_user: root
-  ansible.builtin.shell:
-    # TODO: Replace it with value from `backup_locations`
-    cmd: "bash {{ vpn_server_remnawave_backup_project_full_dir }}/remnawave-panel/scripts/backup.sh"
-    creates: "{{ pgdump_backup_location_root_path }}/remnawave-panel/dump_remnawave_panel.sql"
+  become_user: "{{ pgdump_backup_user }}"
+  environment:
+    DOCKER_HOST: "{{ pgdump_backup_docker_host if pgdump_backup_docker_host | length > 0 else ('' if pgdump_backup_docker_context | length > 0 else omit) }}"
+    DOCKER_CONTEXT: "{{ pgdump_backup_docker_context if pgdump_backup_docker_context | length > 0 else ('' if pgdump_backup_docker_host | length > 0 else omit) }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ pgdump_backup_python }}"
+      - "{{ pgdump_runner_path }}"
+      - --manifest-dir
+      - "{{ pgdump_manifest_dir }}"
+      - --output-root
+      - "{{ pgdump_backup_location_root_path }}"
+      - --target
+      - remnawave-panel-db
+      - --require-available
   when: "'backup_restic_node' in group_names"
   tags:
     - never
@@ -156,3 +166,25 @@
     - vpn_server_remnawave_external_port | string | length > 0
   tags:
     - ports_ufw
+
+- name: Declare and reconcile panel PostgreSQL backups
+  ansible.builtin.include_role:
+    name: kwtoolset/declare_postgres_backup
+    apply:
+      tags:
+        - declare_backups
+        - update_config_hard
+        - update_config_soft
+        - update_image_hard
+        - update_image_soft
+  vars:
+    pgdump_declare_owner: remnawave-panel
+    pgdump_declare_legacy_script_subdirectories: [remnawave-panel]
+    pgdump_declare_targets: "{{ vpn_server_remnawave_postgres_backup_targets }}"
+  when: "'backup_restic_node' in group_names"
+  tags:
+    - declare_backups
+    - update_config_hard
+    - update_config_soft
+    - update_image_hard
+    - update_image_soft

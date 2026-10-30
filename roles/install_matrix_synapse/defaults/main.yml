@@ -15,3 +15,22 @@ dest_path_root: "/home/{{ standard_user }}/{{ matrix_server.project.root }}"
 dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
+
+matrix_synapse_postgres_backup_skip_if_unavailable: true
+
+matrix_synapse_postgres_backup_targets:
+  - id: matrix-synapse-db
+    project_path: "{{ dest_path_full }}"
+    execution:
+      driver: compose_exec
+      skip_if_unavailable: "{{ matrix_synapse_postgres_backup_skip_if_unavailable }}"
+      service: synapse_db
+      project_name: "{{ compose_project_name }}"
+    connection:
+      source: container_environment
+    dump:
+      scope: cluster
+      format: plain
+    output:
+      subdirectory: matrix-synapse
+      filename: dump_matrix_synapse.sql

@@ -1,0 +1,29 @@
+---
+- name: Validate producer manifest header
+  ansible.builtin.assert:
+    that:
+      - pgdump_manifest is mapping
+      - pgdump_manifest.schema_version == 1
+      - pgdump_manifest.owner is match('^[a-zA-Z0-9][a-zA-Z0-9_-]*$')
+      - pgdump_manifest.targets is sequence
+      - pgdump_manifest.targets is not string
+      - pgdump_manifest.targets is not mapping
+    fail_msg: Invalid PostgreSQL manifest header.
+
+- name: Validate target structure before accessing fields
+  ansible.builtin.include_tasks: validate-target.yml
+  loop: "{{ pgdump_manifest.targets }}"
+  loop_control:
+    loop_var: pgdump_validate_target
+
+- name: Validate optional legacy script subdirectories
+  ansible.builtin.assert:
+    that:
+      - item is match('^[a-zA-Z0-9_-]+$')
+    fail_msg: Legacy script subdirectories must be single safe path components.
+  loop: "{{ pgdump_manifest.legacy_script_subdirectories | default([]) }}"
+
+- name: Collect this producer's complete target set
+  ansible.builtin.set_fact:
+    pgdump_targets: "{{ pgdump_targets + pgdump_manifest.targets }}"
+    pgdump_legacy_subdirectories: "{{ pgdump_legacy_subdirectories + pgdump_manifest.legacy_script_subdirectories | default([]) }}"

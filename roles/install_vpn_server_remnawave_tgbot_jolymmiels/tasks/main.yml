@@ -26,3 +26,21 @@
     dest_project_fullpath: "{{ dest_path_full }}/{{ instance_index }}"
   tags:
     - always
+
+- name: Declare and reconcile bot backups
+  ansible.builtin.include_tasks:
+    file: declare-backups.yml
+    apply:
+      tags:
+        - declare_backups
+        - update_config_hard
+        - update_config_soft
+        - update_image_hard
+        - update_image_soft
+  when: "'backup_restic_node' in group_names"
+  tags:
+    - declare_backups
+    - update_config_hard
+    - update_config_soft
+    - update_image_hard
+    - update_image_soft

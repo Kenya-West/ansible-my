@@ -121,3 +121,24 @@
     - update_image_hard
     - update_image_soft
     - update_config_hard
+
+- name: Declare and reconcile infra-billing PostgreSQL backups
+  ansible.builtin.include_role:
+    name: kwtoolset/declare_postgres_backup
+    apply:
+      tags:
+        - declare_backups
+        - update_config_hard
+        - update_config_soft
+        - update_image_hard
+        - update_image_soft
+  vars:
+    pgdump_declare_owner: infra-billing
+    pgdump_declare_targets: "{{ infra_billing_postgres_backup_targets }}"
+  when: "'backup_restic_node' in group_names"
+  tags:
+    - declare_backups
+    - update_config_hard
+    - update_config_soft
+    - update_image_hard
+    - update_image_soft

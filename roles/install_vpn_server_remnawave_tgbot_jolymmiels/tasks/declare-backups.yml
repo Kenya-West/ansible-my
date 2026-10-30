@@ -1,0 +1,38 @@
+---
+# Expand instances here, not in the generic backup role. One complete manifest
+# makes reducing the settings list (including to zero) retire old schedules.
+- name: Build this bot producer's current PostgreSQL targets
+  ansible.builtin.set_fact:
+    pgdump_bot_targets: []
+
+- name: Add each configured database instance
+  ansible.builtin.set_fact:
+    pgdump_bot_targets: "{{ pgdump_bot_targets + [pgdump_bot_target] }}"
+  vars:
+    pgdump_bot_target:
+      id: "jolymmiels-bot-db-{{ pgdump_bot_index }}"
+      project_path: "{{ dest_path_full }}/{{ pgdump_bot_index }}"
+      execution:
+        driver: compose_exec
+        skip_if_unavailable: "{{ (vpn_server_remnawave_tgbot_jolymmiels_settings[pgdump_bot_index]).postgres_backup_skip_if_unavailable | default(vpn_server_remnawave_tgbot_jolymmiels_postgres_backup_skip_if_unavailable) }}"
+        service: "remnawave-telegram-tgbot-jolymmiels-{{ pgdump_bot_index }}-db"
+        project_name: "{{ compose_project_name }}"
+      connection:
+        source: container_environment
+      dump:
+        scope: cluster
+        format: plain
+      output:
+        subdirectory: "jolymmiels-bot/{{ pgdump_bot_index }}"
+        filename: "dump_tgbot_jolymmiels_{{ pgdump_bot_index }}.sql"
+  loop: "{{ range(vpn_server_remnawave_tgbot_jolymmiels_settings | default([]) | length) | list }}"
+  loop_control:
+    loop_var: pgdump_bot_index
+
+- name: Publish and reconcile bot PostgreSQL backups
+  ansible.builtin.include_role:
+    name: kwtoolset/declare_postgres_backup
+  vars:
+    pgdump_declare_owner: remnawave-tgbot-jolymmiels
+    pgdump_declare_legacy_script_subdirectories: [jolymmiels-bot]
+    pgdump_declare_targets: "{{ vpn_server_remnawave_tgbot_jolymmiels_postgres_backup_targets | default(pgdump_bot_targets) }}"

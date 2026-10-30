@@ -1,0 +1,45 @@
+---
+- name: Build systemd units for this target
+  vars:
+    pgdump_unit_name: "ansible-postgres-backup-{{ pgdump_target.id }}"
+    pgdump_docker_unit: "{{ pgdump_target.execution.get('docker_unit', pgdump_backup_docker_unit) }}"
+    pgdump_docker_host: "{{ pgdump_target.execution.get('docker_host', '' if pgdump_target.execution.get('docker_context') else pgdump_backup_docker_host) }}"
+    pgdump_docker_context: "{{ pgdump_target.execution.get('docker_context', '' if pgdump_target.execution.get('docker_host') else pgdump_backup_docker_context) }}"
+    pgdump_exec_argv: >-
+      {{ pgdump_backup_monitor_argv + [pgdump_backup_python, pgdump_runner_path,
+         '--manifest-dir', pgdump_manifest_dir, '--output-root', pgdump_backup_location_root_path,
+         '--target', pgdump_target.id] }}
+  ansible.builtin.set_fact:
+    pgdump_unit_configs: >-
+      {{ pgdump_unit_configs + [
+        {
+          'name': pgdump_unit_name, 'type': 'service', 'scope': 'user',
+          'user': pgdump_backup_user, 'path': pgdump_systemd_unit_path,
+          'manage_state': false, 'enabled': false,
+          'Unit': {'Description': 'PostgreSQL dump for ' ~ pgdump_target.id}
+                  | combine({'After': pgdump_docker_unit, 'Requires': pgdump_docker_unit}
+                            if pgdump_target.execution.driver == 'compose_exec' and pgdump_docker_unit | length > 0 else {}),
+          'Service': {
+            'Type': 'oneshot',
+            'ExecStart': pgdump_exec_argv | map('to_json') | join(' ') | replace('%', '%%'),
+            'Environment': ['HOME=' ~ pgdump_backup_home, 'XDG_RUNTIME_DIR=' ~ pgdump_runtime_dir]
+                           + (['DOCKER_HOST=' ~ pgdump_docker_host] if pgdump_docker_host | length > 0 else [])
+                           + (['DOCKER_CONTEXT=' ~ pgdump_docker_context] if pgdump_docker_context | length > 0 else []),
+            'UnsetEnvironment': ['DOCKER_CONTEXT'] if pgdump_docker_host | length > 0
+                                else (['DOCKER_HOST'] if pgdump_docker_context | length > 0 else []),
+            'UMask': '0077', 'TimeoutStartSec': pgdump_backup_timeout,
+            'Nice': '5', 'NoNewPrivileges': 'yes'
+          }
+        },
+        {
+          'name': pgdump_unit_name, 'type': 'timer', 'scope': 'user',
+          'user': pgdump_backup_user, 'path': pgdump_systemd_unit_path,
+          'enabled': true, 'state': 'started',
+          'Unit': {'Description': 'Schedule PostgreSQL dump for ' ~ pgdump_target.id},
+          'Timer': {'Unit': pgdump_unit_name ~ '.service',
+                    'OnCalendar': pgdump_target.get('schedule', {}).get('calendar', pgdump_backup_calendar),
+                    'RandomizedDelaySec': pgdump_target.get('schedule', {}).get('randomized_delay', pgdump_backup_randomized_delay),
+                    'Persistent': 'true'},
+          'Install': {'WantedBy': 'timers.target'}
+        }
+      ] }}

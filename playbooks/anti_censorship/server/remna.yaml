@@ -11,11 +11,15 @@
     install_vpn_server_remnawave_source_paths__base:
       - "{{ source_asset_fullpath_project }}"
 
+  pre_tasks:
+    - name: Fetch a fresh panel backup only when explicitly requested
+      ansible.builtin.include_role:
+        name: configure_remnawave_panel_get_backup
+        apply:
+          tags: [backup_controller]
+      tags: [never, backup_controller]
+
   roles:
-    - role: configure_remnawave_panel_get_backup
-      tags:
-        - never
-        - backup_controller
     - role: kwtoolset/resolve_host_relations
       vars:
         resolve_host_relations_group: vpn_server_remnawave

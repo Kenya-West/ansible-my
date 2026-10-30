@@ -1,2 +1,7 @@
 cron_wrapped_task_prefix: "/home/{{ standard_user }}/{{ analytics_node.project.paths.pushgateway }}/scripts/monitor-cronjob.sh"
 cron_wrapped_task_suffix: ""
+
+# The wrapper accepts an executable and argv after --; no shell interpretation.
+pgdump_backup_monitor_argv: >-
+  {{ [cron_wrapped_task_prefix, '--job-name', 'postgres_' ~ pgdump_target.id, '--']
+     if cron_wrapped_task_prefix | length > 0 else [] }}

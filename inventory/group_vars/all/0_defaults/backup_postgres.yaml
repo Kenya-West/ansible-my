@@ -1,0 +1,13 @@
+---
+# Shared by producers, the backup role, and manual backup consumers.
+pgdump_backup_user: "{{ standard_user }}"
+pgdump_backup_home: "/home/{{ pgdump_backup_user }}"
+pgdump_manifest_dir: "{{ pgdump_backup_home }}/.config/ansible-backup/postgres.d"
+pgdump_runner_path: "{{ pgdump_backup_home }}/.local/lib/ansible-backup/postgres_backup.py"
+pgdump_systemd_unit_path: "{{ pgdump_backup_home }}/.config/systemd/user"
+# Keep the existing Autorestic source and dump paths during migration.
+pgdump_backup_location_root_path: /etc/postgres/db_backup
+pgdump_backup_python: /usr/bin/python3
+# Shared with manual/pre-upgrade callers, which do not include the backup role.
+pgdump_backup_docker_host: ""
+pgdump_backup_docker_context: ""

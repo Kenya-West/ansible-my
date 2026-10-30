@@ -17,10 +17,8 @@ dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
 
-# For backup script
-vpn_server_remnawave_backup_project_root_dir: "{{ backup_restic_node.project.root }}"
-vpn_server_remnawave_backup_project_full_dir: "{{ backup_restic_node.project.paths.postgres }}"
-vpn_server_remnawave_backup_project_full_path: "{{ vpn_server_remnawave_backup_project_full_dir }}/remnawave-panel/scripts/backup.sh"
+# Manual backup uses the same registry, lock and runner as the timer.
+remnawave_backup_target_id: remnawave-panel-db
 
 # Remnawave dump on the remote host, and where it is saved on the controller (repo root temp/)
 remnawave_backup_remote_path: "{{ pgdump_backup_location_root_path }}/remnawave-panel/dump_remnawave_panel.sql"

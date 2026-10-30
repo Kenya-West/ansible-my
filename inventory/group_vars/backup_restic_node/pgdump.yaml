@@ -1,1 +1,4 @@
-pgdump_backup_location_root_path: "/etc/postgres/db_backup"
+---
+# PostgreSQL backup paths are shared with producer roles in
+# inventory/group_vars/all/0_defaults/backup_postgres.yaml.
+# Override pgdump_backup_location_root_path here or in host_vars if needed.

@@ -1,0 +1,29 @@
+---
+- name: Check whether the legacy root crontab exists
+  become: true
+  become_user: root
+  ansible.builtin.stat:
+    path: /var/spool/cron/crontabs/root
+  register: pgdump_root_crontab_stat
+
+- name: Read legacy root cron entries
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    argv: [crontab, -u, root, -l]
+  register: pgdump_legacy_crontab
+  changed_when: false
+  check_mode: false
+  when: pgdump_root_crontab_stat.stat.exists
+
+- name: Extract only enrolled producers' legacy cron names
+  ansible.builtin.include_tasks: legacy-cron-names.yml
+
+- name: Remove the old root-owned PostgreSQL cron jobs only after validation
+  become: true
+  become_user: root
+  ansible.builtin.cron:
+    user: root
+    name: "{{ item }}"
+    state: absent
+  loop: "{{ pgdump_legacy_cron_names }}"

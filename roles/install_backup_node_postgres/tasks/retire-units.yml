@@ -1,0 +1,35 @@
+---
+- name: Find only backup-role-managed unit files
+  ansible.builtin.find:
+    paths: "{{ pgdump_systemd_unit_path }}"
+    patterns:
+      - ansible-postgres-backup-*.service
+      - ansible-postgres-backup-*.timer
+  register: pgdump_existing_units
+
+- name: Calculate retired units
+  ansible.builtin.set_fact:
+    pgdump_retired_units: >-
+      {{ pgdump_existing_units.files | map(attribute='path') | map('basename') | list
+         | difference(pgdump_unit_configs | map(attribute='name') | zip(pgdump_unit_configs | map(attribute='type'))
+                      | map('join', '.') | list) }}
+
+- name: Stop and disable retired timers and services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    scope: user
+    state: stopped
+    enabled: false
+  loop: "{{ pgdump_retired_units | sort(reverse=true) }}"
+
+- name: Remove retired unit files (retain dump data)
+  ansible.builtin.file:
+    path: "{{ pgdump_systemd_unit_path }}/{{ item }}"
+    state: absent
+  loop: "{{ pgdump_retired_units }}"
+
+- name: Reload the user manager after retiring units
+  ansible.builtin.systemd_service:
+    scope: user
+    daemon_reload: true
+  when: pgdump_retired_units | length > 0

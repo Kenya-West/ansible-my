@@ -1,0 +1,163 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    standard_user: nobody
+    pgdump_backup_home: /tmp/ansible-postgres-test
+    pgdump_manifest_dir: /tmp/ansible-postgres-test/manifests
+    pgdump_systemd_unit_path: /tmp/ansible-postgres-test/units
+    pgdump_backup_location_root_path: /tmp/ansible-postgres-test/output
+    pgdump_runtime_dir: /run/user/65534
+    pgdump_targets:
+      - id: example-db
+        project_path: /srv/example
+        execution: {driver: compose_exec, service: db}
+        connection: {source: container_environment}
+        output: {subdirectory: example/0, filename: dump.sql}
+    pgdump_unit_configs: []
+  tasks:
+    - name: Load role defaults without running host setup
+      ansible.builtin.include_vars: ../defaults/main.yml
+    - name: Exercise target validation
+      ansible.builtin.include_tasks: ../tasks/validate-target.yml
+      vars:
+        pgdump_validate_target: "{{ pgdump_targets[0] }}"
+    - name: Build units
+      ansible.builtin.include_tasks: ../tasks/target-units.yml
+      vars:
+        pgdump_target: "{{ pgdump_targets[0] }}"
+    - name: Assert oneshot deployment and timer settings
+      ansible.builtin.assert:
+        that:
+          - pgdump_unit_configs | length == 2
+          - not pgdump_unit_configs[0].manage_state
+          - pgdump_unit_configs[0].scope == 'user'
+          - "'Requires' not in pgdump_unit_configs[0].Unit"
+          - "'After' not in pgdump_unit_configs[0].Unit"
+          - pgdump_unit_configs[1].Timer.Persistent == 'true'
+          - pgdump_unit_configs[1].enabled
+          - "'--target' in pgdump_unit_configs[0].Service.ExecStart"
+          - "pgdump_unit_configs[0].Service.Environment | select('match', '^DOCKER_HOST=') | list | length == 0"
+          - "pgdump_unit_configs[0].Service.Environment | select('match', '^DOCKER_CONTEXT=') | list | length == 0"
+          - "('HOME=' ~ pgdump_backup_home) in pgdump_unit_configs[0].Service.Environment"
+    - name: Inspect generated services and timers with systemd's parser
+      block:
+        - ansible.builtin.tempfile:
+            state: directory
+            prefix: postgres-unit-test-
+          register: pgdump_test_unit_directory
+        - ansible.builtin.copy:
+            dest: "{{ pgdump_test_unit_directory.path }}/{{ item.name }}.{{ item.type }}"
+            content: |
+              {% for section in ['Unit', item.type | capitalize, 'Install'] %}
+              {% if section in item %}
+              [{{ section }}]
+              {% for key, value in item[section].items() %}
+              {% if value is sequence and value is not string %}
+              {% for entry in value %}
+              {{ key }}={{ entry }}
+              {% endfor %}
+              {% else %}
+              {{ key }}={{ value }}
+              {% endif %}
+              {% endfor %}
+              {% endif %}
+              {% endfor %}
+          loop: "{{ pgdump_unit_configs }}"
+        - ansible.builtin.command:
+            argv:
+              - systemd-analyze
+              - --user
+              - verify
+              - "{{ pgdump_test_unit_directory.path }}/ansible-postgres-backup-example-db.service"
+              - "{{ pgdump_test_unit_directory.path }}/ansible-postgres-backup-example-db.timer"
+          changed_when: false
+          # Runner is not installed in this isolated test.
+          failed_when: false
+          register: pgdump_test_systemd_verify
+        - ansible.builtin.assert:
+            that:
+              - "'Failed to parse' not in pgdump_test_systemd_verify.stderr"
+              - "'Unknown key' not in pgdump_test_systemd_verify.stderr"
+              - "'docker.service' not in pgdump_test_systemd_verify.stderr"
+      always:
+        - ansible.builtin.file:
+            path: "{{ pgdump_test_unit_directory.path }}"
+            state: absent
+    - name: Build units with an explicit Docker user-unit dependency
+      ansible.builtin.include_tasks: ../tasks/target-units.yml
+      vars:
+        pgdump_target:
+          id: custom-db
+          execution:
+            driver: compose_exec
+            docker_unit: custom-rootless-docker.service
+            docker_host: unix:///tmp/custom-docker.sock
+    - name: Assert explicitly configured Docker dependency and socket
+      ansible.builtin.assert:
+        that:
+          - pgdump_unit_configs[2].Unit.Requires == 'custom-rootless-docker.service'
+          - pgdump_unit_configs[2].Unit.After == 'custom-rootless-docker.service'
+          - "'DOCKER_HOST=unix:///tmp/custom-docker.sock' in pgdump_unit_configs[2].Service.Environment"
+          - "'DOCKER_CONTEXT' in pgdump_unit_configs[2].Service.UnsetEnvironment"
+    - name: Build units using an explicit Docker CLI context
+      ansible.builtin.include_tasks: ../tasks/target-units.yml
+      vars:
+        pgdump_target:
+          id: context-db
+          execution:
+            driver: compose_exec
+            docker_context: deployed-rootless
+    - name: Assert Docker context selection without a forced socket
+      ansible.builtin.assert:
+        that:
+          - "'DOCKER_CONTEXT=deployed-rootless' in pgdump_unit_configs[4].Service.Environment"
+          - "'DOCKER_HOST' in pgdump_unit_configs[4].Service.UnsetEnvironment"
+          - "pgdump_unit_configs[4].Service.Environment | select('match', '^DOCKER_HOST=') | list | length == 0"
+    - name: Exercise directory and legacy cron migration calculations without privilege
+      vars:
+        pgdump_legacy_subdirectories: [remnawave-panel]
+        pgdump_legacy_crontab:
+          stdout: |
+            #Ansible: remnawave_panel_db
+            0 0 * * * {{ pgdump_legacy_script_directory }}remnawave-panel/scripts/backup.sh
+            #Ansible: jolymmiels_bot_db_0
+            0 0 * * * {{ pgdump_legacy_script_directory }}jolymmiels-bot/0/scripts/backup.sh
+      block:
+        - ansible.builtin.include_tasks: ../tasks/legacy-cron-names.yml
+        - ansible.builtin.assert:
+            that:
+              - pgdump_legacy_cron_names == ['remnawave_panel_db']
+    - name: Exercise declaration helper for a real target without host setup
+      block:
+        - ansible.builtin.tempfile:
+            state: directory
+            prefix: postgres-manifest-test-
+          register: pgdump_test_manifest_directory
+        - ansible.builtin.include_role:
+            name: kwtoolset/declare_postgres_backup
+          vars:
+            pgdump_declare_owner: example
+            pgdump_declare_targets: "{{ pgdump_targets }}"
+            pgdump_declare_reconcile: false
+            pgdump_declare_directory: "{{ pgdump_test_manifest_directory.path }}"
+            pgdump_declare_user: "{{ lookup('env', 'USER') }}"
+        - ansible.builtin.include_role:
+            name: kwtoolset/declare_postgres_backup
+          vars:
+            pgdump_declare_owner: example
+            pgdump_declare_targets: []
+            pgdump_declare_reconcile: false
+            pgdump_declare_directory: "{{ pgdump_test_manifest_directory.path }}"
+            pgdump_declare_user: "{{ lookup('env', 'USER') }}"
+        - ansible.builtin.slurp:
+            src: "{{ pgdump_test_manifest_directory.path }}/example.json"
+          register: pgdump_test_empty_manifest
+        - ansible.builtin.assert:
+            that:
+              - (pgdump_test_empty_manifest.content | b64decode | from_json).targets == []
+      always:
+        - ansible.builtin.file:
+            path: "{{ pgdump_test_manifest_directory.path }}"
+            state: absent

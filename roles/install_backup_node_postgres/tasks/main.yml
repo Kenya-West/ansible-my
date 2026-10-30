@@ -1,110 +1,96 @@
 ---
-# tasks file for roles/install_backup_node_postgres
-- name: Capture this role's path so nested role can use the parent role_path
+- name: Validate rootless backup account
+  ansible.builtin.assert:
+    that:
+      - pgdump_backup_user != 'root'
+      - pgdump_backup_home is match('^/')
+      - pgdump_backup_location_root_path is match('^/')
+      - pgdump_backup_docker_host is string
+      - pgdump_backup_docker_context is string
+      - not (pgdump_backup_docker_host | length > 0 and pgdump_backup_docker_context | length > 0)
+      - pgdump_backup_docker_unit is string
+      - pgdump_backup_docker_unit == '' or pgdump_backup_docker_unit is match('^[a-zA-Z0-9_.@-]+[.](service|socket)$')
+    fail_msg: PostgreSQL backups require a non-root Docker user, absolute paths and a valid optional Docker user-unit name.
+
+- name: Resolve the rootless Docker user's uid without starting user services
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ pgdump_backup_user }}"
+
+- name: Initialize PostgreSQL backup reconciliation
   ansible.builtin.set_fact:
-    this_role_path: "{{ role_path }}"
-  tags:
-    - always
+    pgdump_runtime_dir: "/run/user/{{ ansible_facts.getent_passwd[pgdump_backup_user][1] }}"
+    pgdump_targets: []
+    pgdump_unit_configs: []
+    pgdump_legacy_subdirectories: []
 
-- name: Add to source_paths the current role templates directory
-  ansible.builtin.set_fact:
-    source_paths: >-
-      {{
-        (
-            source_paths_add_role_dirs
-            | default([])
-            | map('regex_replace', '^(.*)$', this_role_path ~ '/\1/')
-            | list
-          )
-        + (source_paths_add_repo_dirs | default([]))
-        + (source_paths_add_user_dirs | default([]))
-      }}
-  tags:
-    - always
-
-- name: Check which source_paths actually exist
-  ansible.builtin.stat:
-    path: "{{ item }}"
-  loop: "{{ source_paths }}"
-  delegate_to: localhost
-  become: false
-  register: source_paths_stat
-  tags:
-    - always
-
-- name: Exclude non-existing paths from source_paths
-  ansible.builtin.set_fact:
-    source_paths: >-
-      {{
-        source_paths_stat.results
-        | selectattr('stat.exists')
-        | map(attribute='item')
-        | list
-      }}
-  tags:
-    - always
-
-- name: "Create non-existent parent directories for {{ dest_path_full }}"
-  ansible.builtin.include_role:
-    name: kwtoolset/create_dirs_traversal
-    apply:
-      tags:
-        - update_config_hard
-  vars:
-    create_dirs_traversal_path: "{{ dest_path_full }}"
-    create_dirs_traversal_strip_leaf: true
-    create_dirs_force_mode: "0775"
-  tags:
-    - update_config_hard
-
-# GROUP, SSL DIRECTORY AND PERMISSIONS
-- name: Create {{ pgdump_backup_access_group }} group
+- name: Read and validate the effective registry
   become: true
-  become_user: root
-  ansible.builtin.group:
-    name: "{{ pgdump_backup_access_group }}"
-    state: present
+  become_user: "{{ pgdump_backup_user }}"
+  block:
+    - name: Check whether the persistent registry exists
+      ansible.builtin.stat:
+        path: "{{ pgdump_manifest_dir }}"
+      register: pgdump_registry_stat
 
-- name: Add users to {{ pgdump_backup_access_group }} group
-  become: true
-  become_user: root
-  ansible.builtin.user:
-    name: "{{ item }}"
-    groups: "{{ pgdump_backup_access_group }}"
-    append: true
-  with_items: "{{ pgdump_backup_access_group_users }}"
+    - name: Find existing producer manifests
+      ansible.builtin.find:
+        paths: "{{ pgdump_manifest_dir }}"
+        patterns: '*.json'
+      register: pgdump_manifest_files
+      when: pgdump_registry_stat.stat.exists
 
-- name: Ensure that pgdump_backup_location_root_path exists
-  become: true
-  become_user: root
-  ansible.builtin.file:
-    path: "{{ pgdump_backup_location_root_path }}"
-    state: directory
-    owner: "{{ pgdump_backup_location_root_owner }}"
-    group: "{{ pgdump_backup_access_group }}"
-    mode: "{{ pgdump_backup_location_root_permissions }}"
+    - name: Read persisted declarations except the owner being previewed
+      ansible.builtin.include_tasks: read-manifest.yml
+      loop: "{{ pgdump_manifest_files.files | default([]) | sort(attribute='path') }}"
+      loop_control:
+        loop_var: pgdump_manifest_file
+        label: "{{ pgdump_manifest_file.path }}"
+      when: >-
+        not ansible_check_mode or
+        (pgdump_manifest_file.path | basename) !=
+        ((pgdump_pending_manifest | default({})).get('owner', '') ~ '.json')
 
-- name: Set fact for location types
-  ansible.builtin.set_fact:
-    static_backup_locations: "{{ backup_locations
-      | selectattr('type','defined')
-      | selectattr('type','equalto','static')
-      | list }}"
-    dynamic_backup_locations: "{{ backup_locations
-      | selectattr('type','defined')
-      | selectattr('type','equalto','dynamic_list')
-      | list }}"
-    expanded_dynamic_backup_locations: []
+    - name: Set the proposed manifest for check-mode collection
+      ansible.builtin.set_fact:
+        pgdump_manifest: "{{ pgdump_pending_manifest }}"
+      when:
+        - ansible_check_mode
+        - pgdump_pending_manifest | default({}) | length > 0
 
-- name: Expand each dynamic backup location
-  ansible.builtin.include_tasks: expand-dynamic.yml
-  loop: "{{ dynamic_backup_locations }}"
-  loop_control:
-    loop_var: dynamic_location
+    - name: Overlay the proposed producer declaration in check mode
+      ansible.builtin.include_tasks: collect-manifest.yml
+      when:
+        - ansible_check_mode
+        - pgdump_pending_manifest | default({}) | length > 0
+        - pgdump_pending_state | default('present') == 'present'
 
-- name: Deploy all backup locations
-  ansible.builtin.include_tasks: process-static.yml
-  loop: "{{ static_backup_locations + expanded_dynamic_backup_locations }}"
-  loop_control:
-    loop_var: location
+    - name: Validate the effective registry without requiring an installed runner
+      ansible.builtin.command:
+        argv:
+          - "{{ pgdump_backup_python }}"
+          - -c
+          - "{{ lookup('file', role_path ~ '/files/postgres_backup.py') }}"
+          - --validate-stdin
+          - --skip-path-resolution
+          - --output-root
+          - "{{ pgdump_backup_location_root_path }}"
+        stdin: "{{ pgdump_targets | to_json }}"
+      changed_when: false
+      check_mode: false
+      # Read-only validation. No Docker commands, credentials or files are used.
 
+    - name: Build user-level services and timers for the effective targets
+      ansible.builtin.include_tasks: target-units.yml
+      loop: "{{ pgdump_targets }}"
+      loop_control:
+        loop_var: pgdump_target
+        label: "{{ pgdump_target.id }}"
+
+    - name: Preview reconciliation without changing files or contacting systemd
+      ansible.builtin.include_tasks: check.yml
+      when: ansible_check_mode
+
+- name: Apply validated PostgreSQL backup configuration
+  ansible.builtin.include_tasks: reconcile.yml
+  when: not ansible_check_mode

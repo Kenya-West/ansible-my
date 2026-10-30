@@ -1,77 +1,77 @@
 #SPDX-License-Identifier: MIT-0
 ---
-# tasks file for roles/configure_remnawave_panel_get_backup
-- name: Assert that host is in backup_restic_node group
-  ansible.builtin.assert:
-    that:
-      - "'backup_restic_node' in group_names"
-    fail_msg: "This host is not in the backup_restic_node group, cannot proceed with Remnawave backup retrieval."
-  tags:
-    - always
+- name: Preview a fresh panel backup and download in check mode
+  ansible.builtin.debug:
+    msg: >-
+      Would create a fresh dump for {{ remnawave_backup_target_id }} and download it
+      to {{ remnawave_backup_local_dir }}. No dump, checksum or download is performed.
+  when: ansible_check_mode
+  tags: [always]
 
-- name: Check if backup script exists on the host
-  ansible.builtin.stat:
-    path: "{{ vpn_server_remnawave_backup_project_full_path }}"
-  register: backup_script_stat
-  tags:
-    - always
+- name: Create and retrieve a fresh panel backup
+  when: not ansible_check_mode
+  tags: [always]
+  block:
+    - name: Assert that host is in backup_restic_node group
+      ansible.builtin.assert:
+        that:
+          - "'backup_restic_node' in group_names"
+        fail_msg: This host is not enrolled in backups, cannot retrieve a panel dump.
 
-- name: Fail if backup script does not exist
-  ansible.builtin.assert:
-    that:
-      - backup_script_stat.stat.exists
-    fail_msg: "Backup script not found on path {{ vpn_server_remnawave_backup_project_full_path }}, cannot proceed with Remnawave backup retrieval."
-  tags:
-    - always
+    - name: Check if the backup runner exists on the host
+      ansible.builtin.stat:
+        path: "{{ pgdump_runner_path }}"
+      register: backup_script_stat
 
-- name: Run backup script to retrieve Remnawave backup
-  become: true
-  become_user: root
-  ansible.builtin.shell:
-    cmd: "bash {{ vpn_server_remnawave_backup_project_full_path }}"
-    creates: "{{ pgdump_backup_location_root_path }}/remnawave-panel/dump_remnawave_panel.sql"
-  tags:
-    - update_image_hard
-    - update_image_soft
+    - name: Require an installed backup runner
+      ansible.builtin.assert:
+        that:
+          - backup_script_stat.stat.exists
+        fail_msg: "Backup runner not installed. Run the panel role with --tags declare_backups first."
 
-- name: Stat Remnawave backup dump on the host
-  become: true
-  become_user: root
-  ansible.builtin.stat:
-    path: "{{ remnawave_backup_remote_path }}"
-    checksum_algorithm: sha256
-    get_checksum: true
-  register: remnawave_backup_stat
-  tags:
-    - update_image_hard
-    - update_image_soft
+    - name: Run a fresh backup to retrieve the panel database
+      become: true
+      become_user: "{{ pgdump_backup_user }}"
+      environment:
+        DOCKER_HOST: "{{ pgdump_backup_docker_host if pgdump_backup_docker_host | length > 0 else ('' if pgdump_backup_docker_context | length > 0 else omit) }}"
+        DOCKER_CONTEXT: "{{ pgdump_backup_docker_context if pgdump_backup_docker_context | length > 0 else ('' if pgdump_backup_docker_host | length > 0 else omit) }}"
+      ansible.builtin.command:
+        argv:
+          - "{{ pgdump_backup_python }}"
+          - "{{ pgdump_runner_path }}"
+          - --manifest-dir
+          - "{{ pgdump_manifest_dir }}"
+          - --output-root
+          - "{{ pgdump_backup_location_root_path }}"
+          - --target
+          - "{{ remnawave_backup_target_id }}"
+          - --require-available
 
-- name: Fail if Remnawave backup dump does not exist
-  ansible.builtin.assert:
-    that:
-      - remnawave_backup_stat.stat.exists
-      - remnawave_backup_stat.stat.isreg
-    fail_msg: "Remnawave backup dump {{ remnawave_backup_remote_path }} not found, cannot download it."
-  tags:
-    - update_image_hard
-    - update_image_soft
+    - name: Stat the fresh panel dump
+      become: true
+      become_user: "{{ pgdump_backup_user }}"
+      ansible.builtin.stat:
+        path: "{{ remnawave_backup_remote_path }}"
+        checksum_algorithm: sha256
+        get_checksum: true
+      register: remnawave_backup_stat
 
-- name: Build unique local name for Remnawave backup dump
-  ansible.builtin.set_fact:
-    remnawave_backup_local_name: >-
-      {{ remnawave_backup_remote_path | basename | splitext | first }}_{{ now(utc=true, fmt='%Y%m%d-%H%M%S') }}_{{ remnawave_backup_stat.stat.checksum[:8] }}{{ remnawave_backup_remote_path | splitext | last }}
-  tags:
-    - update_image_hard
-    - update_image_soft
+    - name: Require a regular dump file before downloading
+      ansible.builtin.assert:
+        that:
+          - remnawave_backup_stat.stat.exists
+          - remnawave_backup_stat.stat.isreg
+        fail_msg: "Panel dump {{ remnawave_backup_remote_path }} not found, cannot download it."
 
-- name: Download Remnawave backup dump to controller temp directory
-  become: true
-  become_user: root
-  ansible.builtin.fetch:
-    src: "{{ remnawave_backup_remote_path }}"
-    dest: "{{ remnawave_backup_local_dir }}/{{ remnawave_backup_local_name }}"
-    flat: true
-  tags:
-    - update_image_hard
-    - update_image_soft
+    - name: Build a unique local name for the panel dump
+      ansible.builtin.set_fact:
+        remnawave_backup_local_name: >-
+          {{ remnawave_backup_remote_path | basename | splitext | first }}_{{ now(utc=true, fmt='%Y%m%d-%H%M%S') }}_{{ remnawave_backup_stat.stat.checksum[:8] }}{{ remnawave_backup_remote_path | splitext | last }}
 
+    - name: Download the panel dump to the controller
+      become: true
+      become_user: "{{ pgdump_backup_user }}"
+      ansible.builtin.fetch:
+        src: "{{ remnawave_backup_remote_path }}"
+        dest: "{{ remnawave_backup_local_dir }}/{{ remnawave_backup_local_name }}"
+        flat: true
