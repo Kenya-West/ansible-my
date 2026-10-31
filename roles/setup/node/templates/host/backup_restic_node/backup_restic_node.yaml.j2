@@ -11,6 +11,15 @@ backup_restic_node_locations_additional:
     cron: 0 0 * * FRI
     options:
       tobereplacedwith: complete_options
+  mongodb:
+    from: "{{ o }} mongodump_backup_location_root_path {{ c }}"
+    to:
+{% for remote in setup_node_backup_restic_remotes %}
+      - {{ remote }}
+{% endfor %}
+    cron: 0 0 * * FRI
+    options:
+      tobereplacedwith: complete_options
 
 # The restic repository password of this host on every remote of
 # backup_restic_node_remotes_base. Generated once, here; keep it safe.
@@ -26,6 +35,14 @@ backup_restic_node_remotes_additional:
 # backup_restic_node_locations_additional:
 #   postgres:
 #     from: "{{ o }} pgdump_backup_location_root_path {{ c }}"
+#     to:
+#       - <remote name>
+#     cron: 0 0 * * FRI
+#     options:
+#       tobereplacedwith: complete_options
+#
+#   mongodb:
+#     from: "{{ o }} mongodump_backup_location_root_path {{ c }}"
 #     to:
 #       - <remote name>
 #     cron: 0 0 * * FRI

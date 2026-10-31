@@ -1,4 +1,5 @@
 ---
 - import_playbook: ../backup/node/rclone.yaml
 - import_playbook: ../backup/node/postgres.yaml
+- import_playbook: ../backup/node/mongodb.yaml
 - import_playbook: ../backup/node/restic.yaml

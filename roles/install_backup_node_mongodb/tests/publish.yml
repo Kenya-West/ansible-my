@@ -1,0 +1,15 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Publish MongoDB service targets without host reconciliation
+      ansible.builtin.include_role:
+        name: kwtoolset/declare_mongodb_backup
+        apply:
+          tags: [always]
+      vars:
+        mongodump_declare_owner: example
+        mongodump_declare_targets: "{{ test_targets }}"
+        mongodump_declare_reconcile: false
+      tags: [always]

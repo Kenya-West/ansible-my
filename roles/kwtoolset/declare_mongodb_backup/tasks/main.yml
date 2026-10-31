@@ -1,0 +1,62 @@
+---
+- name: Validate producer identity and target list
+  ansible.builtin.assert:
+    that:
+      - mongodump_declare_owner is match('^[a-zA-Z0-9][a-zA-Z0-9_-]*$')
+      - mongodump_declare_state in ['present', 'absent']
+      - mongodump_declare_targets is sequence
+      - mongodump_declare_targets is not string
+      - mongodump_declare_targets is not mapping
+
+- name: Validate all producer targets before publishing
+  ansible.builtin.include_tasks: "{{ role_path }}/../../install_backup_node_mongodb/tasks/validate-target.yml"
+  loop: "{{ mongodump_declare_targets }}"
+  loop_control:
+    loop_var: mongodump_validate_target
+  when: mongodump_declare_state == 'present'
+
+- name: Publish this producer's complete current declaration
+  become: true
+  become_user: "{{ mongodump_declare_user }}"
+  block:
+    - name: Preview the producer manifest in check mode
+      ansible.builtin.debug:
+        msg: "Would {{ 'replace' if mongodump_declare_state == 'present' else 'remove' }} {{ mongodump_declare_directory }}/{{ mongodump_declare_owner }}.json ({{ mongodump_declare_targets | length }} targets)."
+      when: ansible_check_mode
+
+    - name: Create private manifest directory
+      ansible.builtin.file:
+        path: "{{ mongodump_declare_directory }}"
+        state: directory
+        mode: "0700"
+      when: not ansible_check_mode
+
+    - name: Atomically replace this producer's manifest
+      ansible.builtin.copy:
+        content: "{{ {'schema_version': 1, 'owner': mongodump_declare_owner, 'targets': mongodump_declare_targets,
+                     'legacy_cron_job': mongodump_declare_legacy_cron_job} | to_nice_json }}\n"
+        dest: "{{ mongodump_declare_directory }}/{{ mongodump_declare_owner }}.json"
+        mode: "0600"
+      when: mongodump_declare_state == 'present' and not ansible_check_mode
+      no_log: true
+
+    - name: Remove only this producer's manifest on uninstall
+      ansible.builtin.file:
+        path: "{{ mongodump_declare_directory }}/{{ mongodump_declare_owner }}.json"
+        state: absent
+      when: mongodump_declare_state == 'absent' and not ansible_check_mode
+
+- name: Reconcile the complete persistent registry
+  ansible.builtin.include_role:
+    name: install_backup_node_mongodb
+    public: false
+    apply:
+      tags: [always]
+  vars:
+    mongodump_pending_manifest:
+      schema_version: 1
+      owner: "{{ mongodump_declare_owner }}"
+      targets: "{{ mongodump_declare_targets }}"
+      legacy_cron_job: "{{ mongodump_declare_legacy_cron_job }}"
+    mongodump_pending_state: "{{ mongodump_declare_state }}"
+  when: mongodump_declare_reconcile | bool

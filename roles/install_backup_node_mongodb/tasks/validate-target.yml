@@ -1,0 +1,20 @@
+---
+- name: Validate MongoDB target has the required sections
+  ansible.builtin.assert:
+    that:
+      - mongodump_validate_target is mapping
+      - mongodump_validate_target.id is defined
+      - mongodump_validate_target.execution is mapping
+      - mongodump_validate_target.output is mapping
+
+- name: Validate MongoDB target
+  ansible.builtin.assert:
+    that:
+      - mongodump_validate_target is mapping
+      - mongodump_validate_target.id is match('^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$')
+      - mongodump_validate_target.execution.get('skip_if_unavailable', true) is boolean
+      - mongodump_validate_target.execution.driver in ['compose_exec', 'direct']
+      - mongodump_validate_target.output.subdirectory is match('^[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$')
+      - mongodump_validate_target.output.filename is match('^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$')
+      - mongodump_validate_target.output.filename not in ['.', '..']
+    fail_msg: Invalid MongoDB target id, execution driver or output path.

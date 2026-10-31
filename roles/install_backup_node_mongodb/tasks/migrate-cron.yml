@@ -1,0 +1,19 @@
+---
+- name: Check whether the old root crontab exists
+  become: true
+  become_user: root
+  ansible.builtin.stat:
+    path: /var/spool/cron/crontabs/root
+  register: mongodump_root_crontab_stat
+  when: mongodump_legacy_cron_enrolled
+
+- name: Remove old all-endpoints MongoDB cron job after compatibility enrollment
+  become: true
+  become_user: root
+  ansible.builtin.cron:
+    user: root
+    name: "{{ mongotools_mongodb_backup_cron_job_name | default('Mongotools backup') }}"
+    state: absent
+  when:
+    - mongodump_legacy_cron_enrolled
+    - mongodump_root_crontab_stat.stat.exists

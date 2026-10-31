@@ -1,0 +1,8 @@
+---
+mongodump_declare_user: "{{ mongodump_backup_user | default(standard_user) }}"
+mongodump_declare_directory: "{{ mongodump_manifest_dir | default('/home/' ~ mongodump_declare_user ~ '/.config/ansible-backup/mongodb.d') }}"
+mongodump_declare_state: present
+mongodump_declare_targets: []
+# Only the compatibility producer retires the old all-endpoints cron job.
+mongodump_declare_legacy_cron_job: false
+mongodump_declare_reconcile: true

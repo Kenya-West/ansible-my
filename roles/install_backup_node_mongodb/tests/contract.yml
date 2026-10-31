@@ -1,0 +1,149 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    standard_user: nobody
+    mongodump_backup_home: /tmp/ansible-mongodb-test
+    mongodump_manifest_dir: /tmp/ansible-mongodb-test/manifests
+    mongodump_systemd_unit_path: /tmp/ansible-mongodb-test/units
+    mongodump_backup_location_root_path: /tmp/ansible-mongodb-test/output
+    mongodump_runtime_dir: /run/user/65534
+    mongodump_targets:
+      - id: example-db
+        project_path: /srv/example
+        execution: {driver: compose_exec, service: db}
+        connection: {source: container_environment}
+        output: {subdirectory: example/0, filename: dump.archive.gz}
+    mongodump_unit_configs: []
+  tasks:
+    - name: Load role defaults without running host setup
+      ansible.builtin.include_vars: ../defaults/main.yml
+    - name: Exercise target validation
+      ansible.builtin.include_tasks: ../tasks/validate-target.yml
+      vars:
+        mongodump_validate_target: "{{ mongodump_targets[0] }}"
+    - name: Build units
+      ansible.builtin.include_tasks: ../tasks/target-units.yml
+      vars:
+        mongodump_target: "{{ mongodump_targets[0] }}"
+    - name: Assert oneshot deployment and timer settings
+      ansible.builtin.assert:
+        that:
+          - mongodump_unit_configs | length == 2
+          - not mongodump_unit_configs[0].manage_state
+          - mongodump_unit_configs[0].scope == 'user'
+          - "'Requires' not in mongodump_unit_configs[0].Unit"
+          - "'After' not in mongodump_unit_configs[0].Unit"
+          - mongodump_unit_configs[1].Timer.Persistent == 'true'
+          - mongodump_unit_configs[1].enabled
+          - "'--target' in mongodump_unit_configs[0].Service.ExecStart"
+          - "mongodump_unit_configs[0].Service.Environment | select('match', '^DOCKER_HOST=') | list | length == 0"
+          - "mongodump_unit_configs[0].Service.Environment | select('match', '^DOCKER_CONTEXT=') | list | length == 0"
+          - "('HOME=' ~ mongodump_backup_home) in mongodump_unit_configs[0].Service.Environment"
+    - name: Inspect generated services and timers with systemd's parser
+      block:
+        - ansible.builtin.tempfile:
+            state: directory
+            prefix: mongodb-unit-test-
+          register: mongodump_test_unit_directory
+        - ansible.builtin.copy:
+            dest: "{{ mongodump_test_unit_directory.path }}/{{ item.name }}.{{ item.type }}"
+            content: |
+              {% for section in ['Unit', item.type | capitalize, 'Install'] %}
+              {% if section in item %}
+              [{{ section }}]
+              {% for key, value in item[section].items() %}
+              {% if value is sequence and value is not string %}
+              {% for entry in value %}
+              {{ key }}={{ entry }}
+              {% endfor %}
+              {% else %}
+              {{ key }}={{ value }}
+              {% endif %}
+              {% endfor %}
+              {% endif %}
+              {% endfor %}
+          loop: "{{ mongodump_unit_configs }}"
+        - ansible.builtin.command:
+            argv:
+              - systemd-analyze
+              - --user
+              - verify
+              - "{{ mongodump_test_unit_directory.path }}/ansible-mongodb-backup-example-db.service"
+              - "{{ mongodump_test_unit_directory.path }}/ansible-mongodb-backup-example-db.timer"
+          changed_when: false
+          # Runner is not installed in this isolated test.
+          failed_when: false
+          register: mongodump_test_systemd_verify
+        - ansible.builtin.assert:
+            that:
+              - "'Failed to parse' not in mongodump_test_systemd_verify.stderr"
+              - "'Unknown key' not in mongodump_test_systemd_verify.stderr"
+              - "'docker.service' not in mongodump_test_systemd_verify.stderr"
+      always:
+        - ansible.builtin.file:
+            path: "{{ mongodump_test_unit_directory.path }}"
+            state: absent
+    - name: Build units with an explicit Docker user-unit dependency
+      ansible.builtin.include_tasks: ../tasks/target-units.yml
+      vars:
+        mongodump_target:
+          id: custom-db
+          execution:
+            driver: compose_exec
+            docker_unit: custom-rootless-docker.service
+            docker_host: unix:///tmp/custom-docker.sock
+    - name: Assert explicitly configured Docker dependency and socket
+      ansible.builtin.assert:
+        that:
+          - mongodump_unit_configs[2].Unit.Requires == 'custom-rootless-docker.service'
+          - mongodump_unit_configs[2].Unit.After == 'custom-rootless-docker.service'
+          - "'DOCKER_HOST=unix:///tmp/custom-docker.sock' in mongodump_unit_configs[2].Service.Environment"
+          - "'DOCKER_CONTEXT' in mongodump_unit_configs[2].Service.UnsetEnvironment"
+    - name: Build units using an explicit Docker CLI context
+      ansible.builtin.include_tasks: ../tasks/target-units.yml
+      vars:
+        mongodump_target:
+          id: context-db
+          execution:
+            driver: compose_exec
+            docker_context: deployed-rootless
+    - name: Assert Docker context selection without a forced socket
+      ansible.builtin.assert:
+        that:
+          - "'DOCKER_CONTEXT=deployed-rootless' in mongodump_unit_configs[4].Service.Environment"
+          - "'DOCKER_HOST' in mongodump_unit_configs[4].Service.UnsetEnvironment"
+          - "mongodump_unit_configs[4].Service.Environment | select('match', '^DOCKER_HOST=') | list | length == 0"
+    - name: Exercise declaration helper for a real target without host setup
+      block:
+        - ansible.builtin.tempfile:
+            state: directory
+            prefix: mongodb-manifest-test-
+          register: mongodump_test_manifest_directory
+        - ansible.builtin.include_role:
+            name: kwtoolset/declare_mongodb_backup
+          vars:
+            mongodump_declare_owner: example
+            mongodump_declare_targets: "{{ mongodump_targets }}"
+            mongodump_declare_reconcile: false
+            mongodump_declare_directory: "{{ mongodump_test_manifest_directory.path }}"
+            mongodump_declare_user: "{{ lookup('env', 'USER') }}"
+        - ansible.builtin.include_role:
+            name: kwtoolset/declare_mongodb_backup
+          vars:
+            mongodump_declare_owner: example
+            mongodump_declare_targets: []
+            mongodump_declare_reconcile: false
+            mongodump_declare_directory: "{{ mongodump_test_manifest_directory.path }}"
+            mongodump_declare_user: "{{ lookup('env', 'USER') }}"
+        - ansible.builtin.slurp:
+            src: "{{ mongodump_test_manifest_directory.path }}/example.json"
+          register: mongodump_test_empty_manifest
+        - ansible.builtin.assert:
+            that:
+              - (mongodump_test_empty_manifest.content | b64decode | from_json).targets == []
+      always:
+        - ansible.builtin.file:
+            path: "{{ mongodump_test_manifest_directory.path }}"
+            state: absent

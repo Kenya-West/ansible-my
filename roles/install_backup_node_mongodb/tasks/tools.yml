@@ -1,0 +1,20 @@
+---
+- name: Install host MongoDB Database Tools when explicitly requested
+  become: true
+  become_user: root
+  ansible.builtin.apt:
+    name: "{{ mongodump_tools_package }}"
+    state: present
+  when:
+    - mongodump_install_tools | bool
+    - mongodump_targets | selectattr('execution.driver', 'equalto', 'direct') | list | length > 0
+
+- name: Verify host mongodump for direct targets before changing timers
+  become: true
+  become_user: "{{ mongodump_backup_user }}"
+  ansible.builtin.command:
+    argv: ["{{ item.execution.get('mongodump_bin', 'mongodump') }}", --version]
+  loop: "{{ mongodump_targets | selectattr('execution.driver', 'equalto', 'direct') | list }}"
+  loop_control:
+    label: "{{ item.id }}"
+  changed_when: false

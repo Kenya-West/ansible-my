@@ -5,3 +5,7 @@ cron_wrapped_task_suffix: ""
 pgdump_backup_monitor_argv: >-
   {{ [cron_wrapped_task_prefix, '--job-name', 'postgres_' ~ pgdump_target.id, '--']
      if cron_wrapped_task_prefix | length > 0 else [] }}
+
+mongodump_backup_monitor_argv: >-
+  {{ [cron_wrapped_task_prefix, '--job-name', 'mongodb_' ~ mongodump_target.id, '--']
+     if cron_wrapped_task_prefix | length > 0 else [] }}

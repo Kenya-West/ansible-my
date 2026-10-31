@@ -1,0 +1,27 @@
+---
+- name: Validate producer manifest header
+  ansible.builtin.assert:
+    that:
+      - mongodump_manifest is mapping
+      - mongodump_manifest.schema_version == 1
+      - mongodump_manifest.owner is match('^[a-zA-Z0-9][a-zA-Z0-9_-]*$')
+      - mongodump_manifest.targets is sequence
+      - mongodump_manifest.targets is not string
+      - mongodump_manifest.targets is not mapping
+    fail_msg: Invalid MongoDB manifest header.
+
+- name: Validate target structure before accessing fields
+  ansible.builtin.include_tasks: validate-target.yml
+  loop: "{{ mongodump_manifest.targets }}"
+  loop_control:
+    loop_var: mongodump_validate_target
+
+- name: Validate legacy cron migration marker
+  ansible.builtin.assert:
+    that:
+      - mongodump_manifest.get('legacy_cron_job', false) is boolean
+
+- name: Collect this producer's complete target set
+  ansible.builtin.set_fact:
+    mongodump_targets: "{{ mongodump_targets + mongodump_manifest.targets }}"
+    mongodump_legacy_cron_enrolled: "{{ mongodump_legacy_cron_enrolled or mongodump_manifest.get('legacy_cron_job', false) }}"

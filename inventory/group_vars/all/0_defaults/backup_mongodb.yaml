@@ -1,0 +1,12 @@
+---
+# Same contract/path layout as pgdump_*, with MongoDB-specific names.
+mongodump_backup_user: "{{ standard_user }}"
+mongodump_backup_home: "/home/{{ mongodump_backup_user }}"
+mongodump_manifest_dir: "{{ mongodump_backup_home }}/.config/ansible-backup/mongodb.d"
+mongodump_runner_path: "{{ mongodump_backup_home }}/.local/lib/ansible-backup/mongodb_backup.py"
+mongodump_systemd_unit_path: "{{ mongodump_backup_home }}/.config/systemd/user"
+# Old inventory overrides remain valid during migration.
+mongodump_backup_location_root_path: "{{ mongotools_mongodb_backup_location_root_path | default('/etc/mongodb/db_backup') }}"
+mongodump_backup_python: /usr/bin/python3
+mongodump_backup_docker_host: ""
+mongodump_backup_docker_context: ""

@@ -1,0 +1,49 @@
+---
+# Exercised locally with --check. All paths must be nonexistent for first-install
+# coverage; the parent Python regression test supplies temporary inventory vars.
+- name: Preview declaration, replacement and removal without host setup
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require check mode for this isolated regression
+      ansible.builtin.assert:
+        that: [ansible_check_mode]
+
+    - name: Preview replacing one producer alongside a persisted producer
+      ansible.builtin.include_role:
+        name: kwtoolset/declare_mongodb_backup
+        apply:
+          tags: [always]
+      vars:
+        mongodump_declare_owner: example
+        mongodump_declare_targets:
+          - id: proposed-db
+            project_path: /srv/proposed
+            execution: {driver: compose_exec, service: db}
+            output: {subdirectory: proposed, filename: dump.archive.gz}
+      tags: [always]
+
+    - name: Require the proposed target, not the old persisted target
+      ansible.builtin.assert:
+        that:
+          - "mongodump_targets | map(attribute='id') | sort == (expected_other_targets + ['proposed-db']) | sort"
+          - mongodump_unit_configs | length == (expected_other_targets | length + 1) * 2
+          - "'ansible-mongodb-backup-old-db.timer' in mongodump_retired_units or expected_other_targets | length == 0"
+      tags: [always]
+
+    - name: Preview removing the same producer
+      ansible.builtin.include_role:
+        name: kwtoolset/declare_mongodb_backup
+        apply:
+          tags: [always]
+      vars:
+        mongodump_declare_owner: example
+        mongodump_declare_state: absent
+      tags: [always]
+
+    - name: Require removal to exclude the owner's persisted targets
+      ansible.builtin.assert:
+        that:
+          - mongodump_targets | map(attribute='id') | sort == expected_other_targets | sort
+      tags: [always]

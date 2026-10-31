@@ -1,0 +1,77 @@
+---
+- name: Validate legacy endpoint list
+  ansible.builtin.assert:
+    that:
+      - mongodump_legacy_endpoints is sequence
+      - mongodump_legacy_endpoints is not string
+      - mongodump_legacy_endpoints is not mapping
+
+- name: Validate legacy URI and output before writing credentials
+  ansible.builtin.assert:
+    that:
+      - item is mapping
+      - item.uri is match('^mongodb(\+srv)?://')
+      - item.out_file is match('^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$')
+      - item.out_file not in ['.', '..']
+    fail_msg: Legacy MongoDB endpoints require a MongoDB URI and safe out_file basename.
+  loop: "{{ mongodump_legacy_endpoints }}"
+  no_log: true
+
+- name: Verify legacy output basenames are unique
+  ansible.builtin.assert:
+    that:
+      - mongodump_legacy_endpoints | map(attribute='out_file') | unique | length == mongodump_legacy_endpoints | length
+    fail_msg: Legacy MongoDB out_file values must be unique.
+
+- name: Initialize legacy compatibility targets
+  ansible.builtin.set_fact:
+    mongodump_legacy_targets: []
+
+- name: Convert legacy endpoints to stable manifest targets
+  ansible.builtin.set_fact:
+    mongodump_legacy_targets: "{{ mongodump_legacy_targets + [mongodump_legacy_target] }}"
+  vars:
+    mongodump_legacy_id: "legacy-{{ item.out_file | hash('sha256') | truncate(16, true, '') }}"
+    mongodump_legacy_target:
+      id: "{{ mongodump_legacy_id }}"
+      execution:
+        driver: direct
+      connection:
+        source: config_file
+        config_file: "{{ mongodump_legacy_credentials_dir }}/{{ mongodump_legacy_id }}.yaml"
+      dump:
+        gzip: true
+      output:
+        subdirectory: legacy
+        filename: "{{ item.out_file }}"
+  loop: "{{ mongodump_legacy_endpoints }}"
+  no_log: true
+
+- name: Store private MongoDB connection configurations
+  become: true
+  become_user: "{{ mongodump_backup_user }}"
+  when: not ansible_check_mode
+  block:
+    - name: Create private credentials directory
+      ansible.builtin.file:
+        path: "{{ mongodump_legacy_credentials_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Write mongodump configuration (credentials never go into argv)
+      ansible.builtin.copy:
+        content: "{{ {'uri': item.uri} | to_nice_json }}\n"
+        dest: "{{ mongodump_legacy_credentials_dir }}/legacy-{{ item.out_file | hash('sha256') | truncate(16, true, '') }}.yaml"
+        mode: "0600"
+      loop: "{{ mongodump_legacy_endpoints }}"
+      no_log: true
+
+- name: Publish compatibility producer and reconcile all MongoDB targets
+  ansible.builtin.include_role:
+    name: kwtoolset/declare_mongodb_backup
+    apply:
+      tags: [always]
+  vars:
+    mongodump_declare_owner: legacy-mongotools
+    mongodump_declare_targets: "{{ mongodump_legacy_targets }}"
+    mongodump_declare_legacy_cron_job: true

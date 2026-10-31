@@ -1,0 +1,96 @@
+---
+- name: Validate rootless backup account
+  ansible.builtin.assert:
+    that:
+      - mongodump_backup_user != 'root'
+      - mongodump_backup_home is match('^/')
+      - mongodump_backup_location_root_path is match('^/')
+      - mongodump_backup_docker_host is string
+      - mongodump_backup_docker_context is string
+      - not (mongodump_backup_docker_host | length > 0 and mongodump_backup_docker_context | length > 0)
+      - mongodump_backup_docker_unit is string
+      - mongodump_backup_docker_unit == '' or mongodump_backup_docker_unit is match('^[a-zA-Z0-9_.@-]+[.](service|socket)$')
+    fail_msg: MongoDB backups require a non-root Docker user, absolute paths and a valid optional Docker user-unit name.
+
+- name: Resolve the rootless Docker user's uid without starting user services
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ mongodump_backup_user }}"
+
+- name: Initialize MongoDB backup reconciliation
+  ansible.builtin.set_fact:
+    mongodump_runtime_dir: "/run/user/{{ ansible_facts.getent_passwd[mongodump_backup_user][1] }}"
+    mongodump_targets: []
+    mongodump_unit_configs: []
+    mongodump_legacy_cron_enrolled: false
+
+- name: Read and validate the effective registry
+  become: true
+  become_user: "{{ mongodump_backup_user }}"
+  block:
+    - name: Check whether the persistent registry exists
+      ansible.builtin.stat:
+        path: "{{ mongodump_manifest_dir }}"
+      register: mongodump_registry_stat
+
+    - name: Find existing producer manifests
+      ansible.builtin.find:
+        paths: "{{ mongodump_manifest_dir }}"
+        patterns: '*.json'
+      register: mongodump_manifest_files
+      when: mongodump_registry_stat.stat.exists
+
+    - name: Read persisted declarations except the owner being previewed
+      ansible.builtin.include_tasks: read-manifest.yml
+      loop: "{{ mongodump_manifest_files.files | default([]) | sort(attribute='path') }}"
+      loop_control:
+        loop_var: mongodump_manifest_file
+        label: "{{ mongodump_manifest_file.path }}"
+      when: >-
+        not ansible_check_mode or
+        (mongodump_manifest_file.path | basename) !=
+        ((mongodump_pending_manifest | default({})).get('owner', '') ~ '.json')
+
+    - name: Set the proposed manifest for check-mode collection
+      ansible.builtin.set_fact:
+        mongodump_manifest: "{{ mongodump_pending_manifest }}"
+      when:
+        - ansible_check_mode
+        - mongodump_pending_manifest | default({}) | length > 0
+
+    - name: Overlay the proposed producer declaration in check mode
+      ansible.builtin.include_tasks: collect-manifest.yml
+      when:
+        - ansible_check_mode
+        - mongodump_pending_manifest | default({}) | length > 0
+        - mongodump_pending_state | default('present') == 'present'
+
+    - name: Validate the effective registry without requiring an installed runner
+      ansible.builtin.command:
+        argv:
+          - "{{ mongodump_backup_python }}"
+          - -c
+          - "{{ lookup('file', role_path ~ '/files/mongodb_backup.py') }}"
+          - --validate-stdin
+          - --skip-path-resolution
+          - --output-root
+          - "{{ mongodump_backup_location_root_path }}"
+        stdin: "{{ mongodump_targets | to_json }}"
+      changed_when: false
+      check_mode: false
+      # Read-only validation. No Docker commands, credentials or files are used.
+
+    - name: Build user-level services and timers for the effective targets
+      ansible.builtin.include_tasks: target-units.yml
+      loop: "{{ mongodump_targets }}"
+      loop_control:
+        loop_var: mongodump_target
+        label: "{{ mongodump_target.id }}"
+
+    - name: Preview reconciliation without changing files or contacting systemd
+      ansible.builtin.include_tasks: check.yml
+      when: ansible_check_mode
+
+- name: Apply validated MongoDB backup configuration
+  ansible.builtin.include_tasks: reconcile.yml
+  when: not ansible_check_mode

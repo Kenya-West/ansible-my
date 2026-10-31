@@ -1,0 +1,35 @@
+---
+- name: Find only backup-role-managed unit files
+  ansible.builtin.find:
+    paths: "{{ mongodump_systemd_unit_path }}"
+    patterns:
+      - ansible-mongodb-backup-*.service
+      - ansible-mongodb-backup-*.timer
+  register: mongodump_existing_units
+
+- name: Calculate retired units
+  ansible.builtin.set_fact:
+    mongodump_retired_units: >-
+      {{ mongodump_existing_units.files | map(attribute='path') | map('basename') | list
+         | difference(mongodump_unit_configs | map(attribute='name') | zip(mongodump_unit_configs | map(attribute='type'))
+                      | map('join', '.') | list) }}
+
+- name: Stop and disable retired timers and services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    scope: user
+    state: stopped
+    enabled: false
+  loop: "{{ mongodump_retired_units | sort(reverse=true) }}"
+
+- name: Remove retired unit files (retain dump data)
+  ansible.builtin.file:
+    path: "{{ mongodump_systemd_unit_path }}/{{ item }}"
+    state: absent
+  loop: "{{ mongodump_retired_units }}"
+
+- name: Reload the user manager after retiring units
+  ansible.builtin.systemd_service:
+    scope: user
+    daemon_reload: true
+  when: mongodump_retired_units | length > 0

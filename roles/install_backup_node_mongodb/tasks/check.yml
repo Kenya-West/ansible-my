@@ -1,0 +1,34 @@
+---
+- name: Inspect existing user-level backup units
+  ansible.builtin.stat:
+    path: "{{ mongodump_systemd_unit_path }}"
+  register: mongodump_unit_directory_stat
+
+- name: Find backup-role-managed units if the directory exists
+  ansible.builtin.find:
+    paths: "{{ mongodump_systemd_unit_path }}"
+    patterns:
+      - ansible-mongodb-backup-*.service
+      - ansible-mongodb-backup-*.timer
+  register: mongodump_check_existing_units
+  when: mongodump_unit_directory_stat.stat.exists
+
+- name: Calculate units that would be retired
+  ansible.builtin.set_fact:
+    mongodump_retired_units: >-
+      {{ mongodump_check_existing_units.files | default([]) | map(attribute='path') | map('basename') | list
+         | difference(mongodump_unit_configs | map(attribute='name') | zip(mongodump_unit_configs | map(attribute='type'))
+                      | map('join', '.') | list) }}
+
+- name: Preview MongoDB backup changes
+  ansible.builtin.debug:
+    msg:
+      targets: "{{ mongodump_targets | map(attribute='id') | list }}"
+      units_to_configure: "{{ mongodump_unit_configs | map(attribute='name') | zip(mongodump_unit_configs | map(attribute='type')) | map('join', '.') | list }}"
+      units_to_retire: "{{ mongodump_retired_units }}"
+      manifest_directory: "{{ mongodump_manifest_dir }}"
+      output_root: "{{ mongodump_backup_location_root_path }}"
+      note: >-
+        Would install the runner, prepare directories, enable lingering and reconcile user timers.
+        No files, databases or systemd state are changed. Output symlink/permission checks
+        and legacy cron migration are performed when applying the configuration.

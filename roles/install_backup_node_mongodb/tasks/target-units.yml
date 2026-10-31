@@ -1,0 +1,45 @@
+---
+- name: Build systemd units for this target
+  vars:
+    mongodump_unit_name: "ansible-mongodb-backup-{{ mongodump_target.id }}"
+    mongodump_docker_unit: "{{ mongodump_target.execution.get('docker_unit', mongodump_backup_docker_unit) }}"
+    mongodump_docker_host: "{{ mongodump_target.execution.get('docker_host', '' if mongodump_target.execution.get('docker_context') else mongodump_backup_docker_host) }}"
+    mongodump_docker_context: "{{ mongodump_target.execution.get('docker_context', '' if mongodump_target.execution.get('docker_host') else mongodump_backup_docker_context) }}"
+    mongodump_exec_argv: >-
+      {{ mongodump_backup_monitor_argv + [mongodump_backup_python, mongodump_runner_path,
+         '--manifest-dir', mongodump_manifest_dir, '--output-root', mongodump_backup_location_root_path,
+         '--target', mongodump_target.id] }}
+  ansible.builtin.set_fact:
+    mongodump_unit_configs: >-
+      {{ mongodump_unit_configs + [
+        {
+          'name': mongodump_unit_name, 'type': 'service', 'scope': 'user',
+          'user': mongodump_backup_user, 'path': mongodump_systemd_unit_path,
+          'manage_state': false, 'enabled': false,
+          'Unit': {'Description': 'MongoDB dump for ' ~ mongodump_target.id}
+                  | combine({'After': mongodump_docker_unit, 'Requires': mongodump_docker_unit}
+                            if mongodump_target.execution.driver == 'compose_exec' and mongodump_docker_unit | length > 0 else {}),
+          'Service': {
+            'Type': 'oneshot',
+            'ExecStart': mongodump_exec_argv | map('to_json') | join(' ') | replace('%', '%%'),
+            'Environment': ['HOME=' ~ mongodump_backup_home, 'XDG_RUNTIME_DIR=' ~ mongodump_runtime_dir]
+                           + (['DOCKER_HOST=' ~ mongodump_docker_host] if mongodump_docker_host | length > 0 else [])
+                           + (['DOCKER_CONTEXT=' ~ mongodump_docker_context] if mongodump_docker_context | length > 0 else []),
+            'UnsetEnvironment': ['DOCKER_CONTEXT'] if mongodump_docker_host | length > 0
+                                else (['DOCKER_HOST'] if mongodump_docker_context | length > 0 else []),
+            'UMask': '0077', 'TimeoutStartSec': mongodump_backup_timeout,
+            'Nice': '5', 'NoNewPrivileges': 'yes'
+          }
+        },
+        {
+          'name': mongodump_unit_name, 'type': 'timer', 'scope': 'user',
+          'user': mongodump_backup_user, 'path': mongodump_systemd_unit_path,
+          'enabled': true, 'state': 'started',
+          'Unit': {'Description': 'Schedule MongoDB dump for ' ~ mongodump_target.id},
+          'Timer': {'Unit': mongodump_unit_name ~ '.service',
+                    'OnCalendar': mongodump_target.get('schedule', {}).get('calendar', mongodump_backup_calendar),
+                    'RandomizedDelaySec': mongodump_target.get('schedule', {}).get('randomized_delay', mongodump_backup_randomized_delay),
+                    'Persistent': 'true'},
+          'Install': {'WantedBy': 'timers.target'}
+        }
+      ] }}

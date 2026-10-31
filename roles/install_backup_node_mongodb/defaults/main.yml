@@ -1,0 +1,30 @@
+---
+mongodump_backup_user: "{{ standard_user }}"
+mongodump_backup_home: "/home/{{ mongodump_backup_user }}"
+mongodump_manifest_dir: "{{ mongodump_backup_home }}/.config/ansible-backup/mongodb.d"
+mongodump_runner_path: "{{ mongodump_backup_home }}/.local/lib/ansible-backup/mongodb_backup.py"
+mongodump_systemd_unit_path: "{{ mongodump_backup_home }}/.config/systemd/user"
+mongodump_backup_location_root_path: "{{ mongotools_mongodb_backup_location_root_path | default('/etc/mongodb/db_backup') }}"
+mongodump_backup_python: /usr/bin/python3
+mongodump_backup_calendar: "*-*-* 00:00:00 UTC"
+mongodump_backup_randomized_delay: 15min
+mongodump_backup_timeout: 1h
+# Empty means use the user's normal Docker CLI configuration/current context.
+# Set only one of these if the interactive shell selects an endpoint via env.
+mongodump_backup_docker_host: ""
+mongodump_backup_docker_context: ""
+
+# Optional dependency in the user's systemd manager. Rootless does not imply
+# a unit named docker.service; normally connect directly to the Docker socket.
+mongodump_backup_docker_unit: ""
+# Optional monitoring command as an argv list (not shell syntax).
+mongodump_backup_monitor_argv: []
+# Required only to migrate the old root-owned cron jobs/dump directory.
+mongodump_migrate_legacy: true
+# Database Tools are only required on the host for direct (remote) targets.
+# Explicit opt-in avoids architecture/version guessing and network downloads.
+mongodump_install_tools: false
+mongodump_tools_package: mongodb-database-tools
+# Compatibility producer for the old [{uri, out_file}] inventory contract.
+mongodump_legacy_endpoints: "{{ mongotools_mongodb_endpoints | default([]) }}"
+mongodump_legacy_credentials_dir: "{{ mongodump_backup_home }}/.config/ansible-backup/mongodb-credentials"
