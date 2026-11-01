@@ -1,8 +1,12 @@
-- name: Install SystemD unit and timer for this role
+- name: Reconcile user-scoped Microwarp rotation service and timer
   ansible.builtin.include_role:
-    name: 0x0I.systemd
+    name: kwtoolset/systemd_timer
   vars:
-    unit_config: "{{ systemd_unit_configs }}"
+    systemd_timer_units: "{{ systemd_unit_configs }}"
+    systemd_timer_state: "{{ role_state }}"
+    systemd_timer_legacy_cron_jobs: >-
+      {{ [{'user': 'root', 'name': microwarp_legacy_cron_name}]
+         if microwarp_migrate_legacy_cron | bool else [] }}
   args:
     apply:
       tags:

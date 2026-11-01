@@ -18,15 +18,8 @@ dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
 
-cron_job_name_prefix: "microwarp:"
-cron_job_name: "rotate"
-cron_job_role_prefix: "su {{ standard_user }} -c \""
-cron_job_role_suffix: "\""
-
-# This is just a template that should be created per config in git_sync_configs list. It should be set in the role.
-cronjob_base_script: "{{ dest_path_full }}/scripts/rotate.sh"
-# fallback. Should be set in role
-cronjob_base_script_with_analytics: "{{ cronjob_base_script }}"
+microwarp_migrate_legacy_cron: true
+microwarp_legacy_cron_name: "microwarp:rotate"
 
 systemd_timer_user: "{{ standard_user }}"
 systemd_timer_name: "microwarp-rotate"
@@ -44,22 +37,24 @@ systemd_unit_configs:
     user: "{{ systemd_user }}"
     group: "{{ systemd_group }}"
     path: "{{ systemd_user_unit_path }}"
+    manage_state: false
+    enabled: false
     Unit:
       Description: "Run {{ systemd_timer_name }} script"
       Documentation: "man:systemd.service(5)"
     Service:
       Type: oneshot
-      ExecStart: "/usr/bin/bash {{ systemd_timer_script_path }}"
+      ExecStart: "/usr/bin/bash {{ systemd_timer_script_path | to_json | replace('%', '%%') }}"
       WorkingDirectory: "/home/{{ systemd_timer_user }}"
       Environment:
+        - "HOME=/home/{{ systemd_timer_user }}"
+        - "PATH=/usr/local/bin:/usr/bin:/bin"
         - "TZ=Asia/Yakutsk"
       TimeoutStartSec: "2m"
       Nice: "5"
       IOSchedulingClass: "best-effort"
       IOSchedulingPriority: "7"
       NoNewPrivileges: "yes"
-      PrivateTmp: "yes"
-      ProtectSystem: "full"
 
   - name: "{{ systemd_timer_name }}"
     type: timer

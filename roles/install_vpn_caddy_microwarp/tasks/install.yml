@@ -98,9 +98,10 @@
     - update_image_soft
     - update_config_hard
 
-- name: Create systemd services per git_sync_configs items
+- name: Create user-scoped Microwarp rotation service and timer
   ansible.builtin.include_tasks: install_systemd.yml
   tags:
     - always
     - update_config_hard
-    - update_cron_job
+    - install_systemd_timer
+    - update_systemd_timer

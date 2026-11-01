@@ -1,5 +1,5 @@
-- name: Remove cron job
-  ansible.builtin.include_tasks: uninstall_cron.yml
+- name: Remove Microwarp rotation timer and service
+  ansible.builtin.include_tasks: install_systemd.yml
   tags:
     - always
 
