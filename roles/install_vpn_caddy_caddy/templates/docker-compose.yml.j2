@@ -17,6 +17,9 @@ services:
     environment:
       - CADDY_INGRESS_NETWORKS=caddy
       - CADDY_DOCKER_CADDYFILE_PATH=/config/base/Caddyfile
+      - GODEBUG=multipathtcp=0
+    sysctls:
+      net.mptcp.enabled: "0"
     env_file:
       - .env
     networks:
