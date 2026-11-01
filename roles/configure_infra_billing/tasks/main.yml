@@ -22,12 +22,24 @@
     domains: "{{ infrastructure_domains }}"
     domain_bindings: "{{ infra_billing_domain_bindings }}"
     rotate_credentials: "{{ infra_billing_rotate_credentials }}"
+    sync_all_accounts: "{{ infra_billing_sync_all_accounts }}"
     sync_missing_services: "{{ infra_billing_sync_missing_services }}"
     validate_certs: "{{ infra_billing_validate_certs }}"
     timeout: "{{ infra_billing_timeout }}"
   delegate_to: localhost
   register: cib_result
+  # Defer only explicitly sanitized diagnostics and known partial sync failures.
+  # Raw results, credentials and unexpected failures remain private.
+  failed_when: >-
+    cib_result.failed | default(false)
+    and cib_result.sync_failed | default(0) | int == 0
+    and cib_result.public_error is not defined
   no_log: true
+
+- name: Explain infra-billing validation or request failure
+  ansible.builtin.fail:
+    msg: "{{ cib_result.public_error }}"
+  when: cib_result.public_error is defined
 
 - name: Publish private read result
   ansible.builtin.set_fact:
@@ -46,3 +58,10 @@
             if infra_billing_action == 'reconcile' else
             ['Read providers=' ~ cib_result.report.read.providers ~ ' accounts=' ~ cib_result.report.read.accounts
              ~ ' services=' ~ cib_result.report.read.services ~ ' projects=' ~ cib_result.report.read.projects]) }}
+
+- name: Fail after reporting unsuccessful connector syncs
+  ansible.builtin.fail:
+    msg: >-
+      {{ cib_result.sync_failed }} infra-billing account sync(s) failed; remaining accounts were attempted.
+      See the FAILED account lines above and the account sync errors in infra-billing.
+  when: cib_result.sync_failed | default(0) | int > 0

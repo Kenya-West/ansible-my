@@ -1,5 +1,6 @@
 ---
 # Always preview with --check. This does not deploy or contact Remnawave.
+# Refresh every enabled connector account, including services absent from inventory.
 - name: Reconcile infrastructure records in infra-billing
   hosts: analytics_server
   gather_facts: false
@@ -8,3 +9,4 @@
     - role: configure_infra_billing
       vars:
         infra_billing_action: reconcile
+        infra_billing_sync_all_accounts: true

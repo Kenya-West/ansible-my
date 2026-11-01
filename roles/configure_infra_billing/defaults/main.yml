@@ -12,6 +12,9 @@ infra_billing_domain_bindings: {}
 infra_billing_manage_hosts: true
 infra_billing_node_group: general_vps_prepare
 infra_billing_rotate_credentials: false
+# Full sync playbook refreshes all enabled non-manual accounts, even unbound ones.
+# Scoped domain/onboarding workflows retain missing-service-only imports.
+infra_billing_sync_all_accounts: false
 # Account-wide import only if an enabled connector service is missing.
 infra_billing_sync_missing_services: true
 infra_billing_validate_certs: true

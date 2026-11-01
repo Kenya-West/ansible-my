@@ -12,9 +12,32 @@ def single_line(value):
     return ' '.join(str(value).split())
 
 
-def build_report(projected, entries, before, after, operations, check_mode, resolved=None):
+def sync_failure_reason(result):
+    """Classify failures using fixed text only; connector errors may embed secrets."""
+    if not isinstance(result, dict) or result.get('status') not in ('ok', 'error'):
+        return 'unexpected sync response'
+    if result['status'] == 'ok':
+        return None
+    error = str(result.get('error') or '').lower()
+    if any(word in error for word in ('401', '403', 'unauthorized', 'forbidden', 'authentication', 'permission')):
+        return 'connector authentication/permission failure'
+    if any(word in error for word in ('timeout', 'timed out', 'canceled')):
+        return 'connector timeout'
+    if any(word in error for word in ('no api token', 'credentials')):
+        return 'missing connector credentials'
+    return 'connector error'
+
+
+def build_report(projected, entries, before, after, operations, check_mode, resolved=None, sync_failures=None):
     resolved = resolved or {}
+    sync_failures = sync_failures or {}
     providers, accounts, services = {}, {}, {}
+    # Full refresh includes live accounts not represented by inventory bindings.
+    # Report their public provider name/label, never credential hints or bodies.
+    for provider in before['providers'] + after['providers']:
+        providers[provider['uuid']] = provider['name']
+        for account in provider['accounts']:
+            accounts[account['uuid']] = provider['name'] + ('/' + account['label'] if account.get('label') else '')
     for index, provider in enumerate(projected['providers']):
         current = match(before['providers'], provider['uuid'], name=provider['body']['name'])
         latest = match(after['providers'], provider['uuid'], name=provider['body']['name'])
@@ -51,7 +74,9 @@ def build_report(projected, entries, before, after, operations, check_mode, reso
             target = accounts.get(aid, aid)
             detail = 'account ' + target
             if method == 'SYNC':
-                detail += ' (account-wide connector import)'
+                detail += ' (account-wide connector refresh/import)'
+                if aid in sync_failures:
+                    detail += ' [FAILED: ' + sync_failures[aid] + '; check account sync error in the UI]'
         elif path.startswith('/providers/') and path.endswith('/accounts'):
             target = accounts.get(ref, ref or body.get('label', 'account'))
             detail = 'account ' + target
@@ -67,4 +92,6 @@ def build_report(projected, entries, before, after, operations, check_mode, reso
             detail += ' [fields: ' + ', '.join(sorted(body)) + ']'
         verb = {'POST': 'CREATE', 'PATCH': 'UPDATE', 'SYNC': 'SYNC'}[method]
         lines.append(single_line(verb + ' ' + detail))
-    return {'mode': 'check (planned, no API writes)' if check_mode else 'apply (completed)', 'lines': lines}
+    mode = 'check (planned, no API writes; connector health not tested)' if check_mode else (
+        'apply (partial failure)' if sync_failures else 'apply (completed)')
+    return {'mode': mode, 'lines': lines}

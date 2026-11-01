@@ -235,7 +235,9 @@ def project_model(catalog, bindings, hosts):
             require(aid in p['accounts'], 'binding refers to unknown account ' + aid)
             connection = p['accounts'][aid].get('connection', {})
             require(not connection.get('driver') or connection['driver'] == kind,
-                    'Binding kind conflicts with declared connection.driver')
+                    'Provider/account ' + key + '/' + aid + ': binding kind ' + kind
+                    + ' conflicts with declared connection.driver ' + str(connection.get('driver'))
+                    + '; for a manual migration set connection.type: manual and remove connection.driver')
             ref = (key, aid)
             require(ref not in account_refs, 'account bound to multiple API providers')
             payload = account_payload(p['accounts'][aid], ab)
