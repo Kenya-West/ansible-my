@@ -1,0 +1,10 @@
+---
+- name: Reconcile root-scoped Autorestic services and timers
+  ansible.builtin.include_tasks:
+    file: systemd-job.yml
+    apply:
+      tags: [update_config_hard, update_systemd_timer, uninstall]
+  loop: "{{ restic_node_timer_jobs }}"
+  loop_control:
+    loop_var: restic_timer_job
+    label: "{{ restic_timer_job.name }}"

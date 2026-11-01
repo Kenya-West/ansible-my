@@ -118,13 +118,6 @@
   ansible.builtin.shell: |
     find "{{ dest_path_full }}/scripts" -type f -name '*.sh' -exec chmod 0775 {} +
 
-# Cron job
-- name: Change cron job path to monitoring if it is in analytics_node group
-  set_fact:
-    cronjob_script_path_with_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix}} {{ cron_wrapped_task_prefix }} --job-name autorestic_backup -- {{ dest_path_full }}/scripts/update-cron.sh {{ cron_wrapped_task_suffix }} {{ restic_node_cron_job_name_suffix }}"
-    cronjob_script_path_with_analytics_autorestic_forget: "{{ cron_wrapped_task_prefix }} --job-name autorestic_forget -- {{ cronjob_script_path_without_analytics_autorestic_forget }} {{ cron_wrapped_task_suffix }}"
-  when: "'analytics_node' in group_names"
-
 # Check
 - name: Get info about configuration
   become: true
@@ -137,7 +130,7 @@
   become: true
   become_user: root
   ansible.builtin.shell:
-    cmd: "./check.sh"
+    cmd: "timeout {{ restic_node_check_timeout }} ./check.sh"
     chdir: "{{ dest_path_full }}/scripts"
   ignore_errors: true
   register: autorestic_check_config
@@ -145,6 +138,11 @@
 - name: Debug configuration
   debug:
     var: autorestic_check_config
+
+- name: Fail if configuration check timed out
+  ansible.builtin.fail:
+    msg: "Configuration check exceeded {{ restic_node_check_timeout }} seconds"
+  when: autorestic_check_config.rc == 124
 
 # Error handling
 - name: Run yq command to fix corrupted config # Look for https://github.com/cupcakearmy/autorestic/issues/315
@@ -234,20 +232,11 @@
   loop_control:
     loop_var: autorestic_file
 
-# Cron
-- name: Add cron job for autorestic
-  become: true
-  become_user: root
-  ansible.builtin.cron:
-    name: "{{ restic_node_cron_job_name }}"
-    minute: "*/30"
-    job: "{{ cronjob_script_path_with_analytics_autorestic_backup }}"
-
-- name: Add cron job for autorestic to forget
-  become: true
-  become_user: root
-  ansible.builtin.cron:
-    name: "{{ restic_node_cron_job_name_forget }}"
-    minute: "16"
-    hour: "0"
-    job: "{{ cronjob_script_path_with_analytics_autorestic_forget }}"
+- name: Install Autorestic services and timers and remove legacy cron schedules
+  ansible.builtin.include_tasks:
+    file: ../systemd.yml
+    apply:
+      tags: [update_config_hard, update_systemd_timer]
+  tags:
+    - update_config_hard
+    - update_systemd_timer

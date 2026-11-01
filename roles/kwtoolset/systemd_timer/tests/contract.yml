@@ -1,0 +1,162 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    standard_user: nobody
+    dest_path_full: /tmp/timer-contract/project with spaces%test
+    role_state: present
+    git_sync_configs:
+      - config_file_name: repo.main.conf
+      - config_file_name: repo.other.conf
+    group_names: []
+  tasks:
+    - name: Set isolated project path
+      ansible.builtin.set_fact:
+        dest_path_full: /tmp/timer-contract/project with spaces%test
+    - name: Load Git defaults
+      ansible.builtin.include_vars: ../../../git_sync/defaults/main.yml
+    - name: Build Git units for distinct configs sharing an old cron name
+      ansible.builtin.include_tasks: ../../../git_sync/tasks/systemd.yml
+      loop: "{{ git_sync_configs }}"
+      loop_control:
+        loop_var: config_item
+    - ansible.builtin.assert:
+        that:
+          - captured_units | length == 4
+          - captured_units[0].name != captured_units[2].name
+          - captured_units[0].scope == 'user'
+          - not captured_units[0].manage_state
+          - not captured_units[0].enabled
+          - captured_units[1].Timer.OnCalendar == '*-*-* 00:00:00'
+          - captured_units[1].Timer.Persistent == 'true'
+          - "'%%test' in captured_units[0].Service.ExecStart"
+          - captured_cron_jobs[0].name == 'git-sync:repo'
+    - name: Load Microwarp defaults
+      ansible.builtin.include_vars: ../../../install_vpn_caddy_microwarp/defaults/main.yml
+    - ansible.builtin.include_tasks: ../../../install_vpn_caddy_microwarp/tasks/install_systemd.yml
+    - ansible.builtin.assert:
+        that:
+          - captured_units[4].scope == 'user'
+          - not captured_units[4].manage_state
+          - "'PrivateTmp' not in captured_units[4].Service"
+          - captured_units[5].Timer.OnCalendar == '*-*-* 00:00:00 Asia/Yakutsk'
+    - name: Load Restic defaults
+      ansible.builtin.include_vars: ../../../install_backup_node_restic/defaults/main.yml
+    - ansible.builtin.include_tasks: ../../../install_backup_node_restic/tasks/systemd.yml
+    - ansible.builtin.assert:
+        that:
+          - captured_units[6].scope == 'system'
+          - captured_units[6].user == 'root'
+          - not captured_units[6].manage_state
+          - "'NoNewPrivileges' not in captured_units[6].Service"
+          - captured_units[7].Timer.OnCalendar == '*-*-* *:00,30:00'
+          - captured_units[9].Timer.OnCalendar == '*-*-* 00:16:00'
+          - captured_cron_jobs[-2].name == 'Autorestic backup'
+          - captured_cron_jobs[-1].name == 'Autorestic forget'
+    - name: Load certificate copy defaults
+      ansible.builtin.include_vars: ../../../install_webfeatures_certcopy/defaults/main.yml
+    - ansible.builtin.include_tasks: ../../../install_webfeatures_certcopy/tasks/systemd.yml
+    - ansible.builtin.assert:
+        that:
+          - captured_units[10].scope == 'user'
+          - "'/usr/bin/sudo -n --' in captured_units[10].Service.ExecStart"
+          - captured_units[10].Service.NoNewPrivileges == 'no'
+          - captured_units[11].Timer.Persistent == 'true'
+    - name: Exercise monitored Git command
+      ansible.builtin.include_tasks: ../../../git_sync/tasks/systemd.yml
+      vars:
+        config_item: "{{ git_sync_configs[0] }}"
+        group_names: [analytics_node]
+        cron_wrapped_task_prefix: /tmp/monitor.sh
+        cron_wrapped_task_suffix: ''
+    - ansible.builtin.assert:
+        that:
+          - "'/tmp/monitor.sh --job-name' in captured_units[12].Service.ExecStart"
+          - "' -- ' in captured_units[12].Service.ExecStart"
+    - name: Exercise monitored Restic command as root
+      ansible.builtin.include_tasks: ../../../install_backup_node_restic/tasks/systemd-job.yml
+      vars:
+        restic_timer_job: "{{ restic_node_timer_jobs[0] }}"
+        group_names: [analytics_node]
+        cron_wrapped_task_prefix: /tmp/monitor.sh
+        cron_wrapped_task_suffix: ''
+    - ansible.builtin.assert:
+        that:
+          - captured_units[-2].scope == 'system'
+          - "'--job-name autorestic_backup --' in captured_units[-2].Service.ExecStart"
+    - name: Exercise monitored certificate copy command
+      ansible.builtin.include_tasks: ../../../install_webfeatures_certcopy/tasks/systemd.yml
+      vars:
+        group_names: [analytics_node]
+        cron_wrapped_task_prefix: /tmp/monitor.sh
+        cron_wrapped_task_suffix: ''
+    - ansible.builtin.assert:
+        that:
+          - "'--job-name copy_certs -- /usr/bin/sudo -n' in captured_units[-2].Service.ExecStart"
+    - name: Reject unsafe config filenames before managing units
+      block:
+        - ansible.builtin.include_tasks: ../../../git_sync/tasks/systemd.yml
+          vars:
+            config_item:
+              config_file_name: ../unsafe.conf
+        - ansible.builtin.fail:
+            msg: Unsafe config filename was accepted
+      rescue:
+        - ansible.builtin.assert:
+            that:
+              - ansible_failed_task.name == 'Validate Git sync config file names and unique unit identifiers'
+    - name: Exercise uninstall request
+      ansible.builtin.include_tasks: ../../../install_webfeatures_certcopy/tasks/systemd.yml
+      vars:
+        role_state: absent
+    - ansible.builtin.assert:
+        that:
+          - captured_states[-1] == 'absent'
+    - name: Validate generated units with systemd's parser
+      block:
+        - ansible.builtin.tempfile:
+            state: directory
+            prefix: timer-contract-
+          register: unit_directory
+        - name: Render privileged certificate helper
+          ansible.builtin.template:
+            src: ../../../install_webfeatures_certcopy/templates/scripts/copy.sh.j2
+            dest: "{{ unit_directory.path }}/copy.sh"
+            mode: '0755'
+          vars:
+            cert_location_root_path: /tmp/shared certificates
+        - name: Validate helper shell syntax
+          ansible.builtin.command:
+            argv: [bash, -n, "{{ unit_directory.path }}/copy.sh"]
+          changed_when: false
+        - ansible.builtin.copy:
+            dest: "{{ unit_directory.path }}/{{ item.name }}.{{ item.type }}"
+            content: |
+              {% for section in ['Unit', item.type | capitalize, 'Install'] %}
+              {% if section in item %}
+              [{{ section }}]
+              {% for key, value in item[section].items() %}
+              {% if value is sequence and value is not string %}
+              {% for entry in value %}
+              {{ key }}={{ entry }}
+              {% endfor %}
+              {% else %}
+              {{ key }}={{ value }}
+              {% endif %}
+              {% endfor %}
+              {% endif %}
+              {% endfor %}
+          loop: "{{ captured_units[:12] }}"
+        - ansible.builtin.command:
+            argv: "{{ ['systemd-analyze', 'verify'] + (captured_units[:12] | map(attribute='name') | zip(captured_units[:12] | map(attribute='type')) | map('join', '.') | map('regex_replace', '^', unit_directory.path ~ '/') | list) }}"
+          register: unit_verify
+          changed_when: false
+          failed_when: false
+        - ansible.builtin.assert:
+            that:
+              - unit_verify.rc == 0
+      always:
+        - ansible.builtin.file:
+            path: "{{ unit_directory.path }}"
+            state: absent

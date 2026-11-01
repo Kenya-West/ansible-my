@@ -1,0 +1,59 @@
+---
+- name: Validate timer management request
+  ansible.builtin.assert:
+    that:
+      - systemd_timer_state in ['present', 'absent']
+      - systemd_timer_units | length > 0
+
+- name: Look up service accounts
+  ansible.builtin.getent:
+    database: passwd
+
+- name: Prepare user service managers
+  ansible.builtin.include_tasks: prepare-user.yml
+  loop: "{{ systemd_timer_units | selectattr('scope', 'equalto', 'user') | map(attribute='user') | unique | list }}"
+  loop_control:
+    loop_var: timer_user
+  when: systemd_timer_state == 'present'
+
+- name: Install services and enable timers without starting oneshot services
+  ansible.builtin.include_role:
+    name: 0x0I.systemd
+  vars:
+    unit_config: "{{ systemd_timer_units }}"
+    systemd_backup_files: false
+  when: systemd_timer_state == 'present'
+
+- name: Remove timers before services
+  ansible.builtin.include_tasks: remove-unit.yml
+  loop: >-
+    {{ (systemd_timer_units | selectattr('type', 'equalto', 'timer') | list)
+       + (systemd_timer_units | selectattr('type', 'equalto', 'service') | list) }}
+  loop_control:
+    loop_var: timer_unit
+    label: "{{ timer_unit.name }}.{{ timer_unit.type }}"
+  when: systemd_timer_state == 'absent'
+
+# Probe first: crontab may not be installed, or the account may have no crontab.
+- name: Read legacy crontabs
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    argv: [crontab, -u, "{{ item }}", -l]
+  loop: "{{ systemd_timer_legacy_cron_jobs | map(attribute='user') | unique | list }}"
+  register: timer_legacy_crontabs
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Remove legacy cron jobs after systemd reconciliation
+  become: true
+  become_user: root
+  ansible.builtin.cron:
+    user: "{{ item.user }}"
+    name: "{{ item.name }}"
+    state: absent
+  loop: "{{ systemd_timer_legacy_cron_jobs }}"
+  when: >-
+    timer_legacy_crontabs.results | selectattr('item', 'equalto', item.user)
+    | selectattr('rc', 'equalto', 0) | list | length > 0

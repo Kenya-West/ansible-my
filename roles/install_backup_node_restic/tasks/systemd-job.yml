@@ -1,0 +1,52 @@
+---
+- name: Reconcile Autorestic service and timer
+  ansible.builtin.include_role:
+    name: kwtoolset/systemd_timer
+  vars:
+    restic_timer_command: >-
+      {{ ((cron_wrapped_task_prefix ~ ' --job-name ' ~ restic_timer_job.monitor_name ~ ' -- ')
+          if 'analytics_node' in group_names and cron_wrapped_task_prefix | default('') | length > 0 else '')
+         ~ (restic_timer_job.script | quote)
+         ~ ((' ' ~ (cron_wrapped_task_suffix | default(''))) if 'analytics_node' in group_names else '') }}
+    systemd_timer_state: "{{ role_state | default('present') }}"
+    systemd_timer_legacy_cron_jobs: >-
+      {{ [{'user': 'root', 'name': restic_node_legacy_cron_names[0]},
+          {'user': 'root', 'name': restic_node_legacy_cron_names[1]}]
+         if restic_node_migrate_legacy_cron | bool and restic_timer_job.name == restic_node_forget_unit_name else [] }}
+    systemd_timer_units:
+      - name: "{{ restic_timer_job.name }}"
+        type: service
+        scope: system
+        user: root
+        path: "{{ restic_node_systemd_unit_path }}"
+        manage_state: false
+        enabled: false
+        Unit:
+          Description: "Run {{ restic_timer_job.name }}"
+          Wants: network-online.target
+          After: network-online.target
+        Service:
+          Type: oneshot
+          ExecStart: "{{ '/usr/bin/bash -c ' ~ (restic_timer_command | to_json) | replace('%', '%%') }}"
+          WorkingDirectory: "{{ dest_path_full }}"
+          Environment:
+            - "HOME=/root"
+            - "PATH=/usr/local/bin:/usr/bin:/bin"
+          TimeoutStartSec: "{{ restic_node_timeout }}"
+          Nice: "5"
+      - name: "{{ restic_timer_job.name }}"
+        type: timer
+        scope: system
+        user: root
+        path: "{{ restic_node_systemd_unit_path }}"
+        enabled: true
+        state: started
+        Unit:
+          Description: "Schedule {{ restic_timer_job.name }}"
+        Timer:
+          Unit: "{{ restic_timer_job.name }}.service"
+          OnCalendar: "{{ restic_timer_job.calendar }}"
+          RandomizedDelaySec: "{{ restic_timer_job.randomized_delay }}"
+          Persistent: "true"
+        Install:
+          WantedBy: timers.target

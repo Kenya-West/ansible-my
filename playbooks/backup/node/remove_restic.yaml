@@ -13,22 +13,15 @@
     dest_project_rootpath: "/home/{{ standard_user }}/{{ project_root_dir }}"
     dest_project_fullpath: "{{ dest_project_rootpath }}/{{ project_dir }}"
 
+  pre_tasks:
+    - name: Stop and remove Autorestic timers before removing backup scripts
+      ansible.builtin.include_role:
+        name: install_backup_node_restic
+        tasks_from: systemd
+      vars:
+        role_state: absent
+
   roles:
     - name: remove_project_dirs
       vars:
         remove_project_dirs: "['{{ dest_project_fullpath }}']"
-
-  post_tasks:
-    - name: Remove certbot cron job
-      become: true
-      become_user: root
-      ansible.builtin.cron:
-        name: "{{ restic_node_cron_job_name }}"
-        state: absent
-    - name: Remove Autorestic forget cron job
-      become: true
-      become_user: root
-      ansible.builtin.cron:
-        name: "{{ restic_node_cron_job_name_forget }}"
-        state: absent
-      when: "'analytics_node' in group_names"

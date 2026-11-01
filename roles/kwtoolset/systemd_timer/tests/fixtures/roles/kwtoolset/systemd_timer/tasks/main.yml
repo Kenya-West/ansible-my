@@ -1,0 +1,6 @@
+---
+- name: Capture timer request without touching host services
+  ansible.builtin.set_fact:
+    captured_units: "{{ captured_units | default([]) + systemd_timer_units }}"
+    captured_cron_jobs: "{{ captured_cron_jobs | default([]) + systemd_timer_legacy_cron_jobs }}"
+    captured_states: "{{ captured_states | default([]) + [systemd_timer_state | default('present')] }}"

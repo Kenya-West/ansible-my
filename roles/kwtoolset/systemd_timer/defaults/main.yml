@@ -1,0 +1,6 @@
+---
+# Units use the same schema as 0x0I.systemd.
+systemd_timer_units: []
+systemd_timer_state: present
+# Only removal is supported; this role never creates cron jobs.
+systemd_timer_legacy_cron_jobs: []

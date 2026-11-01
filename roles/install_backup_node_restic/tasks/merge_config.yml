@@ -6,4 +6,8 @@
            | combine(backup_restic_node_locations_additional|default({}), recursive=True) }}
       remotes: >-
         {{ backup_restic_node_remotes_base
-           | combine(backup_restic_node_remotes_additional|default({}), recursive=True) }}
+           | combine(backup_restic_node_remotes_additional|default({})
+                     | dict2items
+                     | selectattr('key', 'in', backup_restic_node_remotes_base.keys() | list)
+                     | list | items2dict,
+                     recursive=True) }}

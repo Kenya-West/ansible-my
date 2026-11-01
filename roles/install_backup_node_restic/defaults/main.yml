@@ -16,10 +16,20 @@ dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
 compose_project_name: "{{ project_dir }}"
 
-restic_node_cron_job_name: "Autorestic backup"
-restic_node_cron_job_name_forget: "Autorestic forget"
-restic_node_cron_job_name_prefix: "/bin/bash -c 'sleep $((RANDOM\\%300))' &&"
-restic_node_cron_job_name_suffix: ""
+# Full-filesystem backups deliberately run as root system services.
+restic_node_systemd_unit_path: /etc/systemd/system
+restic_node_backup_unit_name: autorestic-backup
+restic_node_forget_unit_name: autorestic-forget
+restic_node_backup_calendar: "*-*-* *:00,30:00"
+restic_node_forget_calendar: "*-*-* 00:16:00"
+restic_node_backup_randomized_delay: "5min"
+restic_node_timeout: "24h"
+# Seconds allowed for the autorestic configuration check before the play fails
+restic_node_check_timeout: 360
+restic_node_migrate_legacy_cron: true
+restic_node_legacy_cron_names:
+  - "{{ restic_node_cron_job_name | default('Autorestic backup') }}"
+  - "{{ restic_node_cron_job_name_forget | default('Autorestic forget') }}"
 restic_excludes_list_files:
   - excludes-common.txt
   - excludes-dev-build.txt
@@ -27,10 +37,17 @@ restic_excludes_list_files:
   - excludes-home-dirs.txt
   - excludes-root.txt
 
-cronjob_script_path_without_analytics_autorestic_backup: "{{ restic_node_cron_job_name_prefix | default('') }} {{ dest_path_full }}/scripts/update-cron.sh"
-cronjob_script_path_with_analytics_autorestic_backup: "{{ cronjob_script_path_without_analytics_autorestic_backup }}"
-cronjob_script_path_without_analytics_autorestic_forget: "{{ dest_path_full }}/scripts/forget.sh"
-cronjob_script_path_with_analytics_autorestic_forget: "{{ cronjob_script_path_without_analytics_autorestic_forget }}"
+restic_node_timer_jobs:
+  - name: "{{ restic_node_backup_unit_name }}"
+    script: "{{ dest_path_full }}/scripts/update-cron.sh"
+    monitor_name: autorestic_backup
+    calendar: "{{ restic_node_backup_calendar }}"
+    randomized_delay: "{{ restic_node_backup_randomized_delay }}"
+  - name: "{{ restic_node_forget_unit_name }}"
+    script: "{{ dest_path_full }}/scripts/forget.sh"
+    monitor_name: autorestic_forget
+    calendar: "{{ restic_node_forget_calendar }}"
+    randomized_delay: "0"
 
 restic_global_forget:
   keep-last: 5

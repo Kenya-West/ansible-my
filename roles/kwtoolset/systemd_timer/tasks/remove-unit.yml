@@ -1,0 +1,42 @@
+---
+- name: Check managed unit file
+  ansible.builtin.stat:
+    path: "{{ timer_unit.path }}/{{ timer_unit.name }}.{{ timer_unit.type }}"
+  register: timer_unit_file
+
+- name: Start user manager when removing installed user units
+  become: true
+  become_user: root
+  ansible.builtin.systemd_service:
+    name: "user@{{ ansible_facts.getent_passwd[timer_unit.user][1] }}.service"
+    state: started
+  when:
+    - timer_unit_file.stat.exists
+    - timer_unit.scope == 'user'
+
+- name: Stop and disable installed unit
+  become: true
+  become_user: "{{ timer_unit.user if timer_unit.scope == 'user' else 'root' }}"
+  environment: "{{ {'XDG_RUNTIME_DIR': '/run/user/' ~ ansible_facts.getent_passwd[timer_unit.user][1]} if timer_unit.scope == 'user' else {} }}"
+  ansible.builtin.systemd_service:
+    name: "{{ timer_unit.name }}.{{ timer_unit.type }}"
+    scope: "{{ timer_unit.scope }}"
+    state: stopped
+    enabled: false
+  when: timer_unit_file.stat.exists
+
+- name: Remove managed unit file
+  become: true
+  become_user: "{{ timer_unit.user if timer_unit.scope == 'user' else 'root' }}"
+  ansible.builtin.file:
+    path: "{{ timer_unit.path }}/{{ timer_unit.name }}.{{ timer_unit.type }}"
+    state: absent
+
+- name: Reload service manager after removal
+  become: true
+  become_user: "{{ timer_unit.user if timer_unit.scope == 'user' else 'root' }}"
+  environment: "{{ {'XDG_RUNTIME_DIR': '/run/user/' ~ ansible_facts.getent_passwd[timer_unit.user][1]} if timer_unit.scope == 'user' else {} }}"
+  ansible.builtin.systemd_service:
+    scope: "{{ timer_unit.scope }}"
+    daemon_reload: true
+  when: timer_unit_file.stat.exists

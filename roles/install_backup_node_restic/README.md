@@ -1,38 +1,45 @@
-Role Name
-=========
+# Autorestic node backups
 
-A brief description of the role goes here.
+Deploys Autorestic configuration/scripts and schedules execution with persistent
+**root-scoped systemd timers**. Root scope is deliberate: full-filesystem backups
+and hooks retain root access without interactive sudo, new sudoers rules, or
+sandbox options that prevent privilege elevation.
 
-Requirements
-------------
+Requires systemd and the external `0x0I.systemd` role.
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+| Variable | Default |
+| --- | --- |
+| `restic_node_backup_unit_name` | `autorestic-backup` |
+| `restic_node_forget_unit_name` | `autorestic-forget` |
+| `restic_node_backup_calendar` | `*-*-* *:00,30:00` |
+| `restic_node_forget_calendar` | `*-*-* 00:16:00` |
+| `restic_node_backup_randomized_delay` | `5min` |
+| `restic_node_timeout` | `24h` |
+| `restic_node_systemd_unit_path` | `/etc/systemd/system` |
 
-Role Variables
---------------
+Calendars use the host timezone. The backup service invokes the existing
+`update-cron.sh`; **`autorestic --ci cron` and the configuration's `cron` fields
+are Autorestic's internal due-location selector, not OS cron jobs**, and remain
+necessary. The forget service invokes `forget.sh`. The `analytics_node`
+monitoring wrapper and `autorestic_backup`/`autorestic_forget` metric names are
+preserved.
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+Timer reconciliation does not explicitly start the backup services. Persistent
+timers may perform catch-up runs; the existing installation scenario still
+performs its initial backup/configuration checks.
 
-Dependencies
-------------
+`restic_node_migrate_legacy_cron: true` removes the old root entries only after
+both timers are reconciled. Customize `restic_node_legacy_cron_names` if needed;
+old `restic_node_cron_job_name` and `restic_node_cron_job_name_forget` overrides
+are accepted for cleanup only. Shell sleep prefixes are replaced by systemd's
+randomized delay.
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+`playbooks/backup/node/remove_restic.yaml` removes timers/services and both legacy
+cron entries before deleting the project, regardless of analytics group
+membership. Scheduling can be reconciled separately via `tasks_from: systemd`
+with `role_state: present` or `absent`.
 
-Example Playbook
-----------------
-
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
-
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
-
-License
--------
-
-BSD
-
-Author Information
-------------------
-
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+```bash
+sudo systemctl list-timers 'autorestic-*'
+sudo journalctl -u autorestic-backup.service
+```
