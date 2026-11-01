@@ -90,10 +90,13 @@
   ansible.builtin.file:
     path: "{{ dest_path_full }}/ssh-keys"
     state: directory
-    mode: "0600"
+    mode: "0700"
+    owner: "{{ git_sync_user }}"
+    group: "{{ git_sync_user }}"
   tags:
     - update_config_hard
     - update_known_hosts
+    - update_ssh_keys
 
 - name: Create known_hosts file with correct permissions
   become: true
@@ -140,6 +143,23 @@
     - update_config_hard
     - update_ssh_keys
 
+- name: Migrate root-owned Git sync files to the service user
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ dest_path_full }}"
+    state: directory
+    owner: "{{ git_sync_user }}"
+    group: "{{ git_sync_user }}"
+    recurse: true
+  tags:
+    - update_config_hard
+    - update_sync_configs
+    - update_ssh_keys
+    - update_known_hosts
+    - update_systemd_timer
+    - update_scripts
+
 - name: Make {{ dest_path_full }}/sources a safe directory for git
   community.general.git_config:
     name: "{{ item.key }}"
@@ -163,11 +183,16 @@
     - update_config_hard
     - update_git_config
 
-- name: Create cron jobs per git_sync_configs items
-  ansible.builtin.include_tasks: install_cron.yml
+- name: Create user services and timers per Git sync config
+  ansible.builtin.include_tasks:
+    file: systemd.yml
+    apply:
+      tags:
+        - update_config_hard
+        - update_systemd_timer
   loop: "{{ git_sync_configs }}"
   loop_control:
     loop_var: config_item
   tags:
     - update_config_hard
-    - update_cron_jobs
+    - update_systemd_timer

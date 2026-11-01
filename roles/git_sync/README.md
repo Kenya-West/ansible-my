@@ -1,38 +1,43 @@
-Role Name
-=========
+# Git sync
 
-A brief description of the role goes here.
+Synchronizes each `git_sync_configs` entry using a user-scoped oneshot service
+and persistent systemd timer. Requires `0x0I.systemd`, systemd, and an existing
+`standard_user` account. Setup enables lingering and starts the user manager so
+jobs run after logout and reboot.
 
-Requirements
-------------
+Defaults:
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+- `git_sync_user`: `standard_user`
+- `git_sync_home`: `/home/<git_sync_user>`
+- `git_sync_systemd_unit_path`: `<git_sync_home>/.config/systemd/user`
+- `git_sync_calendar`: `*-*-* 00:00:00` (host timezone)
+- `git_sync_randomized_delay`: `5min`
+- `git_sync_timeout`: `6h`
 
-Role Variables
---------------
+Each config can override `calendar` and `randomized_delay`. Unit names include
+the **whole** config filename, e.g. `git-sync-repo.main.conf.timer`, so filenames
+sharing the same first component no longer collide. Config filenames must be
+unique basenames containing letters, numbers, dots, underscores and hyphens.
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+Root-owned project files and SSH keys are transferred to `git_sync_user`. Any
+external SSH key files and persistent work directories referenced by configs
+must also be accessible and writable as appropriate to that user. The
+`analytics_node` monitoring wrapper is retained, including the existing metric
+job names.
 
-Dependencies
-------------
+Deployment installs services without explicitly starting syncs; timers trigger
+them, including catch-up runs from `Persistent=true`. Legacy root cron entries
+are removed after timer reconciliation. Disable that cleanup with
+`git_sync_migrate_legacy_cron: false`, or customize
+`git_sync_legacy_cron_name_prefix` (the old `cron_job_name_prefix` is accepted for
+cleanup only).
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+Use `--tags update_systemd_timer` to update scheduling. `role_state: absent`
+stops/disables timers and services, removes their unit files and legacy cron
+entries, then removes the project. Keep the same config list during removal;
+removing a config from the list alone does not retire its old timer.
 
-Example Playbook
-----------------
-
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
-
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
-
-License
--------
-
-BSD
-
-Author Information
-------------------
-
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+```bash
+systemctl --user list-timers 'git-sync-*'
+journalctl --user -u git-sync-repo.main.conf.service
+```

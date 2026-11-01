@@ -17,12 +17,12 @@ source_paths_add_user_dirs: []
 dest_path_root: "/home/{{ standard_user }}/{{ git_sync.project.root }}"
 dest_path_full: "{{ dest_path_root }}/{{ project_dir }}"
 
-cron_job_name_prefix: "git-sync:"
-cron_job_name: ""
-cron_job_role_prefix: "/bin/bash -c 'sleep $((RANDOM\\%300))' &&"
-cron_job_role_suffix: ""
-
-# This is just a template that should be created per config in git_sync_configs list. It should be set in the role.
-cronjob_base_script: "{{ dest_path_full }}/scripts/script.sh --config {{ dest_path_full }}/config/example.conf --verbose"
-# fallback. Should be set in role
-cronjob_base_script_with_analytics: "{{ cronjob_base_script }}"
+git_sync_user: "{{ standard_user }}"
+git_sync_home: "/home/{{ git_sync_user }}"
+git_sync_systemd_unit_path: "{{ git_sync_home }}/.config/systemd/user"
+git_sync_unit_prefix: git-sync-
+git_sync_calendar: "*-*-* 00:00:00"
+git_sync_randomized_delay: "5min"
+git_sync_timeout: "6h"
+git_sync_migrate_legacy_cron: true
+git_sync_legacy_cron_name_prefix: "git-sync:"

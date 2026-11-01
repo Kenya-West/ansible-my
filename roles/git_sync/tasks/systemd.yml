@@ -1,0 +1,62 @@
+---
+- name: Validate Git sync config file names and unique unit identifiers
+  ansible.builtin.assert:
+    that:
+      - config_item.config_file_name is match('^[A-Za-z0-9_-][A-Za-z0-9_.-]*$')
+      - git_sync_configs | map(attribute='config_file_name') | unique | length == git_sync_configs | length
+    fail_msg: "Git sync config file names must be unique, nonempty basenames containing only letters, numbers, dots, underscores and hyphens."
+
+- name: Reconcile user-scoped Git sync service and timer
+  ansible.builtin.include_role:
+    name: kwtoolset/systemd_timer
+  vars:
+    git_sync_unit_name: "{{ git_sync_unit_prefix }}{{ config_item.config_file_name }}"
+    git_sync_command: >-
+      {{ (dest_path_full ~ '/scripts/script.sh') | quote }} --config
+      {{ (dest_path_full ~ '/config/' ~ config_item.config_file_name) | quote }} --verbose
+    git_sync_monitored_command: >-
+      {{ ((cron_wrapped_task_prefix ~ ' --job-name ' ~
+           ((git_sync_legacy_cron_name_prefix ~ config_item.config_file_name.split('.')[0]) | quote) ~
+           ' -- ' ~ git_sync_command ~ ' ' ~ (cron_wrapped_task_suffix | default('')))
+          if 'analytics_node' in group_names and cron_wrapped_task_prefix | default('') | length > 0
+          else git_sync_command) }}
+    systemd_timer_state: "{{ role_state }}"
+    systemd_timer_legacy_cron_jobs: >-
+      {{ [{'user': 'root', 'name': (cron_job_name_prefix | default(git_sync_legacy_cron_name_prefix)) ~ config_item.config_file_name.split('.')[0]}]
+         if git_sync_migrate_legacy_cron | bool else [] }}
+    systemd_timer_units:
+      - name: "{{ git_sync_unit_name }}"
+        type: service
+        scope: user
+        user: "{{ git_sync_user }}"
+        path: "{{ git_sync_systemd_unit_path }}"
+        manage_state: false
+        enabled: false
+        Unit:
+          Description: "Git sync for {{ config_item.config_file_name }}"
+        Service:
+          Type: oneshot
+          ExecStart: "{{ '/usr/bin/bash -c ' ~ (git_sync_monitored_command | to_json) | replace('%', '%%') }}"
+          WorkingDirectory: "{{ git_sync_home }}"
+          Environment:
+            - "HOME={{ git_sync_home }}"
+            - "PATH=/usr/local/bin:/usr/bin:/bin"
+          TimeoutStartSec: "{{ git_sync_timeout }}"
+          Nice: "5"
+          NoNewPrivileges: "yes"
+      - name: "{{ git_sync_unit_name }}"
+        type: timer
+        scope: user
+        user: "{{ git_sync_user }}"
+        path: "{{ git_sync_systemd_unit_path }}"
+        enabled: true
+        state: started
+        Unit:
+          Description: "Schedule Git sync for {{ config_item.config_file_name }}"
+        Timer:
+          Unit: "{{ git_sync_unit_name }}.service"
+          OnCalendar: "{{ config_item.calendar | default(git_sync_calendar) }}"
+          RandomizedDelaySec: "{{ config_item.randomized_delay | default(git_sync_randomized_delay) }}"
+          Persistent: "true"
+        Install:
+          WantedBy: timers.target
