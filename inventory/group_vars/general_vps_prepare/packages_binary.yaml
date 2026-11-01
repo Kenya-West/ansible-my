@@ -10,6 +10,7 @@ packages_binary_list:
   #     - lnav                    # Usually, a package name
   #     - ^REG:musl               # and/or a negative filter to exclude unsupported architecture
   #     - tar.gz                  # and/or a file extension
+  #   tag: v1.2.3                 # Optional. Release tag to pin instead of the latest one
   #   dest_loc: /usr/local/bin    # Optional. Location to put bin file
   #   bin_name: lnav              # Optional. Name of command that will be available in shell
   #   file: lnav                  # Optional. Name of file to extract (glob)

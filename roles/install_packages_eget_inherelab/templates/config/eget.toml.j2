@@ -39,4 +39,9 @@
 {%   if pkg.assets is defined %}
   asset_filters = [{% for a in pkg.assets %}"{{ a }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 {%   endif %}
+{#   Without tag_policy, `eget update` ignores the tag and goes for the latest release. #}
+{%   if pkg.tag is defined %}
+  tag = "{{ pkg.tag }}"
+  tag_policy = "tag"
+{%   endif %}
 {% endfor %}
