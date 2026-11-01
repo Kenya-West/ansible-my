@@ -50,10 +50,6 @@ packages_binary_list:
   - repo: ajeetdsouza/zoxide
   - repo: veeso/termscp
   - repo: cupcakearmy/autorestic
-  - repo: kutovoys/xray-torrent-blocker
-    assets:
-      - tar.gz
-    bin_name: tblocker
   - repo: mr-karan/doggo
     assets:
       - ^REG:web
