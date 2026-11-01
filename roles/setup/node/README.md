@@ -30,6 +30,11 @@ What it does
      `domain_management` are always joined, and a russian host also joins
      `vps_russia` (and `vpn_caddy_russia_chain` when it is a `vpn_caddy`
      host), see `setup_node_groups_by_region`;
+   - the host the new one relates to by default (`host_relations.default`
+     of `1_domains.yaml`): chosen from the `analytics_server` and
+     `vpn_server_remnawave` hosts (deduplicated), or typed. This is asked
+     before domain selection; a `vpn_caddy` host selects one or more main
+     and XRay base domains from that panel's catalog;
    - for a host outside `vpn_caddy`, the base domain of its own domain
      (`initial_configure_host_base_domain_name`, `accessto.page`): chosen
      from the base domains already in use, or typed when there is none or
@@ -39,12 +44,7 @@ What it does
      (the `4` of `chain-russia-4.123987465.xyz`; the default is the next
      free index of the region, and an existing one joins that round-robin
      domain), the primary protocol of the node and whether its
-     certificates use the Cloudflare DNS-01 challenge;
-   - the host the new one relates to by default (`host_relations.default`
-     of `1_domains.yaml`): chosen from the hosts of the `analytics_server`
-     and `vpn_server_remnawave` groups of the inventory the play runs
-     against (deduplicated), or typed when there is none or another one is
-     wanted.
+     certificates use the Cloudflare DNS-01 challenge.
 3. Renders `templates/host/0_all/` of `setup/common` and of this role and, for every group joined that has a
    directory of the same name in `templates/host/`, that directory into
    `host_vars/<hostname>/`.
@@ -56,14 +56,56 @@ Nothing is written when `host_vars/<hostname>/` already exists.
 Domains of a `vpn_caddy` host
 -----------------------------
 
-Its `1_domains.yaml` holds only `domains_node` (the location indexes) and
-`host_relations`. `inventory/group_vars/vpn_caddy/domain_generator.yaml`
-builds `domains_keys` from them: `main` and every `remna_node` entry of
+Its `1_domains.yaml` holds `domains_node` (the location indexes and optional
+base-domain subsets) and `host_relations`. The panel catalog accepts ordered
+lists and legacy strings. `inventory/group_vars/vpn_caddy/domain_generator.yaml`
+builds `domains_keys` from them: the primary string `main`, `main_extra` aliases,
+and every `remna_node` entry of
 `domains_node_remna_node_spec`, on the base domains of the panel its
 `host_relations` resolve to (`vpn_server_remnawave_node_base_domains` of that
 panel's `host_vars`). `domains_node.remna_node_types` narrows the entries,
 `domains_node.remna_node_extra` adds some. `domains` is flattened from
 `domains_keys` in `group_vars/all/0_defaults/domains.yaml`.
+
+The unattended answers are `node_main_base_domains` and
+`node_xray_base_domains` (default: all panel entries); plain hosts can use
+`extra_base_domains` for aliases. The relation is asked before these selections.
+
+In `host_vars/<panel>/0_all/1_domains.yaml`, declare the panel's supported domains:
+
+```yaml
+vpn_server_remnawave_node_base_domains:
+  main: [hosts.example.com, hosts.example.net]
+  xray: [vpn.example.com, vpn.example.net]
+```
+
+Both keys accept a non-empty list or a legacy string of bare lowercase DNS
+names. Lists preserve order and remove duplicates. Select a subset per node:
+
+```yaml
+domains_node:
+  base_domains:
+    main: [hosts.example.net]
+    xray: [vpn.example.com, vpn.example.net]
+  net_location_index: 4
+  chain_location_index: 4
+```
+
+An omitted selection key inherits all entries of that key. An explicit
+selection must be non-empty and registered on the related panel. `main` and
+`xray` selections are independent; their list positions are not paired.
+The first selected `main` domain is the primary service/control hostname;
+remaining own hostnames go into `domains_keys.main_extra`. DNS, Caddy and
+certificate consumers include those aliases. `host_relations` still selects
+the panel and its credentials, even if several panels share domain bases.
+
+Existing strings need no migration. When adding panel catalog entries, pin
+existing nodes to their old bases first if they should not inherit the new
+entries. Adding domains can renumber generated remarks, outbounds and route
+IDs; preview panel playbooks with `--check --diff` and review route-ID limits.
+Deploy DNS, Caddy/node configuration and certificates before generating the
+panel's config profiles, snippets, nodes and hosts; then run
+`remnawave_verify.yaml`. Ensure all chosen DNS zones have provider credentials.
 
 Run it
 ------
@@ -108,7 +150,8 @@ Templates
 ---------
 
 - `host/0_all/1_domains.yaml.j2`: for a `vpn_caddy` host, `domains_node`
-  with the location indexes; for any other, `domains_keys.main` and an empty
+  with location indexes and selected `base_domains`; for any other,
+  `domains_keys.main`, optional `main_extra` aliases, and an empty
   `remna_node`. Then `host_relations.default`.
 - `host/0_all/2_domains.yaml` of `setup/common`: how to add or override DNS
   records and define `host_relations` (resolved by

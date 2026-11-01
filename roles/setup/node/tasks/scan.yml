@@ -45,6 +45,32 @@
       {%- endfor -%}
       {{ ips | to_json }}
 
+- name: Validate the panel domain catalogs found in the inventory
+  ansible.builtin.assert:
+    that:
+      - __setup_node_catalog is mapping
+      - __setup_node_catalog | list | sort == ['main', 'xray']
+      - >-
+        __setup_node_catalog.values() | select('string') | list | length
+        + (__setup_node_catalog.values() | select('sequence') | reject('string') | reject('mapping') | list | length)
+        == __setup_node_catalog | length
+      - __setup_node_catalog.values() | select('equalto', []) | list | length == 0
+      - >-
+        __setup_node_catalog.values() | flatten(levels=1, skip_nulls=false) | select('string') | list | length
+        == __setup_node_catalog.values() | flatten(levels=1, skip_nulls=false) | length
+      - __setup_node_catalog.values() | flatten(levels=1, skip_nulls=false) | reject('match', domains_base_domain_pattern) | list | length == 0
+    quiet: true
+    fail_msg: >-
+      {{ item.item.path }} must declare main and xray as non-empty domain
+      strings or lists of bare lowercase DNS names.
+  vars:
+    __setup_node_data: "{{ item.content | b64decode | from_yaml }}"
+    __setup_node_catalog: "{{ __setup_node_data.vpn_server_remnawave_node_base_domains }}"
+  when: __setup_node_data is mapping and __setup_node_data.vpn_server_remnawave_node_base_domains is defined
+  loop: "{{ __setup_node_domain_slurp.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+
 # One entry per fact a host's domain file holds, with the host and its region:
 #   key main  - the base domain of a literal domains_keys.main (Jinja included,
 #               filtered out later), or vpn_server_remnawave_node_base_domains.main
@@ -71,13 +97,42 @@
       {%-   set _ = entries.append({'host': host, 'region': region, 'key': 'main',
                                     'base': dk.main | regex_replace('^(?:\{\{[^}]*\}\}|[^.]+)[^.]*\.', '')}) -%}
       {%- endif -%}
-      {%- for key in ['main', 'xray'] if bases is mapping and bases[key] is defined and bases[key] is string -%}
-      {%-   set _ = entries.append({'host': host, 'region': region, 'key': key, 'base': bases[key]}) -%}
+      {%- for alias in dk.main_extra | default([]) if alias is string -%}
+      {%-   set _ = entries.append({'host': host, 'region': region, 'key': 'main',
+                                    'base': alias | regex_replace('^(?:\{\{[^}]*\}\}|[^.]+)[^.]*\.', '')}) -%}
+      {%- endfor -%}
+      {%- for key in ['main', 'xray'] if bases is mapping and bases[key] is defined -%}
+      {%-   for base in ([bases[key]] if bases[key] is string else bases[key]) -%}
+      {%-     set _ = entries.append({'host': host, 'region': region, 'key': key, 'base': base}) -%}
+      {%-   endfor -%}
+      {%- endfor -%}
+      {%- for key, values in (node.base_domains | default({})).items() -%}
+      {%-   set values = [values] if values is string else values -%}
+      {%-   if key not in ['main', 'xray'] or values is not sequence or values is mapping or values | length == 0
+                or values | select('string') | list | length != values | length
+                or values | reject('match', domains_base_domain_pattern) | list | length > 0 -%}
+      {{ undef('Invalid domains_node.base_domains.' ~ key ~ ' in ' ~ item.item.path) | mandatory }}
+      {%-   endif -%}
+      {%-   for base in values | unique(case_sensitive=true) -%}
+      {%-     set _ = entries.append({'host': host, 'region': region, 'key': key, 'base': base}) -%}
+      {%-   endfor -%}
       {%- endfor -%}
       {%- for kind in ['net_location', 'chain_location'] if node is mapping and node[kind ~ '_index'] is defined -%}
       {%-   set _ = entries.append({'host': host, 'region': region, 'key': kind, 'index': node[kind ~ '_index'] | int}) -%}
       {%- endfor -%}
       {{ ((__setup_node_domain_entries_json | default('[]') | from_json) + entries) | to_json }}
+    __setup_node_panel_catalogs_json: >-
+      {%- set host = item.item.path | dirname | dirname | basename -%}
+      {%- set data = item.content | b64decode | from_yaml -%}
+      {%- set catalogs = __setup_node_panel_catalogs_json | default('{}') | from_json -%}
+      {%- if data is mapping and data.vpn_server_remnawave_node_base_domains is defined -%}
+      {%-   set normalized = {} -%}
+      {%-   for key, value in data.vpn_server_remnawave_node_base_domains.items() -%}
+      {%-     set _ = normalized.update({key: ([value] if value is string else value) | unique(case_sensitive=true) | list}) -%}
+      {%-   endfor -%}
+      {%-   set _ = catalogs.update({host: normalized}) -%}
+      {%- endif -%}
+      {{ catalogs | to_json }}
   loop: "{{ __setup_node_domain_slurp.results }}"
   loop_control:
     label: "{{ item.item.path }}"
@@ -86,6 +141,7 @@
   ansible.builtin.set_fact:
     setup_node_scan_existing_ip_addresses: "{{ __setup_node_ip_addresses_json | from_json }}"
     setup_node_scan_domain_entries: "{{ __setup_node_domain_entries_json | default('[]') | from_json }}"
+    setup_node_scan_panel_base_domains: "{{ __setup_node_panel_catalogs_json | default('{}') | from_json }}"
     setup_node_scan_providers: >-
       {{ setup_node_scan_existing_hostnames
          | select('match', '^[a-z0-9]+-[a-z]{2}-[0-9]+$')

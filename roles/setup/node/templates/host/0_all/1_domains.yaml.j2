@@ -2,11 +2,18 @@
 {% set c = '}}' %}
 {% if setup_node_remna_node_enabled %}
 domains_node:
+  base_domains: {{ setup_node_selected_base_domains | to_json }}
   net_location_index: {{ initial_configure_host_net_location_index }}
   chain_location_index: {{ initial_configure_host_chain_location_index }}
 {% else %}
 domains_keys:
-  main: "{{ o }} inventory_hostname {{ c }}.{{ initial_configure_host_base_domain_name }}"
+  main: "{{ o }} inventory_hostname {{ c }}.{{ setup_node_host_base_domains | first }}"
+  main_extra:
+{% for base in setup_node_host_base_domains[1:] %}
+    - "{{ o }} inventory_hostname {{ c }}.{{ base }}"
+{% else %}
+    []
+{% endfor %}
   remna_node: []
 {% endif %}
 

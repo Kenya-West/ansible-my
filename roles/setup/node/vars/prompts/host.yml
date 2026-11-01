@@ -127,9 +127,44 @@ prompts:
     default: "{{ setup_node_groups_optional_default }}"
     required: false
 
-  # A vpn_caddy host takes its base domains from the panel it relates to
-  # (vpn_server_remnawave_node_base_domains, see
-  # group_vars/vpn_caddy/domain_generator.yaml); any other host names its own.
+  - id: default_relation_host_choice
+    prompt: "Host {{ setup_node_hostname }} relates to by default"
+    help: >-
+      Upstream in host_relations.default. For vpn_caddy, choose the panel
+      whose domain catalog this node will use; domains do not select a panel.
+    type: choice
+    choices: "{{ setup_node_scan_relation_host_choices }}"
+    default: "{{ setup_node_scan_relation_hosts | first }}"
+    when: setup_node_scan_relation_hosts | length > 0
+    validate:
+      - that: "'vpn_caddy' not in answers.groups | default([]) or answer == setup_node_other_choice or answer in setup_node_scan_panel_base_domains"
+        msg: A vpn_caddy node needs a panel with a domain catalog.
+
+  - id: default_relation_host_custom
+    prompt: "Host {{ setup_node_hostname }} relates to by default"
+    when: answers.default_relation_host_choice | default(setup_node_other_choice, true) == setup_node_other_choice
+    validate:
+      - pattern: '^[a-z0-9][a-z0-9._-]*$'
+      - that: "'vpn_caddy' not in answers.groups | default([]) or answer in setup_node_scan_panel_base_domains"
+        msg: Add the panel's 0_all/1_domains.yaml domain catalog first.
+
+  - id: node_main_base_domains
+    prompt: Base domains for this node's own hostnames
+    help: First selected domain is primary. Default selects all panel entries.
+    type: multichoice
+    choices: "{{ setup_node_panel_base_domains.main }}"
+    default: "{{ setup_node_panel_base_domains.main }}"
+    when: "'vpn_caddy' in answers.groups | default([], true)"
+
+  - id: node_xray_base_domains
+    prompt: Base domains for this node's XRay exit and chain names
+    help: Select one or more entries from the related panel's catalog.
+    type: multichoice
+    choices: "{{ setup_node_panel_base_domains.xray }}"
+    default: "{{ setup_node_panel_base_domains.xray }}"
+    when: "'vpn_caddy' in answers.groups | default([], true)"
+
+  # Hosts outside vpn_caddy name their own primary hostname and optional aliases.
   - id: base_domain_name_choice
     prompt: "Base domain of the host's own domain: {{ setup_node_hostname }}.<base domain>"
     help: The base domains the hosts of this inventory already use.
@@ -148,6 +183,16 @@ prompts:
     validate:
       - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
         msg: "'{{ answer }}' does not look like a domain."
+
+  - id: extra_base_domains
+    prompt: Additional base domains for the host's own hostname (comma-separated)
+    type: list
+    required: false
+    default: []
+    when: "'vpn_caddy' not in answers.groups | default([], true)"
+    validate:
+      - that: answer | reject('match', '^([a-z0-9-]+\\.)+[a-z]{2,}$') | list | length == 0
+        msg: Every entry must be a base domain.
 
   - id: net_location_index
     prompt: "Index of the exit domain: net-{{ setup_node_region }}-<index>.{{ setup_node_xray_base_domain }}"
@@ -188,26 +233,3 @@ prompts:
     type: bool
     default: true
     when: "'vpn_caddy' in answers.groups | default([], true)"
-
-  - id: default_relation_host_choice
-    prompt: "Host {{ setup_node_hostname }} relates to by default"
-    help: >-
-      host_relations.default of 0_all/1_domains.yaml: the upstream a component
-      of the host falls back to. The hosts of
-      {{ setup_node_relation_host_groups | join(' and ') }} in this inventory.
-      A vpn_caddy host takes its base domains from this panel
-      (vpn_server_remnawave_node_base_domains).
-    type: choice
-    choices: "{{ setup_node_scan_relation_host_choices }}"
-    default: "{{ setup_node_scan_relation_hosts | first }}"
-    when: setup_node_scan_relation_hosts | length > 0
-
-  - id: default_relation_host_custom
-    prompt: "Host {{ setup_node_hostname }} relates to by default"
-    help: >-
-      host_relations.default of 0_all/1_domains.yaml, an inventory_hostname
-      like play2go-nl-3.
-    when: answers.default_relation_host_choice | default(setup_node_other_choice, true) == setup_node_other_choice
-    validate:
-      - pattern: '^[a-z0-9][a-z0-9._-]*$'
-        msg: "'{{ answer }}' does not look like an inventory hostname."

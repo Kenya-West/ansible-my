@@ -3,22 +3,9 @@
 # defaults file for roles/kwtoolset/remap_caddy_cert_path
 
 remap_caddy_cert_path: >-
-  {{
-    dict(
-      domains_keys.keys() | zip(
-        domains_keys.values() | map('regex_replace', '^(.*)$', '\g<1>')
-      ) +
-      (
-        domains_keys.keys() | map('regex_replace', '^(.*)$', '\1_crt')
-        | zip(
-            domains_keys.values() | map('regex_replace', '^(.*)$', '\g<1>/\g<1>.crt')
-          )
-      ) +
-      (
-        domains_keys.keys() | map('regex_replace', '^(.*)$', '\1_key')
-        | zip(
-            domains_keys.values() | map('regex_replace', '^(.*)$', '\g<1>/\g<1>.key')
-          )
-      )
-    )
-  }}
+  {%- set out = {} -%}
+  {%- for key, domain in domains_keys.items() if domain is string -%}
+  {%-   set _ = out.update({key: domain, key ~ '_crt': domain ~ '/' ~ domain ~ '.crt',
+                          key ~ '_key': domain ~ '/' ~ domain ~ '.key'}) -%}
+  {%- endfor -%}
+  {{ out }}

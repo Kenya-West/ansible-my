@@ -132,7 +132,8 @@ vpn_server_remnawave_snippets_exits: >-
 # Outbound tags are
 #   <prefix>-<region code>-<protocol>-<NNN>   location exits, numbered per region
 #                                            and protocol in domain index order
-#   <prefix>-<geo code>-<protocol>-all       all exits
+#   <prefix>-<geo code>-<protocol>-all       all exits; subsequent domains in
+#                                            the same group append -2, -3, ...
 # where <protocol> is the last of remna_protocol_types.<key>.parts, e.g.
 # out-chain-eu-tcp-001, out-chain-ru-xhttp-001, out-chain-global-tcp-all,
 # out-chain-ru-tcp-all. A geo without a region code of its own keeps its name.
@@ -149,6 +150,7 @@ vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]
 # from its template with node_address set to the exit's address.
 vpn_server_remnawave_snippets_outbounds_plan: >-
   {%- set counters = {} -%}
+  {%- set all_counters = {} -%}
   {%- set out = [] -%}
   {%- for exit in vpn_server_remnawave_snippets_exits | sort(attribute='kind_order,region_order,region_code,token,index,address') -%}
   {%-   set group = exit.region_code ~ '-' ~ exit.token -%}
@@ -156,7 +158,9 @@ vpn_server_remnawave_snippets_outbounds_plan: >-
   {%-     set _ = counters.update({group: counters.get(group, 0) + 1}) -%}
   {%-     set suffix = ('%0' ~ vpn_server_remnawave_snippets_outbound_tag_index_width ~ 'd') | format(counters[group]) -%}
   {%-   else -%}
-  {%-     set suffix = vpn_server_remnawave_snippets_outbound_tag_all_suffix -%}
+  {%-     set _ = all_counters.update({group: all_counters.get(group, 0) + 1}) -%}
+  {%-     set suffix = vpn_server_remnawave_snippets_outbound_tag_all_suffix
+                      ~ (('-' ~ all_counters[group]) if all_counters[group] > 1 else '') -%}
   {%-   endif -%}
   {%-   set _ = out.append(exit | combine({
           'tag': vpn_server_remnawave_snippets_outbound_tag_prefix ~ '-' ~ group ~ '-' ~ suffix,
@@ -172,6 +176,7 @@ vpn_server_remnawave_snippets_outbounds_plan: >-
 # selecting every all outbound of that geo:
 #   bal-global-all-001: [out-chain-global-tcp-all, out-chain-global-xhttp-all]
 #   bal-russia-all-001: [out-chain-ru-tcp-all, out-chain-ru-xhttp-all]
+# Alternate base domains add their distinct ...-all-N tags to the same selector.
 vpn_server_remnawave_snippets_balancer_tag_prefix: bal
 vpn_server_remnawave_snippets_balancer_tag_suffix: all-001
 vpn_server_remnawave_snippets_balancers_all: >-

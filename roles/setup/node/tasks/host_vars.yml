@@ -32,13 +32,66 @@
       - not setup_node_remna_node_enabled or initial_configure_host_default_relation_host | length > 0
       - >-
         not setup_node_remna_node_enabled
-        or initial_configure_host_default_relation_host not in hostvars
-        or hostvars[initial_configure_host_default_relation_host].vpn_server_remnawave_node_base_domains is defined
+        or initial_configure_host_default_relation_host in setup_node_scan_panel_base_domains
     fail_msg: >-
       A host outside vpn_caddy needs a base domain. A vpn_caddy host needs the
       panel it relates to, holding vpn_server_remnawave_node_base_domains: its
       domains are built on those base domains.
     quiet: true
+
+- name: Normalize the node's domain selection before writing files
+  ansible.builtin.set_fact:
+    setup_node_selected_base_domains: >-
+      {%- set out = {} -%}
+      {%- for key, value in {'main': __setup_node_main, 'xray': __setup_node_xray}.items() -%}
+      {%-   set values = [value] if value is string else value -%}
+      {%-   if values is not sequence or values is mapping -%}
+      {{ undef('Selected ' ~ key ~ ' base domains must be a string or list') | mandatory }}
+      {%-   endif -%}
+      {%-   set _ = out.update({key: values | unique(case_sensitive=true) | list}) -%}
+      {%- endfor -%}
+      {{ out }}
+  vars:
+    __setup_node_main: "{{ initial_configure_host_node_main_base_domains | default(setup_node_scan_panel_base_domains[initial_configure_host_default_relation_host].main) }}"
+    __setup_node_xray: "{{ initial_configure_host_node_xray_base_domains | default(setup_node_scan_panel_base_domains[initial_configure_host_default_relation_host].xray) }}"
+  when: setup_node_remna_node_enabled
+
+- name: Validate the node's selected domains against its panel
+  ansible.builtin.assert:
+    that:
+      - item.value | length > 0
+      - item.value | select('string') | list | length == item.value | length
+      - item.value | difference(setup_node_scan_panel_base_domains[initial_configure_host_default_relation_host][item.key]) | length == 0
+    quiet: true
+    fail_msg: "Select one or more registered {{ item.key }} base domains of {{ initial_configure_host_default_relation_host }}."
+  loop: "{{ setup_node_selected_base_domains | default({}) | dict2items }}"
+  when: setup_node_remna_node_enabled
+
+- name: Check the type of the host's additional base domains
+  ansible.builtin.assert:
+    that:
+      - initial_configure_host_extra_base_domains | default([]) is sequence
+      - initial_configure_host_extra_base_domains | default([]) is not string
+      - initial_configure_host_extra_base_domains | default([]) is not mapping
+    quiet: true
+    fail_msg: Additional host base domains must be a list.
+  when: not setup_node_remna_node_enabled
+
+- name: Normalize primary hostname and aliases before writing files
+  ansible.builtin.set_fact:
+    setup_node_host_base_domains: >-
+      {{ ([initial_configure_host_base_domain_name] + (initial_configure_host_extra_base_domains | default([])))
+         | unique(case_sensitive=true) | list }}
+  when: not setup_node_remna_node_enabled
+
+- name: Validate primary hostname and aliases before writing files
+  ansible.builtin.assert:
+    that:
+      - setup_node_host_base_domains | select('string') | list | length == setup_node_host_base_domains | length
+      - setup_node_host_base_domains | reject('match', domains_base_domain_pattern) | list | length == 0
+    quiet: true
+    fail_msg: Host base domains must be bare lowercase DNS names.
+  when: not setup_node_remna_node_enabled
 
 - name: Validate optional billing answers before writing host_vars
   ansible.builtin.assert:

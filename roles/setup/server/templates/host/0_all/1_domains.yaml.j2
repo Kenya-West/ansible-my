@@ -4,8 +4,8 @@
 # Base domains of the nodes whose host_relations resolve to this panel
 # (group_vars/vpn_caddy/domain_generator.yaml builds their domains_keys from them).
 vpn_server_remnawave_node_base_domains:
-  main: {{ initial_configure_server_base_domain_name }}
-  xray: {{ initial_configure_server_node_xray_base_domain_name }}
+  main: {{ setup_server_node_base_domains.main | to_json }}
+  xray: {{ setup_server_node_base_domains.xray | to_json }}
 
 {% endif %}
 domains_keys:

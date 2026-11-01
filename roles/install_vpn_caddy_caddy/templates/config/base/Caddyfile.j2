@@ -107,7 +107,7 @@
     }
 }
 
-{{ domains_keys.main }} {
+{{ ([domains_keys.main] + (domains_keys.main_extra | default([]))) | join(', ') }} {
     import logging {{ domains_keys.main }}
     import autodiscovery
 {% if 'analytics_node' in group_names %}

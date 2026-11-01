@@ -1,0 +1,5 @@
+---
+- import_playbook: ../../../../backup/node/git_sync.yaml
+- import_playbook: ../../../../backup/node/restic.yaml
+- import_playbook: ../../../../vpn/warp.yaml
+- import_playbook: ../../../../reverse_proxy/certcopy.yaml

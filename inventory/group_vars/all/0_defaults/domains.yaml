@@ -1,3 +1,6 @@
+# Bare lowercase ASCII DNS names accepted by the node domain catalogs.
+domains_base_domain_pattern: '^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$'
+
 # Every domain of the host, flattened from domains_keys: a string value is
 # one domain, a list holds domains or {domain, type} entries (remna_node).
 domains: >-

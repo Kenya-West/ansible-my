@@ -153,8 +153,20 @@ prompts:
       - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
         msg: "'{{ answer }}' does not look like a domain."
 
+  - id: node_main_extra_base_domains
+    prompt: Additional base domains for this panel's node hostnames (comma-separated)
+    help: The server's own base domain is always the first main catalog entry.
+    type: list
+    default: []
+    required: false
+    when: "'vpn_server_remnawave' in answers.groups | default([], true)"
+    validate:
+      - that: answer | reject('match', '^([a-z0-9-]+\\.)+[a-z]{2,}$') | list | length == 0
+        msg: Every entry must be a base domain.
+
   - id: node_xray_base_domain_name
-    prompt: Base domain of the Remnawave node (Xray) domains
+    prompt: Base domains of the Remnawave node (Xray) domains (comma-separated)
+    type: list
     help: >-
       vpn_server_remnawave_node_base_domains.xray of 0_all/1_domains.yaml. The
       nodes relating to this panel get net-<region>-<index>.<base domain> and
@@ -162,8 +174,8 @@ prompts:
     default: "{{ setup_node_scan_xray_base_domain_default | default(setup_server_base_domain, true) }}"
     when: "'vpn_server_remnawave' in answers.groups | default([], true)"
     validate:
-      - pattern: '^([a-z0-9-]+\.)+[a-z]{2,}$'
-        msg: "'{{ answer }}' does not look like a domain."
+      - that: answer | length > 0 and answer | reject('match', '^([a-z0-9-]+\\.)+[a-z]{2,}$') | list | length == 0
+        msg: Enter one or more base domains.
 
   - id: matrix_base_domain_name
     prompt: Base domain of the Matrix server

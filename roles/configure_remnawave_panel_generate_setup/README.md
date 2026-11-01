@@ -100,6 +100,17 @@ which follows the node's compose (`remna_node_control_port`, published onto
 publish-state rules the hosts do. The collection has no bulk module for nodes,
 so each is its own module run. Run the nodes stage before the hosts one.
 
+A panel's `vpn_server_remnawave_node_base_domains.main` and `.xray` accept
+ordered lists (legacy strings still work). Nodes may select subsets through
+`domains_node.base_domains`; every selected typed domain is published without
+creating additional node entities. Ownership remains `host_relations`, not
+DNS suffix matching. REALITY server names cover every XRay catalog entry.
+For identical labels under different bases, `vpn_server_remnawave_hosts_labels`
+can use full FQDN keys, falling back to legacy label keys. Multiple
+regional/protocol `all` outbounds use `...-all`, `...-all-2`, etc., and all
+remain in the geo's balancer. See
+[node domain catalogs and rollout](../setup/node/README.md#domains-of-a-vpn_caddy-host).
+
 **Config profiles** are rendered from the base profiles of
 `vpn_server_remnawave_config_profiles_base`
 (`group_vars/vpn_server_remnawave/config_profiles.yaml`): every base profile as

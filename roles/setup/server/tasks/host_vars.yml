@@ -31,6 +31,43 @@
     fail_msg: A base domain and at least one server group are needed.
     quiet: true
 
+- name: Check the types of the panel's node domain answers
+  ansible.builtin.assert:
+    that:
+      - >-
+        initial_configure_server_node_main_extra_base_domains | default([]) is sequence
+        and initial_configure_server_node_main_extra_base_domains | default([]) is not string
+        and initial_configure_server_node_main_extra_base_domains | default([]) is not mapping
+      - >-
+        initial_configure_server_node_xray_base_domain_name is string
+        or (initial_configure_server_node_xray_base_domain_name is sequence
+            and initial_configure_server_node_xray_base_domain_name is not mapping)
+    quiet: true
+    fail_msg: Main extra domains must be a list; XRay domains must be a string or list.
+  when: "'vpn_server_remnawave' in setup_server_groups"
+
+- name: Normalize the panel's node domain catalog before writing files
+  ansible.builtin.set_fact:
+    setup_server_node_base_domains:
+      main: >-
+        {{ ([initial_configure_server_base_domain_name] + (initial_configure_server_node_main_extra_base_domains | default([])))
+           | unique(case_sensitive=true) | list }}
+      xray: >-
+        {{ ([initial_configure_server_node_xray_base_domain_name] if initial_configure_server_node_xray_base_domain_name is string
+            else initial_configure_server_node_xray_base_domain_name) | unique(case_sensitive=true) | list }}
+  when: "'vpn_server_remnawave' in setup_server_groups"
+
+- name: Validate the panel's node domain catalog before writing files
+  ansible.builtin.assert:
+    that:
+      - item.value | length > 0
+      - item.value | select('string') | list | length == item.value | length
+      - item.value | reject('match', domains_base_domain_pattern) | list | length == 0
+    quiet: true
+    fail_msg: "Panel {{ item.key }} base domains must be a non-empty list of bare lowercase DNS names."
+  loop: "{{ setup_server_node_base_domains | default({}) | dict2items }}"
+  when: "'vpn_server_remnawave' in setup_server_groups"
+
 - name: Validate optional billing answers before writing host_vars
   ansible.builtin.assert:
     that:

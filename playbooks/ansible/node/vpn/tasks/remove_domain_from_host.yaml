@@ -2,7 +2,8 @@
 # Removes remove_domains_from_list_caddy_new_domain from domains_node.remna_node_extra
 # of the host's 0_all/1_domains.yaml. A domain generated from domains_node
 # (group_vars/vpn_caddy/domain_generator.yaml) is not removed here: drop its
-# key from domains_node.remna_node_types instead.
+# key from domains_node.remna_node_types instead, or deselect its base domain
+# in domains_node.base_domains (removes every generated type on that base).
 
 - name: "{{ __host_name }}: check domains file exists"
   ansible.builtin.stat:
@@ -75,7 +76,7 @@
         - remove_domains_from_list_caddy_new_domain not in (__host_extra | map(attribute='domain') | list)
         - remove_domains_from_list_caddy_new_domain in __host_current_domains
       ansible.builtin.set_fact:
-        __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'generated from domains_node, drop its type from domains_node.remna_node_types'}] }}"
+        __report: "{{ __report + [{'host': __host_name, 'status': 'skipped', 'reason': 'generated from domains_node: deselect its base in domains_node.base_domains or drop its type from domains_node.remna_node_types'}] }}"
 
     - name: "{{ __host_name }}: append report entry (not found)"
       when: remove_domains_from_list_caddy_new_domain not in __host_current_domains

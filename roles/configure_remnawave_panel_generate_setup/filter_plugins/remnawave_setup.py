@@ -95,7 +95,7 @@ def _name(slots, region_codes, flag_symbols):
         key=lambda slot: (slot['region'],
                           _index(slot['label']) is None,
                           _index(slot['label']) or 0,
-                          slot['label']))
+                          slot['label'], slot['domain']))
     for slot in ordered:
         region = slot['region']
         counted[region] = counted.get(region, 0) + 1
@@ -247,7 +247,7 @@ def _chain_pairs(exits, entries, options):
 def _remark(slot, labels):
     """A domain's name in the panel: the one the inventory gives it, else its
     generated short name, else the domain label itself."""
-    return labels.get(slot['label']) or slot.get('display') or slot['label']
+    return labels.get(slot['domain']) or labels.get(slot['label']) or slot.get('display') or slot['label']
 
 
 def _plain(value):

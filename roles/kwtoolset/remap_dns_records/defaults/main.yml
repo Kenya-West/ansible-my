@@ -25,9 +25,11 @@ _dns_records_raw:
           'ttl': 1
         }
       ]
+      + (domains_keys.main_extra | default([])
+         | map('community.general.dict_kv', 'name') | list)
       + (
         domains_keys.remna_node
-        | rejectattr('domain', 'equalto', domains_keys.main)
+        | rejectattr('domain', 'in', [domains_keys.main] + (domains_keys.main_extra | default([])))
         | map(attribute='domain')
         | map('community.general.dict_kv', 'name')
         | list

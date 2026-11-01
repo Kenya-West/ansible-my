@@ -32,7 +32,7 @@ What it does
      (`prometheus.<base>`, `rw.<base>`, `matrix.<base>` ..., see
      `setup_server_service_domains`), the server's own base domain by
      default;
-   - for `vpn_server_remnawave`, the base domain of the Xray domains of the
+   - for `vpn_server_remnawave`, one or more base domains of the Xray domains of the
      nodes relating to the panel (`vpn_server_remnawave_node_base_domains.xray`,
      next to `.main`, the server's own base domain), from which
      `group_vars/vpn_caddy/domain_generator.yaml` builds their `domains_keys`;
@@ -53,6 +53,24 @@ What it does
    shows once it runs, ...).
 
 Nothing is written when `host_vars/<hostname>/` already exists.
+
+Panel catalogs are written as lists. `node_xray_base_domain_name` accepts a
+list or comma-separated input (legacy single-string presets still work),
+and `node_main_extra_base_domains` adds main catalog entries after the server's
+own base domain. The catalog stays in `host_vars/<panel>/0_all/1_domains.yaml`
+as literal YAML, so nodes can read it without recursive cross-host templating.
+See [node domain catalogs and selections](../node/README.md#domains-of-a-vpn_caddy-host).
+
+When changing an existing catalog string to a list, a panel's own
+`domains_keys.main` must not interpolate the list directly. Use an explicit
+hostname, or select the first base with:
+
+```yaml
+domains_keys:
+  main: "{{ inventory_hostname }}.{{ vpn_server_remnawave_node_base_domains.main if vpn_server_remnawave_node_base_domains.main is string else vpn_server_remnawave_node_base_domains.main | first }}"
+```
+
+Panel service URLs remain single hostnames independent of the node catalog.
 
 A server that is also a node, like `play2go-nl-3` (`vpn_caddy`,
 `analytics_node`, `backup_restic_node`), gets the node groups and their

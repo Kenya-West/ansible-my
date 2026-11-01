@@ -5,6 +5,9 @@
 # A host defining domains_keys in its host_vars (a panel) replaces all of this.
 #
 # domains_node of a node:
+#   base_domains          - optional {main: [...], xray: [...]} subsets of the
+#                           panel catalog; omitted keys inherit every entry.
+#                           First main domain is the primary service hostname.
 #   net_location_index    - N of net-<region>-N.<xray base>
 #   chain_location_index  - N of chain-<region>-N.<xray base>
 #   remna_node_types      - optional, keys of domains_node_remna_node_spec;
@@ -57,12 +60,40 @@ domains_node_panel: >-
 # (hostvars['<node>'].domains_keys on the panel or the controller).
 domains_node_base_domains_file: "{{ inventory_dir }}/host_vars/{{ domains_node_panel }}/0_all/1_domains.yaml"
 domains_node_base_domains: >-
-  {{ ((lookup('ansible.builtin.file', domains_node_base_domains_file, errors='ignore') | default('', true)
-       | from_yaml | default({}, true)).vpn_server_remnawave_node_base_domains
-     | mandatory('domains_node_base_domains: ' ~ domains_node_base_domains_file ~ ' has no vpn_server_remnawave_node_base_domains')) }}
+  {%- set catalog = (lookup('ansible.builtin.file', domains_node_base_domains_file)
+                      | from_yaml).vpn_server_remnawave_node_base_domains
+                      | mandatory('Missing vpn_server_remnawave_node_base_domains in ' ~ domains_node_base_domains_file) -%}
+  {%- set selection = (domains_node | default({})).base_domains | default({}) -%}
+  {%- if catalog is not mapping or catalog | list | sort != ['main', 'xray'] -%}
+  {{ undef('Panel domain catalog must contain exactly main and xray: ' ~ domains_node_base_domains_file) | mandatory }}
+  {%- elif selection is not mapping or selection | list | difference(['main', 'xray']) | length > 0 -%}
+  {{ undef('domains_node.base_domains must be a mapping with only main and/or xray for ' ~ inventory_hostname) | mandatory }}
+  {%- else -%}
+  {%-   set out = {} -%}
+  {%-   for key in ['main', 'xray'] -%}
+  {%-     set available = [catalog[key]] if catalog[key] is string else catalog[key] -%}
+  {%-     set chosen = selection.get(key, available) -%}
+  {%-     set chosen = [chosen] if chosen is string else chosen -%}
+  {%-     for values in [available, chosen] -%}
+  {%-       if values is not sequence or values is mapping or values | length == 0
+                or values | select('string') | list | length != values | length
+                or values | reject('match', domains_base_domain_pattern) | list | length > 0 -%}
+  {{ undef('Base domains must be a string or a non-empty list of DNS names: ' ~ inventory_hostname ~ '.' ~ key) | mandatory }}
+  {%-       endif -%}
+  {%-     endfor -%}
+  {%-     if chosen | difference(available) | length > 0 -%}
+  {{ undef('domains_node.base_domains.' ~ key ~ ' contains domains not registered on panel ' ~ domains_node_panel) | mandatory }}
+  {%-     endif -%}
+  {%-     set _ = out.update({key: chosen | unique(case_sensitive=true) | list}) -%}
+  {%-   endfor -%}
+  {{ out }}
+  {%- endif -%}
 
 domains_keys:
-  main: "{{ inventory_hostname }}.{{ domains_node_base_domains.main }}"
+  main: "{{ inventory_hostname }}.{{ domains_node_base_domains.main | first }}"
+  main_extra: >-
+    {{ domains_node_base_domains.main[1:]
+       | map('regex_replace', '^', inventory_hostname ~ '.') | list }}
   remna_node: >-
     {%- set types = domains_node.remna_node_types | default(domains_node_remna_node_spec | map(attribute='key') | list, true) -%}
     {%- set out = [] -%}
@@ -71,7 +102,11 @@ domains_keys:
     {%-   set suffix = ('-' ~ (domains_node[spec.index ~ '_location_index']
                                | mandatory('domains_node.' ~ spec.index ~ '_location_index of ' ~ inventory_hostname ~ ' is needed for ' ~ spec.key)))
                        if spec.index is defined else '' -%}
-    {%-   set _ = out.append({'domain': prefix.value ~ suffix ~ '.' ~ domains_node_base_domains[spec.base],
-                              'type': prefix.type}) -%}
+    {%-   for base in domains_node_base_domains[spec.base] -%}
+    {%-     set entry = {'domain': prefix.value ~ suffix ~ '.' ~ base, 'type': prefix.type} -%}
+    {%-     if entry not in out -%}
+    {%-       set _ = out.append(entry) -%}
+    {%-     endif -%}
+    {%-   endfor -%}
     {%- endfor -%}
     {{ out + (domains_node.remna_node_extra | default([], true)) }}
