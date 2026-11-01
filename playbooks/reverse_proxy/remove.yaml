@@ -9,16 +9,25 @@
         remove_project_dirs: "{{ remove_project_dirs_remapped }}"
 
   pre_tasks:
+    - name: Remove certificate copy timer and service before deleting scripts
+      ansible.builtin.include_role:
+        name: install_webfeatures_certcopy
+        tasks_from: systemd
+        public: true
+      vars:
+        role_state: absent
+
+    - name: Remove privileged certificate copy helper and sudo rule
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ certcopy_helper_dir }}"
+        - /etc/sudoers.d/ansible-certcopy
+
     - name: Remap remove_project_dirs variable to contain complete paths - add /home/{{ standard_user }} prefix
       ansible.builtin.set_fact:
         remove_project_dirs_remapped: "{{ webfeatures.project.paths.values() | list | map('regex_replace', '^(.*)$', '/home/{{ standard_user }}/\\1') | list }}"
     - name: Add root directory to remove_project_dirs variable
       ansible.builtin.set_fact:
         remove_project_dirs_remapped: "{{ remove_project_dirs_remapped + ['/home/{{ standard_user }}/{{ webfeatures.project.root }}'] }}"
-
-  post_tasks:
-    - name: Remove certbot cron job
-      ansible.builtin.cron:
-        # Be sure to set same name like in install_web_features.yaml
-        name: "Copy certs"
-        state: absent

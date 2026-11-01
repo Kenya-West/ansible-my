@@ -43,11 +43,6 @@
     mode: "0775"
     recurse: true
 
-- name: Change cron job path to monitoring if it is in analytics_node group
-  set_fact:
-    cronjob_script_path_with_analytics: "{{ cron_wrapped_task_prefix }} --job-name copy_certs -- {{ cronjob_script_path_without_analytics }} {{ cron_wrapped_task_suffix }}"
-  when: "'analytics_node' in group_names"
-
 # GROUP, SSL DIRECTORY AND PERMISSIONS
 - name: Create {{ cert_access_group }} group
   become: true
@@ -87,18 +82,54 @@
     msg: "The copy.sh script does not exist at {{ dest_path_full }}/scripts/copy.sh"
   when: update_script_exists.stat.exists == false
 
-- name: Add cron job for certcopy
+- name: Create root-owned certificate helper directory
   become: true
   become_user: root
-  ansible.builtin.cron:
-    name: "Copy certs"
-    minute: "{{ copy_certs_auto_renew_minute }}"
-    hour: "{{ copy_certs_auto_renew_hour }}"
-    job: "{{ cronjob_script_path_with_analytics }}"
-  when: update_script_exists.stat.exists == true
+  ansible.builtin.file:
+    path: "{{ certcopy_helper_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
-- name: Run certcopy job now
+- name: Install root-owned certificate copy helper
   become: true
   become_user: root
-  ansible.builtin.shell: "{{ cronjob_script_path_with_analytics }}"
-  when: update_script_exists.stat.exists == true
+  ansible.builtin.template:
+    src: scripts/copy.sh.j2
+    dest: "{{ certcopy_helper_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Allow only the root-owned certificate copy helper without a password or TTY
+  become: true
+  become_user: root
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/ansible-certcopy
+    content: |
+      Defaults:{{ certcopy_user }} !requiretty
+      {{ certcopy_user }} ALL=(root) NOPASSWD: {{ certcopy_helper_path }} ""
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Install certificate copy service and timer
+  ansible.builtin.include_tasks:
+    file: systemd.yml
+    apply:
+      tags: [update_config_hard, update_systemd_timer]
+  tags:
+    - update_config_hard
+    - update_systemd_timer
+
+- name: Run certcopy job now through the user service
+  become: true
+  become_user: "{{ certcopy_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd[certcopy_user][1] }}"
+  ansible.builtin.systemd_service:
+    name: "{{ certcopy_unit_name }}.service"
+    scope: user
+    state: started

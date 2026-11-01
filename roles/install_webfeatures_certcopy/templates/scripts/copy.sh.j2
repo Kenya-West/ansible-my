@@ -1,26 +1,24 @@
 #!/bin/bash
+set -euo pipefail
+export PATH="/usr/local/bin:/usr/bin:/bin"
 echo "Starting copy.sh script"
 
-#!/bin/bash
-
-TARGET_DIR="{{ cert_location_root_path }}"
+TARGET_DIR={{ cert_location_root_path | quote }}
 
 # Ensure the base target directory exists
 mkdir -p "$TARGET_DIR"
 chmod -R {{ cert_location_root_permissions | default('0755') }} "$TARGET_DIR"
 
-docker cp caddy:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/ {{ cert_location_root_path }}/
-if [ -d {{ cert_location_root_path }}/acme* ]; then
-    rsync -a --remove-source-files {{ cert_location_root_path }}/acme*/* {{ cert_location_root_path }}/
-    rm -rf {{ cert_location_root_path }}/acme*/
+docker cp caddy:/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/ "$TARGET_DIR/"
+ACME_DIR="$TARGET_DIR/acme-v02.api.letsencrypt.org-directory"
+if [ -d "$ACME_DIR" ]; then
+    rsync -a --remove-source-files "$ACME_DIR/" "$TARGET_DIR/"
+    rm -rf "$ACME_DIR"
 fi
-find {{ cert_location_root_path }}/ -type d -exec chmod {{ cert_location_root_permissions | default('0755') }} {} +
-find {{ cert_location_root_path }}/ -type f -exec chmod {{ cert_location_files_permissions | default('0755') }} {} +
+find "$TARGET_DIR/" -type d -exec chmod {{ cert_location_root_permissions | default('0755') }} {} +
+find "$TARGET_DIR/" -type f -exec chmod {{ cert_location_files_permissions | default('0644') }} {} +
 
-# Directory containing the exported certificates
-TARGET_DIR="/etc/ssl/shared"
-
-# Iterate over each subdirectory in the source directory
+# Iterate over each subdirectory in the exported certificates
 for DOMAIN_DIR in "$TARGET_DIR"/*; do
     if [ -d "$DOMAIN_DIR" ]; then
         # Extract the domain name from the directory name

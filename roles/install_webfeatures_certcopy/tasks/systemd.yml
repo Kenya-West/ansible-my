@@ -1,0 +1,47 @@
+---
+- name: Reconcile user-scoped certificate copy service and timer
+  ansible.builtin.include_role:
+    name: kwtoolset/systemd_timer
+  vars:
+    certcopy_command: "/usr/bin/sudo -n -- {{ certcopy_helper_path | quote }}"
+    certcopy_monitored_command: >-
+      {{ ((cron_wrapped_task_prefix ~ ' --job-name copy_certs -- ' ~ certcopy_command ~ ' ' ~ (cron_wrapped_task_suffix | default('')))
+          if 'analytics_node' in group_names and cron_wrapped_task_prefix | default('') | length > 0 else certcopy_command) }}
+    systemd_timer_state: "{{ role_state | default('present') }}"
+    systemd_timer_legacy_cron_jobs: "{{ [{'user': 'root', 'name': 'Copy certs'}] if certcopy_migrate_legacy_cron | bool else [] }}"
+    systemd_timer_units:
+      - name: "{{ certcopy_unit_name }}"
+        type: service
+        scope: user
+        user: "{{ certcopy_user }}"
+        path: "{{ certcopy_systemd_unit_path }}"
+        manage_state: false
+        enabled: false
+        Unit:
+          Description: Copy Caddy certificates to the shared certificate directory
+        Service:
+          Type: oneshot
+          ExecStart: "{{ '/usr/bin/bash -c ' ~ (certcopy_monitored_command | to_json) | replace('%', '%%') }}"
+          WorkingDirectory: "{{ certcopy_home }}"
+          Environment:
+            - "HOME={{ certcopy_home }}"
+            - "PATH=/usr/local/bin:/usr/bin:/bin"
+          TimeoutStartSec: "{{ certcopy_timeout }}"
+          # NoNewPrivileges/namespace hardening would prevent sudo elevation here.
+          NoNewPrivileges: "no"
+      - name: "{{ certcopy_unit_name }}"
+        type: timer
+        scope: user
+        user: "{{ certcopy_user }}"
+        path: "{{ certcopy_systemd_unit_path }}"
+        enabled: true
+        state: started
+        Unit:
+          Description: Schedule Caddy certificate copying
+        Timer:
+          Unit: "{{ certcopy_unit_name }}.service"
+          OnCalendar: "{{ certcopy_calendar }}"
+          RandomizedDelaySec: "{{ certcopy_randomized_delay }}"
+          Persistent: "true"
+        Install:
+          WantedBy: timers.target

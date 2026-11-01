@@ -22,9 +22,14 @@ cert_access_group_users_initial:
 cert_location_root_owner: "root"
 cert_location_root_permissions: "0755"
 cert_location_files_permissions: "0644"
-# For cron job
-copy_certs_auto_renew_hour: 0
-copy_certs_auto_renew_minute: 0
-
-cronjob_script_path_without_analytics: "{{ dest_path_full }}/scripts/copy.sh"
-cronjob_script_path_with_analytics: "{{ cronjob_script_path_without_analytics }}"
+certcopy_user: "{{ standard_user }}"
+certcopy_home: "/home/{{ certcopy_user }}"
+certcopy_systemd_unit_path: "{{ certcopy_home }}/.config/systemd/user"
+certcopy_unit_name: certcopy
+certcopy_calendar: "*-*-* 00:00:00"
+certcopy_randomized_delay: "0"
+certcopy_timeout: "30min"
+# This privileged helper must stay outside user-writable project directories.
+certcopy_helper_dir: /usr/local/libexec/ansible-certcopy
+certcopy_helper_path: "{{ certcopy_helper_dir }}/copy.sh"
+certcopy_migrate_legacy_cron: true

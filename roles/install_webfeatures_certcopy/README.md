@@ -1,38 +1,42 @@
-Role Name
-=========
+# Caddy certificate copying
 
-A brief description of the role goes here.
+Copies Caddy certificates to the shared certificate directory using
+`certcopy.service` / `.timer`, scoped to `standard_user`. Requires systemd,
+`0x0I.systemd`, sudo/visudo, Docker and rsync. Lingering is enabled so scheduling
+continues after logout and reboot.
 
-Requirements
-------------
+Defaults:
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+- `certcopy_user`: `standard_user`
+- `certcopy_home`: `/home/<certcopy_user>`
+- `certcopy_systemd_unit_path`: `<certcopy_home>/.config/systemd/user`
+- `certcopy_unit_name`: `certcopy`
+- `certcopy_calendar`: `*-*-* 00:00:00` (host timezone)
+- `certcopy_randomized_delay`: `0`
+- `certcopy_timeout`: `30min`
 
-Role Variables
---------------
+The privileged helper is rendered directly from the role template to
+`/usr/local/libexec/ansible-certcopy/copy.sh`, owned by root in a root-owned
+non-user-writable directory. `/etc/sudoers.d/ansible-certcopy` permits only this
+helper **without arguments**, with `NOPASSWD` and no TTY requirement. The user
+service invokes `sudo -n`; it must not set `NoNewPrivileges=yes` or namespace
+hardening that prevents sudo. Keep helper paths outside user-writable
+locations. This retains access to root-owned shared certificates without giving
+sudo permission to execute a user-editable project script.
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+The `analytics_node` wrapper and `copy_certs` metric name are preserved. The
+service is explicitly run once during installation, as certificate copying was
+before; the persistent timer schedules subsequent runs.
 
-Dependencies
-------------
+`certcopy_migrate_legacy_cron: true` removes the old root `Copy certs` entry after
+the timer is reconciled. Old `copy_certs_auto_renew_hour`/`minute` options are
+replaced by `certcopy_calendar`.
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+`playbooks/reverse_proxy/remove.yaml` removes the timer/service, helper and sudo
+rule before deleting the project. Scheduling can be reconciled alone with
+`tasks_from: systemd`; pass `role_state: absent` to remove units.
 
-Example Playbook
-----------------
-
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
-
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
-
-License
--------
-
-BSD
-
-Author Information
-------------------
-
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+```bash
+systemctl --user list-timers certcopy.timer
+journalctl --user -u certcopy.service
+```
