@@ -8,6 +8,54 @@
   tags:
     - always
 
+# Effective config, so Include'd drop-ins and "ListenAddress host:port" count too
+- name: Read effective sshd config
+  ansible.builtin.command: sshd -T
+  register: ufw_docker_sshd_config
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags:
+    - always
+
+# Not sudo: sudo drops SSH_CONNECTION. Its 4th field is the port this very session came in on,
+# which still matters when sshd_config was changed but sshd has not been restarted yet.
+- name: Read port of the current SSH connection
+  ansible.builtin.command: printenv SSH_CONNECTION
+  become: false
+  register: ufw_docker_ssh_connection
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags:
+    - always
+
+- name: Collect SSH ports
+  ansible.builtin.set_fact:
+    ufw_docker_ssh_ports: >-
+      {{
+        (
+          (ufw_docker_sshd_config.stdout | default('') | regex_findall('(?m)^(?:port |listenaddress .*:)([0-9]{1,5})$'))
+          + (ufw_docker_ssh_connection.stdout | default('') | split)[3:]
+        )
+        | unique
+        | default(['22'], true)
+      }}
+  tags:
+    - always
+
+# Before UFW is enabled, otherwise the deny policy leaves no way to log in again.
+# From any IP. Replaces a "limit" rule on the same port: it rejects a 6th connection within 30 s,
+# which is enough to cut Ansible off in the middle of a run.
+- name: Allow SSH in UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ ufw_docker_ssh_ports }}"
+  tags:
+    - always
+
 - name: Enable UFW
   community.general.ufw:
     state: enabled

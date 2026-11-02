@@ -7,13 +7,15 @@ the rules in sync with running containers with
 
 What it does:
 
-1. Installs `ufw-docker` (raw script of the master branch, the repo has no release assets) and the
+1. Allows SSH from any IP, then enables UFW with a deny policy. SSH ports are the ones `sshd -T` reports plus
+   the port of the current connection, `22` if neither is known. A `limit` rule on such a port becomes `allow`.
+2. Installs `ufw-docker` (raw script of the master branch, the repo has no release assets) and the
    `ufw-docker-automated` release binary to `/usr/local/bin` with `copy_eget_binaries_from_controller`: eget
    downloads them on the controller and they are synchronized to the host. Only binaries missing on the
    host are installed, existing ones are never replaced.
-2. Runs `ufw-docker install`, which adds the DOCKER-USER rules to `/etc/ufw/after.rules` and `after6.rules`
+3. Runs `ufw-docker install`, which adds the DOCKER-USER rules to `/etc/ufw/after.rules` and `after6.rules`
    (with a backup), then restarts UFW. Nothing is touched if the rules are already there.
-3. Installs and starts `ufw-docker-automated.service` through `0x0I.systemd`.
+4. Installs and starts `ufw-docker-automated.service` through `0x0I.systemd`.
 
 Requirements
 ------------
