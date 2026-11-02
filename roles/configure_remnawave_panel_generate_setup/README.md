@@ -541,15 +541,13 @@ Node side, in `group_vars/vpn_caddy/remna.yaml` or a node's host_vars:
 | `vpn_server_remnawave_hosts_chain_bind_nodes` | `entry` | Which nodes a chain host binds to: `entry`, `exit`, `both`, `none` |
 | `vpn_server_remnawave_final_mask` | both sides off | Generated ClientHello fragmentation for hosts and chain outbounds, see below |
 
-`vpn_server_remnawave_final_mask` puts an Xray `fragment` mask on every
-generated host and every planned chain outbound, never on an inbound. Each side
-has an `enabled` switch and windows for its ranges (`length_min`, `length_max`,
-`delay_min`, `delay_max`); the actual ranges are picked inside them from a hash
-of the domain, so they differ per domain and stay the same between runs. Bump
-`rotation` to pick new ones. `covered_bytes` is how far into the ClientHello the
-small fragments must reach, past the end of the SNI, and sets `maxSplit`. A host
-takes its mask from the address the client dials, so chain hosts through one
-entry share one. Turning `hosts` off clears the masks of the role's hosts.
+`vpn_server_remnawave_final_mask` puts Xray `fragment` masks on every generated
+host and every planned chain outbound, never on an inbound. Each side has an
+`enabled` switch and a `tcp` list written as in Xray: `type: fragment` with
+`packets`, `lengths`, `delays` and `maxSplit`. A number can be a range such as
+`"6-10"`, from which Xray draws per connection. Other keys, including `length`,
+`delay` and `interval`, are refused rather than dropped by Xray unnoticed.
+Turning `hosts` off clears the masks of the role's hosts.
 
 Remarks identify hosts in the panel, so they are how the role finds its own
 work again. A host is named `<flag> <REGION CODE>-<n>` - the flag of the

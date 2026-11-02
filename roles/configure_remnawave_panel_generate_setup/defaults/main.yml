@@ -138,8 +138,6 @@ vpn_server_remnawave_hosts_chain:
 # Generated finalmask, off unless the inventory turns it on. See the role's
 # README and group_vars/vpn_server_remnawave/final_mask.yaml.
 vpn_server_remnawave_final_mask:
-  rotation: 1
-  covered_bytes: 160
   hosts:
     enabled: false
   outbounds:

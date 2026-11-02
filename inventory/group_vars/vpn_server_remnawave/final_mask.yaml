@@ -4,32 +4,39 @@
 #
 # Fragmenting only changes how a side writes, and the peer reassembles ordinary
 # TLS records. So a host's mask (client -> node) and an outbound's (node -> next
-# node) are independent and need not match.
+# node) are independent and need not match; give outbounds a tcp of their own
+# for them to differ.
 #
-# Each side lists windows, [lowest, highest]. Inside them the ranges are picked
-# from a hash of the domain: they differ per domain and stay the same between
-# runs. Xray then draws from those ranges per connection by itself.
+# tcp is written as in Xray: https://xtls.github.io/en/config/transports/finalmask.html
+#   packets:  tlshello, or the range of writes to slice ("1-1" is the first).
+#   lengths:  size of the nth fragment in bytes; the last entry repeats.
+#   delays:   wait in ms after the nth fragment; the last entry repeats.
+#   maxSplit: most pieces per write; 0 means no limit.
+# Numbers can be ranges such as "6-10", from which Xray draws per connection.
 #
-#   length_*: fragment size in bytes. The upper end must stay below the length
-#             of the shortest hostname, or a fragment could hold the whole SNI.
-#   delay_*:  wait after each fragment in ms. delay_max cannot be 0, which would
-#             merge the fragments back into one write. Every small fragment
-#             delays each new TCP connection, and a chain pays for both sides.
+# The first mask gets the write first, and these two work as a pair:
+#   1. tlshello cuts the ClientHello into TLS records of 6 and 98 bytes, then 1
+#      byte each. Delays of just "0" hand them on together as one write. Without
+#      a maxSplit, every remaining byte takes a record of its own.
+#   2. "1-1" slices that one write for the wire: 114 bytes, exactly those first
+#      two records with their 5-byte headers, then 1 byte at a time up to 11
+#      pieces in all, 1 ms apart. The eleventh piece carries the rest.
 vpn_server_remnawave_final_mask:
-  # Bump to pick new ranges everywhere.
-  rotation: 1
-  # How far into the ClientHello the small fragments reach, past the end of the
-  # SNI; the rest goes out whole. Sets maxSplit.
-  covered_bytes: 160
   hosts:
     enabled: true
-    length_min: [10, 14]
-    length_max: [18, 22]
-    delay_min: [3, 6]
-    delay_max: [8, 14]
+    tcp: &vpn_server_remnawave_final_mask_tcp
+      - type: fragment
+        settings:
+          packets: tlshello
+          lengths: ["6", "98", "1"]
+          delays: ["0"]
+          maxSplit: "0"
+      - type: fragment
+        settings:
+          packets: "1-1"
+          lengths: ["114", "1"]
+          delays: ["1"]
+          maxSplit: "11"
   outbounds:
     enabled: true
-    length_min: [10, 14]
-    length_max: [18, 22]
-    delay_min: [1, 2]
-    delay_max: [3, 5]
+    tcp: *vpn_server_remnawave_final_mask_tcp

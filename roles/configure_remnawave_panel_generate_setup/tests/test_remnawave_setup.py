@@ -113,78 +113,90 @@ def panel_for(model):
 
 
 class FinalMaskTests(unittest.TestCase):
-    ADDRESS = 'net-asia-1.123987465.xyz'
+    TCP = [
+        {'type': 'fragment', 'settings': {'packets': 'tlshello', 'lengths': ['6', '98', '1'],
+                                          'delays': ['0'], 'maxSplit': '0'}},
+        {'type': 'fragment', 'settings': {'packets': '1-1', 'lengths': ['114', '1'],
+                                          'delays': ['1'], 'maxSplit': '11'}},
+    ]
 
-    def setUp(self):
-        self.spec = {
-            'rotation': 1,
-            'covered_bytes': 160,
-            'hosts': {'enabled': True, 'length_min': [10, 14], 'length_max': [18, 22],
-                      'delay_min': [3, 6], 'delay_max': [8, 14]},
-            'outbounds': {'enabled': True, 'length_min': [10, 14], 'length_max': [18, 22],
-                          'delay_min': [1, 2], 'delay_max': [3, 5]},
-        }
+    def spec(self):
+        tcp = copy.deepcopy(self.TCP)
+        return {'hosts': {'enabled': True, 'tcp': tcp},
+                'outbounds': {'enabled': True, 'tcp': copy.deepcopy(tcp)}}
 
-    def settings(self, address=ADDRESS, side='hosts'):
-        return setup.remnawave_final_mask(address, self.spec, side)['tcp'][0]['settings']
+    def test_the_masks_come_out_as_written_and_in_order(self):
+        self.assertEqual(setup.remnawave_final_mask(self.spec(), 'hosts'), {'tcp': self.TCP})
+        self.assertEqual(setup.remnawave_final_mask(self.spec(), 'outbounds'), {'tcp': self.TCP})
 
-    def test_the_same_input_gives_the_same_mask(self):
-        self.assertEqual(self.settings(), self.settings())
+    def test_ranges_are_kept_and_plain_numbers_become_strings(self):
+        spec = self.spec()
+        settings = spec['hosts']['tcp'][0]['settings']
+        settings.update({'lengths': ['5-7', 98, 1], 'delays': [0], 'maxSplit': '0-3'})
+        out = setup.remnawave_final_mask(spec, 'hosts')['tcp'][0]['settings']
+        self.assertEqual(out['lengths'], ['5-7', '98', '1'])
+        self.assertEqual(out['delays'], ['0'])
+        self.assertEqual(out['maxSplit'], '0-3')
 
-    def test_address_side_and_rotation_each_change_the_pick(self):
-        # Across many domains, not one: a single pair may land on equal ranges.
-        addresses = ['net-asia-%d.123987465.xyz' % i for i in range(1, 30)]
-        base = [self.settings(a) for a in addresses]
-        self.assertGreater(len(set(str(b) for b in base)), 1)
-        self.assertNotEqual(base, [self.settings(a, 'outbounds') for a in addresses])
-        self.spec['rotation'] = 2
-        self.assertNotEqual(base, [self.settings(a) for a in addresses])
-
-    def test_every_pick_stays_inside_its_window_and_covers_the_sni(self):
-        for i in range(1, 200):
-            address = 'net-asia-%d.123987465.xyz' % i
-            for side, delays in (('hosts', ((3, 6), (8, 14))), ('outbounds', ((1, 2), (3, 5)))):
-                settings = self.settings(address, side)
-                self.assertEqual(settings['packets'], 'tlshello')
-                length_low, length_high = (int(v) for v in settings['length'].split('-'))
-                delay_low, delay_high = (int(v) for v in settings['delay'].split('-'))
-                split_low, split_high = (int(v) for v in settings['maxSplit'].split('-'))
-                self.assertTrue(10 <= length_low <= 14 and 18 <= length_high <= 22)
-                self.assertTrue(delays[0][0] <= delay_low <= delays[0][1])
-                self.assertTrue(delays[1][0] <= delay_high <= delays[1][1])
-                self.assertEqual(split_high, split_low + 4)
-                self.assertGreaterEqual((split_low - 1) * length_low, 160)
+    def test_a_missing_max_split_means_no_limit(self):
+        spec = self.spec()
+        del spec['hosts']['tcp'][0]['settings']['maxSplit']
+        out = setup.remnawave_final_mask(spec, 'hosts')['tcp'][0]['settings']
+        self.assertEqual(out['maxSplit'], '0')
 
     def test_a_side_switched_off_gives_no_mask(self):
-        self.spec['outbounds']['enabled'] = 'False'
-        self.assertEqual(setup.remnawave_final_mask(self.ADDRESS, self.spec, 'outbounds'), {})
-        self.assertEqual(setup.remnawave_final_mask(self.ADDRESS, None, 'hosts'), {})
+        spec = self.spec()
+        spec['outbounds']['enabled'] = 'False'
+        self.assertEqual(setup.remnawave_final_mask(spec, 'outbounds'), {})
+        self.assertEqual(setup.remnawave_final_mask(None, 'hosts'), {})
 
-    def test_windows_that_would_break_the_hello_are_refused(self):
-        for key, value in (('length_min', [0, 14]), ('delay_max', [0, 0]),
-                           ('length_min', [20, 10]), ('length_min', [10, 20]),
-                           ('delay_min', [3, 9]), ('length_max', [18, 24])):
-            spec = copy.deepcopy(self.spec)
-            spec['hosts'][key] = value
-            with self.assertRaises(AnsibleFilterError, msg='%s %s' % (key, value)):
-                setup.remnawave_final_mask(self.ADDRESS, spec, 'hosts')
-        spec = copy.deepcopy(self.spec)
-        spec['covered_bytes'] = 0
+    def test_what_xray_would_drop_or_refuse_is_refused(self):
+        for position, change in (
+                (0, {'interval': '10-20'}),         # dropped by Xray unnoticed
+                (0, {'length': '10-20'}),           # the old form
+                (0, {'lengths': ['0', '98', '1']}),  # an empty TLS record
+                (0, {'lengths': ['6', '98', '0']}),  # never finishes
+                (0, {'lengths': []}),
+                (0, {'lengths': '6'}),
+                (0, {'lengths': ['20-10', '1']}),
+                (0, {'lengths': ['abc', '1']}),
+                (0, {'delays': []}),
+                (0, {'maxSplit': ''}),
+                (1, {'packets': '0-1'}),
+                (1, {'packets': 'hello'}),
+                (1, {'lengths': ['114', '0']})):
+            spec = self.spec()
+            spec['hosts']['tcp'][position]['settings'].update(change)
+            with self.assertRaises(AnsibleFilterError, msg=str(change)):
+                setup.remnawave_final_mask(spec, 'hosts')
+
+    def test_the_stream_form_may_skip_a_write(self):
+        spec = self.spec()
+        spec['hosts']['tcp'][1]['settings']['lengths'] = ['0', '1']
+        out = setup.remnawave_final_mask(spec, 'hosts')['tcp'][1]['settings']
+        self.assertEqual(out['lengths'], ['0', '1'])
+
+    def test_masks_in_an_order_that_cannot_work_are_refused(self):
+        spec = self.spec()
+        spec['hosts']['tcp'].reverse()
         with self.assertRaises(AnsibleFilterError):
-            setup.remnawave_final_mask(self.ADDRESS, spec, 'hosts')
+            setup.remnawave_final_mask(spec, 'hosts')
 
-    def test_model_gives_hosts_the_mask_of_the_address_they_dial(self):
+    def test_only_fragment_masks_and_a_list_of_them(self):
+        spec = self.spec()
+        spec['hosts']['tcp'][0]['type'] = 'sudoku'
+        with self.assertRaises(AnsibleFilterError):
+            setup.remnawave_final_mask(spec, 'hosts')
+        spec['hosts']['tcp'] = []
+        with self.assertRaises(AnsibleFilterError):
+            setup.remnawave_final_mask(spec, 'hosts')
+
+    def test_model_gives_every_host_the_mask(self):
         option_set = options()
-        option_set['final_mask'] = self.spec
+        option_set['final_mask'] = self.spec()
         hosts = setup.remnawave_model(nodes(), option_set)['hosts']
         self.assertTrue(any(h['kind'] == 'chain' for h in hosts))
-        by_address = {}
-        for host in hosts:
-            self.assertEqual(host['final_mask'],
-                             setup.remnawave_final_mask(host['address'], self.spec, 'hosts'))
-            by_address.setdefault(host['address'], []).append(host['final_mask'])
-        for masks in by_address.values():
-            self.assertTrue(all(m == masks[0] for m in masks))
+        self.assertTrue(all(h['final_mask'] == {'tcp': self.TCP} for h in hosts))
 
     def test_model_without_the_option_gives_hosts_no_mask(self):
         hosts = setup.remnawave_model(nodes(), options())['hosts']
