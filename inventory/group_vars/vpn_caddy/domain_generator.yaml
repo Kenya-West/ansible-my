@@ -6,7 +6,9 @@
 #
 # domains_node of a node:
 #   base_domains          - optional {main: [...], xray: [...]} subsets of the
-#                           panel catalog; omitted keys inherit every entry.
+#                           panel catalog; an omitted key takes only the
+#                           catalog's first entry, so a further domain reaches
+#                           a node only if that node declares it.
 #                           First main domain is the primary service hostname.
 #   net_location_index    - N of net-<region>-N.<xray base>
 #   chain_location_index  - N of chain-<region>-N.<xray base>
@@ -72,7 +74,7 @@ domains_node_base_domains: >-
   {%-   set out = {} -%}
   {%-   for key in ['main', 'xray'] -%}
   {%-     set available = [catalog[key]] if catalog[key] is string else catalog[key] -%}
-  {%-     set chosen = selection.get(key, available) -%}
+  {%-     set chosen = selection.get(key, available[:1]) -%}
   {%-     set chosen = [chosen] if chosen is string else chosen -%}
   {%-     for values in [available, chosen] -%}
   {%-       if values is not sequence or values is mapping or values | length == 0

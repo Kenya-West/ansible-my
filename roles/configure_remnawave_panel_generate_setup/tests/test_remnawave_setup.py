@@ -112,6 +112,85 @@ def panel_for(model):
     }
 
 
+class FinalMaskTests(unittest.TestCase):
+    ADDRESS = 'net-asia-1.123987465.xyz'
+
+    def setUp(self):
+        self.spec = {
+            'rotation': 1,
+            'covered_bytes': 160,
+            'hosts': {'enabled': True, 'length_min': [10, 14], 'length_max': [18, 22],
+                      'delay_min': [3, 6], 'delay_max': [8, 14]},
+            'outbounds': {'enabled': True, 'length_min': [10, 14], 'length_max': [18, 22],
+                          'delay_min': [1, 2], 'delay_max': [3, 5]},
+        }
+
+    def settings(self, address=ADDRESS, side='hosts'):
+        return setup.remnawave_final_mask(address, self.spec, side)['tcp'][0]['settings']
+
+    def test_the_same_input_gives_the_same_mask(self):
+        self.assertEqual(self.settings(), self.settings())
+
+    def test_address_side_and_rotation_each_change_the_pick(self):
+        # Across many domains, not one: a single pair may land on equal ranges.
+        addresses = ['net-asia-%d.123987465.xyz' % i for i in range(1, 30)]
+        base = [self.settings(a) for a in addresses]
+        self.assertGreater(len(set(str(b) for b in base)), 1)
+        self.assertNotEqual(base, [self.settings(a, 'outbounds') for a in addresses])
+        self.spec['rotation'] = 2
+        self.assertNotEqual(base, [self.settings(a) for a in addresses])
+
+    def test_every_pick_stays_inside_its_window_and_covers_the_sni(self):
+        for i in range(1, 200):
+            address = 'net-asia-%d.123987465.xyz' % i
+            for side, delays in (('hosts', ((3, 6), (8, 14))), ('outbounds', ((1, 2), (3, 5)))):
+                settings = self.settings(address, side)
+                self.assertEqual(settings['packets'], 'tlshello')
+                length_low, length_high = (int(v) for v in settings['length'].split('-'))
+                delay_low, delay_high = (int(v) for v in settings['delay'].split('-'))
+                split_low, split_high = (int(v) for v in settings['maxSplit'].split('-'))
+                self.assertTrue(10 <= length_low <= 14 and 18 <= length_high <= 22)
+                self.assertTrue(delays[0][0] <= delay_low <= delays[0][1])
+                self.assertTrue(delays[1][0] <= delay_high <= delays[1][1])
+                self.assertEqual(split_high, split_low + 4)
+                self.assertGreaterEqual((split_low - 1) * length_low, 160)
+
+    def test_a_side_switched_off_gives_no_mask(self):
+        self.spec['outbounds']['enabled'] = 'False'
+        self.assertEqual(setup.remnawave_final_mask(self.ADDRESS, self.spec, 'outbounds'), {})
+        self.assertEqual(setup.remnawave_final_mask(self.ADDRESS, None, 'hosts'), {})
+
+    def test_windows_that_would_break_the_hello_are_refused(self):
+        for key, value in (('length_min', [0, 14]), ('delay_max', [0, 0]),
+                           ('length_min', [20, 10]), ('length_min', [10, 20]),
+                           ('delay_min', [3, 9]), ('length_max', [18, 24])):
+            spec = copy.deepcopy(self.spec)
+            spec['hosts'][key] = value
+            with self.assertRaises(AnsibleFilterError, msg='%s %s' % (key, value)):
+                setup.remnawave_final_mask(self.ADDRESS, spec, 'hosts')
+        spec = copy.deepcopy(self.spec)
+        spec['covered_bytes'] = 0
+        with self.assertRaises(AnsibleFilterError):
+            setup.remnawave_final_mask(self.ADDRESS, spec, 'hosts')
+
+    def test_model_gives_hosts_the_mask_of_the_address_they_dial(self):
+        option_set = options()
+        option_set['final_mask'] = self.spec
+        hosts = setup.remnawave_model(nodes(), option_set)['hosts']
+        self.assertTrue(any(h['kind'] == 'chain' for h in hosts))
+        by_address = {}
+        for host in hosts:
+            self.assertEqual(host['final_mask'],
+                             setup.remnawave_final_mask(host['address'], self.spec, 'hosts'))
+            by_address.setdefault(host['address'], []).append(host['final_mask'])
+        for masks in by_address.values():
+            self.assertTrue(all(m == masks[0] for m in masks))
+
+    def test_model_without_the_option_gives_hosts_no_mask(self):
+        hosts = setup.remnawave_model(nodes(), options())['hosts']
+        self.assertTrue(all(h['final_mask'] == {} for h in hosts))
+
+
 class GenerationTests(unittest.TestCase):
     def setUp(self):
         self.options = options()

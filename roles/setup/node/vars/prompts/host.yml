@@ -150,18 +150,18 @@ prompts:
 
   - id: node_main_base_domains
     prompt: Base domains for this node's own hostnames
-    help: First selected domain is primary. Default selects all panel entries.
+    help: First selected domain is primary. Default selects the panel's first entry.
     type: multichoice
     choices: "{{ setup_node_panel_base_domains.main }}"
-    default: "{{ setup_node_panel_base_domains.main }}"
+    default: "{{ setup_node_panel_base_domains.main[:1] }}"
     when: "'vpn_caddy' in answers.groups | default([], true)"
 
   - id: node_xray_base_domains
     prompt: Base domains for this node's XRay exit and chain names
-    help: Select one or more entries from the related panel's catalog.
+    help: Select one or more entries from the related panel's catalog. Default selects its first entry.
     type: multichoice
     choices: "{{ setup_node_panel_base_domains.xray }}"
-    default: "{{ setup_node_panel_base_domains.xray }}"
+    default: "{{ setup_node_panel_base_domains.xray[:1] }}"
     when: "'vpn_caddy' in answers.groups | default([], true)"
 
   # Hosts outside vpn_caddy name their own primary hostname and optional aliases.

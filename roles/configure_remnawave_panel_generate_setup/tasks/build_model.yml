@@ -105,6 +105,7 @@
       chain_bind_nodes: "{{ vpn_server_remnawave_hosts_chain_bind_nodes }}"
       remark_chain_separator: "{{ vpn_server_remnawave_hosts_remark_chain_separator }}"
       remark_exclusive_format: "{{ vpn_server_remnawave_hosts_remark_exclusive_format }}"
+      final_mask: "{{ vpn_server_remnawave_final_mask }}"
       # Config profiles: one base per protocol, rendered for every scope in
       # use, with ordered composition fragments and the squads granted them.
       profiles_base: "{{ vpn_server_remnawave_config_profiles_base }}"

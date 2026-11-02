@@ -36,12 +36,18 @@
     crpgs_outbounds: >-
       {{
         crpgs_outbounds
-        + [lookup('ansible.builtin.vars', item.template) | combine({'tag': item.tag})]
+        + [lookup('ansible.builtin.vars', item.template)
+           | combine({'tag': item.tag}, crpgs_outbound_final_mask, recursive=True)]
       }}
   vars:
     # The templates are written against this name; it is what makes one
     # template serve every exit.
     node_address: "{{ item.address }}"
+    # Merged here rather than written in the templates, so every protocol's
+    # template gets it.
+    crpgs_outbound_final_mask: >-
+      {%- set mask = item.address | remnawave_final_mask(vpn_server_remnawave_final_mask, 'outbounds') -%}
+      {{ {'streamSettings': {'finalmask': mask}} if mask else {} }}
   loop: "{{ crpgs_outbounds_plan }}"
   loop_control:
     label: "{{ item.tag }} -> {{ item.address }}"

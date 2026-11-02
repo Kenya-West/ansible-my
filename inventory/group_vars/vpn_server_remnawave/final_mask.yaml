@@ -1,0 +1,35 @@
+# ClientHello fragmentation (Xray streamSettings.finalmask) on the generated
+# hosts and chain outbounds. Never on inbounds: there it would fragment the
+# ServerHello and give up splice, for nothing.
+#
+# Fragmenting only changes how a side writes, and the peer reassembles ordinary
+# TLS records. So a host's mask (client -> node) and an outbound's (node -> next
+# node) are independent and need not match.
+#
+# Each side lists windows, [lowest, highest]. Inside them the ranges are picked
+# from a hash of the domain: they differ per domain and stay the same between
+# runs. Xray then draws from those ranges per connection by itself.
+#
+#   length_*: fragment size in bytes. The upper end must stay below the length
+#             of the shortest hostname, or a fragment could hold the whole SNI.
+#   delay_*:  wait after each fragment in ms. delay_max cannot be 0, which would
+#             merge the fragments back into one write. Every small fragment
+#             delays each new TCP connection, and a chain pays for both sides.
+vpn_server_remnawave_final_mask:
+  # Bump to pick new ranges everywhere.
+  rotation: 1
+  # How far into the ClientHello the small fragments reach, past the end of the
+  # SNI; the rest goes out whole. Sets maxSplit.
+  covered_bytes: 160
+  hosts:
+    enabled: true
+    length_min: [10, 14]
+    length_max: [18, 22]
+    delay_min: [3, 6]
+    delay_max: [8, 14]
+  outbounds:
+    enabled: true
+    length_min: [10, 14]
+    length_max: [18, 22]
+    delay_min: [1, 2]
+    delay_max: [3, 5]

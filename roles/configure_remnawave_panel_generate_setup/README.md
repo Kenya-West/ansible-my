@@ -101,8 +101,8 @@ publish-state rules the hosts do. The collection has no bulk module for nodes,
 so each is its own module run. Run the nodes stage before the hosts one.
 
 A panel's `vpn_server_remnawave_node_base_domains.main` and `.xray` accept
-ordered lists (legacy strings still work). Nodes may select subsets through
-`domains_node.base_domains`; every selected typed domain is published without
+ordered lists (legacy strings still work). A node gets the first entry of each,
+or what it selects through `domains_node.base_domains`; every selected typed domain is published without
 creating additional node entities. Ownership remains `host_relations`, not
 DNS suffix matching. REALITY server names cover every XRay catalog entry.
 For identical labels under different bases, `vpn_server_remnawave_hosts_labels`
@@ -539,6 +539,17 @@ Node side, in `group_vars/vpn_caddy/remna.yaml` or a node's host_vars:
 | `vpn_server_remnawave_hosts_remark_chain_separator` | `' \| by '` | Joins the two names of a chain host's remark |
 | `vpn_server_remnawave_hosts_remark_exclusive_format` | `'{name} · {profile}'` | Remark of an exclusive profile's exit |
 | `vpn_server_remnawave_hosts_chain_bind_nodes` | `entry` | Which nodes a chain host binds to: `entry`, `exit`, `both`, `none` |
+| `vpn_server_remnawave_final_mask` | both sides off | Generated ClientHello fragmentation for hosts and chain outbounds, see below |
+
+`vpn_server_remnawave_final_mask` puts an Xray `fragment` mask on every
+generated host and every planned chain outbound, never on an inbound. Each side
+has an `enabled` switch and windows for its ranges (`length_min`, `length_max`,
+`delay_min`, `delay_max`); the actual ranges are picked inside them from a hash
+of the domain, so they differ per domain and stay the same between runs. Bump
+`rotation` to pick new ones. `covered_bytes` is how far into the ClientHello the
+small fragments must reach, past the end of the SNI, and sets `maxSplit`. A host
+takes its mask from the address the client dials, so chain hosts through one
+entry share one. Turning `hosts` off clears the masks of the role's hosts.
 
 Remarks identify hosts in the panel, so they are how the role finds its own
 work again. A host is named `<flag> <REGION CODE>-<n>` - the flag of the

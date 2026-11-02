@@ -23,5 +23,5 @@
     setup_node_panel_base_domains: "{{ setup_node_scan_panel_base_domains.get(setup_node_panel_host, {}) }}"
     setup_node_xray_base_domain: >-
       {{ initial_configure_host_node_xray_base_domains
-         | default(setup_node_panel_base_domains.xray | default(['<xray base domain of the panel>']), true)
+         | default((setup_node_panel_base_domains.xray | default(['<xray base domain of the panel>']))[:1], true)
          | join(', ') }}"

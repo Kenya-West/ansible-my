@@ -68,7 +68,7 @@ panel's `host_vars`). `domains_node.remna_node_types` narrows the entries,
 `domains_keys` in `group_vars/all/0_defaults/domains.yaml`.
 
 The unattended answers are `node_main_base_domains` and
-`node_xray_base_domains` (default: all panel entries); plain hosts can use
+`node_xray_base_domains` (default: the panel's first entry); plain hosts can use
 `extra_base_domains` for aliases. The relation is asked before these selections.
 
 In `host_vars/<panel>/0_all/1_domains.yaml`, declare the panel's supported domains:
@@ -91,7 +91,9 @@ domains_node:
   chain_location_index: 4
 ```
 
-An omitted selection key inherits all entries of that key. An explicit
+An omitted selection key takes only the first entry of that key, so a node
+declares nothing unless it wants another domain, or more than one. The generated
+`1_domains.yaml` writes only a selection that differs from this. An explicit
 selection must be non-empty and registered on the related panel. `main` and
 `xray` selections are independent; their list positions are not paired.
 The first selected `main` domain is the primary service/control hostname;
@@ -99,9 +101,10 @@ remaining own hostnames go into `domains_keys.main_extra`. DNS, Caddy and
 certificate consumers include those aliases. `host_relations` still selects
 the panel and its credentials, even if several panels share domain bases.
 
-Existing strings need no migration. When adding panel catalog entries, pin
-existing nodes to their old bases first if they should not inherit the new
-entries. Adding domains can renumber generated remarks, outbounds and route
+Existing strings need no migration. Adding a catalog entry at the end changes
+no node until one declares it; changing the first entry moves every node that
+declares nothing, so pin those first. Adding domains to nodes can renumber
+generated remarks, outbounds and route
 IDs; preview panel playbooks with `--check --diff` and review route-ID limits.
 Deploy DNS, Caddy/node configuration and certificates before generating the
 panel's config profiles, snippets, nodes and hosts; then run
@@ -150,7 +153,8 @@ Templates
 ---------
 
 - `host/0_all/1_domains.yaml.j2`: for a `vpn_caddy` host, `domains_node`
-  with location indexes and selected `base_domains`; for any other,
+  with location indexes, and `base_domains` when the selection is not the
+  panel's first entry; for any other,
   `domains_keys.main`, optional `main_extra` aliases, and an empty
   `remna_node`. Then `host_relations.default`.
 - `host/0_all/2_domains.yaml` of `setup/common`: how to add or override DNS

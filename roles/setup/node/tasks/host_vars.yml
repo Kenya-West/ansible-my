@@ -52,8 +52,8 @@
       {%- endfor -%}
       {{ out }}
   vars:
-    __setup_node_main: "{{ initial_configure_host_node_main_base_domains | default(setup_node_scan_panel_base_domains[initial_configure_host_default_relation_host].main) }}"
-    __setup_node_xray: "{{ initial_configure_host_node_xray_base_domains | default(setup_node_scan_panel_base_domains[initial_configure_host_default_relation_host].xray) }}"
+    __setup_node_main: "{{ initial_configure_host_node_main_base_domains | default(setup_node_scan_panel_base_domains[initial_configure_host_default_relation_host].main[:1]) }}"
+    __setup_node_xray: "{{ initial_configure_host_node_xray_base_domains | default(setup_node_scan_panel_base_domains[initial_configure_host_default_relation_host].xray[:1]) }}"
   when: setup_node_remna_node_enabled
 
 - name: Validate the node's selected domains against its panel
@@ -65,6 +65,20 @@
     quiet: true
     fail_msg: "Select one or more registered {{ item.key }} base domains of {{ initial_configure_host_default_relation_host }}."
   loop: "{{ setup_node_selected_base_domains | default({}) | dict2items }}"
+  when: setup_node_remna_node_enabled
+
+# The panel's first entry is what a node without a declaration gets, so only
+# another choice is written.
+- name: Keep the selections that differ from the panel's default
+  ansible.builtin.set_fact:
+    setup_node_declared_base_domains: >-
+      {%- set out = {} -%}
+      {%- for key, values in setup_node_selected_base_domains.items() -%}
+      {%-   if values != setup_node_scan_panel_base_domains[initial_configure_host_default_relation_host][key][:1] -%}
+      {%-     set _ = out.update({key: values}) -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ out }}
   when: setup_node_remna_node_enabled
 
 - name: Check the type of the host's additional base domains

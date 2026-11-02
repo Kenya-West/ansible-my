@@ -15,6 +15,9 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
+import hashlib
+import math
+
 from ansible.errors import AnsibleFilterError
 
 
@@ -556,6 +559,75 @@ def _squad_grants(profiles, grants):
     return [out[s] for s in order]
 
 
+def _final_mask_window(side, name, value, lowest):
+    """Read one (low, high) window of the mask spec and check its bounds."""
+    low, high = _as_pair(value, 'final_mask %s %s' % (side, name))
+    if low < lowest or low > high:
+        raise AnsibleFilterError('final_mask %s %s must be an ascending window starting '
+                                 'at %d or more, got %d-%d' % (side, name, lowest, low, high))
+    return low, high
+
+
+def remnawave_final_mask(address, spec, side):
+    """The finalmask of one domain: ClientHello fragmentation, or {} when off.
+
+    ``spec`` is vpn_server_remnawave_final_mask and ``side`` is 'hosts' or
+    'outbounds'. The ranges are picked inside the spec's windows from a hash of
+    the address, so they differ per domain yet never change between runs: the
+    panel holds what was sent, and a new pick would rewrite it every time. Xray
+    then draws from the ranges per connection by itself.
+
+    A fragment shorter than the hostname puts a record boundary inside the SNI,
+    and maxSplit keeps the small fragments going until covered_bytes, past where
+    the SNI ends. The rest of the hello goes out whole, since each fragment
+    delays every new connection. Fragmenting only touches writes and the peer
+    reassembles ordinary TLS records, so hosts and outbounds need not match.
+    """
+    spec = spec or {}
+    side_spec = spec.get(side) or {}
+    if not _as_bool(side_spec.get('enabled')):
+        return {}
+
+    address = str(address)
+    length_min = _final_mask_window(side, 'length_min', side_spec.get('length_min'), 1)
+    length_max = _final_mask_window(side, 'length_max', side_spec.get('length_max'), 1)
+    delay_min = _final_mask_window(side, 'delay_min', side_spec.get('delay_min'), 0)
+    # A delay of 0 merges the fragments back into one write.
+    delay_max = _final_mask_window(side, 'delay_max', side_spec.get('delay_max'), 1)
+    if length_min[1] > length_max[0] or delay_min[1] > delay_max[0]:
+        raise AnsibleFilterError('final_mask %s: the min windows must end where the max '
+                                 'windows start or earlier' % side)
+    if length_max[1] >= len(address):
+        raise AnsibleFilterError(
+            'final_mask %s length_max reaches %d, which leaves no fragment boundary '
+            'certain inside the %d characters of %s'
+            % (side, length_max[1], len(address), address))
+    try:
+        covered = int(spec.get('covered_bytes'))
+    except (TypeError, ValueError):
+        raise AnsibleFilterError('final_mask covered_bytes must be a number, got %r'
+                                 % (spec.get('covered_bytes'),))
+    if covered < 1:
+        raise AnsibleFilterError('final_mask covered_bytes must be positive, got %d' % covered)
+
+    digest = hashlib.sha256(
+        ('%s|%s|%s' % (spec.get('rotation', 1), side, address)).encode('utf-8')).digest()
+
+    def pick(position, window):
+        value = int.from_bytes(digest[position * 2:position * 2 + 2], 'big')
+        return window[0] + value % (window[1] - window[0] + 1)
+
+    shortest = pick(0, length_min)
+    # The last fragment takes the remainder, so N fragments carry N-1 short ones.
+    max_split = int(math.ceil(covered / shortest)) + 1
+    return {'tcp': [{'type': 'fragment', 'settings': {
+        'packets': 'tlshello',
+        'length': '%d-%d' % (shortest, pick(1, length_max)),
+        'delay': '%d-%d' % (pick(2, delay_min), pick(3, delay_max)),
+        'maxSplit': '%d-%d' % (max_split, max_split + 4),
+    }}]}
+
+
 def remnawave_model(nodes, options):
     """Build the whole desired setup out of the collected node facts.
 
@@ -796,6 +868,9 @@ def remnawave_model(nodes, options):
     # regardless of host kind.
     for host in hosts:
         host['override_sni_from_address'] = True
+        # By the address the client dials: chain hosts through one entry show
+        # the censor the same SNI, so they share a mask.
+        host['final_mask'] = remnawave_final_mask(host['address'], options.get('final_mask'), 'hosts')
 
     duplicates = sorted(set(
         h['remark'] for h in hosts
@@ -1285,6 +1360,7 @@ def remnawave_verify(panel, model, options):
 class FilterModule(object):
     def filters(self):
         return {
+            'remnawave_final_mask': remnawave_final_mask,
             'remnawave_model': remnawave_model,
             'remnawave_select_tagged': remnawave_select_tagged,
             'remnawave_select_profiles_kept': remnawave_select_profiles_kept,

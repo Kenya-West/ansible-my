@@ -2,7 +2,9 @@
 {% set c = '}}' %}
 {% if setup_node_remna_node_enabled %}
 domains_node:
-  base_domains: {{ setup_node_selected_base_domains | to_json }}
+{% if setup_node_declared_base_domains %}
+  base_domains: {{ setup_node_declared_base_domains | to_json }}
+{% endif %}
   net_location_index: {{ initial_configure_host_net_location_index }}
   chain_location_index: {{ initial_configure_host_chain_location_index }}
 {% else %}
