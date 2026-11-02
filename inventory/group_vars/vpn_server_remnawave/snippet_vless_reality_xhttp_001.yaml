@@ -12,17 +12,6 @@ vless_reality_xhttp_001:
             encryption: none
         address: "{{ node_address }}"
 
-  xhttpSettings:
-    host: "{{ node_address }}"
-    mode: auto
-    path: "/"
-    headers: {}
-    noSSEHeader: false
-    xPaddingBytes: 100-1000
-    scMaxBufferedPosts: 30
-    scMaxEachPostBytes: 1000000
-    scStreamUpServerSecs: 20-80
-
   streamSettings:
     network: xhttp
     security: reality
@@ -30,3 +19,13 @@ vless_reality_xhttp_001:
       password: "{{ vpn_server_remnawave_xray_reality_password }}"
       serverName: "{{ node_address }}"
       fingerprint: firefox
+    xhttpSettings:
+      host: "{{ node_address }}"
+      mode: auto
+      path: "/"
+      headers: {}
+      noSSEHeader: false
+      xPaddingBytes: 100-1000
+      scMaxBufferedPosts: 30
+      scMaxEachPostBytes: 1000000
+      scStreamUpServerSecs: 20-80
