@@ -127,18 +127,22 @@
   become: true
   become_user: root
   block:
-    - name: Create private key file for {{ item.name }}
+    - name: Create private key files
       ansible.builtin.copy:
         content: "{{ item.secretBase64 | b64decode }}"
         dest: "{{ dest_path_full }}/ssh-keys/{{ item.name }}"
         mode: "0600"
       loop: "{{ git_sync_ssh_keys }}"
-    - name: Create public key file for {{ item.name }}
+      loop_control:
+        label: "{{ item.name }}"
+    - name: Create public key files
       ansible.builtin.copy:
         content: "{{ item.public }}"
         dest: "{{ dest_path_full }}/ssh-keys/{{ item.name }}.pub"
         mode: "0644"
       loop: "{{ git_sync_ssh_keys }}"
+      loop_control:
+        label: "{{ item.name }}"
   tags:
     - update_config_hard
     - update_ssh_keys
