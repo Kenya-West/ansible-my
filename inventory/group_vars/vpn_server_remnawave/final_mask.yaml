@@ -12,15 +12,30 @@
 #   lengths:  size of the nth fragment in bytes; the last entry repeats.
 #   delays:   wait in ms after the nth fragment; the last entry repeats.
 #   maxSplit: most pieces per write; 0 means no limit.
-# Numbers can be ranges such as "6-10", from which Xray draws per connection.
+#
+# A number can vary in two ways:
+#   "6-10":        Xray draws from it per connection.
+#   {pick: "6-10"}: settled once per domain and side from a hash, so it differs
+#                  between domains yet stays the same between runs.
+# And one size is worked out instead of written:
+#   aligned:       as the first length of a stream mask, ends the first write
+#                  right after the tlshello records: each of its lengths but the
+#                  last, plus a 5-byte header. It can't work with a "6-10" there,
+#                  so those use pick.
 #
 # The first mask gets the write first, and these two work as a pair:
 #   1. tlshello cuts the ClientHello into TLS records of 6 and 98 bytes, then 1
 #      byte each. Delays of just "0" hand them on together as one write. Without
 #      a maxSplit, every remaining byte takes a record of its own.
 #   2. "1-1" slices that one write for the wire: 114 bytes, exactly those first
-#      two records with their 5-byte headers, then 1 byte at a time up to 11
-#      pieces in all, 1 ms apart. The eleventh piece carries the rest.
+#      two records with their headers, then 1 byte at a time up to 11 pieces in
+#      all, 1 ms apart. The eleventh piece carries the rest.
+#
+# The picks are as wide as one value for now, which pins the mask to what is
+# known to work. To vary it, widen them, such as "5-8" and "90-98", and give the
+# last three values of the second mask ranges, such as "1-2", "1-3" and "9-13".
+# Keep the second record at 98 or under: more could put a larger part of the
+# hostname in one record.
 vpn_server_remnawave_final_mask:
   hosts:
     enabled: true
@@ -28,13 +43,13 @@ vpn_server_remnawave_final_mask:
       - type: fragment
         settings:
           packets: tlshello
-          lengths: ["6", "98", "1"]
+          lengths: [{pick: "6-6"}, {pick: "98-98"}, "1"]
           delays: ["0"]
           maxSplit: "0"
       - type: fragment
         settings:
           packets: "1-1"
-          lengths: ["114", "1"]
+          lengths: [aligned, "1"]
           delays: ["1"]
           maxSplit: "11"
   outbounds:

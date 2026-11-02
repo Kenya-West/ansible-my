@@ -46,7 +46,7 @@
     # Merged here rather than written in the templates, so every protocol's
     # template gets it.
     crpgs_outbound_final_mask: >-
-      {%- set mask = vpn_server_remnawave_final_mask | remnawave_final_mask('outbounds') -%}
+      {%- set mask = vpn_server_remnawave_final_mask | remnawave_final_mask('outbounds', item.address) -%}
       {{ {'streamSettings': {'finalmask': mask}} if mask else {} }}
   loop: "{{ crpgs_outbounds_plan }}"
   loop_control:

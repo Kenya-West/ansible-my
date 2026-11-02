@@ -545,7 +545,12 @@ Node side, in `group_vars/vpn_caddy/remna.yaml` or a node's host_vars:
 host and every planned chain outbound, never on an inbound. Each side has an
 `enabled` switch and a `tcp` list written as in Xray: `type: fragment` with
 `packets`, `lengths`, `delays` and `maxSplit`. A number can be a range such as
-`"6-10"`, from which Xray draws per connection. Other keys, including `length`,
+`"6-10"`, from which Xray draws per connection, or `{pick: "6-10"}`, settled once
+per domain and side from a hash, so it stays the same between runs. `aligned`, as
+the first length of a stream mask, ends the first write right after the `tlshello`
+mask's records. It can't work with a range there, so those use `pick`. A host
+takes its picks from the address the client dials, so chain hosts through one
+entry share them. Other keys, including `length`,
 `delay` and `interval`, are refused rather than dropped by Xray unnoticed.
 Turning `hosts` off clears the masks of the role's hosts.
 
