@@ -45,10 +45,11 @@ vpn_server_remnawave_hosts_adopt_untagged: false
 # The state generated Remnawave Hosts are published in. A host the panel does
 # not have yet is always created disabled, except with enabled. It can be:
 #   present:  created disabled, then left in whatever state the panel has, so a
-#             host switched on by hand in the panel stays on (the default)
+#             host switched on by hand in the panel stays on
 #   disabled: created disabled and disabled again on every run
-#   enabled:  created enabled and re-enabled on every run
-vpn_server_remnawave_hosts_publish_state: present
+#   enabled:  created enabled and re-enabled on every run, so one switched off by
+#             hand in the panel comes back on; retired hosts stay disabled
+vpn_server_remnawave_hosts_publish_state: enabled
 
 # A direct host takes its exit's profile. A chain host takes its exit's access
 # scope (global, location or exclusive), using the entry's transport.

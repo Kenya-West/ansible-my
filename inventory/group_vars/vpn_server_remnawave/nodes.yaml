@@ -16,10 +16,11 @@ vpn_server_remnawave_nodes_adopt_untagged: false
 # The state generated nodes are published in. A node the panel does not have
 # yet is always created disabled, except with enabled. It can be:
 #   present:  created disabled, then left in whatever state the panel has, so a
-#             node switched on by hand in the panel stays on (the default)
+#             node switched on by hand in the panel stays on
 #   disabled: created disabled and disabled again on every run
-#   enabled:  created enabled and re-enabled on every run
-vpn_server_remnawave_nodes_publish_state: present
+#   enabled:  created enabled and re-enabled on every run, so one switched off by
+#             hand in the panel comes back on; retired nodes stay disabled
+vpn_server_remnawave_nodes_publish_state: enabled
 
 # What to do with nodes carrying the primary tags that the inventory no longer
 # produces. It can be: ignore, disable, delete.
