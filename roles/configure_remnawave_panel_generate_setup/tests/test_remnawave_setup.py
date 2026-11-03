@@ -867,5 +867,29 @@ class RoutingDependencyTests(unittest.TestCase):
             'routing rule targets balancer bal, which is absent from this profile'])
 
 
+class ServerNamesTests(unittest.TestCase):
+    def model(self, server_names):
+        opts = options()
+        for base in opts['profiles_base']:
+            base['inbounds'][0]['streamSettings']['realitySettings']['serverNames'] = server_names
+        return setup.remnawave_model(nodes(), opts)
+
+    def every_dialed_address(self):
+        model = self.model([])
+        return sorted(set(h['address'] for h in model['hosts'])
+                      | set(o['address'] for o in options()['outbounds']))
+
+    def test_no_warning_when_every_dialed_address_is_listed(self):
+        model = self.model(self.every_dialed_address())
+        self.assertFalse(any('serverNames' in w for w in model['warnings']))
+
+    def test_an_unlisted_host_address_is_reported_per_inbound(self):
+        listed = [a for a in self.every_dialed_address() if a != 'chain-russia-1.example.test']
+        warnings = [w for w in self.model(listed)['warnings'] if 'serverNames' in w]
+        self.assertTrue(warnings)
+        self.assertTrue(all('chain-russia-1.example.test' in w for w in warnings))
+        self.assertTrue(any('Default-Profile' in w for w in warnings))
+
+
 if __name__ == '__main__':
     unittest.main()

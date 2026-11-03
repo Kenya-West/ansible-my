@@ -1,63 +1,29 @@
-# Every domain a node relating to this panel can be entered through, for the
-# serverNames of the XRay REALITY inbounds. Built on every Xray base domain of the
-# panel (vpn_server_remnawave_node_base_domains.xray, host_vars/<panel>/0_all/1_domains.yaml),
-# the names group_vars/vpn_caddy/domain_generator.yaml gives the nodes, for
-# every node that could exist:
+# serverNames of the XRay REALITY inbounds: every domain the nodes of this
+# panel actually declare, and nothing else. One sorted, de-duplicated list of
 #
-#   - <kind>-<region>-<index>, index 1 to vpn_server_remnawave_server_names_location_index_max,
-#     for every *_location type of remna_node_domain_types_allowlist and every
-#     deployment region (the keys of vpn_deployments_region_to_censorship_geo_mapping
-#     but vpn_server_remnawave_server_names_regions_exclude);
-#   - <kind>-<geo>-all for every *_all type and <kind>-<geo>-<protocol> for
-#     every *_protocol type and remna_protocol_types.<key>.short, for every
-#     censorship geo of those regions.
+#   - every domain of domains_keys.<vpn_server_remnawave_hosts_node_manage_key>
+#     (domains_keys.remna_node, group_vars/vpn_caddy/domain_generator.yaml) of
+#     every node whose panel is this host (vpn_server_remnawave_snippets_nodes,
+#     snippets.yaml) - the addresses of every generated Remnawave Host, direct
+#     and chain, are among them;
+#   - the address of every planned outbound
+#     (vpn_server_remnawave_snippets_outbounds_plan, snippets.yaml), so the
+#     chain outbounds always find their exit's SNI.
 #
-# <kind> is the first word of the type key (net_location -> net).
-
-vpn_server_remnawave_server_names_location_index_max: 50
-
-# Regions left out: unknown is the region of a country no matcher knows, not a
-# deployment target.
-vpn_server_remnawave_server_names_regions_exclude:
-  - unknown
+# A node added, removed or renumbered changes the list on the next run of the
+# config profiles; nothing here needs maintaining by hand. The model warns when
+# a host or outbound address is missing from a REALITY inbound's serverNames.
 
 vpn_server_remnawave_server_names: >-
-  {%- set catalog = vpn_server_remnawave_node_base_domains -%}
-  {%- if catalog is not mapping or catalog | list | sort != ['main', 'xray'] -%}
-  {{ undef('vpn_server_remnawave_node_base_domains must contain exactly main and xray for ' ~ inventory_hostname) | mandatory }}
-  {%- endif -%}
-  {%- for key, value in catalog.items() -%}
-  {%-   set values = [value] if value is string else value -%}
-  {%-   if values is not sequence or values is mapping or values | length == 0
-              or values | select('string') | list | length != values | length
-              or values | reject('match', domains_base_domain_pattern) | list | length > 0 -%}
-  {{ undef('vpn_server_remnawave_node_base_domains.' ~ key ~ ' must be a string or a non-empty list of DNS names for ' ~ inventory_hostname) | mandatory }}
-  {%-   endif -%}
-  {%- endfor -%}
-  {%- set bases = ([catalog.xray] if catalog.xray is string else catalog.xray) | unique(case_sensitive=true) | list -%}
-  {%- set types = remna_node_domain_types_allowlist | list -%}
-  {%- set regions = vpn_deployments_region_to_censorship_geo_mapping | reject('in', vpn_server_remnawave_server_names_regions_exclude) | list -%}
-  {%- set geos = regions | map('extract', vpn_deployments_region_to_censorship_geo_mapping) | unique | list -%}
-  {%- set protocols = remna_protocol_types.values() | map(attribute='short') | unique | list -%}
   {%- set out = [] -%}
-  {%- for base in bases -%}
-  {%- for type in types if type is match('.*_location$') -%}
-  {%-   for region in regions -%}
-  {%-     for index in range(1, (vpn_server_remnawave_server_names_location_index_max | int) + 1) -%}
-  {%-       set _ = out.append((type.split('_') | first) ~ '-' ~ region ~ '-' ~ index ~ '.' ~ base) -%}
-  {%-     endfor -%}
+  {%- for node in vpn_server_remnawave_snippets_nodes -%}
+  {%-   set declared = (hostvars[node].domains_keys | default({}, true))
+                         .get(vpn_server_remnawave_hosts_node_manage_key) | default([], true) -%}
+  {%-   for entry in ([declared] if declared is string else declared) -%}
+  {%-     set _ = out.append(entry.domain if entry is mapping else entry) -%}
   {%-   endfor -%}
   {%- endfor -%}
-  {%- for type in types -%}
-  {%-   for geo in geos -%}
-  {%-     if type is match('.*_all$') -%}
-  {%-       set _ = out.append((type.split('_') | first) ~ '-' ~ geo ~ '-all.' ~ base) -%}
-  {%-     elif type is match('.*_protocol$') -%}
-  {%-       for protocol in protocols -%}
-  {%-         set _ = out.append((type.split('_') | first) ~ '-' ~ geo ~ '-' ~ protocol ~ '.' ~ base) -%}
-  {%-       endfor -%}
-  {%-     endif -%}
-  {%-   endfor -%}
+  {%- for outbound in vpn_server_remnawave_snippets_outbounds_plan -%}
+  {%-   set _ = out.append(outbound.address) -%}
   {%- endfor -%}
-  {%- endfor -%}
-  {{ out | unique | list }}
+  {{ out | select | unique | sort | list }}

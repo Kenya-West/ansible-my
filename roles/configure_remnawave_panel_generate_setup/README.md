@@ -164,7 +164,7 @@ per-protocol `config` overrides. The config repeats nothing the inventory holds:
 
 | Part | Taken from |
 | --- | --- |
-| `serverNames` of the REALITY inbounds | `vpn_server_remnawave_server_names` |
+| `serverNames` of the REALITY inbounds | `vpn_server_remnawave_server_names`: every domain the panel's nodes declare plus every planned outbound address; the model warns when a host or outbound address is missing from it |
 | `privateKey` | filled in by the role per final inbound tag, from `vpn_server_remnawave_inbounds_private_keys` of the panel's host_vars: `specific` of the tag, else of the base tag it derives from, else `common` |
 | `outbounds`, `routing.rules`, `routing.balancers` | `{snippet: ...}` references named by `vpn_server_remnawave_snippets_key_*` |
 | `log`, `sniffing`, REALITY `target` | `vpn_server_remnawave_config_profiles_log`, `_sniffing`, `_reality_target` |

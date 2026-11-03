@@ -943,6 +943,21 @@ def remnawave_model(nodes, options):
         # the censor the same SNI, so they share a mask.
         host['final_mask'] = remnawave_final_mask(options.get('final_mask'), 'hosts', host['address'])
 
+    # A REALITY inbound refuses a handshake whose SNI it does not list, so every
+    # address a client or a chain outbound dials has to be in its serverNames.
+    dialed = set(h['address'] for h in hosts) | set(o['address'] for o in planned)
+    for profile in profiles:
+        for inbound in profile['config']['inbounds']:
+            stream = inbound.get('streamSettings') or {}
+            if stream.get('security') != 'reality':
+                continue
+            listed = set((stream.get('realitySettings') or {}).get('serverNames') or [])
+            missing = sorted(dialed - listed)
+            if missing:
+                warnings.append('REALITY inbound %s of config profile %s does not list %s '
+                                'in its serverNames, so connections through them fail'
+                                % (inbound['tag'], profile['name'], ', '.join(missing)))
+
     duplicates = sorted(set(
         h['remark'] for h in hosts
         if [x['remark'] for x in hosts].count(h['remark']) > 1))
