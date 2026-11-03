@@ -1,7 +1,9 @@
-# serverNames of the XRay REALITY inbounds: every domain the nodes of this
+# serverNames of the XRay REALITY inbounds: every Xray domain the nodes of this
 # panel actually declare, and nothing else. One sorted, de-duplicated list of
 #
-#   - every domain of domains_keys.<vpn_server_remnawave_hosts_node_manage_key>
+#   - every domain on an Xray base domain of the panel
+#     (vpn_server_remnawave_node_base_domains.xray, host_vars/<panel>/0_all/1_domains.yaml)
+#     out of domains_keys.<vpn_server_remnawave_hosts_node_manage_key>
 #     (domains_keys.remna_node, group_vars/vpn_caddy/domain_generator.yaml) of
 #     every node whose panel is this host (vpn_server_remnawave_snippets_nodes,
 #     snippets.yaml) - the addresses of every generated Remnawave Host, direct
@@ -10,11 +12,16 @@
 #     (vpn_server_remnawave_snippets_outbounds_plan, snippets.yaml), so the
 #     chain outbounds always find their exit's SNI.
 #
+# Domains on a main base (the unique <host>.<main base> the panel reaches a node
+# by) are left out: no client or outbound dials them over REALITY.
+#
 # A node added, removed or renumbered changes the list on the next run of the
 # config profiles; nothing here needs maintaining by hand. The model warns when
 # a host or outbound address is missing from a REALITY inbound's serverNames.
 
 vpn_server_remnawave_server_names: >-
+  {%- set xray = vpn_server_remnawave_node_base_domains.xray -%}
+  {%- set on_xray = '[.](' ~ (([xray] if xray is string else xray) | map('regex_escape') | join('|')) ~ ')$' -%}
   {%- set out = [] -%}
   {%- for node in vpn_server_remnawave_snippets_nodes -%}
   {%-   set declared = (hostvars[node].domains_keys | default({}, true))
@@ -26,4 +33,4 @@ vpn_server_remnawave_server_names: >-
   {%- for outbound in vpn_server_remnawave_snippets_outbounds_plan -%}
   {%-   set _ = out.append(outbound.address) -%}
   {%- endfor -%}
-  {{ out | select | unique | sort | list }}
+  {{ out | select | select('search', on_xray) | unique | sort | list }}
