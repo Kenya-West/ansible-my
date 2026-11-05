@@ -55,7 +55,7 @@ packages_binary_list:
       - ^REG:web
   - repo: babarot/gomi
   - repo: Byron/dua-cli
-    tag: v2.46.0
+    tag: "PRE:v"
   - repo: peltho/tufw
     assets:
       - tar.gz
