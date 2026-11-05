@@ -79,6 +79,8 @@
   when: eget_should_install is not defined or (eget_should_install is defined and eget_should_install == true)
 
 - name: Ensure root eget installed.toml exists
+  become: true
+  become_user: root
   ansible.builtin.stat:
     path: /root/.config/eget/installed.toml
   register: root_eget_installed_stat
