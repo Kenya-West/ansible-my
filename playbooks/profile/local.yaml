@@ -24,3 +24,4 @@
 - import_playbook: ../base/locale.yaml
 - import_playbook: ../base/clear_cache.yaml
 - import_playbook: ../base/logs.yaml
+- import_playbook: ../scenarios/backup_show_keys.yaml

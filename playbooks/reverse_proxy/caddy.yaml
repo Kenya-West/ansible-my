@@ -1,6 +1,6 @@
 ---
 - name: Install Caddy (Docker)
-  hosts: vpn_caddy
+  hosts: caddy
   become: false
   become_user: "{{ standard_user }}"
   strategy: ansible.builtin.host_pinned

@@ -98,6 +98,11 @@
 {% endif %}
 
 {
+{% if caddy_http_only | bool %}
+    # A host on a local network: plain HTTP, no certificates.
+    auto_https off
+
+{% endif %}
     log {
         output file /var/log/caddy/common.access.log
     }
@@ -107,7 +112,13 @@
     }
 }
 
+{# The containers label themselves with caddy_site_address; this site must
+   carry the same address for caddy-docker-proxy to merge them. #}
+{% if caddy_http_only | bool %}
+{{ caddy_site_address }} {
+{% else %}
 {{ ([domains_keys.main] + (domains_keys.main_extra | default([]))) | join(', ') }} {
+{% endif %}
     import logging {{ domains_keys.main }}
     import autodiscovery
 {% if 'analytics_node' in group_names %}

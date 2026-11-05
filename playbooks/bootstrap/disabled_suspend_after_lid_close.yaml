@@ -1,6 +1,6 @@
 ---
 - name: Disable suspend after lid close
-  hosts: mylaptops
+  hosts: local_devices
   become: true
   become_user: root
 

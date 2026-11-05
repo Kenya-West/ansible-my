@@ -1,10 +1,13 @@
 ---
 - name: Settle the facts the host templates use
   ansible.builtin.set_fact:
-    initial_configure_host_hostname: "{{ initial_configure_host_provider }}-{{ initial_configure_host_country_code }}-{{ initial_configure_host_index }}"
+    initial_configure_host_hostname: >-
+      {{ initial_configure_host_local_hostname if setup_node_local | bool
+         else initial_configure_host_provider ~ '-' ~ initial_configure_host_country_code ~ '-' ~ initial_configure_host_index }}
     initial_configure_host_base_domain_name: >-
-      {{ initial_configure_host_base_domain_name_custom
-         | default(initial_configure_host_base_domain_name_choice | default('', true), true) }}
+      {{ initial_configure_host_local_domain if setup_node_local | bool
+         else initial_configure_host_base_domain_name_custom
+              | default(initial_configure_host_base_domain_name_choice | default('', true), true) }}
     initial_configure_host_default_relation_host: >-
       {{ initial_configure_host_default_relation_host_custom
          | default(initial_configure_host_default_relation_host_choice | default('', true), true) }}
@@ -15,15 +18,8 @@
 
 - name: Settle the groups of the host
   ansible.builtin.set_fact:
-    setup_node_groups: >-
-      {{ (setup_node_groups_required + setup_node_groups_chosen
-          + (__setup_node_region_groups | rejectattr('requires', 'defined') | map(attribute='name') | list)
-          + (__setup_node_region_groups | selectattr('requires', 'defined')
-             | selectattr('requires', 'in', setup_node_groups_chosen) | map(attribute='name') | list))
-         | unique }}
+    setup_node_groups: "{{ (setup_node_groups_required + setup_node_groups_chosen) | unique }}"
     setup_node_remna_node_enabled: "{{ 'vpn_caddy' in setup_node_groups_chosen }}"
-  vars:
-    __setup_node_region_groups: "{{ setup_node_groups_by_region.get(setup_node_region, []) }}"
 
 - name: Check the answers the templates rely on
   ansible.builtin.assert:
@@ -33,10 +29,14 @@
       - >-
         not setup_node_remna_node_enabled
         or initial_configure_host_default_relation_host in setup_node_scan_panel_base_domains
+      - not setup_node_local | bool or not setup_node_remna_node_enabled
+      - not setup_node_local | bool or initial_configure_host_default_relation_host | length > 0
     fail_msg: >-
       A host outside vpn_caddy needs a base domain. A vpn_caddy host needs the
       panel it relates to, holding vpn_server_remnawave_node_base_domains: its
-      domains are built on those base domains.
+      domains are built on those base domains. A local host cannot join
+      vpn_caddy (the panel would publish it as a node) and needs a host it
+      relates to: Caddy resolves its analytics server through it.
     quiet: true
 
 - name: Normalize the node's domain selection before writing files
@@ -102,9 +102,14 @@
   ansible.builtin.assert:
     that:
       - setup_node_host_base_domains | select('string') | list | length == setup_node_host_base_domains | length
-      - setup_node_host_base_domains | reject('match', domains_base_domain_pattern) | list | length == 0
+      - setup_node_host_base_domains | reject('match', __setup_node_domain_pattern) | list | length == 0
     quiet: true
-    fail_msg: Host base domains must be bare lowercase DNS names.
+    fail_msg: >-
+      {{ 'The local domain suffix must be dot-separated lowercase labels.' if setup_node_local | bool
+         else 'Host base domains must be bare lowercase DNS names.' }}
+  vars:
+    __setup_node_domain_pattern: >-
+      {{ setup_node_local_domain_pattern if setup_node_local | bool else domains_base_domain_pattern }}
   when: not setup_node_remna_node_enabled
 
 - name: Validate optional billing answers before writing host_vars
@@ -153,6 +158,7 @@
   vars:
     setup_render_tree_src: "{{ setup_node_role_path }}/templates/host/{{ setup_node_template_dir }}"
     setup_render_tree_dest: "{{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}/{{ setup_node_template_dir }}"
+    setup_render_tree_skip: "{{ setup_node_templates_skip if setup_node_template_dir == '0_all' else [] }}"
   loop: >-
     {{ (setup_node_templates_always + setup_node_groups) | unique
        | select('in', __setup_node_template_dirs.files | map(attribute='path') | map('basename') | list) | list }}

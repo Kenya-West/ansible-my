@@ -9,7 +9,9 @@
     setup_node_region: >-
       {{ vpn_deployments_country_to_censorship_region_matcher.get(initial_configure_host_country_code,
            vpn_deployments_country_to_regions_matcher.get(initial_configure_host_country_code, 'unknown')) }}
-    setup_node_hostname: "{{ initial_configure_host_provider }}-{{ initial_configure_host_country_code }}-{{ initial_configure_host_index }}"
+    setup_node_hostname: >-
+      {{ initial_configure_host_local_hostname if setup_node_local | bool
+         else initial_configure_host_provider ~ '-' ~ initial_configure_host_country_code ~ '-' ~ initial_configure_host_index }}
     setup_node_country_hostnames: >-
       {{ setup_node_scan_existing_hostnames
          | select('match', '^[a-z0-9]+-' ~ initial_configure_host_country_code ~ '-[0-9]+$') | list }}

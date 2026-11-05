@@ -72,6 +72,16 @@ analytics_node
 vpn_caddy
 analytics_node
 
+# Hosts on a local network (a laptop, a home server): Caddy in plain HTTP, no
+# domain, no DNS records. Added by playbooks/ansible/node/add_host_local.yaml.
+[local_caddy]
+
+# Every host running Caddy (playbooks/reverse_proxy/caddy.yaml); its shared
+# variables are in group_vars/caddy.
+[caddy:children]
+vpn_caddy
+local_caddy
+
 # The above two groups are used when you run the playbook with --limit option, passing hostname of the server in value
 
 # You are free to create other groups but the defined ones are necessary.

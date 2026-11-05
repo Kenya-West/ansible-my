@@ -1,3 +1,7 @@
+# Group caddy holds every host running the Caddy of
+# playbooks/reverse_proxy/caddy.yaml: vpn_caddy (public, HTTPS on its domains)
+# and local_caddy (a local network, plain HTTP, no domain).
+
 docker_caddy_external_ip: "{{ host_ip_address }}"
 
 caddy_external_ports_allowlist__base:

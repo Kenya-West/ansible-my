@@ -1,0 +1,9 @@
+# Plain HTTP only: Caddy gets no certificates and redirects nothing to HTTPS.
+# Set by group_vars/local_caddy for hosts on a local network.
+caddy_http_only: false
+
+# The site address the containers of the host label themselves with
+# (caddy-docker-proxy merges the labels sharing it, and the site of the base
+# Caddyfile, into one site). `http://` answers plain HTTP on port 80 for any
+# name or address of the host: its LAN address, localhost, <hostname>.local.
+caddy_site_address: "{{ 'http://' if caddy_http_only | bool else domains_keys.main }}"

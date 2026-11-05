@@ -27,9 +27,7 @@ What it does
    - the IPv4 address, checked against the ones already in use;
    - the optional groups (`vpn_caddy`, `analytics_node`,
      `backup_restic_node` by default); `general_vps_prepare` and
-     `domain_management` are always joined, and a russian host also joins
-     `vps_russia` (and `vpn_caddy_russia_chain` when it is a `vpn_caddy`
-     host), see `setup_node_groups_by_region`;
+     `domain_management` are always joined;
    - the host the new one relates to by default (`host_relations.default`
      of `1_domains.yaml`): chosen from the `analytics_server` and
      `vpn_server_remnawave` hosts (deduplicated), or typed. This is asked
@@ -52,6 +50,40 @@ What it does
    inventory file(s) the play runs with.
 
 Nothing is written when `host_vars/<hostname>/` already exists.
+
+A host on a local network
+-------------------------
+
+`playbooks/ansible/node/add_host_local.yaml` runs the role with
+`setup_node_local: true`, for a laptop or a home server:
+
+- the hostname is asked whole (`kw-laptop`), not built from provider, country
+  and index; the country is still asked and written to
+  `0_all/0_country.yaml` as `country_code`, overriding the one
+  `group_vars/all` derives from the hostname;
+- its own domain is `<hostname>.<suffix>` (`local` by default, resolved
+  through mDNS), with no DNS record: the host joins `general_vps_prepare` and
+  `local_caddy`, never `domain_management` or `vpn_caddy` (the Remnawave panel
+  publishes every `vpn_caddy` host as a node). `local_devices`,
+  `backup_restic_node` and `analytics_node` are offered;
+- no provider, account or billing is asked, and `0_all/3_infrastructure.yaml`
+  is not written;
+- a host it relates to is required: Caddy resolves its analytics server
+  through it.
+
+`group_vars/local_caddy` sets `caddy_http_only`: Caddy turns `auto_https`
+off and serves one `http://` site, so every container labelled with
+`caddy_site_address` answers on port 80 at any address of the host (LAN,
+localhost). Prepare the host with `playbooks/profile/bootstrap.yaml`, then
+`playbooks/profile/node_local.yaml`.
+
+Unattended:
+
+    ansible-playbook -i inventory/production.ini playbooks/ansible/node/add_host_local.yaml \
+      -e prompting_engine_interactive=false \
+      -e '{"setup_node_prompt_answers": {"local_hostname": "kw-laptop", "country_code": "ru",
+           "ip_address": "192.168.1.50", "groups": ["local_devices"],
+           "default_relation_host_choice": "play2go-nl-3"}}'
 
 Domains of a `vpn_caddy` host
 -----------------------------
@@ -132,12 +164,14 @@ Role variables
 
 | Variable | Default | Description |
 | --- | --- | --- |
+| `setup_node_local` | `false` | A host on a local network: free hostname, country written as `country_code`, local domain suffix, no DNS, no billing. |
+| `setup_node_local_domain_default` | `local` | Suffix of a local host's own domain offered at the prompt. |
+| `setup_node_templates_skip` | `3_infrastructure.yaml.j2` (local) or `0_country.yaml.j2` | Files of this role's `templates/host/0_all/` not written. |
 | `setup_node_inventory_dir` | directory of the inventory the play runs with, else `inventory/` of the project | Where `host_vars/` lives. |
 | `setup_node_inventory_files` | the `.ini` files of `ansible_inventory_sources` | Inventory files that get the host. |
 | `setup_node_groups_required` | `general_vps_prepare`, `domain_management` | Groups every host joins. |
 | `setup_node_groups_optional` | `vpn_caddy`, `analytics_node`, `backup_restic_node` | Groups offered at the prompt (value: label). |
 | `setup_node_groups_optional_default` | all three | The ones chosen when Enter is pressed. |
-| `setup_node_groups_by_region` | `russia`: `vps_russia`, `vpn_caddy_russia_chain` (requires `vpn_caddy`) | Groups joined depending on the deployment region. |
 | `setup_node_templates_always` | `0_all` | Template directories rendered for every host. |
 | `setup_node_remna_protocol_types` | `vless_reality_tcp`, `vless_reality_xhttp` | Protocols offered at the prompt. |
 | `setup_node_relation_host_groups` | `analytics_server`, `vpn_server_remnawave` | Groups whose hosts are offered as the default relation host. |
@@ -152,6 +186,7 @@ and `initial_configure_host_default_relation_host` for the templates.
 Templates
 ---------
 
+- `host/0_all/0_country.yaml.j2`: `country_code`, for a local host only.
 - `host/0_all/1_domains.yaml.j2`: for a `vpn_caddy` host, `domains_node`
   with location indexes, and `base_domains` when the selection is not the
   panel's first entry; for any other,

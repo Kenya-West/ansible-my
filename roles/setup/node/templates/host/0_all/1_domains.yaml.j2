@@ -8,6 +8,10 @@ domains_node:
   net_location_index: {{ initial_configure_host_net_location_index }}
   chain_location_index: {{ initial_configure_host_chain_location_index }}
 {% else %}
+{% if setup_node_local | bool %}
+# A host on a local network: its own domain lives on the LAN only (no DNS
+# records, no certificates); Caddy serves it in plain HTTP (group local_caddy).
+{% endif %}
 domains_keys:
   main: "{{ o }} inventory_hostname {{ c }}.{{ setup_node_host_base_domains | first }}"
   main_extra:

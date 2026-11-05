@@ -57,4 +57,6 @@
       - "Groups: {{ setup_node_groups | join(', ') }}."
       - "host_vars: {{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}/"
       - "Inventory file(s): {{ setup_node_inventory_files | join(', ') }}."
-      - "Review the files, then prepare the host with the playbooks/profile/bootstrap.yml and playbooks/profile/node_full.yml."
+      - >-
+        Review the files, then prepare the host with playbooks/profile/bootstrap.yaml
+        and playbooks/profile/{{ 'node_local' if setup_node_local | bool else 'node_full' }}.yaml.

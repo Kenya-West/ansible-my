@@ -16,6 +16,26 @@ setup_node_inventory_files: >-
 # offer the base domains already in use and to suggest location indexes.
 setup_node_scan_domains_file: 1_domains.yaml
 
+# A host on a local network (a laptop, a home server) instead of a hosted one:
+# its name is free (no <provider>-<country>-<index>), so the country is asked
+# and written as country_code; its own domain is <hostname>.<local suffix>
+# with no DNS records, and it has no hosting bill. The groups for it are set
+# by playbooks/ansible/node/add_host_local.yaml.
+setup_node_local: false
+
+# The suffix of a local host's own domain (domains_keys.main), offered at the
+# prompt: `local` resolves through mDNS (Avahi) on the network once
+# playbooks/base/hostname.yaml has named the machine after the host.
+setup_node_local_domain_default: local
+# A hostname, or a suffix of one or more dot-separated labels.
+setup_node_local_name_pattern: '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'
+setup_node_local_domain_pattern: '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'
+
+# Files of templates/host/0_all/ of this role not written: a local host has
+# no hosting bill, a hosted one takes country_code from its name.
+setup_node_templates_skip: >-
+  {{ ['3_infrastructure.yaml.j2'] if setup_node_local | bool else ['0_country.yaml.j2'] }}
+
 # Groups every new host joins, the ones offered at the prompt (value: label)
 # and the ones chosen when Enter is pressed.
 setup_node_groups_required:
@@ -29,14 +49,6 @@ setup_node_groups_optional_default:
   - vpn_caddy
   - analytics_node
   - backup_restic_node
-
-# Groups joined on top, depending on the deployment region of the host. An
-# entry with `requires` is only joined when that group was chosen too.
-setup_node_groups_by_region:
-  russia:
-    - name: vps_russia
-    - name: vpn_caddy_russia_chain
-      requires: vpn_caddy
 
 # Directories of templates/host/ rendered into host_vars/<hostname>/. The ones
 # listed here always are; any other is when the host joins the group of the

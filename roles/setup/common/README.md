@@ -28,6 +28,7 @@ Nothing needs rsync or `become`.
 | `setup_render_tree_dest` | | Destination directory; created when missing. |
 | `setup_render_tree_file_mode` | `0664` | Mode of the written files. |
 | `setup_render_tree_dir_mode` | `0775` | Mode of the created directories. |
+| `setup_render_tree_skip` | `[]` | Paths relative to the source, as kept in it (`.j2` included), not written. |
 
 generate_passwords
 ------------------

@@ -13,10 +13,14 @@
 #   setup_render_tree_dest       destination directory, created when missing
 #   setup_render_tree_file_mode  mode of the written files (0664)
 #   setup_render_tree_dir_mode   mode of the created directories (0775)
+#   setup_render_tree_skip       paths (relative to the source, as kept in
+#                                it, .j2 included) not written; none by default
 
 - name: Collect the entries of {{ setup_render_tree_src }}
   ansible.builtin.set_fact:
-    __setup_render_tree_entries: "{{ query('community.general.filetree', setup_render_tree_src) }}"
+    __setup_render_tree_entries: >-
+      {{ query('community.general.filetree', setup_render_tree_src)
+         | rejectattr('path', 'in', setup_render_tree_skip | default([])) | list }}
 
 - name: Create the directories under {{ setup_render_tree_dest }}
   ansible.builtin.file:

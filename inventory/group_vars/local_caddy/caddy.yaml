@@ -1,0 +1,11 @@
+# A host on a local network (a laptop, a home server): it has no public
+# domain, no DNS records and no certificates. Its Caddy serves the containers
+# in plain HTTP on port 80, on every address of the host (LAN and localhost):
+#   http://<LAN address>/internal-network/autodiscovery/<container>/
+# Added by playbooks/ansible/node/add_host_local.yaml, prepared by
+# playbooks/profile/node_local.yaml.
+caddy_http_only: true
+
+# The UFW hairpin lets containers reach Caddy through the host's public
+# address; a LAN host has none (and may have no UFW at all).
+install_vpn_caddy_caddy_ufw_hairpin: false

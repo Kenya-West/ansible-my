@@ -1,0 +1,29 @@
+---
+# Prepare a host on a local network, added by
+# playbooks/ansible/node/add_host_local.yaml, after playbooks/profile/bootstrap.yaml:
+#
+#   ansible-playbook -i inventory/production.ini playbooks/profile/node_local.yaml --limit <host>
+#
+# No DNS records (the host is not in domain_management) and none of the
+# vpn_caddy services (frp, wg, zapret, remna, ufw-docker): those playbooks
+# target vpn_caddy, which a local host never joins.
+
+# Step 0: The laptop keeps running with its lid closed (group local_devices)
+- import_playbook: ../bootstrap/disabled_suspend_after_lid_close.yaml
+
+# Step 1: Caddy in plain HTTP on the LAN (group local_caddy)
+- import_playbook: ../reverse_proxy/caddy.yaml
+
+# Step 2: Install analytics and monitoring (group analytics_node)
+- import_playbook: ../observability/node/node_exporter.yaml
+- import_playbook: ../observability/node/fail2ban_exporter.yaml
+- import_playbook: ../observability/node/logporter.yaml
+- import_playbook: ../observability/node/docker_exporter.yaml
+- import_playbook: ../observability/node/vector.yaml
+- import_playbook: ../observability/node/pushgateway.yaml
+
+# Step 3: Install backup tools (group backup_restic_node)
+- import_playbook: ../backup/node/rclone.yaml
+- import_playbook: ../backup/node/postgres.yaml
+- import_playbook: ../backup/node/mongodb.yaml
+- import_playbook: ../backup/node/restic.yaml

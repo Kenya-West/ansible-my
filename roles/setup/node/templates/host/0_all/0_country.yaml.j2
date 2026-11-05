@@ -1,0 +1,5 @@
+# The name of this local host does not follow <provider>-<country>-<index>,
+# so its country is set here instead of being derived from inventory_hostname
+# (group_vars/all/0_defaults/country_code.yaml). It drives country_code_upper
+# and the deployment region.
+country_code: {{ initial_configure_host_country_code }}

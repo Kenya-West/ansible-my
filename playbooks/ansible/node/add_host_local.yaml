@@ -1,0 +1,34 @@
+---
+# Add a host on a local network (a laptop, a home server) to the inventory:
+# asks for its name, country, LAN address, groups and the host it relates to,
+# then writes inventory/host_vars/<hostname>/ and the host's inventory
+# sections. Same role as add_host_initial.yaml, in local mode: the name is
+# free, there is no DNS record, no certificate and no hosting bill, and Caddy
+# serves the containers in plain HTTP on the LAN (group local_caddy).
+# See roles/setup/node.
+#
+#   ansible-playbook -i inventory/production.ini playbooks/ansible/node/add_host_local.yaml
+#
+# Then: playbooks/profile/bootstrap.yaml and playbooks/profile/node_local.yaml,
+# limited to the new host.
+
+- name: Create basic configuration of a local host
+  hosts: localhost
+  become: false
+  gather_facts: false
+
+  roles:
+    - role: setup/node
+      vars:
+        setup_node_local: true
+        # Not domain_management (no DNS records) and never vpn_caddy: the
+        # Remnawave panel publishes every vpn_caddy host as a node.
+        setup_node_groups_required:
+          - general_vps_prepare
+          - local_caddy
+        setup_node_groups_optional:
+          local_devices: "local_devices - a laptop: keeps running with the lid closed"
+          backup_restic_node: "backup_restic_node - Autorestic backups of the host"
+          analytics_node: "analytics_node - exporters; the analytics server must reach the host to scrape them"
+        setup_node_groups_optional_default:
+          - local_devices
