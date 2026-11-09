@@ -148,11 +148,16 @@ def _collect(nodes, wanted_types):
                 'domain': domain,
                 'label': _label(domain),
                 'nodes': [],
+                'hosts': [],
                 'countries': [],
                 'protocols': [],
                 'profiles': [],
                 'scopes': [],
             })
+            # The inventory hostnames behind the domain, which hop relations
+            # (remna_node_hops) name, beside the panel names hosts bind to.
+            if node['name'] not in slot['hosts']:
+                slot['hosts'].append(node['name'])
             scope = node.get('scope')
             if scope and scope not in slot['scopes']:
                 slot['scopes'].append(scope)
@@ -381,6 +386,18 @@ def _merge_profile_config(target, fragment, append_lists=True):
     return target
 
 
+def _refuse_empty_conditions(rule, where):
+    """Xray reads an empty domain or ip list as no condition at all, so such a
+    rule would send all of its route's traffic where it meant to send some."""
+    if not isinstance(rule, dict) or not ('outboundTag' in rule or 'balancerTag' in rule):
+        return
+    for field in ('domain', 'ip'):
+        if field in rule and not rule[field]:
+            raise AnsibleFilterError(
+                '%s has a routing rule with an empty %s list, which Xray reads as matching '
+                'everything: %r' % (where, field, rule))
+
+
 def _prepare_composition(options):
     """Validate ordered fragments and collect their snippet definitions once."""
     if 'addons' in options or 'profile_common' in options:
@@ -417,11 +434,15 @@ def _prepare_composition(options):
                                       or any(not isinstance(item, dict) for item in value)):
                 raise AnsibleFilterError('Composition fragment %s config.%s must be a list '
                                          'of mappings' % (name, section))
+        for rule in routing.get('rules') or []:
+            _refuse_empty_conditions(rule, 'Composition fragment %s' % name)
         for snippet in _as_list(fragment.get('snippets')):
             if (not isinstance(snippet, dict) or not snippet.get('name')
                     or not isinstance(snippet.get('snippet'), list)):
                 raise AnsibleFilterError('Composition fragment %s snippets need name and '
                                          'snippet (a list)' % name)
+            for rule in snippet['snippet']:
+                _refuse_empty_conditions(rule, 'Snippet %s' % snippet['name'])
             previous = snippets.get(snippet['name'])
             if previous is not None and previous != snippet:
                 raise AnsibleFilterError('Conflicting definitions of composition snippet %s'
@@ -699,6 +720,276 @@ def remnawave_final_mask(spec, side, address):
     return {'tcp': out}
 
 
+def remnawave_route_uuid(uuid, route):
+    """``uuid`` carrying VLESS route ``route``, the way the panel writes a
+    host's vlessRouteId into its clients' UUIDs: the hex of bytes 6-7 (the
+    third group) replaced by the route. Xray ignores those bytes when it looks
+    the user up and routes by them (vlessRoute), so a chain outbound tells the
+    next hop what to do with the traffic it hands over. Route 0 is written as
+    0000, unlike the panel, which leaves a UUID alone for route 0."""
+    text = str(uuid or '').strip().lower()
+    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', text):
+        raise AnsibleFilterError('remnawave_route_uuid needs a UUID, got %r' % (uuid,))
+    number = _route_number(route)
+    if number is None or not 0 <= number <= 0xFFFF:
+        raise AnsibleFilterError('remnawave_route_uuid needs a route from 0 to 65535, got %r'
+                                 % (route,))
+    return text[:14] + '%04x' % number + text[18:]
+
+
+def _uuid_route(uuid):
+    """The route a UUID carries (its bytes 6-7), or None when it is not a UUID."""
+    text = str(uuid or '').strip().lower()
+    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', text):
+        return None
+    return int(text[14:18], 16)
+
+
+# --- hops between nodes (remna_node_hops) -----------------------------------
+
+_HOPS_KEYS = ('from', 'hidden', 'publish_direct', 'egress')
+_HOPS_FROM_KEYS = ('host', 'hidden')
+_EGRESS_KEYS = ('interface', 'family', 'gateway')
+_EGRESS_FAMILIES = ('ipv4', 'ipv6', 'dual')
+_FINAL = 0
+
+
+class _RepeatedNode(Exception):
+    """A path would pass the same Ansible host twice."""
+
+
+def _hops_of(node):
+    """A node's remna_node_hops, normalized.
+
+    ``from`` lists the Ansible hosts this node takes traffic from, each a
+    hostname or {host, hidden}; ``hidden`` is the default of every relation;
+    ``publish_direct`` keeps a node with relations published on its own;
+    ``egress`` is only checked here, the node role acts on it.
+    """
+    name = node['name']
+    raw = node.get('hops') or {}
+    if not isinstance(raw, dict):
+        raise AnsibleFilterError('remna_node_hops of %s must be a mapping, got %r' % (name, raw))
+    unknown = sorted(set(raw) - set(_HOPS_KEYS))
+    if unknown:
+        raise AnsibleFilterError('remna_node_hops of %s has unknown keys %s; it takes %s'
+                                 % (name, ', '.join(unknown), ', '.join(_HOPS_KEYS)))
+    hidden_default = _as_bool(raw.get('hidden', True))
+    items = raw.get('from') or []
+    if isinstance(items, (str, dict)):
+        items = [items]
+    relations, seen = [], set()
+    for item in items:
+        if isinstance(item, str):
+            item = {'host': item}
+        if not isinstance(item, dict) or not item.get('host'):
+            raise AnsibleFilterError('remna_node_hops.from of %s takes hostnames or {host, hidden}, '
+                                     'got %r' % (name, item))
+        unknown = sorted(set(item) - set(_HOPS_FROM_KEYS))
+        if unknown:
+            raise AnsibleFilterError('remna_node_hops.from of %s: %s has unknown keys %s; it takes %s'
+                                     % (name, item['host'], ', '.join(unknown),
+                                        ', '.join(_HOPS_FROM_KEYS)))
+        host = str(item['host'])
+        if host == name:
+            raise AnsibleFilterError(
+                'remna_node_hops.from of %s names the host itself. A second address of the '
+                'same machine is a hop through remna_node_hops.egress (interface, family), '
+                'not a relation.' % name)
+        if host in seen:
+            raise AnsibleFilterError('remna_node_hops.from of %s names %s twice' % (name, host))
+        seen.add(host)
+        hidden = item.get('hidden')
+        relations.append({'host': host,
+                          'hidden': hidden_default if hidden is None else _as_bool(hidden)})
+    egress = raw.get('egress') or {}
+    if not isinstance(egress, dict):
+        raise AnsibleFilterError('remna_node_hops.egress of %s must be a mapping, got %r'
+                                 % (name, egress))
+    unknown = sorted(set(egress) - set(_EGRESS_KEYS))
+    if unknown:
+        raise AnsibleFilterError('remna_node_hops.egress of %s has unknown keys %s; it takes %s'
+                                 % (name, ', '.join(unknown), ', '.join(_EGRESS_KEYS)))
+    family = str(egress.get('family') or 'ipv4')
+    if family not in _EGRESS_FAMILIES:
+        raise AnsibleFilterError('remna_node_hops.egress.family of %s must be one of %s, got %r'
+                                 % (name, ', '.join(_EGRESS_FAMILIES), family))
+    return {
+        'from': relations,
+        'publish_direct': _as_bool(raw.get('publish_direct', False)),
+        'egress': {'interface': str(egress.get('interface') or ''), 'family': family},
+    }
+
+
+def _find_cycle(edges):
+    """A cycle of a directed graph ({vertex: [successors]}) as a closed list of
+    vertices, or None. Vertices and successors are visited in sorted order, so
+    the cycle reported is the same on every run."""
+    state, stack = {}, []
+
+    def visit(vertex):
+        state[vertex] = 'open'
+        stack.append(vertex)
+        for successor in sorted(edges.get(vertex) or []):
+            if state.get(successor) == 'open':
+                return stack[stack.index(successor):] + [successor]
+            if successor not in state:
+                found = visit(successor)
+                if found:
+                    return found
+        stack.pop()
+        state[vertex] = 'done'
+        return None
+
+    for vertex in sorted(edges):
+        if vertex not in state:
+            found = visit(vertex)
+            if found:
+                return found
+    return None
+
+
+class _Hops(object):
+    """The hop relations of a panel's nodes, checked and lifted to domains.
+
+    A relation U -> D (D lists U in remna_node_hops.from) is *hidden* by
+    default: D then carries on whatever U would send out itself, and is not
+    published. Hidden relations hang off the Ansible host, so every domain of
+    U - its exit as much as its chain entry - continues into D: U's tail. A
+    *visible* relation publishes "D | by U" instead, entered through U's chain
+    domain.
+    """
+
+    def __init__(self, nodes, exits, entries):
+        self.node = dict((n['name'], n) for n in nodes)
+        for node in nodes:
+            node['hop'] = _hops_of(node)
+        self.exit_of = {}
+        self.entry_of = {}
+        for slot in exits:
+            for host in slot['hosts']:
+                self.exit_of.setdefault(host, []).append(slot)
+        for slot in entries:
+            for host in slot['hosts']:
+                self.entry_of.setdefault(host, []).append(slot)
+        self.hidden_down = {}
+        self.visible = []
+        self.relations = []
+        edges = {}
+        for node in nodes:
+            for relation in node['hop']['from']:
+                self._check(relation['host'], node, relation['hidden'])
+                edges.setdefault(relation['host'], []).append(node['name'])
+                self.relations.append({'from': relation['host'], 'to': node['name'],
+                                       'hidden': relation['hidden']})
+                if relation['hidden']:
+                    self.hidden_down.setdefault(relation['host'], []).append(node['name'])
+                else:
+                    self.visible.append((self.entry_of[relation['host']][0],
+                                         self.exit_of[node['name']][0]))
+        cycle = _find_cycle(edges)
+        if cycle:
+            raise AnsibleFilterError(
+                'remna_node_hops: hop relations form a cycle: %s. Each arrow means the next '
+                'host lists the previous one in remna_node_hops.from; remove one of these '
+                'relations.' % ' → '.join(cycle))
+        for slot in exits + entries:
+            self._agree(slot)
+        slot_edges = {}
+        for slot in exits + entries:
+            slot_edges.setdefault(slot['domain'], []).extend(
+                t['domain'] for t in self.tails(slot))
+        for upstream, downstream in self.visible:
+            slot_edges.setdefault(upstream['domain'], []).append(downstream['domain'])
+        cycle = _find_cycle(slot_edges)
+        if cycle:
+            raise AnsibleFilterError(
+                'remna_node_hops: the domains of the hop relations form a cycle: %s. Nodes '
+                'behind one domain take part in each other\'s relations; remove one of them.'
+                % ' → '.join(cycle))
+        self.visible.sort(key=lambda pair: (pair[1]['domain'], pair[0]['domain']))
+        self.relations.sort(key=lambda r: (r['to'], r['from']))
+
+    def _check(self, upstream, downstream, hidden):
+        name = downstream['name']
+        if upstream not in self.node:
+            raise AnsibleFilterError(
+                'remna_node_hops.from of %s names %s, which is no node of this panel: a host '
+                'of the node group relating to the panel and publishing domains'
+                % (name, upstream))
+        source = self.node[upstream]
+        exits = self.exit_of.get(name) or []
+        if len(exits) != 1:
+            raise AnsibleFilterError(
+                'remna_node_hops: %s takes traffic from %s, so it needs exactly one direct '
+                '(net-location) domain for it to be dialed by; it has %s'
+                % (name, upstream, ', '.join(s['domain'] for s in exits) or 'none'))
+        if hidden:
+            if source['scope']['geo'] != downstream['scope']['geo']:
+                raise AnsibleFilterError(
+                    'remna_node_hops: the hidden relation %s -> %s crosses censorship geos '
+                    '(%s -> %s). A hidden node carries on what its upstream sends out, inside '
+                    'one geo; publish it with hidden: false to chain across them.'
+                    % (upstream, name, source['scope']['geo'], downstream['scope']['geo']))
+            scope = downstream['scope']
+            if scope['kind'] == 'exclusive' and source['scope'] != scope:
+                raise AnsibleFilterError(
+                    'remna_node_hops: the hidden relation %s -> %s would let everyone %s '
+                    'serves exit through exclusive node %s (%s). Hide an exclusive node only '
+                    'behind a node of the same exclusive profile.'
+                    % (upstream, name, upstream, name, scope['scope']))
+        elif len(self.entry_of.get(upstream) or []) != 1:
+            raise AnsibleFilterError(
+                'remna_node_hops: %s is published through %s (hidden: false), so %s needs '
+                'exactly one chain (chain-location) domain to be entered by; it has %s'
+                % (name, upstream, upstream,
+                   ', '.join(s['domain'] for s in self.entry_of.get(upstream) or []) or 'none'))
+
+    def _agree(self, slot):
+        """Nodes behind one domain are one entity in the panel and run the same
+        rules, so they must agree on every relation they take part in."""
+        def view(host):
+            hop = self.node[host]['hop']
+            return (sorted((r['host'], r['hidden']) for r in hop['from']),
+                    hop['publish_direct'] if hop['from'] else None,
+                    sorted(self.hidden_down.get(host) or []),
+                    sorted(d for u, d in ((r['from'], r['to']) for r in self.relations
+                                          if not r['hidden']) if u == host))
+        views = dict((host, view(host)) for host in slot['hosts'])
+        if len(set(repr(v) for v in views.values())) > 1:
+            raise AnsibleFilterError(
+                'remna_node_hops: %s is served by %s, which declare different hop relations. '
+                'Nodes behind one domain run the same routing, so give them the same '
+                'remna_node_hops.from and name all of them wherever one is named.'
+                % (slot['domain'], ', '.join(sorted(views))))
+
+    def published(self, slot):
+        """Whether a domain is published on its own: its nodes take traffic from
+        no one, or say publish_direct."""
+        return all(not self.node[h]['hop']['from'] or self.node[h]['hop']['publish_direct']
+                   for h in slot['hosts'])
+
+    def tails(self, slot):
+        """The direct domains of the hidden nodes a domain's traffic continues into."""
+        found = {}
+        for host in slot['hosts']:
+            for down in self.hidden_down.get(host) or []:
+                target = self.exit_of[down][0]
+                found[target['domain']] = target
+        return [found[d] for d in sorted(found)]
+
+    def hosts_of(self, slot):
+        """Every Ansible host a domain's traffic passes, its tail included."""
+        hosts = set(slot['hosts'])
+        for tail in self.tails(slot):
+            hosts |= self.hosts_of(tail)
+        return hosts
+
+
+def _geo_of(slot):
+    return slot['scopes'][0]['geo'] if slot.get('scopes') else 'global'
+
+
 def remnawave_model(nodes, options):
     """Build the whole desired setup out of the collected node facts.
 
@@ -743,19 +1034,48 @@ def remnawave_model(nodes, options):
     # Plan chains before rendering profiles: their client-facing transport is
     # the entry's, but access is granted by the exit's scope. Location and
     # exclusive exits need a profile variant for each usable entry protocol.
-    exits = [
+    all_exits = [
         _settle(slot, default_protocol, warnings, 'Direct domain')
         for _, slot in sorted(_collect(nodes, set(options['direct_domain_types'])).items())
     ]
-    entries = [
+    all_entries = [
         _settle(slot, default_protocol, warnings, 'Chain domain')
         for _, slot in sorted(_collect(nodes, set(options['entry_domain_types'])).items())
     ]
+    # Hop relations (remna_node_hops): a node taking traffic from another is
+    # out of both pools unless it says publish_direct; a hidden one is only
+    # ever reached through the tail of its upstream, a visible one through the
+    # "D | by U" host of its relation.
+    hops = _Hops(nodes, all_exits, all_entries)
+    exits = [s for s in all_exits if hops.published(s)]
+    entries = [s for s in all_entries if hops.published(s)]
     entry_countries = set(str(c).upper() for c in options.get('entry_country_codes') or [])
     global_entries = _as_bool(options.get('entry_global_for_non_global', False))
     entries = [e for e in entries if e['country'] in entry_countries
                or (global_entries and e['scopes'][0]['kind'] == 'global')]
     pairs = _chain_pairs(exits, entries, options)
+    # A visible relation publishes its own "D | by U"; an automatic pair of the
+    # same two domains would collide with it. A pair whose tails share a node
+    # would pass that node twice.
+    covered = set((u['domain'], d['domain']) for u, d in hops.visible)
+    for exit_domain in list(pairs):
+        exit_slot = next(s for s in exits if s['domain'] == exit_domain)
+        exit_hosts = hops.hosts_of(exit_slot)
+        kept = []
+        for entry in pairs[exit_domain]:
+            if (entry['domain'], exit_domain) in covered:
+                continue
+            shared = hops.hosts_of(entry) & exit_hosts
+            if shared:
+                warnings.append('No chain host of %s through %s: both reach %s through their '
+                                'hop relations' % (exit_domain, entry['domain'],
+                                                   ', '.join(sorted(shared))))
+                continue
+            kept.append(entry)
+        if kept:
+            pairs[exit_domain] = kept
+        else:
+            del pairs[exit_domain]
     planned_domains = set(o['address'] for o in options.get('outbounds') or []
                           if o.get('kind', 'location') == 'location')
     for exit_slot in exits:
@@ -765,6 +1085,17 @@ def remnawave_model(nodes, options):
         if scope['kind'] != 'global':
             key = (scope['kind'], scope['scope'], scope['geo'])
             scopes_in_use[key].update(e['protocol'] for e in pairs.get(exit_slot['domain'], []))
+    # A visible relation into a location or exclusive node advertises that
+    # node's scope with its upstream's transport, as a chain host does.
+    for upstream, downstream in hops.visible:
+        if downstream['domain'] not in planned_domains:
+            raise AnsibleFilterError(
+                'remna_node_hops: %s is published through %s, but no outbound is planned for '
+                'its domain %s' % (downstream['hosts'][0], upstream['hosts'][0],
+                                   downstream['domain']))
+        scope = downstream['scopes'][0]
+        if scope['kind'] != 'global':
+            scopes_in_use[(scope['kind'], scope['scope'], scope['geo'])].add(upstream['protocol'])
 
     profiles = _render_profiles(scopes_in_use, options, composition, warnings)
     squad_grants = _squad_grants(profiles, options.get('squads_inbounds'))
@@ -795,9 +1126,24 @@ def remnawave_model(nodes, options):
             warnings.append('Config profile %s is granted to no internal squad, so no '
                             'user can connect through its inbounds' % profile['name'])
 
+    # Every domain the setup uses: the two pools, both ends of the visible
+    # relations and every hidden node in a tail of any of them.
+    used, seen_domains = [], set()
+
+    def use(slot):
+        if id(slot) in seen_domains:
+            return
+        seen_domains.add(id(slot))
+        used.append(slot)
+        for tail in hops.tails(slot):
+            use(tail)
+
+    for slot in exits + entries + [s for pair in hops.visible for s in pair]:
+        use(slot)
+
     # Every node behind one domain must activate the same profile, even when
     # the scope agrees but its primary transports do not.
-    for slot in exits + entries:
+    for slot in used:
         slot['profiles'] = sorted(set(node_profiles[n]['config_profile'] for n in slot['nodes']))
         _settle(slot, default_protocol, [], 'Domain')
 
@@ -805,7 +1151,7 @@ def remnawave_model(nodes, options):
     # gone by now, so it takes no number with it.
     region_codes = options.get('region_codes') or {}
     flag_symbols = options.get('flag_symbols') or {}
-    for slot in exits + entries:
+    for slot in used:
         profile = profile_by_name[slot['profiles'][0]]
         slot['profile'] = profile['name']
         slot['inbound'] = profile['inbound_tags'][0]
@@ -815,11 +1161,18 @@ def remnawave_model(nodes, options):
     # Exclusive exits are counted apart, per exclusive profile, so neither the
     # shared numbering nor an exclusive squad's own list has gaps; their names
     # carry the profile's name, since a remark has to be unique panel-wide.
+    # Both ends of a visible relation are named with the pools; a hidden node
+    # has no name of its own, as it is never published.
     def group_of(slot):
         return slot['scope'] if slot['scope_kind'] == 'exclusive' else ''
 
+    named_exits = exits + [d for _, d in hops.visible if all(d is not s for s in exits)]
+    named_entries = entries + [u for u, _ in hops.visible if all(u is not s for s in entries)]
+    named_exits = [s for i, s in enumerate(named_exits) if all(s is not t for t in named_exits[:i])]
+    named_entries = [s for i, s in enumerate(named_entries)
+                     if all(s is not t for t in named_entries[:i])]
     exclusive_format = options.get('remark_exclusive_format') or '{name} · {profile}'
-    for collection in (exits, entries):
+    for collection in (named_exits, named_entries):
         for group in sorted(set(group_of(s) for s in collection)):
             members = [s for s in collection if group_of(s) == group]
             _name(members, region_codes, flag_symbols)
@@ -828,17 +1181,25 @@ def remnawave_model(nodes, options):
                     slot['display'] = exclusive_format.format(
                         name=slot['display'], profile=group)
 
-    # --- number the chained exits ------------------------------------------
-    # Every exit's outbound is planned in the inventory, tag included. A
-    # chained exit's rule points at that outbound and its route id is its
-    # position in the plan, so tag and id always follow the same order.
+    # --- route ids: what each node does with the traffic it is handed -------
+    # A route id is an action: where a node sends what arrives carrying it
+    # (one next hop, or several behind a balancer) and with which route the
+    # outbound hands it over, plus what the node does with local traffic
+    # itself. A host carries the id of the action of the node it dials; every
+    # chain outbound carries the next node's id in its UUID
+    # (remnawave_route_uuid), so the route travels hop by hop, and the last
+    # hop hands over route 0: the node it reaches is the exit. The rules are
+    # one snippet in every profile, so an id must mean the same anywhere -
+    # which it does, being the action itself.
     planned = [o for o in (options.get('outbounds') or [])
                if o.get('kind', 'location') == 'location']
     position_of = {}
     tag_of = {}
+    plan_of = {}
     for position, outbound in enumerate(planned):
         position_of.setdefault(outbound['address'], position)
         tag_of.setdefault(outbound['address'], outbound['tag'])
+        plan_of.setdefault(outbound['address'], outbound)
 
     unplanned = sorted(e['domain'] for e in exits
                        if e['domain'] in pairs and e['domain'] not in tag_of)
@@ -850,22 +1211,245 @@ def remnawave_model(nodes, options):
         (e for e in exits if e['domain'] in pairs and e['domain'] in tag_of),
         key=lambda e: position_of[e['domain']])
 
-    base = int(options['route_id_base'])
-    rules = []
-    for position, exit_slot in enumerate(chained):
-        tag = tag_of[exit_slot['domain']]
-        route_id = base + position
-        exit_slot['route_id'] = route_id
-        exit_slot['outbound_tag'] = tag
-        rules.append({'vlessRoute': str(route_id), 'outboundTag': tag})
+    performers = {}
 
-    highest = base + len(chained) - 1 if chained else None
+    def arrive(slot, cont, passed=frozenset()):
+        """The action ``slot`` takes on traffic that, past its own tail,
+        continues as ``cont`` ((next head, its cont) or None at the exit),
+        as a nested key; _FINAL when it is the exit itself."""
+        hosts = set(slot['hosts'])
+        if hosts & passed:
+            raise _RepeatedNode(', '.join(sorted(hosts & passed)))
+        passed = passed | hosts
+        tails = hops.tails(slot)
+        if tails:
+            key = ('act', tuple((t['domain'], arrive(t, cont, passed)) for t in tails), None)
+        elif cont is None:
+            return _FINAL
+        else:
+            head, rest = cont
+            # Local traffic of a censored geo leaves at the last node inside
+            # it, through that node's WARP, never through a VPS address.
+            local = (_geo_of(slot) if _geo_of(slot) != 'global' and _geo_of(head) == 'global'
+                     else None)
+            key = ('act', ((head['domain'], arrive(head, rest, passed)),), local)
+        performers.setdefault(key, []).append(slot)
+        return key
+
+    def path_list(slot, cont):
+        """Every way through, as lists of the domains passed."""
+        tails = hops.tails(slot)
+        if tails:
+            return [[slot['domain']] + rest for t in tails for rest in path_list(t, cont)]
+        if cont is None:
+            return [[slot['domain']]]
+        head, rest = cont
+        return [[slot['domain']] + more for more in path_list(head, rest)]
+
+    # The hosts' journeys, in the order hosts are generated: direct hosts,
+    # the automatic chains, then the visible relations.
+    journeys = []
+    for exit_slot in exits:
+        journeys.append(('direct', exit_slot, None, exit_slot, None))
+    for exit_slot in chained:
+        for entry in pairs[exit_slot['domain']]:
+            journeys.append(('chain', entry, (exit_slot, None), exit_slot, entry))
+    for upstream, downstream in hops.visible:
+        journeys.append(('relation', upstream, (downstream, None), downstream, upstream))
+
+    keys_in_order = []
+
+    def collect(key):
+        if key == _FINAL or key in keys_in_order:
+            return
+        keys_in_order.append(key)
+        for _, child in key[1]:
+            collect(child)
+
+    journey_keys = []
+    for journey in journeys:
+        kind, head, cont = journey[0], journey[1], journey[2]
+        try:
+            key = arrive(head, cont)
+        except _RepeatedNode as repeated:
+            raise AnsibleFilterError(
+                'remna_node_hops: the way from %s to %s passes %s twice'
+                % (head['domain'], (cont or (head,))[0]['domain'], repeated))
+        journey_keys.append(key)
+        collect(key)
+
+    # Legacy ids first: the n-th chained exit's action keeps base + n, as it
+    # had before actions, whenever an entry without a tail reaches it.
+    base = int(options['route_id_base'])
+    ids = {}
+    for position, exit_slot in enumerate(chained):
+        for entry in pairs[exit_slot['domain']]:
+            if hops.tails(entry):
+                continue
+            key = arrive(entry, (exit_slot, None))
+            if key not in ids and base + position not in ids.values():
+                ids[key] = base + position
+            break
+    next_id = base + len(chained)
+    for key in keys_in_order:
+        if key in ids:
+            continue
+        while next_id in ids.values():
+            next_id += 1
+        ids[key] = next_id
+        next_id += 1
+
+    def carried(child):
+        return 0 if child == _FINAL else ids[child]
+
+    # One outbound per next hop and route it hands over: the planned outbound
+    # of the domain for route 0, an out-hop one per other route.
+    hop_prefix = options.get('hop_tag_prefix') or 'out-hop'
+    wanted_outbounds = set()
+    for key in keys_in_order:
+        for domain, child in key[1]:
+            if domain not in tag_of:
+                raise AnsibleFilterError(
+                    'remna_node_hops: %s is dialed as a next hop but has no planned outbound '
+                    '(vpn_server_remnawave_snippets_outbounds_plan)' % domain)
+            wanted_outbounds.add((domain, carried(child)))
+    hop_outbounds = []
+    hop_tag = {}
+    for sequence, (route, domain) in enumerate(sorted((r, d) for d, r in wanted_outbounds if r)):
+        if sequence >= 999:
+            raise AnsibleFilterError('More than 999 hop outbounds; their tags would no longer '
+                                     'have a fixed width')
+        tag = '%s-%03d-%s' % (hop_prefix, sequence + 1, _label(domain))
+        hop_tag[(domain, route)] = tag
+        outbound = dict(_plain(plan_of[domain]))
+        outbound.update({'tag': tag, 'address': domain, 'route': route})
+        hop_outbounds.append(outbound)
+
+    def outbound_tag(domain, route):
+        return tag_of[domain] if route == 0 else hop_tag[(domain, route)]
+
+    def finals(key):
+        """The domains a route's traffic exits at, past every next hop."""
+        out = set()
+        for domain, child in key[1]:
+            out |= set([domain]) if child == _FINAL else finals(child)
+        return out
+
+    geo_of_domain = dict((s['domain'], _geo_of(s)) for s in used)
+    slot_by_domain = dict((s['domain'], s) for s in used)
+    balancer_prefix = options.get('balancer_hops_prefix') or 'bal-hop'
+    routes = []
+    for key, number in sorted(ids.items(), key=lambda item: item[1]):
+        nexts = [{'address': domain, 'carried': carried(child),
+                  'tag': outbound_tag(domain, carried(child))} for domain, child in key[1]]
+        doers = performers.get(key) or []
+        routes.append({
+            'id': number,
+            'next': nexts,
+            'local': key[2],
+            'balancer': ('%s-%d' % (balancer_prefix, number)) if len(nexts) > 1 else None,
+            'performed_by': sorted(set(s['domain'] for s in doers)),
+            'profiles': sorted(set(s['profile'] for s in doers)),
+            'final_geos': sorted(set(geo_of_domain[d] for d in finals(key))),
+        })
+
+    # A node that egresses over IPv6 only cannot dial other nodes: their
+    # domains carry A records only.
+    for route in routes:
+        for domain in route['performed_by']:
+            slot = next(s for s in used if s['domain'] == domain)
+            for host in slot['hosts']:
+                if hops.node[host]['hop']['egress']['family'] == 'ipv6':
+                    raise AnsibleFilterError(
+                        'remna_node_hops.egress.family of %s is ipv6, but it forwards to %s, '
+                        'whose domains have IPv4 records only; use dual'
+                        % (host, ', '.join(n['address'] for n in route['next'])))
+
+    # The rules snippet: local traffic first (a node's own decision, split
+    # per censored geo), then one rule per action handing to one next hop.
+    # Several next hops are a balancer, written inline into the profiles of
+    # the nodes taking that action, with the rule naming it and the
+    # observatory measuring it, so a profile never names a balancer it lacks.
+    rules = []
+    local_traffic = options.get('local_traffic')
+    warp_tag = options.get('warp_tag') or 'out-warp-socks'
+    if local_traffic is not None:
+        for geo in sorted(set(r['local'] for r in routes if r['local'])):
+            numbers = ','.join(str(r['id']) for r in routes if r['local'] == geo)
+            wanted = (local_traffic or {}).get(geo) or {}
+            if not wanted.get('domain') and not wanted.get('ip'):
+                warnings.append('Routes %s leave the %s geo, but '
+                                'vpn_server_remnawave_routing_local_traffic names no local '
+                                'traffic of it, so it travels to the exit with the rest'
+                                % (numbers, geo))
+                continue
+            for field in ('domain', 'ip'):
+                if wanted.get(field):
+                    rules.append({'vlessRoute': numbers, field: list(wanted[field]),
+                                  'outboundTag': warp_tag})
+    for route in routes:
+        if not route['balancer']:
+            rules.append({'vlessRoute': str(route['id']), 'outboundTag': route['next'][0]['tag']})
+
+    # Fan-out: only the nodes taking the action ever receive its id, and they
+    # all activate the profiles listed on the route, so the balancer, its
+    # rule and the observatory go there, written with the profile in one go.
+    # leastPing picks the next hop the observatory measures fastest; every
+    # node of such a profile probes, through the whole rest of each path. A
+    # path ending in a censored geo blocks all but its local traffic there
+    # (reverse users), so the probe of a profile balancing such paths has to
+    # be local to that geo: the observatory settings of the geo the balanced
+    # paths end in are taken, else those of the global geo.
+    observatory = options.get('observatory') or {}
+    subjects = {}
+    probe_geos = {}
+    for route in routes:
+        if not route['balancer']:
+            continue
+        tags = [n['tag'] for n in route['next']]
+        for name in route['profiles']:
+            config = profile_by_name[name]['config']
+            routing = config.setdefault('routing', {})
+            routing.setdefault('rules', []).append(
+                {'vlessRoute': str(route['id']), 'balancerTag': route['balancer']})
+            routing.setdefault('balancers', []).append({
+                'tag': route['balancer'],
+                'selector': list(tags),
+                'strategy': {'type': 'leastPing'},
+                'fallbackTag': tags[0],
+            })
+            subjects.setdefault(name, set()).update(tags)
+            probe_geos.setdefault(name, set()).update(g for g in route['final_geos'] if g != 'global')
+    for name, tags in sorted(subjects.items()):
+        censored = sorted(probe_geos.get(name) or [])
+        if len(censored) > 1:
+            warnings.append('Config profile %s balances paths ending in %s; one observatory '
+                            'probe cannot be local to all of them, so it is local to %s'
+                            % (name, ', '.join(censored), censored[0]))
+        geo = censored[0] if censored else 'global'
+        settings = observatory.get(geo) or observatory.get('default') or {}
+        if not settings.get('probeUrl'):
+            raise AnsibleFilterError(
+                'Config profile %s balances hops ending in the %s geo, which needs an observatory '
+                'probeUrl for it (vpn_server_remnawave_hosts_hops_observatory)' % (name, geo))
+        merged = dict(_plain(settings))
+        merged['subjectSelector'] = sorted(tags)
+        profile['config']['observatory'] = merged
+
+    for exit_slot in chained:
+        exit_slot['route_id'] = None
+        exit_slot['outbound_tag'] = tag_of[exit_slot['domain']]
+    for journey, key in zip(journeys, journey_keys):
+        if journey[0] == 'chain' and journey[3].get('route_id') is None:
+            journey[3]['route_id'] = ids[key]
+
+    numbers = sorted(ids.values())
     lo, hi = _as_pair(options['route_id_range'], 'route_id_range')
-    if highest is not None and (base < lo or highest > hi):
+    if numbers and (numbers[0] < lo or numbers[-1] > hi):
         warnings.append(
             'Generated route ids %d-%d fall outside the route id range %d-%d, so '
             'verify will not check the rules beyond it'
-            % (base, highest, lo, hi))
+            % (numbers[0], numbers[-1], lo, hi))
 
     # --- the hosts ----------------------------------------------------------
     # A direct host uses its exit's profile. A chain host uses the exit's
@@ -876,14 +1460,67 @@ def remnawave_model(nodes, options):
     direct_route_id = '' if direct_route_id in (None, '') else int(direct_route_id)
     unrestricted = {'mode': 'exclude', 'squads': []}
 
+    key_of = {}
+    for journey, key in zip(journeys, journey_keys):
+        key_of[(journey[0], journey[1]['domain'], journey[3]['domain'])] = key
+
+    def restriction_of(exit_slot, what):
+        # Visibility follows the exit's access scope, never the entry's.
+        if exit_slot['scope_kind'] != 'exclusive':
+            return dict(unrestricted)
+        allowed = sorted(profile_by_name[exit_slot['profile']]['squads'])
+        if not allowed:
+            warnings.append('%s of exclusive exit %s are shown to no one: no internal squad '
+                            'is granted config profile %s'
+                            % (what, exit_slot['domain'], exit_slot['profile']))
+        return {'mode': 'allow_only', 'squads': allowed}
+
+    def bound_to(exit_slot, entry):
+        if bind in ('exit', 'both'):
+            warnings.append(
+                'Chain host of %s through %s is bound to exit nodes, but the client '
+                'connects to the entry; set vpn_server_remnawave_hosts_chain_bind_nodes '
+                'to entry' % (exit_slot['domain'], entry['domain']))
+        if bind == 'exit':
+            return list(exit_slot['nodes'])
+        if bind == 'both':
+            return sorted(set(exit_slot['nodes']) | set(entry['nodes']))
+        if bind == 'none':
+            return []
+        return list(entry['nodes'])
+
+    def through(exit_slot, entry, kind, restriction):
+        client_profile = profile_by_key[(exit_slot['scope_kind'], exit_slot['scope'],
+                                         entry['protocol'])]
+        key = key_of[(kind, entry['domain'], exit_slot['domain'])]
+        return {
+            'kind': 'chain',
+            'via': kind,
+            'remark': _remark(exit_slot, labels) + separator + _remark(entry, labels),
+            'address': entry['domain'],
+            'sni': '',
+            'vless_route_id': ids[key],
+            'nodes': bound_to(exit_slot, entry),
+            'protocol': entry['protocol'],
+            'config_profile': client_profile['name'],
+            'inbound': client_profile['inbound_tags'][0],
+            'internal_squads': restriction,
+            'exit': exit_slot['domain'],
+            'entry': entry['domain'],
+            'paths': path_list(entry, (exit_slot, None)),
+        }
+
     hosts = []
     for exit_slot in exits:
+        key = key_of[('direct', exit_slot['domain'], exit_slot['domain'])]
         hosts.append({
             'kind': 'direct',
             'remark': _remark(exit_slot, labels),
             'address': exit_slot['domain'],
             'sni': '',
-            'vless_route_id': direct_route_id,
+            # A direct host's node is the exit unless a hidden node carries on
+            # for it: then it is that node's first action.
+            'vless_route_id': direct_route_id if key == _FINAL else ids[key],
             'nodes': list(exit_slot['nodes']),
             'protocol': exit_slot['protocol'],
             'config_profile': exit_slot['profile'],
@@ -891,49 +1528,17 @@ def remnawave_model(nodes, options):
             'internal_squads': dict(unrestricted),
             'exit': exit_slot['domain'],
             'entry': None,
+            'paths': path_list(exit_slot, None),
         })
 
     for exit_slot in chained:
-        # Visibility follows the exit's access scope, never the entry's.
-        if exit_slot['scope_kind'] == 'exclusive':
-            allowed = sorted(profile_by_name[exit_slot['profile']]['squads'])
-            restriction = {'mode': 'allow_only', 'squads': allowed}
-            if not allowed:
-                warnings.append('Chain hosts of exclusive exit %s are shown to no one: no '
-                                'internal squad is granted config profile %s'
-                                % (exit_slot['domain'], exit_slot['profile']))
-        else:
-            restriction = dict(unrestricted)
+        restriction = restriction_of(exit_slot, 'Chain hosts')
         for entry in pairs[exit_slot['domain']]:
-            client_profile = profile_by_key[(exit_slot['scope_kind'], exit_slot['scope'],
-                                             entry['protocol'])]
-            if bind == 'exit':
-                bound = list(exit_slot['nodes'])
-            elif bind == 'both':
-                bound = sorted(set(exit_slot['nodes']) | set(entry['nodes']))
-            elif bind == 'none':
-                bound = []
-            else:
-                bound = list(entry['nodes'])
-            if bind in ('exit', 'both'):
-                warnings.append(
-                    'Chain host of %s through %s is bound to exit nodes, but the client '
-                    'connects to the entry; set vpn_server_remnawave_hosts_chain_bind_nodes '
-                    'to entry' % (exit_slot['domain'], entry['domain']))
-            hosts.append({
-                'kind': 'chain',
-                'remark': _remark(exit_slot, labels) + separator + _remark(entry, labels),
-                'address': entry['domain'],
-                'sni': '',
-                'vless_route_id': exit_slot['route_id'],
-                'nodes': bound,
-                'protocol': entry['protocol'],
-                'config_profile': client_profile['name'],
-                'inbound': client_profile['inbound_tags'][0],
-                'internal_squads': restriction,
-                'exit': exit_slot['domain'],
-                'entry': entry['domain'],
-            })
+            hosts.append(through(exit_slot, entry, 'chain', restriction))
+
+    for upstream, downstream in hops.visible:
+        hosts.append(through(downstream, upstream, 'relation',
+                             restriction_of(downstream, 'Relation hosts')))
 
     # Nodes managed in the panel require their SNI to come from the address,
     # regardless of host kind.
@@ -945,7 +1550,8 @@ def remnawave_model(nodes, options):
 
     # A REALITY inbound refuses a handshake whose SNI it does not list, so every
     # address a client or a chain outbound dials has to be in its serverNames.
-    dialed = set(h['address'] for h in hosts) | set(o['address'] for o in planned)
+    dialed = (set(h['address'] for h in hosts) | set(o['address'] for o in planned)
+              | set(o['address'] for o in hop_outbounds))
     for profile in profiles:
         for inbound in profile['config']['inbounds']:
             stream = inbound.get('streamSettings') or {}
@@ -977,6 +1583,12 @@ def remnawave_model(nodes, options):
         'chained': chained,
         'hosts': hosts,
         'rules': rules,
+        'routes': routes,
+        'hop_outbounds': hop_outbounds,
+        # Every node a chain outbound dials, which the service user must reach.
+        'hop_targets': dict((n['address'], sorted(slot_by_domain[n['address']]['nodes']))
+                            for r in routes for n in r['next']),
+        'relations': hops.relations,
         'warnings': warnings,
     }
 
@@ -1034,6 +1646,32 @@ def _route_number(value):
         return None
 
 
+def _route_numbers(value):
+    """The route ids of a vlessRoute condition ("401", "400,402", "400-410"),
+    as a set, or None when it is not one."""
+    if value is None or value == '':
+        return None
+    numbers = set()
+    for part in str(value).split(','):
+        part = part.strip()
+        match = re.match(r'^(\d+)(?:-(\d+))?$', part)
+        if not match:
+            return None
+        low = int(match.group(1))
+        high = int(match.group(2)) if match.group(2) else low
+        numbers.update(range(low, high + 1))
+    return numbers
+
+
+_ROUTE_ONLY_KEYS = ('vlessRoute', 'outboundTag', 'balancerTag', 'ruleTag', 'type')
+
+
+def _route_only(rule):
+    """Whether a rule matches on its route id alone, deciding where all of that
+    route's traffic goes rather than splitting some of it off."""
+    return set(rule) <= set(_ROUTE_ONLY_KEYS) and 'vlessRoute' in rule
+
+
 def _snippet_refs(section):
     """The snippet names a config profile section embeds ({snippet: name})."""
     return [item.get('snippet') for item in (section or [])
@@ -1087,6 +1725,50 @@ def _routing_dependencies(config, snippets):
             problems.append('balancer %s targets fallback outbound %s, which is absent from '
                             'this profile' % (balancer.get('tag'), fallback))
     return list(dict.fromkeys(problems))
+
+
+def remnawave_expand(config, snippets):
+    """``config`` with every {snippet: name} item of its lists replaced by
+    that snippet's items, as the panel does before a node gets it."""
+    def expand(value, stack=()):
+        if isinstance(value, dict):
+            return dict((k, expand(v, stack)) for k, v in value.items())
+        if isinstance(value, list):
+            out = []
+            for item in value:
+                if isinstance(item, dict) and set(item) == {'snippet'}:
+                    name = item['snippet']
+                    if name in stack:
+                        raise AnsibleFilterError('Cyclic snippet reference %s'
+                                                 % ' -> '.join(stack + (name,)))
+                    if name not in snippets:
+                        raise AnsibleFilterError('Snippet %s is not defined' % name)
+                    out.extend(expand(snippets[name], stack + (name,)))
+                else:
+                    out.append(expand(item, stack))
+            return out
+        return value
+    return expand(_plain(config))
+
+
+def remnawave_dangling(profiles, snippets, name, content, tags=None):
+    """What would dangle once snippet ``name`` held ``content``: every rule of a
+    profile embedding it that would name an outbound or balancer the profile
+    lacks. ``profiles`` and ``snippets`` are the panel's (remnawave_gathered);
+    only profiles carrying every one of ``tags`` are looked at, if given."""
+    catalog = dict((s.get('name'), s.get('snippet') or []) for s in snippets or [])
+    catalog[name] = content or []
+    wanted = set(tags or [])
+    problems = []
+    for profile in profiles or []:
+        if wanted and not wanted.issubset(profile.get('tags') or []):
+            continue
+        config = profile.get('config') or {}
+        if name not in _snippet_refs((config.get('routing') or {}).get('rules')):
+            continue
+        for problem in _routing_dependencies(config, catalog):
+            problems.append("Config profile '%s': %s" % (profile.get('name'), problem))
+    return problems
 
 
 def _client_transport(inbound):
@@ -1170,37 +1852,113 @@ def remnawave_verify(panel, model, options):
             problems.append('Composition snippet %s differs from the inventory; its routing '
                             'conditions or settings may bypass a chain' % name)
 
-    # Several rules may share a route id when they only split its match
-    # conditions (geoip and geosite of one family); they conflict only when
-    # they send it to different outbounds or balancers.
-    rule_of = {}
-    target_of = {}
-    for rule in snippets.get(rules_name) or []:
-        number = _route_number((rule or {}).get('vlessRoute'))
-        if number is None:
-            continue
-        target = rule.get('outboundTag') or rule.get('balancerTag')
-        if number in target_of:
-            if target_of[number] != target:
-                problems.append('Rules snippet %s has route id %d twice (%s and %s)'
-                                % (rules_name, number, target_of[number], target))
-            continue
-        target_of[number] = target
-        rule_of[number] = rule.get('outboundTag')
+    if rules_name in snippets and snippets[rules_name] != model.get('rules'):
+        problems.append('Rules snippet %s differs from the inventory; regenerate the snippets '
+                        'stage' % rules_name)
 
+    # The rules a route id is resolved by: the rules snippet and the rules
+    # written inline into managed profiles (balanced hops). Only a rule
+    # matching on the route alone decides where its traffic goes next; one
+    # with domain or ip conditions only splits off local traffic (WARP), so
+    # several rules of one id conflict only when two unconditional ones send
+    # it to different outbounds or balancers.
+    route_rules = list(snippets.get(rules_name) or [])
+    inline_balancers = []
+    for profile in profiles.values():
+        if not primary.issubset(profile.get('tags') or []):
+            continue
+        routing = (profile.get('config') or {}).get('routing') or {}
+        route_rules.extend(r for r in routing.get('rules') or []
+                           if isinstance(r, dict) and 'snippet' not in r)
+        inline_balancers.extend(b for b in routing.get('balancers') or []
+                                if isinstance(b, dict) and 'snippet' not in b)
+    rule_of = {}
+    for rule in route_rules:
+        if not isinstance(rule, dict) or not _route_only(rule):
+            continue
+        numbers = _route_numbers(rule.get('vlessRoute'))
+        if not numbers:
+            continue
+        target = ('balancer', rule['balancerTag']) if rule.get('balancerTag') else \
+            ('outbound', rule.get('outboundTag'))
+        for number in sorted(numbers):
+            if number in rule_of and rule_of[number] != target:
+                problems.append('Route id %d is sent to %s and to %s by different rules'
+                                % (number, rule_of[number][1], target[1]))
+                continue
+            rule_of.setdefault(number, target)
+
+    # Where each outbound goes and the route it hands over (its UUID's bytes
+    # 6-7); an outbound without a user id is taken to hand over route 0.
     outbound_address = {}
+    outbound_route = {}
+    outbound_user = {}
     for outbound in snippets.get(outbounds_name) or []:
         tag = (outbound or {}).get('tag')
         if not tag:
             continue
         vnext = ((outbound.get('settings') or {}).get('vnext') or [{}])
         outbound_address[tag] = (vnext[0] or {}).get('address')
+        users = (vnext[0] or {}).get('users') or [{}]
+        user_id = (users[0] or {}).get('id')
+        route = _uuid_route(user_id)
+        outbound_route[tag] = 0 if user_id is None else route
+        if route is not None:
+            outbound_user[tag] = str(user_id).lower()[:14] + str(user_id).lower()[18:]
 
-    for balancer in snippets.get(balancers_name) or [] if balancers_name else []:
-        for tag in (balancer or {}).get('selector') or []:
-            if tag not in outbound_address:
+    balancer_selectors = {}
+    for balancer in (snippets.get(balancers_name) or [] if balancers_name else []) + inline_balancers:
+        tag = (balancer or {}).get('tag')
+        selectors = (balancer or {}).get('selector') or []
+        for selector in selectors:
+            if not any(t.startswith(selector) for t in outbound_address):
                 problems.append('Balancer %s selects outbound %s, which is not in %s'
-                                % (balancer.get('tag'), tag, outbounds_name))
+                                % (tag, selector, outbounds_name))
+        if tag:
+            balancer_selectors[tag] = selectors
+
+    def branches(target):
+        if target[0] == 'outbound':
+            return [target[1]]
+        selectors = balancer_selectors.get(target[1])
+        if selectors is None:
+            return None
+        return sorted(t for t in outbound_address if any(t.startswith(s) for s in selectors))
+
+    used_route_ids = set()
+
+    def walk(address, route, depth=0):
+        """Every way traffic arriving at ``address`` with ``route`` goes, as
+        lists of the addresses passed; a str says why it cannot be followed."""
+        if depth > 12:
+            return 'loops through route ids without reaching an exit'
+        used_route_ids.add(route)
+        target = rule_of.get(route)
+        if target is None:
+            return 'route id %d reaches %s, but no rule routes it' % (route, address)
+        tags = branches(target)
+        if tags is None:
+            return 'route id %d goes to balancer %s, which is in no profile' % (route, target[1])
+        if not tags:
+            return 'route id %d goes to %s %s, which selects nothing in %s' % (
+                route, target[0], target[1], outbounds_name)
+        found = []
+        for tag in tags:
+            if tag not in outbound_address:
+                return 'route id %d goes to outbound %s, which is not in %s' % (
+                    route, tag, outbounds_name)
+            following = outbound_address[tag]
+            handed = outbound_route.get(tag)
+            if handed is None:
+                return 'outbound %s has no UUID to carry a route' % tag
+            if handed == 0:
+                found.append([address, following])
+                continue
+            rest = walk(following, handed, depth + 1)
+            if isinstance(rest, str):
+                return rest
+            found.extend([address] + more for more in rest)
+        return found
 
     def config_inbound(profile, tag):
         return next((i for i in (profile.get('config') or {}).get('inbounds') or []
@@ -1240,28 +1998,27 @@ def remnawave_verify(panel, model, options):
             problems.append('Host %s has fingerprint %s, the inventory wants %s'
                             % (describe(have), have.get('fingerprint'), options['fingerprint']))
 
-        if want['kind'] == 'chain':
-            if have_id is None:
-                problems.append('Chain host %s has no route id, so it is served directly '
-                                'by its entry instead of reaching %s'
-                                % (describe(have), want['exit']))
-            else:
-                used_route_ids.add(have_id)
-                tag = rule_of.get(have_id)
-                if tag is None:
-                    problems.append('Chain host %s carries route id %d, but %s has no rule '
-                                    'for it' % (describe(have), have_id, rules_name))
-                elif tag not in outbound_address:
-                    problems.append('Chain host %s: route id %d goes to outbound %s, which '
-                                    'is not in %s' % (describe(have), have_id, tag, outbounds_name))
-                elif outbound_address[tag] != want['exit']:
-                    problems.append('Chain host %s: route id %d goes to outbound %s (%s), '
-                                    'not to its exit %s'
-                                    % (describe(have), have_id, tag,
-                                       outbound_address[tag], want['exit']))
-        elif have_id != direct_route_id:
-            problems.append('Direct host %s carries route id %s instead of %s'
-                            % (describe(have), have_id, direct_route_id))
+        # Followed hop by hop: the rule of the host's route id, the outbound
+        # or balanced outbounds it sends to, the route each hands over, until
+        # one hands over route 0 - the exit. Every way must be the inventory's.
+        want_paths = sorted(want.get('paths') or [[want['address']]])
+        if want['kind'] == 'chain' and have_id is None:
+            problems.append('Chain host %s has no route id, so it is served directly '
+                            'by its entry instead of reaching %s'
+                            % (describe(have), want['exit']))
+        elif have_id is None or have_id == direct_route_id:
+            if want_paths != [[want['address']]]:
+                problems.append('Host %s is served by %s itself, the inventory wants it to go '
+                                '%s' % (describe(have), want['address'],
+                                        ' or '.join(' > '.join(p) for p in want_paths)))
+        else:
+            walked = walk(have.get('address') or want['address'], have_id)
+            if isinstance(walked, str):
+                problems.append('Host %s: %s' % (describe(have), walked))
+            elif sorted(walked) != want_paths:
+                problems.append('Host %s goes %s, the inventory wants %s'
+                                % (describe(have), ' or '.join(' > '.join(p) for p in sorted(walked)),
+                                   ' or '.join(' > '.join(p) for p in want_paths)))
 
         # The inbound and the nodes: a host bound to a node that does not
         # activate its inbound is offered to clients and serves nothing.
@@ -1360,6 +2117,16 @@ def remnawave_verify(panel, model, options):
             if have_refs != want_refs:
                 problems.append("Config profile '%s' embeds %s snippets %s, the inventory wants %s"
                                 % (name, part, ', '.join(have_refs) or '-', ', '.join(want_refs) or '-'))
+        for part, pick in (('observatory', lambda c: c.get('observatory')),
+                           ('inline balancers', lambda c: [b for b in (c.get('routing') or {})
+                                                           .get('balancers') or []
+                                                           if 'snippet' not in b]),
+                           ('inline rules', lambda c: [r for r in (c.get('routing') or {})
+                                                       .get('rules') or []
+                                                       if 'snippet' not in r])):
+            if (pick(have_config) or None) != (pick(want_config) or None):
+                problems.append("Config profile '%s' holds %s that differ from the inventory"
+                                % (name, part))
         if outbounds_name not in _snippet_refs(have_config.get('outbounds')):
             problems.append("Config profile '%s' does not embed snippet %s" % (name, outbounds_name))
         if rules_name not in _snippet_refs((have_config.get('routing') or {}).get('rules')):
@@ -1409,8 +2176,9 @@ def remnawave_verify(panel, model, options):
         have_id = _route_number(have.get('vlessRouteId'))
         where = ''
         if have_id is not None and have_id in rule_of:
+            target = rule_of[have_id][1]
             where = ' and route id %d now goes to %s (%s)' % (
-                have_id, rule_of[have_id], outbound_address.get(rule_of[have_id]))
+                have_id, target, outbound_address.get(target) or 'balanced')
         if have.get('isDisabled'):
             notes.append('Host %s is no longer produced by the inventory; it is disabled%s'
                          % (describe(have), where))
@@ -1421,12 +2189,46 @@ def remnawave_verify(panel, model, options):
     for number in sorted(rule_of):
         if not lo <= number <= hi:
             continue
-        if rule_of[number] not in outbound_address:
+        kind, target = rule_of[number]
+        if kind == 'outbound' and target not in outbound_address:
             problems.append('Rule for route id %d goes to outbound %s, which is not in %s'
-                            % (number, rule_of[number], outbounds_name))
+                            % (number, target, outbounds_name))
+        if kind == 'balancer' and target not in balancer_selectors:
+            problems.append('Rule for route id %d goes to balancer %s, which is in no profile'
+                            % (number, target))
         if number not in used_route_ids:
             notes.append('Rule for route id %d (%s) is used by no host of the inventory'
-                         % (number, rule_of[number]))
+                         % (number, target))
+
+    # The chain outbounds authenticate as the service user on every node they
+    # hand traffic to, so its squads must hold an inbound each such node runs.
+    users = set(outbound_user.values())
+    if len(users) > 1:
+        problems.append('Chain outbounds authenticate as %d different users; they must all use '
+                        'the service user' % len(users))
+    service = options.get('service_user')
+    targets = model.get('hop_targets') or {}
+    if targets and not service:
+        notes.append('Set vpn_server_remnawave_service_user_name to check that the service '
+                     'user may connect to every node chain outbounds dial')
+    elif targets:
+        vless = str(service.get('vlessUuid') or '').lower()
+        if users and vless[:14] + vless[18:] not in users:
+            problems.append('Service user %s is not the user the chain outbounds authenticate as'
+                            % service.get('username'))
+        held = set()
+        for squad in service.get('activeInternalSquads') or []:
+            held |= squad_tags.get(squad.get('name'), set())
+        for address, names in sorted(targets.items()):
+            for name in names:
+                node = nodes_by_name.get(name) or {}
+                active = set(i.get('tag') for i in
+                             ((node.get('configProfile') or {}).get('activeInbounds') or []))
+                if active and not active & held:
+                    problems.append('Service user %s cannot connect to node %s (%s): its squads '
+                                    'hold none of the inbounds %s'
+                                    % (service.get('username'), name, address,
+                                       ', '.join(sorted(active))))
 
     return {
         'problems': problems,
@@ -1448,6 +2250,9 @@ class FilterModule(object):
         return {
             'remnawave_final_mask': remnawave_final_mask,
             'remnawave_model': remnawave_model,
+            'remnawave_route_uuid': remnawave_route_uuid,
+            'remnawave_dangling': remnawave_dangling,
+            'remnawave_expand': remnawave_expand,
             'remnawave_select_tagged': remnawave_select_tagged,
             'remnawave_select_profiles_kept': remnawave_select_profiles_kept,
             'remnawave_verify': remnawave_verify,

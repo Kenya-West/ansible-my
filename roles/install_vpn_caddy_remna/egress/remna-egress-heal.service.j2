@@ -1,0 +1,14 @@
+# {{ ansible_managed | default('Managed by Ansible') }}
+# Puts the egress routes, rules and guards of the Remnawave node container
+# back, refreshes the guard of its other addresses, and stops it when its
+# default route is not the egress network. Started by
+# {{ remna_node_egress_unit }}.timer and by networkd-dispatcher.
+[Unit]
+Description=Re-apply the Remnawave node egress through {{ remna_node_egress_interface }}
+Documentation=file://{{ remna_node_egress_tool }}
+After=docker.service {{ remna_node_egress_unit }}.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=120
+ExecStart=/usr/bin/python3 {{ remna_node_egress_tool }} apply

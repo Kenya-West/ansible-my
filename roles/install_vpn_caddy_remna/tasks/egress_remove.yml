@@ -1,0 +1,55 @@
+---
+# remna_node_hops.egress is unset: whatever an earlier run installed goes,
+# after the compose came up without the egress network, so the container is
+# never left on a network without its routing.
+
+- name: Find an egress tool left from an earlier run
+  ansible.builtin.stat:
+    path: "{{ remna_node_egress_tool }}"
+  register: remna_egress_left
+
+- name: Remove the egress routing
+  become: true
+  become_user: root
+  when: remna_egress_left.stat.exists
+  block:
+    - name: Stop re-applying it
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: false
+        state: stopped
+      loop:
+        - "{{ remna_node_egress_unit }}.timer"
+        - "{{ remna_node_egress_unit }}-heal.service"
+        - "{{ remna_node_egress_unit }}.service"
+      failed_when: false
+
+    - name: Remove its rules, routes and nft table
+      ansible.builtin.command:
+        argv: [python3, "{{ remna_node_egress_tool }}", flush]
+      changed_when: true
+
+    - name: Remove the tool, its units, sysctls and hook
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ remna_node_egress_tool }}"
+        - "/etc/systemd/system/{{ remna_node_egress_unit }}.service"
+        - "/etc/systemd/system/{{ remna_node_egress_unit }}-heal.service"
+        - "/etc/systemd/system/{{ remna_node_egress_unit }}.timer"
+        - /etc/sysctl.d/95-remna-egress.conf
+        - /etc/networkd-dispatcher/routable.d/50-remna-egress
+
+    - name: Forget the units
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+# force: a container still on it (compose restart never detaches one) is
+# disconnected; its default route falls back to its other network, which is
+# what no egress interface means.
+- name: Remove the egress network
+  community.docker.docker_network:
+    name: "{{ remna_node_egress_network }}"
+    force: true
+    state: absent

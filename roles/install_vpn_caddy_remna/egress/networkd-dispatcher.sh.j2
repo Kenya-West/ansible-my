@@ -1,0 +1,6 @@
+#!/bin/sh
+# {{ ansible_managed | default('Managed by Ansible') }}
+# systemd-networkd removes routing rules it did not make when it reconfigures
+# a link; put the Remnawave node egress back at once rather than at the next
+# timer tick.
+systemctl start --no-block {{ remna_node_egress_unit }}-heal.service

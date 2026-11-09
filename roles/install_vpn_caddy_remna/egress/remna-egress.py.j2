@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+# {{ ansible_managed | default('Managed by Ansible') }}
+# roles/install_vpn_caddy_remna, tasks/egress.yml.
+"""Send what the Remnawave node container opens itself out of one interface.
+
+The container's default route is the Docker network {{ remna_node_egress_network }}
+(bridge {{ remna_node_egress_bridge }}), attached with the highest gw_priority. Connections it
+opens through that bridge get a conntrack mark; packets of marked connections
+coming back from any bridge get the firewall mark, and the firewall mark looks
+up a routing table of its own that leads out of {{ remna_node_egress_interface }}. Docker's
+MASQUERADE then gives them that interface's address. Nothing else on the host
+is routed differently: no other source carries the mark.
+
+Fail closed: a mark that finds no route in the table hits an unreachable rule
+instead of falling back to the main table, and a forward guard drops anything
+the container opens that would leave through another interface. If the
+container's default route ever stops being the egress network, `check` stops
+the container rather than let it leave through the host's address.
+
+    remna-egress apply     install or repair everything, then check (Docker must be up)
+    remna-egress prepare   the same, never asking Docker: at boot, before Docker,
+                           and before compose (re)creates the container
+    remna-egress check     report, exit 1 on anything missing or leaking
+    remna-egress flush     remove the rules, routes and nft table
+"""
+
+import ipaddress
+import json
+import os
+import subprocess
+import sys
+
+IFACE = {{ remna_node_egress_interface | to_json }}
+FAMILY = {{ remna_node_egress_family | to_json }}
+GATEWAY = {{ remna_node_egress_gateway | string | to_json }}
+BRIDGE = {{ remna_node_egress_bridge | to_json }}
+NETWORK = {{ remna_node_egress_network | to_json }}
+SUBNETS = {4: {{ remna_node_egress_subnet_ipv4 | to_json }}, 6: {{ remna_node_egress_subnet_ipv6 | to_json }}}
+CONTAINER = {{ remna_node_egress_container | to_json }}
+MARK = {{ remna_node_egress_mark | int }}
+TABLE = {{ remna_node_egress_table | int }}
+PRIORITY = {{ remna_node_egress_rule_priority | int }}
+
+FAMILIES = {'ipv4': (4,), 'ipv6': (6,), 'dual': (4, 6)}[FAMILY]
+NFT_TABLE = 'remna_egress'
+
+
+def run(args, data=None, check=True, timeout=30):
+    try:
+        result = subprocess.run(args, input=data, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if check:
+            raise RuntimeError('%s: timed out' % ' '.join(args))
+        return subprocess.CompletedProcess(args, 124, '', 'timed out')
+    if check and result.returncode != 0:
+        raise RuntimeError('%s: %s' % (' '.join(args), (result.stderr or result.stdout).strip()))
+    return result
+
+
+def ip_json(family, *args):
+    out = run(['ip', '-j', '-%d' % family] + list(args), check=False)
+    return json.loads(out.stdout) if out.returncode == 0 and out.stdout.strip() else []
+
+
+def say(message):
+    print('remna-egress: %s' % message, flush=True)
+
+
+# --- the container ----------------------------------------------------------
+
+def container():
+    """(pid, {network: {ipv4, ipv6, internal}}) of the running container, or None.
+
+    Only ever called with Docker up (`apply`, from the heal service ordered
+    after it): at boot the egress service runs before Docker and must not wait
+    for it, or the two wait for each other."""
+    out = run(['docker', 'inspect', CONTAINER], check=False, timeout=20)
+    if out.returncode != 0:
+        return None
+    info = json.loads(out.stdout)[0]
+    if not info.get('State', {}).get('Running'):
+        return None
+    networks = {}
+    for name, endpoint in (info.get('NetworkSettings', {}).get('Networks') or {}).items():
+        internal = run(['docker', 'network', 'inspect', '-f', '{{ '{{' }}.Internal{{ '}}' }}', name],
+                       check=False, timeout=20).stdout.strip() == 'true'
+        networks[name] = {'ipv4': endpoint.get('IPAddress') or '',
+                          'ipv6': endpoint.get('GlobalIPv6Address') or '',
+                          'internal': internal}
+    return info['State']['Pid'], networks
+
+
+def container_default_ok(pid):
+    """Whether every default route of the container leads into the egress subnet."""
+    for family in (4, 6):
+        routes = json.loads(run(['nsenter', '-t', str(pid), '-n', 'ip', '-j', '-%d' % family,
+                                 'route', 'show', 'default'], check=False).stdout or '[]')
+        for route in routes:
+            gateway = route.get('gateway')
+            if gateway and ipaddress.ip_address(gateway) not in ipaddress.ip_network(SUBNETS[family]):
+                return False, 'IPv%d default route of %s goes via %s, outside %s' % (
+                    family, CONTAINER, gateway, SUBNETS[family])
+    return True, ''
+
+
+# --- nft: marks and guards ----------------------------------------------------
+
+def nft_ruleset(others):
+    guard = ''
+    for family, field in ((4, 'ip'), (6, 'ip6')):
+        addresses = sorted(set(a for a in others if ipaddress.ip_address(a).version == family))
+        if addresses:
+            guard += ('    %s saddr { %s } ct direction original oifname != "br-*" '
+                      'oifname != "docker0" drop\n' % (field, ', '.join(addresses)))
+    return (
+        'table inet %(t)s {}\n'
+        'delete table inet %(t)s\n'
+        'table inet %(t)s {\n'
+        '  chain prerouting {\n'
+        '    type filter hook prerouting priority mangle; policy accept;\n'
+        '    iifname "%(b)s" ct state new ct mark set %(m)d\n'
+        '    iifname != "%(i)s" ct mark %(m)d meta mark set %(m)d\n'
+        '  }\n'
+        '  chain forward {\n'
+        '    type filter hook forward priority -10; policy accept;\n'
+        '    iifname "%(i)s" ct state new ct mark set %(m)d\n'
+        '    iifname "%(b)s" ct direction original oifname != { "%(i)s", "%(b)s" } drop\n'
+        '%(g)s'
+        '  }\n'
+        '}\n' % {'t': NFT_TABLE, 'b': BRIDGE, 'i': IFACE, 'm': MARK, 'g': guard})
+
+
+def nft_present():
+    return run(['nft', 'list', 'table', 'inet', NFT_TABLE], check=False).returncode == 0
+
+
+# --- ip rules and the table ----------------------------------------------------
+
+def rules(family):
+    return [r for r in ip_json(family, 'rule', 'show')
+            if r.get('priority') in (PRIORITY, PRIORITY + 1)]
+
+
+def ensure_rules(family):
+    have = rules(family)
+    wanted = [(PRIORITY + 1, ['unreachable'])]
+    if family in FAMILIES:
+        wanted.insert(0, (PRIORITY, ['lookup', str(TABLE)]))
+    for priority, action in wanted:
+        if any(r.get('priority') == priority for r in have):
+            continue
+        run(['ip', '-%d' % family, 'rule', 'add', 'fwmark', str(MARK), 'priority', str(priority)] + action)
+    if family not in FAMILIES:
+        for r in have:
+            if r.get('priority') == PRIORITY:
+                run(['ip', '-%d' % family, 'rule', 'del', 'priority', str(PRIORITY)], check=False)
+
+
+def connected(family):
+    return [r['dst'] for r in ip_json(family, 'route', 'show', 'table', 'main', 'dev', IFACE)
+            if r.get('protocol') == 'kernel' and r.get('dst') not in (None, 'default')
+            and not str(r['dst']).startswith('fe80')]
+
+
+def gateway(family):
+    """The gateway of the egress interface: given, routed, leased, or none."""
+    if GATEWAY not in ('', 'auto'):
+        if ipaddress.ip_address(GATEWAY).version == family:
+            return GATEWAY
+    for route in ip_json(family, 'route', 'show', 'table', 'all', 'default', 'dev', IFACE):
+        if route.get('gateway') and str(route.get('table', 'main')) != str(TABLE):
+            return route['gateway']
+    if family == 4:
+        index = open('/sys/class/net/%s/ifindex' % IFACE).read().strip()
+        lease = '/run/systemd/netif/leases/%s' % index
+        if os.path.exists(lease):
+            for line in open(lease):
+                if line.startswith('ROUTER='):
+                    return line.split('=', 1)[1].split()[0].strip()
+        for directory in ('/var/lib/dhcp', '/var/lib/dhclient'):
+            if not os.path.isdir(directory):
+                continue
+            for name in sorted(os.listdir(directory)):
+                if IFACE not in name or not name.endswith('.leases'):
+                    continue
+                found = None
+                for line in open(os.path.join(directory, name)):
+                    line = line.strip()
+                    if line.startswith('option routers'):
+                        found = line.split()[2].rstrip(';').split(',')[0]
+                if found:
+                    return found
+    return None
+
+
+def ensure_table(family):
+    prefixes = connected(family)
+    for prefix in prefixes:
+        run(['ip', '-%d' % family, 'route', 'replace', prefix, 'dev', IFACE, 'table', str(TABLE)])
+    for route in ip_json(family, 'route', 'show', 'table', str(TABLE)):
+        if route.get('dst') not in ('default', None) and route['dst'] not in prefixes:
+            run(['ip', '-%d' % family, 'route', 'del', route['dst'], 'table', str(TABLE)], check=False)
+    via = gateway(family)
+    flags = [f for link in ip_json(family, 'link', 'show', 'dev', IFACE) for f in link.get('flags', [])]
+    if via:
+        onlink = not any(ipaddress.ip_address(via) in ipaddress.ip_network(p, strict=False)
+                         for p in connected(family))
+        run(['ip', '-%d' % family, 'route', 'replace', 'default', 'via', via, 'dev', IFACE,
+             'table', str(TABLE)] + (['onlink'] if onlink else []))
+        return True
+    if 'POINTOPOINT' in flags:
+        run(['ip', '-%d' % family, 'route', 'replace', 'default', 'dev', IFACE, 'table', str(TABLE)])
+        return True
+    say('no IPv%d gateway found for %s: the container\'s IPv%d traffic stays blocked; set '
+        'remna_node_hops.egress.gateway' % (family, IFACE, family))
+    return False
+
+
+def table_default(family):
+    return [r for r in ip_json(family, 'route', 'show', 'table', str(TABLE)) if r.get('dst') == 'default']
+
+
+# --- sysctls -------------------------------------------------------------------
+
+def write(path, value):
+    if os.path.exists(path):
+        with open(path) as current:
+            if current.read().strip() == str(value):
+                return
+        with open(path, 'w') as target:
+            target.write(str(value))
+
+
+def sysctls():
+    # Replies to what the container opened come back on the egress interface
+    # while the main table routes their source elsewhere: loose reverse-path
+    # checks there, and on the bridge for replies the container sends from
+    # another network's address.
+    for name in (IFACE, BRIDGE):
+        write('/proc/sys/net/ipv4/conf/%s/rp_filter' % name, 2)
+    if 6 in FAMILIES:
+        write('/proc/sys/net/ipv6/conf/all/forwarding', 1)
+        for name in os.listdir('/proc/sys/net/ipv6/conf'):
+            path = '/proc/sys/net/ipv6/conf/%s/accept_ra' % name
+            if name not in ('all', 'default') and open(path).read().strip() == '1':
+                write(path, 2)
+
+
+# --- commands --------------------------------------------------------------------
+
+def others(found):
+    """The container's addresses on every other network that can reach out."""
+    if not found:
+        return []
+    return [address for name, net in found[1].items() if name != NETWORK and not net['internal']
+            for address in (net['ipv4'], net['ipv6']) if address]
+
+
+def apply(with_container=True):
+    found = container() if with_container else None
+    # The parts that keep it closed come first and need nothing to be up.
+    run(['nft', '-f', '-'], data=nft_ruleset(others(found)))
+    for family in (4, 6):
+        ensure_rules(family)
+    if os.path.exists('/sys/class/net/%s' % IFACE):
+        for family in FAMILIES:
+            ensure_table(family)
+    else:
+        say('interface %s is missing: the container\'s traffic stays blocked' % IFACE)
+    sysctls()
+    return check(found, with_container)
+
+
+def prepare():
+    """apply, leaving the container alone: it is about to be recreated."""
+    return apply(with_container=False)
+
+
+def check(found=None, with_container=True):
+    problems = []
+    if not nft_present():
+        problems.append('nft table inet %s is missing' % NFT_TABLE)
+    for family in (4, 6):
+        priorities = set(r.get('priority') for r in rules(family))
+        wanted = {PRIORITY, PRIORITY + 1} if family in FAMILIES else {PRIORITY + 1}
+        if not wanted <= priorities:
+            problems.append('IPv%d rules %s are missing' % (family, sorted(wanted - priorities)))
+        if family in FAMILIES and not table_default(family):
+            problems.append('IPv%d table %d has no default route' % (family, TABLE))
+    found = found if found is not None or not with_container else container()
+    if found and with_container:
+        ok, why = container_default_ok(found[0])
+        if not ok:
+            problems.append(why)
+            say('stopping %s: %s' % (CONTAINER, why))
+            run(['docker', 'stop', CONTAINER], check=False, timeout=60)
+        elif NETWORK not in found[1]:
+            problems.append('%s is not attached to %s' % (CONTAINER, NETWORK))
+            say('stopping %s: not attached to %s' % (CONTAINER, NETWORK))
+            run(['docker', 'stop', CONTAINER], check=False, timeout=60)
+    for problem in problems:
+        say(problem)
+    if not problems:
+        say('ok: %s leaves through %s (%s)' % (CONTAINER, IFACE, FAMILY))
+    return 1 if problems else 0
+
+
+def flush():
+    for family in (4, 6):
+        for priority in (PRIORITY, PRIORITY + 1):
+            while run(['ip', '-%d' % family, 'rule', 'del', 'priority', str(priority)],
+                      check=False).returncode == 0:
+                pass
+        run(['ip', '-%d' % family, 'route', 'flush', 'table', str(TABLE)], check=False)
+    run(['nft', 'delete', 'table', 'inet', NFT_TABLE], check=False)
+    say('flushed')
+    return 0
+
+
+if __name__ == '__main__':
+    command = sys.argv[1] if len(sys.argv) > 1 else 'check'
+    commands = {'apply': apply, 'prepare': prepare, 'check': check, 'flush': flush}
+    if command not in commands:
+        print(__doc__)
+        sys.exit(2)
+    sys.exit(commands[command]())

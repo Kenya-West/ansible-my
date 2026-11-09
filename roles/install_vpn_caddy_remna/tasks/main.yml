@@ -91,6 +91,26 @@
   tags:
     - always
 
+# The egress interface (remna_node_hops.egress): its network and routing must
+# exist before the compose brings the container up on them.
+- name: Prepare the egress interface of the container
+  ansible.builtin.include_tasks:
+    file: egress.yml
+    apply:
+      tags:
+        - update_config_hard
+        - update_config_soft
+        - update_image_hard
+        - update_image_soft
+        - remna_egress
+  when: remna_node_egress_enabled | bool
+  tags:
+    - update_config_hard
+    - update_config_soft
+    - update_image_hard
+    - update_image_soft
+    - remna_egress
+
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
@@ -183,6 +203,38 @@
     - update_image_hard
     - update_config_hard
   when: caddy_occupy_HTTPS is defined and caddy_occupy_HTTPS == true
+
+- name: Check the container leaves through its egress interface
+  ansible.builtin.include_tasks:
+    file: egress_verify.yml
+    apply:
+      tags:
+        - update_config_hard
+        - update_config_soft
+        - update_image_hard
+        - update_image_soft
+        - remna_egress
+  when:
+    - remna_node_egress_enabled | bool
+    - caddy_occupy_HTTPS is not defined or caddy_occupy_HTTPS == false
+  tags:
+    - update_config_hard
+    - update_config_soft
+    - update_image_hard
+    - update_image_soft
+    - remna_egress
+
+- name: Remove an egress interface no longer declared
+  ansible.builtin.include_tasks:
+    file: egress_remove.yml
+    apply:
+      tags:
+        - update_config_hard
+        - remna_egress
+  when: not (remna_node_egress_enabled | bool)
+  tags:
+    - update_config_hard
+    - remna_egress
 
 - name: Install SystemD unit
   ansible.builtin.include_tasks: systemd-install.yml

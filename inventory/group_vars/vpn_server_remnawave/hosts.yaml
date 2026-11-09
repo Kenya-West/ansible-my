@@ -138,3 +138,36 @@ vpn_server_remnawave_hosts_vless_route_id_base: 400
 # Route id put on every direct host. Leave empty to publish direct hosts
 # without a route id at all.
 vpn_server_remnawave_hosts_vless_route_id_direct: 2
+
+# ---------------------------------------------------------------------------
+# Hops between nodes (remna_node_hops, group_vars/vpn_caddy/remna.yaml)
+# ---------------------------------------------------------------------------
+
+# A node several hidden nodes take traffic from balances between them
+# (leastPing): its profile gets the balancer and an Xray observatory probing
+# every next hop through the whole rest of its path. Every node activating
+# that profile probes, not only the one balancing. Settings per geo the
+# balanced paths end in: a path ending in a censored geo blocks all but local
+# traffic for reverse users there, so its probe must be a local site (google.ru
+# is in geosite:category-ru through its TLD); the global settings serve the
+# rest.
+vpn_server_remnawave_hosts_hops_observatory:
+  global:
+    probeUrl: https://www.gstatic.com/generate_204
+    probeInterval: 1m
+    enableConcurrency: true
+  russia:
+    probeUrl: https://www.google.ru/generate_204
+    probeInterval: 1m
+    enableConcurrency: true
+
+# Tags of what the model adds for hops: outbounds handing a route other than 0
+# to the next node (<prefix>-<NNN>-<label>), and the balancers of nodes with
+# several hidden next hops (<prefix>-<route id>).
+vpn_server_remnawave_hosts_hops_outbound_tag_prefix: out-hop
+vpn_server_remnawave_hosts_hops_balancer_tag_prefix: bal-hop
+
+# The username of the user the chain outbounds authenticate as
+# (service_user_id is its VLESS UUID). When set, verify checks that its
+# internal squads hold an inbound of every node a chain outbound dials.
+vpn_server_remnawave_service_user_name: ''

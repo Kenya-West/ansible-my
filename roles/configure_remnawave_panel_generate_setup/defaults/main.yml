@@ -176,5 +176,26 @@ vpn_server_remnawave_snippets_outbounds_plan: []
 # Snippets written as they are, as {name, snippet}.
 vpn_server_remnawave_snippets_whole: []
 vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain
-vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]
+vpn_server_remnawave_snippets_vless_route_id_range: [400, 999]
 vpn_server_remnawave_snippets_sync: on_change
+
+# --- hops and local traffic -------------------------------------------------
+# Built in inventory/group_vars/vpn_server_remnawave/routing_local.yaml and
+# hosts.yaml; see the README's Hops section.
+#
+# Per censored geo, {domain, ip}: the geosite/geoip lists of its own sites.
+# Unset (null), default users' local traffic gets no rules of its own.
+vpn_server_remnawave_routing_local_traffic: null
+vpn_server_remnawave_routing_local_outbound: out-warp-socks
+# Per geo the balanced paths end in (and global): {probeUrl, probeInterval,
+# enableConcurrency} of the observatory of a profile that balances hops.
+vpn_server_remnawave_hosts_hops_observatory: {}
+vpn_server_remnawave_hosts_hops_outbound_tag_prefix: out-hop
+vpn_server_remnawave_hosts_hops_balancer_tag_prefix: bal-hop
+# The user the chain outbounds authenticate as, by username; verify checks its
+# squads reach every node chain outbounds dial when it is set.
+vpn_server_remnawave_service_user_name: ''
+# Run every generated profile, its snippets expanded, through `xray run -test`
+# of the node image before anything is written (needs Docker on the controller).
+vpn_server_remnawave_xray_test: false
+vpn_server_remnawave_xray_test_image: "remnawave/node:latest"

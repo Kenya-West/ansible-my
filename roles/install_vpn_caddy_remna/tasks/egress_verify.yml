@@ -1,0 +1,122 @@
+---
+# After the compose is up: the container has to be on its egress network with
+# that network as its default route, the routing has to be complete, and
+# what it opens has to leave with another address than the host's own.
+
+- name: Read the networks of the container
+  ansible.builtin.command:
+    argv: [docker, inspect, --format, "{{ '{{' }}json .NetworkSettings.Networks{{ '}}' }}", "{{ remna_node_egress_container }}"]
+  register: remna_egress_attached
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+# `compose restart` (update_config_soft) never attaches a network the compose
+# file gained, and `compose up` does not see an endpoint that lost its
+# gw_priority (Docker reconnects containers without it when a network is
+# recreated): either way the container is recreated, so the egress network
+# is its default route again.
+- name: Recreate the container when its egress network is not its default route
+  community.docker.docker_compose_v2:
+    project_src: "{{ dest_path_full }}"
+    project_name: "{{ compose_project_name }}"
+    files:
+      - docker-compose.yml
+    services:
+      - "{{ remna_node_egress_container }}"
+    recreate: always
+    state: present
+  vars:
+    remna_egress_endpoint: >-
+      {{ (remna_egress_attached.stdout | default('{}', true) | from_json).get(remna_node_egress_network) }}
+  when:
+    - not ansible_check_mode
+    - remna_egress_attached.rc != 0
+      or remna_egress_endpoint is none
+      or (remna_egress_endpoint.GwPriority | default(0) | int) != 1
+
+- name: Check the routing, marks and guards of the container
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    argv: [python3, "{{ remna_node_egress_tool }}", apply]
+  register: remna_egress_applied
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: The container must leave through {{ remna_node_egress_interface }} only
+  ansible.builtin.assert:
+    that:
+      - remna_egress_applied.rc == 0
+    fail_msg: >-
+      remna-egress on {{ inventory_hostname }} reports problems, and stops the container
+      rather than let it leave through the host's address:
+      {{ remna_egress_applied.stdout_lines | join(' / ') }}
+    quiet: true
+  when: not ansible_check_mode
+
+- name: Start re-applying the egress on a timer
+  become: true
+  become_user: root
+  ansible.builtin.systemd_service:
+    name: "{{ remna_node_egress_unit }}.timer"
+    enabled: true
+    state: started
+
+# The probe answers with the address a connection arrived from. Run inside the
+# container's network namespace (curl of the host, the address of the
+# endpoint, since the host's resolver is not reachable from there) and on the
+# host itself.
+- name: Find the container's network namespace
+  ansible.builtin.command:
+    argv: [docker, inspect, --format, "{{ '{{' }}.State.Pid{{ '}}' }}", "{{ remna_node_egress_container }}"]
+  register: remna_egress_pid
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Ask from inside the container which address it leaves with
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    argv: [nsenter, -t, "{{ remna_egress_pid.stdout }}", -n, curl, -s, -m, "15", "{{ remna_egress_probe[item] }}"]
+  loop: "{{ remna_egress_probe_families }}"
+  register: remna_egress_seen_container
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Ask from the host which address it leaves with
+  ansible.builtin.command:
+    argv: [curl, -s, -m, "15", "{{ remna_egress_probe[item] }}"]
+  loop: "{{ remna_egress_probe_families }}"
+  register: remna_egress_seen_host
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: The container must leave with another address than the host
+  ansible.builtin.assert:
+    that:
+      - remna_egress_container_ip | length > 0
+      - remna_egress_container_ip != remna_egress_host_ip
+    fail_msg: >-
+      Over IPv{{ item.0.item }}, the remna container of {{ inventory_hostname }} leaves as
+      {{ remna_egress_container_ip or 'nothing (the probe failed)' }} and the host as
+      {{ remna_egress_host_ip or 'nothing' }}: the egress interface {{ remna_node_egress_interface }}
+      is not in use.
+    success_msg: >-
+      Over IPv{{ item.0.item }}, the remna container leaves as {{ remna_egress_container_ip }}
+      ({{ remna_node_egress_interface }}{{ '' if remna_egress_container_ip in remna_egress_iface_addresses
+      else ', behind the provider\'s NAT' }}), the host as {{ remna_egress_host_ip or 'nothing' }}.
+  loop: "{{ remna_egress_seen_container.results | zip(remna_egress_seen_host.results) | list }}"
+  loop_control:
+    label: "IPv{{ item.0.item }}"
+  vars:
+    remna_egress_container_ip: "{{ item.0.stdout | default('') | regex_findall('(?m)^ip=([0-9a-fA-F.:]+)') | first | default('') }}"
+    remna_egress_host_ip: "{{ item.1.stdout | default('') | regex_findall('(?m)^ip=([0-9a-fA-F.:]+)') | first | default('') }}"
+    remna_egress_iface: "{{ ansible_facts[remna_node_egress_interface | replace('-', '_')] | default({}) }}"
+    remna_egress_iface_addresses: >-
+      {{ ([remna_egress_iface.ipv4.address | default('')]
+          + (remna_egress_iface.ipv4_secondaries | default([]) | map(attribute='address') | list)
+          + (remna_egress_iface.ipv6 | default([]) | map(attribute='address') | list)) | select | list }}
+  when: not ansible_check_mode

@@ -177,7 +177,7 @@ vpn_server_remnawave_config_profiles_exclusive_group: vps_exclusive
 # One ordered list assembles the config of every profile. Matching fragments
 # contribute normal Xray config mappings: nested mappings merge, lists append
 # in declaration order, scalar values are replaced by the last matching one.
-# Thus routing precedence is visible here: defaults -> WARP -> chain/geo rules.
+# Thus routing precedence is visible here: defaults -> WARP -> local -> chains.
 # Per-protocol base.config overrides the result (its lists replace, not append);
 # the role then supplies the generated inbounds.
 #
@@ -201,25 +201,64 @@ vpn_server_remnawave_config_profiles_composition:
         rules:
           - snippet: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
 
-  # The microwarp proxy beside global-geo nodes, including exclusive ones.
-  # WARP precedes chain/geo rules, but its rule matches only unmarked/direct
-  # traffic (snippets_warp.yaml); explicit chain routes still reach their exit.
-  # Rule and outbound are selected together: non-global profiles embed neither
-  # snippet. A host's direct route id (2) alone cannot activate the WARP rule.
+  # The microwarp proxy beside every node. Every profile can send to it: a
+  # node of a censored geo hands a default user's local traffic to its own
+  # WARP where the user's path leaves the geo (routing_local.yaml, rules_all).
+  - name: warp_outbound
+    snippets:
+      - name: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
+        snippet: "{{ vpn_server_remnawave_snippets_outbounds_warp }}"
+    config:
+      outbounds:
+        - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
+
+  # WARP rules of global-geo nodes, including exclusive ones: a few services
+  # and default users' local traffic. They precede the chain rules but match
+  # only traffic exiting here - route 0 from the hop before, or the direct
+  # route id (snippets_warp.yaml) - so chain routes still reach their exit.
   - name: warp
     profiles:
       geo: global
     snippets:
-      - name: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
-        snippet: "{{ vpn_server_remnawave_snippets_outbounds_warp }}"
       - name: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
         snippet: "{{ vpn_server_remnawave_snippets_rules_warp }}"
     config:
-      outbounds:
-        - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
       routing:
         rules:
           - snippet: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
+
+  # Reverse users: the exit of their path is a node of a censored geo, and
+  # they come for that geo's own sites only. Traffic exiting here (route 0
+  # from the hop before, the direct route id from clients) leaves DIRECT when
+  # it is local and is blocked otherwise. Chain routes passing the node carry
+  # other ids and are untouched. IPIfNonMatch resolves a domain no rule
+  # matched and tries the ip rules again, so a site hosted in the geo but
+  # missing from the domain list still counts as local; the last rule is an
+  # ip rule for that reason. Scoped to the VLESS inbounds, so the node's own
+  # API inbound (route 0 too) is never blocked. One fragment per censored geo
+  # with nodes, each with its own lists (routing_local.yaml).
+  - name: local_reverse_russia
+    profiles:
+      kind: location
+      geo: russia
+    inbounds:
+      - VLESS_TCP_REALITY
+      - VLESS_REALITY_XHTTP
+    config:
+      routing:
+        domainStrategy: IPIfNonMatch
+        rules:
+          - vlessRoute: "{{ vpn_server_remnawave_routing_final_route_ids }}"
+            domain: "{{ vpn_server_remnawave_routing_local_traffic.russia.domain }}"
+            outboundTag: DIRECT
+          - vlessRoute: "{{ vpn_server_remnawave_routing_final_route_ids }}"
+            ip: "{{ vpn_server_remnawave_routing_local_traffic.russia.ip }}"
+            outboundTag: DIRECT
+          - vlessRoute: "{{ vpn_server_remnawave_routing_final_route_ids }}"
+            ip:
+              - "0.0.0.0/0"
+              - "::/0"
+            outboundTag: BLOCK
 
   - name: chains
     # outbounds_all and rules_all are generated/merged by the snippets stage;

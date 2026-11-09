@@ -1,0 +1,4 @@
+# {{ ansible_managed | default('Managed by Ansible') }}
+# Replies to what the Remnawave node container opens come back on
+# {{ remna_node_egress_interface }}, while the main routing table sends their sources elsewhere.
+net.ipv4.conf.{{ remna_node_egress_interface }}.rp_filter = 2

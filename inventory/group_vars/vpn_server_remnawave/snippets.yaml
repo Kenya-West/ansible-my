@@ -144,7 +144,7 @@ vpn_server_remnawave_snippets_exits: >-
 vpn_server_remnawave_snippets_outbound_tag_prefix: out-chain
 vpn_server_remnawave_snippets_outbound_tag_index_width: 3
 vpn_server_remnawave_snippets_outbound_tag_all_suffix: all
-vpn_server_remnawave_snippets_vless_route_id_range: [400, 499]
+vpn_server_remnawave_snippets_vless_route_id_range: [400, 999]
 
 # Every exit with its outbound tag, in the order written. The role renders each
 # from its template with node_address set to the exit's address.

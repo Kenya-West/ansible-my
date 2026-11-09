@@ -43,9 +43,19 @@ services:
       UFW_ALLOW_FROM: "${UFW_ALLOW_FROM}"
 {% endif %}
 
+{% if remna_node_egress_enabled | bool %}
+    networks:
+      {{ docker_vpn_network }}: {}
+      {{ warp_docker_network }}: {}
+      # The default route of the container: what it opens leaves through
+      # {{ remna_node_egress_interface }} (remna_node_hops.egress, tasks/egress.yml).
+      {{ remna_node_egress_network }}:
+        gw_priority: 1
+{% else %}
     networks:
       - {{ docker_vpn_network }}
       - {{ warp_docker_network }}
+{% endif %}
 
     restart: unless-stopped
 
@@ -55,3 +65,7 @@ networks:
     external: true
   {{ warp_docker_network }}:
     external: true
+{% if remna_node_egress_enabled | bool %}
+  {{ remna_node_egress_network }}:
+    external: true
+{% endif %}

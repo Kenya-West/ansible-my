@@ -1,0 +1,15 @@
+# {{ ansible_managed | default('Managed by Ansible') }}
+# Puts the egress routes, rules and guards back after whatever removed them
+# (systemd-networkd reconfiguring the interface, a gateway change, Docker
+# recreating the container), and stops the container if it leaks.
+[Unit]
+Description=Re-apply the Remnawave node egress every {{ remna_node_egress_heal_interval }}
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec={{ remna_node_egress_heal_interval }}
+AccuracySec=5s
+Unit={{ remna_node_egress_unit }}-heal.service
+
+[Install]
+WantedBy=timers.target

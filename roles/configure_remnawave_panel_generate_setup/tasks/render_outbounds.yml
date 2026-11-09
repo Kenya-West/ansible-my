@@ -1,0 +1,46 @@
+---
+# Render every chain outbound - the planned ones (handing over route 0) and the
+# model's hop outbounds (handing over another route) - from the snippet
+# template of its protocol, into crpgs_outbounds. Used by the snippets stage
+# and the Xray test.
+
+- name: Start from an empty set of rendered outbounds
+  ansible.builtin.set_fact:
+    crpgs_outbounds: []
+
+- name: Every planned outbound must have a snippet template
+  ansible.builtin.assert:
+    that:
+      - item.template in query('varnames', '.*')
+    fail_msg: >-
+      No snippet template for protocol '{{ item.protocol }}' of exit
+      {{ item.address }}. Expected a variable named '{{ item.template }}',
+      normally defined in group_vars/vpn_server_remnawave/snippet_*.yaml.
+    quiet: true
+  loop: "{{ crpgs_outbounds_plan + crpgs_model.hop_outbounds }}"
+  loop_control:
+    label: "{{ item.tag }}"
+
+- name: Render the outbound of each exit
+  ansible.builtin.set_fact:
+    crpgs_outbounds: >-
+      {{
+        crpgs_outbounds
+        + [lookup('ansible.builtin.vars', item.template)
+           | combine({'tag': item.tag}, crpgs_outbound_final_mask, recursive=True)]
+      }}
+  vars:
+    # The templates are written against these names; they are what make one
+    # template serve every next hop: the domain it dials, and the route it
+    # hands over in the service user's UUID (0: the node it reaches is the
+    # exit; another id: what that node does next).
+    node_address: "{{ item.address }}"
+    node_route_id: "{{ item.route | default(0) }}"
+    # Merged here rather than written in the templates, so every protocol's
+    # template gets it.
+    crpgs_outbound_final_mask: >-
+      {%- set mask = vpn_server_remnawave_final_mask | remnawave_final_mask('outbounds', item.address) -%}
+      {{ {'streamSettings': {'finalmask': mask}} if mask else {} }}
+  loop: "{{ crpgs_outbounds_plan + crpgs_model.hop_outbounds }}"
+  loop_control:
+    label: "{{ item.tag }} -> {{ item.address }} (route {{ item.route | default(0) }})"

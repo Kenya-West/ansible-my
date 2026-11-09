@@ -65,6 +65,8 @@
                           | default(vpn_server_remnawave_snippets_default_protocol_type, true),
               'domains': (facts.domains_keys | default({}))
                          .get(vpn_server_remnawave_hosts_node_manage_key, []),
+              'hops': (facts.remna_node_hops_defaults | default({}, true))
+                      | combine(facts.remna_node_hops | default({}, true), recursive=True),
             }) -%}
       {%- endfor -%}
       {{ collected }}
@@ -115,6 +117,14 @@
       private_keys: "{{ vpn_server_remnawave_config_profiles_private_keys }}"
       private_key_common: "{{ vpn_server_remnawave_config_profiles_private_key_common }}"
       squads_inbounds: "{{ vpn_server_remnawave_internal_squads_inbounds }}"
+      # Hops (remna_node_hops of the nodes): local traffic of each censored
+      # geo, the WARP outbound default users' local traffic leaves through,
+      # the observatory of balancing profiles and the tags of what hops add.
+      local_traffic: "{{ vpn_server_remnawave_routing_local_traffic }}"
+      warp_tag: "{{ vpn_server_remnawave_routing_local_outbound }}"
+      observatory: "{{ vpn_server_remnawave_hosts_hops_observatory }}"
+      hop_tag_prefix: "{{ vpn_server_remnawave_hosts_hops_outbound_tag_prefix }}"
+      balancer_hops_prefix: "{{ vpn_server_remnawave_hosts_hops_balancer_tag_prefix }}"
 
 - name: Report what the inventory produced
   ansible.builtin.debug:
@@ -125,11 +135,13 @@
       ({{ crpgs_model.chained | length }} of them chained),
       {{ crpgs_model.entries | length }} chain entries,
       {{ crpgs_model.hosts | length }} hosts,
-      {{ crpgs_outbounds_plan | length }} outbounds,
+      {{ crpgs_outbounds_plan | length }} outbounds
+      (+{{ crpgs_model.hop_outbounds | length }} handing routes on),
       {{ crpgs_model.rules | length }} chain rules,
+      {{ crpgs_model.relations | length }} hop relations,
       route ids
-      {{ crpgs_model.chained | map(attribute='route_id') | min | default('-') }}-{{
-         crpgs_model.chained | map(attribute='route_id') | max | default('-') }}
+      {{ crpgs_model.routes | map(attribute='id') | min | default('-') }}-{{
+         crpgs_model.routes | map(attribute='id') | max | default('-') }}
 
 - name: Surface anything questionable in the inventory
   ansible.builtin.debug:

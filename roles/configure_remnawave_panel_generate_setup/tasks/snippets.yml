@@ -4,9 +4,14 @@
 # inventory variables cannot:
 #
 #   - outbounds_all: every planned outbound rendered from its protocol
-#     template with node_address set to its exit;
-#   - rules_all: one rule per chained exit, routing its route id to that exit's
-#     outbound (crpgs_model, build_model.yml);
+#     template with node_address set to the node it dials and node_route_id
+#     to the route it hands over (0: that node is the exit), plus the
+#     outbounds of the model handing other routes on (hops);
+#   - rules_all: one rule per route id, sending it to the next hop, and the
+#     local-traffic rules of the nodes where a path leaves a censored geo
+#     (crpgs_model, build_model.yml). It is written without syncing: its
+#     rules may name what the profiles only get from the config profiles
+#     stage (WARP outbound, inline balancers), so the profiles take it then;
 #   - vpn_server_remnawave_snippets_whole: standalone snippets written whole;
 #   - snippet definitions from config_profiles_composition (defaults, WARP,
 #     balancers): written once as they are, whichever profiles embed them.
@@ -14,43 +19,15 @@
 # The role owns these snippets whole: each is replaced by what the inventory
 # produces, so an entry added to them by hand is gone after the next run.
 
-- name: Start from an empty set of rendered outbounds
-  ansible.builtin.set_fact:
-    crpgs_outbounds: []
+- name: Render the chain outbounds
+  ansible.builtin.include_tasks: render_outbounds.yml
 
-- name: Every planned outbound must have a snippet template
-  ansible.builtin.assert:
-    that:
-      - item.template in query('varnames', '.*')
-    fail_msg: >-
-      No snippet template for protocol '{{ item.protocol }}' of exit
-      {{ item.address }}. Expected a variable named '{{ item.template }}',
-      normally defined in group_vars/vpn_server_remnawave/snippet_*.yaml.
-    quiet: true
-  loop: "{{ crpgs_outbounds_plan }}"
-  loop_control:
-    label: "{{ item.tag }}"
-
-- name: Render the outbound of each exit
-  ansible.builtin.set_fact:
-    crpgs_outbounds: >-
-      {{
-        crpgs_outbounds
-        + [lookup('ansible.builtin.vars', item.template)
-           | combine({'tag': item.tag}, crpgs_outbound_final_mask, recursive=True)]
-      }}
-  vars:
-    # The templates are written against this name; it is what makes one
-    # template serve every exit.
-    node_address: "{{ item.address }}"
-    # Merged here rather than written in the templates, so every protocol's
-    # template gets it.
-    crpgs_outbound_final_mask: >-
-      {%- set mask = vpn_server_remnawave_final_mask | remnawave_final_mask('outbounds', item.address) -%}
-      {{ {'streamSettings': {'finalmask': mask}} if mask else {} }}
-  loop: "{{ crpgs_outbounds_plan }}"
-  loop_control:
-    label: "{{ item.tag }} -> {{ item.address }}"
+# Before anything is written: one bad shared snippet (an unknown geosite
+# name, a rule naming what a profile lacks) stops Xray on every node of a
+# profile, so the opt-in test runs the node image's Xray on every profile.
+- name: Test every generated profile with the node's Xray
+  ansible.builtin.include_tasks: xray_test.yml
+  when: vpn_server_remnawave_xray_test | bool
 
 - name: Write the outbounds snippet
   kenyawest.remnawave.snippet:
@@ -60,13 +37,68 @@
   delegate_to: localhost
   register: crpgs_outbounds_snippet
 
-- name: Write the rules snippet
+# Not synced here: a profile taking a rule before it holds the outbound or
+# balancer the rule names (the WARP outbound, an inline balancer of the config
+# profiles stage) stops Xray on every node of that profile.
+- name: Write the rules snippet, without pushing it into the profiles yet
   kenyawest.remnawave.snippet:
     name: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
     snippet: "{{ crpgs_model.rules }}"
-    sync: "{{ vpn_server_remnawave_snippets_sync }}"
+    sync: never
   delegate_to: localhost
   register: crpgs_rules_snippet
+
+- name: Remember whether the profiles still have to take the rules
+  ansible.builtin.set_fact:
+    crpgs_rules_sync_pending: >-
+      {{
+        vpn_server_remnawave_snippets_sync == 'always'
+        or (vpn_server_remnawave_snippets_sync == 'on_change' and crpgs_rules_snippet is changed)
+      }}
+
+# With the config profiles stage in this run, it pushes the rules after the
+# profiles are written. Without it, the profiles in the panel are what the
+# rules land in, so they are checked first.
+- name: Push the rules into the profiles now, when no config profiles stage follows
+  when:
+    - crpgs_rules_sync_pending | bool
+    - "'config_profiles' not in vpn_server_remnawave_generate_stages"
+  block:
+    - name: Read the config profiles and snippets the rules would land in
+      ansible.builtin.include_tasks: read_panel.yml
+      vars:
+        crpgs_gather:
+          config_profiles: {}
+          snippets: {}
+
+    - name: Every rule must find its outbound or balancer in each profile taking it
+      ansible.builtin.assert:
+        that:
+          - crpgs_rules_dangling | length == 0
+        fail_msg: >-
+          The new rules would name outbounds or balancers some profiles lack,
+          which stops Xray on their nodes: {{ crpgs_rules_dangling | join('; ') }}.
+          Run the config profiles stage as well
+          (remnawave_generate_all.yaml); the rules snippet is written but not
+          pushed into the profiles.
+        quiet: true
+      vars:
+        crpgs_rules_dangling: >-
+          {{ remnawave_gathered.config_profiles
+             | remnawave_dangling(remnawave_gathered.snippets,
+                                  vpn_server_remnawave_snippets_key_rules_all,
+                                  crpgs_model.rules, crpgs_primary_tags) }}
+
+    - name: Push the rules snippet into the profiles embedding it
+      kenyawest.remnawave.snippet:
+        name: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
+        snippet: "{{ crpgs_model.rules }}"
+        sync: always
+      delegate_to: localhost
+
+    - name: Nothing left to push
+      ansible.builtin.set_fact:
+        crpgs_rules_sync_pending: false
 
 # After outbounds_all: a balancer selects outbounds by tag.
 - name: Write the snippets kept whole

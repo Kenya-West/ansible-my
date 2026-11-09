@@ -2,8 +2,10 @@
 # Follow what the panel holds the way a client is routed, and check it against
 # itself and against the desired setup (crpgs_model, build_model.yml):
 #
-#   - every managed host's route id, through the rules snippet to the outbound
-#     and the exit it reaches, which must be the exit the host is named after;
+#   - every managed host's route id, through the rules snippet (and the inline
+#     rules of balancing profiles) to the outbound or balanced outbounds, the
+#     route each hands over in its UUID, and on hop by hop until route 0 - the
+#     exit; every way through must be the path the inventory wants;
 #   - the config profile and inbound a host is attached to, and the squads it
 #     is shown to, which must be the ones of the model;
 #   - the nodes a host binds to, which must exist and activate its inbound
@@ -35,6 +37,15 @@
       config_profiles: {}
       internal_squads: {}
 
+# The user the chain outbounds authenticate as, when the inventory names it:
+# its squads must reach every node a chain outbound dials.
+- name: Read the service user
+  kenyawest.remnawave.user_info:
+    username: "{{ vpn_server_remnawave_service_user_name }}"
+  delegate_to: localhost
+  register: crpgs_service_user
+  when: vpn_server_remnawave_service_user_name | default('', true) | length > 0
+
 - name: Check the panel against itself and the desired setup
   ansible.builtin.set_fact:
     crpgs_verified: "{{ remnawave_gathered | remnawave_verify(crpgs_model, crpgs_verify_options) }}"
@@ -48,6 +59,9 @@
       rules_snippet: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
       outbounds_snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_all }}"
       balancers_snippet: "{{ vpn_server_remnawave_snippets_key_balancers_all | default('') }}"
+      service_user: >-
+        {{ (crpgs_service_user.users | default([], true) | first | default(none))
+           if crpgs_service_user is not skipped and crpgs_service_user is defined else none }}
 
 # One expression evaluating to a list, so the callback prints a line each.
 - name: Report what the panel holds
