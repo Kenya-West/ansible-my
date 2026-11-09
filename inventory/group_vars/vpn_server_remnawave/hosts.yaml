@@ -147,17 +147,11 @@ vpn_server_remnawave_hosts_vless_route_id_direct: 2
 # (leastPing): its profile gets the balancer and an Xray observatory probing
 # every next hop through the whole rest of its path. Every node activating
 # that profile probes, not only the one balancing. Settings per geo the
-# balanced paths end in: a path ending in a censored geo blocks all but local
-# traffic for reverse users there, so its probe must be a local site (google.ru
-# is in geosite:category-ru through its TLD); the global settings serve the
-# rest.
+# balanced paths end in, falling back to the global ones; every exit reaches
+# the whole internet, so the global probe serves paths ending in Russia too.
 vpn_server_remnawave_hosts_hops_observatory:
   global:
     probeUrl: https://www.gstatic.com/generate_204
-    probeInterval: 1m
-    enableConcurrency: true
-  russia:
-    probeUrl: https://www.google.ru/generate_204
     probeInterval: 1m
     enableConcurrency: true
 

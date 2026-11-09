@@ -177,7 +177,7 @@ vpn_server_remnawave_config_profiles_exclusive_group: vps_exclusive
 # One ordered list assembles the config of every profile. Matching fragments
 # contribute normal Xray config mappings: nested mappings merge, lists append
 # in declaration order, scalar values are replaced by the last matching one.
-# Thus routing precedence is visible here: defaults -> WARP -> local -> chains.
+# Thus routing precedence is visible here: defaults -> WARP -> chains.
 # Per-protocol base.config overrides the result (its lists replace, not append);
 # the role then supplies the generated inbounds.
 #
@@ -227,38 +227,10 @@ vpn_server_remnawave_config_profiles_composition:
         rules:
           - snippet: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
 
-  # Reverse users: the exit of their path is a node of a censored geo, and
-  # they come for that geo's own sites only. Traffic exiting here (route 0
-  # from the hop before, the direct route id from clients) leaves DIRECT when
-  # it is local and is blocked otherwise. Chain routes passing the node carry
-  # other ids and are untouched. IPIfNonMatch resolves a domain no rule
-  # matched and tries the ip rules again, so a site hosted in the geo but
-  # missing from the domain list still counts as local; the last rule is an
-  # ip rule for that reason. Scoped to the VLESS inbounds, so the node's own
-  # API inbound (route 0 too) is never blocked. One fragment per censored geo
-  # with nodes, each with its own lists (routing_local.yaml).
-  - name: local_reverse_russia
-    profiles:
-      kind: location
-      geo: russia
-    inbounds:
-      - VLESS_TCP_REALITY
-      - VLESS_REALITY_XHTTP
-    config:
-      routing:
-        domainStrategy: IPIfNonMatch
-        rules:
-          - vlessRoute: "{{ vpn_server_remnawave_routing_final_route_ids }}"
-            domain: "{{ vpn_server_remnawave_routing_local_traffic.russia.domain }}"
-            outboundTag: DIRECT
-          - vlessRoute: "{{ vpn_server_remnawave_routing_final_route_ids }}"
-            ip: "{{ vpn_server_remnawave_routing_local_traffic.russia.ip }}"
-            outboundTag: DIRECT
-          - vlessRoute: "{{ vpn_server_remnawave_routing_final_route_ids }}"
-            ip:
-              - "0.0.0.0/0"
-              - "::/0"
-            outboundTag: BLOCK
+  # Location nodes (Reverse-<CODE>) need no rules of their own: traffic
+  # exiting there (route 0 from the hop before, the direct route id from
+  # clients) matches nothing and leaves through the first outbound, DIRECT,
+  # with the node's VPS address - the full internet, not only local sites.
 
   - name: chains
     # outbounds_all and rules_all are generated/merged by the snippets stage;

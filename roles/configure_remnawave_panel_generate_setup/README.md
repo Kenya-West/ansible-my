@@ -386,20 +386,16 @@ Who a host is for follows from where its path ends:
 | User type | Path ends at | Local traffic (`vpn_server_remnawave_routing_local_traffic`) | Other traffic |
 | --- | --- | --- | --- |
 | default | a global or exclusive node | WARP of the **last node of the path inside the censored geo**; on a path without one, WARP of the exit | the next hop, then DIRECT at the exit |
-| reverse | a node of a censored geo (`Reverse-<CODE>`) | DIRECT at that node, with its VPS address | **blocked** |
+| reverse | a node of a censored geo (`Reverse-<CODE>`) | DIRECT at that node, with its VPS address | DIRECT at that node too (full internet) |
 
 - The default users' rule sits in `rules_all` on the ids of the actions that
   leave the geo (`local: russia` in the model's routes), so it fires only on
   that node. The exit-side rule is in `rules_warp` (global profiles,
   `vlessRoute` 0 and the direct id).
-- The reverse rules are the `local_reverse_<geo>` composition fragment of the
-  `Reverse-<CODE>` profiles, scoped to their VLESS inbounds (the node's API
-  inbound reports route 0 too), on `vlessRoute` 0 and the direct id - chain
-  routes passing a Russian node carry other ids and are untouched. The
-  profile resolves domains no rule matched (`IPIfNonMatch`) and tries the ip
-  rules again, so a site hosted in Russia but missing from the domain list
-  still counts as local; the last rule, `0.0.0.0/0` and `::/0` to BLOCK, is
-  an ip rule for that reason.
+- Reverse users need no rule: at the exit their traffic (`vlessRoute` 0 from
+  the hop before, the direct id from clients) matches nothing and leaves
+  through the first outbound, DIRECT, so chains and direct hosts ending in
+  Russia reach the whole internet - and pass client ping probes.
 - `geoip` in the default users' rule only sees IP literals: their route
   matches by itself first, so Xray never resolves for it (which also keeps
   their DNS off the Russian node).
@@ -415,8 +411,7 @@ profiles that node activates - rule, balancer and `observatory` together, so
 no profile ever names a balancer it lacks. Only that node receives the
 balancer's route id, but every node activating that profile probes. The
 probe follows the whole rest of each path; a profile balancing paths that end
-in a censored geo uses that geo's probe (`google.ru`, local there), since the
-reverse rules block anything else
+in a censored geo uses that geo's probe when one is set, else the global one
 (`vpn_server_remnawave_hosts_hops_observatory`).
 
 ### Writing order
@@ -617,7 +612,7 @@ In `group_vars/vpn_server_remnawave/config_profiles.yaml`:
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `vpn_server_remnawave_config_profiles_base` | the two below | One base profile per protocol, as `{protocol, name, variant_suffix, inbounds, config}` |
-| `vpn_server_remnawave_config_profiles_composition` | defaults, warp_outbound, warp, local_reverse_russia, chains | Ordered named config fragments with profile selectors and whole snippet definitions |
+| `vpn_server_remnawave_config_profiles_composition` | defaults, warp_outbound, warp, chains | Ordered named config fragments with profile selectors and whole snippet definitions |
 | `vpn_server_remnawave_config_profiles_location` | `{name: Reverse-{code}, inbound_suffix: REVERSE_{code}}` | Naming of a location's variant |
 | `vpn_server_remnawave_config_profiles_exclusive` | `[]` | The panel's exclusive profiles, as `{name, inbound_suffix}` (its host_vars) |
 | `vpn_server_remnawave_config_profiles_exclusive_group` | `vps_exclusive` | Group whose nodes are published on an exclusive profile |
@@ -643,7 +638,7 @@ In `group_vars/vpn_server_remnawave/routing_local.yaml` and `hosts.yaml`; see
 | `vpn_server_remnawave_routing_local_traffic` | russia: `geosite:category-ru`, `geoip:ru` (role: none) | Per censored geo, `{domain, ip}` lists of its own sites |
 | `vpn_server_remnawave_routing_local_outbound` | `out-warp-socks` | Where default users' local traffic leaves |
 | `vpn_server_remnawave_routing_final_route_ids` | `0,2` | Route ids traffic reaches its exit with |
-| `vpn_server_remnawave_hosts_hops_observatory` | global: gstatic, russia: google.ru | Per geo the balanced paths end in: `probeUrl`, `probeInterval`, `enableConcurrency` |
+| `vpn_server_remnawave_hosts_hops_observatory` | global: gstatic | Per geo the balanced paths end in: `probeUrl`, `probeInterval`, `enableConcurrency` |
 | `vpn_server_remnawave_hosts_hops_outbound_tag_prefix` | `out-hop` | Tags of outbounds handing a route other than 0 on |
 | `vpn_server_remnawave_hosts_hops_balancer_tag_prefix` | `bal-hop` | Tags of fan-out balancers |
 | `vpn_server_remnawave_service_user_name` | `''` | Username of the chain outbounds' user, checked by verify when set |

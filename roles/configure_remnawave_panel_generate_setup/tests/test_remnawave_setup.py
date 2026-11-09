@@ -724,28 +724,14 @@ class CompositionTests(unittest.TestCase):
             self.assertEqual(setup._snippet_refs(profile['config']['routing']['rules']), expected)
             self.assertEqual(profile['composition'],
                              ['defaults', 'warp_outbound', 'warp', 'chains'] if profile['geo'] == 'global'
-                             else ['defaults', 'warp_outbound', 'local_reverse_russia', 'chains'])
+                             else ['defaults', 'warp_outbound', 'chains'])
 
-    def test_reverse_profiles_send_local_traffic_direct_and_block_the_rest(self):
+    def test_no_profile_has_inline_rules_or_a_domain_strategy(self):
+        # Reverse profiles block nothing: their exit traffic falls to DIRECT.
         for profile in self.model()['profiles']:
             routing = profile['config']['routing']
-            inline = [r for r in routing['rules'] if 'snippet' not in r]
-            if profile['kind'] != 'location':
-                self.assertEqual(inline, [])
-                self.assertNotIn('domainStrategy', routing)
-                continue
-            self.assertEqual(routing['domainStrategy'], 'IPIfNonMatch')
-            inbound = profile['inbound_tags']
-            self.assertEqual(inline, [
-                {'vlessRoute': '0,2', 'domain': ['geosite:category-ru'], 'outboundTag': 'DIRECT',
-                 'inboundTag': inbound},
-                {'vlessRoute': '0,2', 'ip': ['geoip:ru'], 'outboundTag': 'DIRECT', 'inboundTag': inbound},
-                {'vlessRoute': '0,2', 'ip': ['0.0.0.0/0', '::/0'], 'outboundTag': 'BLOCK',
-                 'inboundTag': inbound},
-            ])
-            # Between the defaults (private ranges blocked) and the chain routes.
-            refs = [r.get('snippet', 'inline') for r in routing['rules']]
-            self.assertEqual(refs, ['rules_default_prod_1', 'inline', 'inline', 'inline', 'rules_all_prod_1'])
+            self.assertEqual([r for r in routing['rules'] if 'snippet' not in r], [])
+            self.assertNotIn('domainStrategy', routing)
 
     def test_empty_condition_lists_are_refused(self):
         self.options['profile_composition'].append({
@@ -1229,8 +1215,8 @@ class HopTests(unittest.TestCase):
             for balancer in config['routing']['balancers']:
                 self.assertEqual(balancer['strategy'], {'type': 'leastPing'})
                 self.assertEqual(balancer['fallbackTag'], balancer['selector'][0])
-            # The balanced reverse paths end in Russia, which blocks foreign
-            # probes for reverse users: the probe is a Russian site.
+            # The balanced reverse paths end in Russia: its probe is taken
+            # when one is set (this scenario sets one).
             self.assertEqual(config['observatory']['probeUrl'], 'https://www.google.ru/generate_204')
             self.assertEqual(config['observatory']['subjectSelector'],
                              sorted(n['tag'] for r in balanced for n in r['next']))
@@ -1458,8 +1444,8 @@ class Xray(object):
 
 class RoutingSemanticsTests(unittest.TestCase):
     """Default users' local traffic leaves through WARP where their path leaves
-    Russia, or at the global exit; reverse users get Russian sites DIRECT at
-    the Russian exit and nothing else; nothing touches the node's own API."""
+    Russia, or at the global exit; reverse users get the whole internet
+    DIRECT at the Russian exit; nothing touches the node's own API."""
 
     def setUp(self):
         defaults = yaml.safe_load((INVENTORY / 'snippets.yaml').read_text())
@@ -1527,13 +1513,15 @@ class RoutingSemanticsTests(unittest.TestCase):
                 'gemini.google.com': 'out-warp-socks', 'google.com': 'DIRECT', '10.1.2.3': 'BLOCK'})
             self.check('Xenus-team', route, {'yandex.ru': 'out-warp-socks', 'google.com': 'DIRECT'})
 
-    def test_reverse_user_gets_local_sites_direct_and_nothing_else(self):
+    def test_reverse_user_gets_the_whole_internet_direct(self):
+        # Route 0 from the hop before (chains), 2 from a direct host's client.
         for profile in ('Reverse-RU', 'Reverse-RU-xHTTP'):
             for route in (0, 2):
                 self.check(profile, route, {
                     'yandex.ru': 'DIRECT', 'gosuslugi.ru': 'DIRECT', '77.88.55.88': 'DIRECT',
-                    'shop-in-moscow.com': 'DIRECT',   # resolved: hosted in Russia
-                    'google.com': 'BLOCK', '8.8.8.8': 'BLOCK', 'gemini.google.com': 'BLOCK',
+                    'shop-in-moscow.com': 'DIRECT',
+                    'google.com': 'DIRECT', '8.8.8.8': 'DIRECT', 'gemini.google.com': 'DIRECT',
+                    'www.gstatic.com': 'DIRECT',   # client ping probes
                     '10.1.2.3': 'BLOCK'})
 
     def test_the_node_api_inbound_is_never_blocked(self):
