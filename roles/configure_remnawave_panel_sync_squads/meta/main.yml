@@ -1,0 +1,13 @@
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: Kenya-West
+  description: >-
+    Put the members of Remnawave internal squads into the external squads
+    the inventory maps them to.
+  license: MIT
+  min_ansible_version: '2.15'
+  galaxy_tags:
+    - remnawave
+    - vpn
+
+dependencies: []

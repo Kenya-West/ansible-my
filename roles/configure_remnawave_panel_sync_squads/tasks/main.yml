@@ -1,0 +1,234 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/configure_remnawave_panel_sync_squads
+#
+# Puts every member of an internal squad into the external squad
+# vpn_server_remnawave_squads_sync maps it to, on the panel of the host the
+# role runs against. The panel has no such rule of its own, so the role
+# compares and corrects on every run: run it on a schedule to keep the squads
+# in step.
+#
+# Reads three listings (internal squads, external squads, users), then writes
+# one bulk request per external squad and 500 users. Every request speaks HTTP
+# to the panel only, so it runs on the controller. --check sends nothing and
+# reports what would change.
+
+- name: Check the squad sync settings
+  ansible.builtin.assert:
+    that:
+      - vpn_server_remnawave_squads_sync is sequence
+      - vpn_server_remnawave_squads_sync is not string
+      - >-
+        vpn_server_remnawave_squads_sync | rejectattr('internal_squad', 'defined') | list | length == 0
+        and vpn_server_remnawave_squads_sync | rejectattr('external_squad', 'defined') | list | length == 0
+      - vpn_server_remnawave_squads_sync_prune in ['ignore', 'remove']
+      - vpn_server_remnawave_squads_sync_skip_multiple_internal_squads | default(false, true) is boolean
+      - crpss_skip_internal_squads is sequence and crpss_skip_internal_squads is not string
+      - crpss_skip_user_tags is sequence and crpss_skip_user_tags is not string
+      - vpn_server_remnawave_squads_sync_batch_size | int in range(1, 501)
+    fail_msg: >-
+      vpn_server_remnawave_squads_sync must be a list of {internal_squad,
+      external_squad}, vpn_server_remnawave_squads_sync_prune one of ignore,
+      remove, vpn_server_remnawave_squads_sync_batch_size 1 to 500,
+      vpn_server_remnawave_squads_sync_skip_multiple_internal_squads a
+      boolean, vpn_server_remnawave_squads_sync_skip_internal_squads a list of
+      squad names and vpn_server_remnawave_squads_sync_skip_user_tags a list
+      of user tags.
+    quiet: true
+
+- name: Sync the external squads of the squad members
+  when: vpn_server_remnawave_squads_sync | length > 0
+  module_defaults:
+    group/kenyawest.remnawave.remnawave:
+      panel_url: "{{ crpss_panel.panel_url }}"
+      token: "{{ crpss_panel.token }}"
+      api_key: "{{ crpss_panel.api_key }}"
+      validate_certs: "{{ crpss_panel.validate_certs }}"
+      timeout: "{{ crpss_panel.timeout }}"
+  block:
+    - name: Read the internal squads in the panel
+      kenyawest.remnawave.internal_squad_info:
+      delegate_to: localhost
+      register: crpss_internal_squads
+
+    - name: Read the external squads in the panel
+      kenyawest.remnawave.external_squad_info:
+      delegate_to: localhost
+      register: crpss_external_squads
+
+    - name: Fail on a squad the panel does not have
+      ansible.builtin.assert:
+        that:
+          - crpss_missing_internal | length == 0
+          - crpss_missing_external | length == 0
+        fail_msg: >-
+          The panel lacks squads that vpn_server_remnawave_squads_sync or
+          vpn_server_remnawave_squads_sync_skip_internal_squads name -
+          internal: {{ crpss_missing_internal | join(', ') or '-' }};
+          external: {{ crpss_missing_external | join(', ') or '-' }}.
+          Create them in the panel or fix the names; nothing was changed.
+        quiet: true
+      vars:
+        crpss_missing_internal: >-
+          {{ (vpn_server_remnawave_squads_sync | map(attribute='internal_squad') | list + crpss_skip_internal_squads) | unique
+             | reject('in', crpss_internal_squads.squads | map(attribute='name') | list) | list }}
+        crpss_missing_external: >-
+          {{ crpss_rules | map(attribute='external_squad') | select | unique
+             | reject('in', crpss_external_squads.squads | map(attribute='name') | list) | list }}
+
+    # Holds the users' credentials: keep them out of -v output.
+    - name: Read the users in the panel
+      kenyawest.remnawave.user_info:
+      delegate_to: localhost
+      register: crpss_users
+      no_log: true
+
+    # The first rule naming one of a user's internal squads decides the
+    # external squad; an empty one takes the user out of any external squad. A user no rule matches is only moved with prune: remove,
+    # and only out of an external squad some rule names. Each change records
+    # the squad names too, for the report.
+    #
+    # A user any skip condition hits is never touched - excluded by name, in
+    # more than one internal squad (when enabled), in one of the skipped
+    # internal squads, or tagged with one of the skipped user tags. Those a rule would have moved are listed as held.
+    - name: Work out which users change external squad
+      ansible.builtin.set_fact:
+        crpss_plan: >-
+          {%- set ext_uuid = dict(crpss_external_squads.squads | map(attribute='name')
+                                  | zip(crpss_external_squads.squads | map(attribute='uuid'))) -%}
+          {%- set ext_name = dict(crpss_external_squads.squads | map(attribute='uuid')
+                                  | zip(crpss_external_squads.squads | map(attribute='name'))) -%}
+          {%- set managed = crpss_rules | map(attribute='external_squad') | select
+                            | map('extract', ext_uuid) | list -%}
+          {%- set changes = [] -%}
+          {%- set conflicts = [] -%}
+          {%- set held = [] -%}
+          {%- for user in crpss_users.users -%}
+          {%-   set squads = user.activeInternalSquads | default([], true) | map(attribute='name') | list -%}
+          {%-   set skip = [] -%}
+          {%-   if user.username in crpss_exclude_users -%}
+          {%-     set _ = skip.append('excluded user') -%}
+          {%-   endif -%}
+          {%-   if crpss_skip_multiple and squads | length > 1 -%}
+          {%-     set _ = skip.append('%d internal squads' | format(squads | length)) -%}
+          {%-   endif -%}
+          {%-   set skipped_squads = squads | select('in', crpss_skip_internal_squads) | list -%}
+          {%-   if skipped_squads -%}
+          {%-     set _ = skip.append('in ' ~ skipped_squads | join(', ')) -%}
+          {%-   endif -%}
+          {%-   if user.tag and user.tag in crpss_skip_user_tags -%}
+          {%-     set _ = skip.append('tag ' ~ user.tag) -%}
+          {%-   endif -%}
+          {%-   set rules = crpss_rules | selectattr('internal_squad', 'in', squads) | list -%}
+          {%-   set current = user.externalSquadUuid | default(none) -%}
+          {%-   if rules -%}
+          {%-     set target = (rules | first).external_squad -%}
+          {%-     set want = ext_uuid[target] if target else none -%}
+          {%-     if not skip and rules | map(attribute='external_squad') | unique | list | length > 1 -%}
+          {%-       set _ = conflicts.append({
+                      'username': user.username,
+                      'internal_squads': rules | map(attribute='internal_squad') | list,
+                      'external_squad': (rules | first).external_squad,
+                    }) -%}
+          {%-     endif -%}
+          {%-   elif vpn_server_remnawave_squads_sync_prune == 'remove' and current in managed -%}
+          {%-     set want = none -%}
+          {%-   else -%}
+          {%-     set want = current -%}
+          {%-   endif -%}
+          {%-   if want != current -%}
+          {%-     set _ = (held if skip else changes).append({
+                    'id': user.id,
+                    'username': user.username,
+                    'from': ext_name.get(current, current) if current else none,
+                    'to': ext_name[want] if want else none,
+                    'to_uuid': want or '',
+                    'skip': skip,
+                  }) -%}
+          {%-   endif -%}
+          {%- endfor -%}
+          {{ {'changes': changes, 'conflicts': conflicts, 'held': held} }}
+
+    - name: Report the users in internal squads mapped to different external squads
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            ['%d users match rules naming different external squads; the first rule wins:'
+              | format(crpss_plan.conflicts | length)]
+            + crpss_lines
+          }}
+      vars:
+        crpss_lines: >-
+          {%- set out = [] -%}
+          {%- for c in crpss_plan.conflicts -%}
+          {%-   set _ = out.append('%s (%s): %s' | format(c.username, c.internal_squads | join(', '), c.external_squad or '(none)')) -%}
+          {%- endfor -%}
+          {{ out }}
+      when: crpss_plan.conflicts | length > 0
+
+    - name: Report the users a skip condition keeps from changing external squad
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            ['%d users skipped that would otherwise change external squad:'
+              | format(crpss_plan.held | length)]
+            + crpss_lines
+          }}
+      vars:
+        crpss_lines: >-
+          {%- set out = [] -%}
+          {%- for c in crpss_plan.held -%}
+          {%-   set _ = out.append('%s: %s -> %s (%s)' | format(c.username, c.from or '(none)', c.to or '(none)', c.skip | join('; '))) -%}
+          {%- endfor -%}
+          {{ out }}
+      when: crpss_plan.held | length > 0
+
+    # One line per user: username: from -> to, with (none) for no squad.
+    # The api module reports a write it skips in check mode as skipped, so in
+    # check mode this is what shows as changed.
+    - name: Report the users changing external squad
+      changed_when: ansible_check_mode and crpss_plan.changes | length > 0
+      ansible.builtin.debug:
+        msg: >-
+          {{
+            ['%d of %d users change external squad%s:' | format(
+                crpss_plan.changes | length, crpss_users.users | length,
+                ' (check mode, nothing sent)' if ansible_check_mode else '')]
+            + crpss_lines
+          }}
+      vars:
+        crpss_lines: >-
+          {%- set out = [] -%}
+          {%- for c in crpss_plan.changes -%}
+          {%-   set _ = out.append('%s: %s -> %s' | format(c.username, c.from or '(none)', c.to or '(none)')) -%}
+          {%- endfor -%}
+          {{ out }}
+
+    # The panel takes up to 500 user ids per request and applies them in the
+    # background (202), so a listing right after may still show the old squad.
+    - name: Move the users to their external squads
+      kenyawest.remnawave.api:
+        method: POST
+        path: /api/users/bulk/update
+        body:
+          userIds: "{{ item.ids }}"
+          fields:
+            externalSquadUuid: "{{ item.uuid or none }}"
+        status_codes: [200, 201, 202]
+      loop: "{{ crpss_batches }}"
+      loop_control:
+        label: "{{ item.name or '(none)' }}: {{ item.ids | length }} users"
+      delegate_to: localhost
+      vars:
+        crpss_batches: >-
+          {%- set out = [] -%}
+          {%- for target, group in crpss_plan.changes | groupby('to_uuid') -%}
+          {%-   for chunk in group | batch(vpn_server_remnawave_squads_sync_batch_size | int) -%}
+          {%-     set _ = out.append({
+                    'uuid': target,
+                    'name': (chunk | first).to,
+                    'ids': chunk | map(attribute='id') | list,
+                  }) -%}
+          {%-   endfor -%}
+          {%- endfor -%}
+          {{ out }}

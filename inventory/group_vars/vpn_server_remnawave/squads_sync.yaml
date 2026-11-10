@@ -1,0 +1,40 @@
+---
+# ---------------------------------------------------------------------------
+# External squads by internal squad
+# (playbooks/anti_censorship/server/remnawave_sync_squads.yaml)
+# ---------------------------------------------------------------------------
+
+# Which external squad the members of an internal squad are put in, as
+# {internal_squad, external_squad}, both by name; both must exist in the panel.
+# A user has one external squad at most, so a user in several internal squads
+# gets the external squad of the first rule matching one of them. Several
+# rules may name the same external squad. Users no rule matches are left
+# alone, unless the prune below says otherwise.
+#
+# An empty external_squad ('' or null) takes the members out of whatever
+# external squad they are in.
+#
+#   - internal_squad: Default-Squad
+#     external_squad: Chain-Ru-NonRu
+#   - internal_squad: Direct-only
+#     external_squad: ''
+vpn_server_remnawave_squads_sync: []
+
+# What happens to a user in an external squad some rule names once no rule
+# matches the user (left the internal squad, say). It can be: ignore,
+# remove (take the user out of that external squad).
+vpn_server_remnawave_squads_sync_prune: ignore
+
+# Users never touched. The skip conditions are ORed: a user any of them hits
+# is skipped, and listed if a rule would have moved them.
+#
+# By username. The service user is in every internal squad.
+vpn_server_remnawave_squads_sync_exclude_users:
+  - "{{ vpn_server_remnawave_service_user_name }}"
+# Users in more than one internal squad (any squads, not only those the rules
+# name).
+vpn_server_remnawave_squads_sync_skip_multiple_internal_squads: false
+# Users in any of these internal squads, by name; they must exist in the panel.
+vpn_server_remnawave_squads_sync_skip_internal_squads: []
+# Users whose tag is one of these (a user has one tag at most).
+vpn_server_remnawave_squads_sync_skip_user_tags: []

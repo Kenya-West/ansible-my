@@ -1,0 +1,21 @@
+---
+# Puts every member of an internal squad into the external squad
+# vpn_server_remnawave_squads_sync maps it to
+# (inventory/group_vars/vpn_server_remnawave/squads_sync.yaml). The panel has
+# no such rule itself, so each run compares and corrects: schedule it to keep
+# the squads in step.
+#
+# --check shows who would move, from which external squad to which; nothing
+# is sent.
+#
+#   -e vpn_server_remnawave_squads_sync_prune=remove   also take users no rule
+#                                                      matches out of the
+#                                                      external squads rules name
+- name: Sync Remnawave external squads with internal squads
+  hosts: vpn_server_remnawave
+  become: false
+  become_user: "{{ standard_user }}"
+  gather_facts: false
+
+  roles:
+    - configure_remnawave_panel_sync_squads
