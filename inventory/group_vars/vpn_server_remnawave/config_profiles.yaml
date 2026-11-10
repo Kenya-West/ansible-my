@@ -268,9 +268,3 @@ vpn_server_remnawave_internal_squads_inbounds:
     profiles:
       kind: location
       geo: russia
-  - squad: Calibrach-extranet
-    profiles:
-      scope: Calibrach-extranet
-  - squad: Xenus-team
-    profiles:
-      scope: Xenus-team
