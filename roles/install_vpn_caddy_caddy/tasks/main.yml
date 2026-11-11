@@ -120,6 +120,21 @@
     state: absent
   when: install_vpn_caddy_caddy_prune_sni_templates | bool
 
+# The cover of REALITY (caddy_cover_*): its nginx configuration must be in
+# place before the compose brings the container up.
+- name: Prepare the cover REALITY falls back to
+  ansible.builtin.include_tasks:
+    file: cover.yml
+    apply:
+      tags:
+        - update_config_hard
+        - update_config_soft
+        - caddy_cover
+  tags:
+    - update_config_hard
+    - update_config_soft
+    - caddy_cover
+
 - name: copy_files_templating
   ansible.builtin.include_role:
     name: kwtoolset/copy_files_templating
@@ -208,6 +223,20 @@
     - update_image_hard
     - update_config_hard
 
+# Only where the compose is brought up next: Caddy takes port 80 back there.
+- name: Remove the cover where it is not active
+  ansible.builtin.include_tasks:
+    file: cover_remove.yml
+    apply:
+      tags:
+        - update_image_hard
+        - update_image_soft
+        - update_config_hard
+  tags:
+    - update_image_hard
+    - update_image_soft
+    - update_config_hard
+
 - name: compose_up
   ansible.builtin.include_role:
     name: kwtoolset/compose_up
@@ -223,6 +252,19 @@
     - update_image_hard
     - update_image_soft
     - update_config_hard
+
+- name: Apply and check the cover REALITY falls back to
+  ansible.builtin.include_tasks:
+    file: cover_reload.yml
+    apply:
+      tags:
+        - update_config_hard
+        - update_config_soft
+        - caddy_cover
+  tags:
+    - update_config_hard
+    - update_config_soft
+    - caddy_cover
 
 - name: Place an original templated Caddyfile as .bak just for debugging
   ansible.builtin.template:

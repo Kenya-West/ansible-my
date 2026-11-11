@@ -1,0 +1,129 @@
+---
+# The cover of REALITY: an nginx container (caddy_cover_container_name) that
+# answers what the Remnawave node forwards to `<caddy_cover_alias>:443`, and
+# port 80, in Caddy's place. A prober then meets nginx/OpenSSL, the commonest
+# web server there is, instead of Caddy's Go TLS. See the README's "Cover".
+#
+# Runs before the compose is brought up: it decides who answers each name of
+# the host from the certificates install_webfeatures_certcopy left in
+# caddy_cover_cert_root, and renders cover/nginx.conf.j2. cover_reload.yml
+# applies it afterwards; cover_remove.yml takes the container away where the
+# cover is not active.
+
+- name: Prepare the cover
+  when: caddy_cover_active | bool
+  block:
+    - name: The cover settings must be valid
+      ansible.builtin.assert:
+        that:
+          - caddy_cover_unknown_sni in ['cert', 'reject']
+          - caddy_cover_alias | length > 0
+          - caddy_cover_alias != caddy_cover_caddy_host
+        fail_msg: >-
+          caddy_cover_unknown_sni is `cert` or `reject`, and caddy_cover_alias a name
+          other than Caddy's own ({{ caddy_cover_caddy_host }}).
+        quiet: true
+
+    - name: Look for the certificate copy helper
+      ansible.builtin.stat:
+        path: "{{ caddy_cover_certcopy_helper }}"
+      register: caddy_cover_helper
+
+    # Runs the helper once, then again every 15 s for up to
+    # caddy_cover_wait_for_certs seconds while a cover name has no certificate
+    # (its own directory, or the wildcard one of its parent domain).
+    - name: Copy Caddy's certificates to {{ caddy_cover_cert_root }} and wait for those of the cover names
+      become: true
+      become_user: root
+      ansible.builtin.shell:
+        cmd: |
+          root={{ caddy_cover_cert_root | quote }}
+          deadline=$(( $(date +%s) + {{ caddy_cover_wait_for_certs | int }} ))
+          while :; do
+            {{ caddy_cover_certcopy_helper | quote }} >/dev/null 2>&1 || true
+            missing=""
+            for name in {{ caddy_cover_names | map('quote') | join(' ') }}; do
+              found=""
+              for dir in "$root/$name" "$root/wildcard_.${name#*.}"; do
+                if [ -s "$dir/fullchain.pem" ] && [ -s "$dir/privkey.pem" ]; then found=1; fi
+              done
+              [ -n "$found" ] || missing="$missing $name"
+            done
+            if [ -z "$missing" ] || [ "$(date +%s)" -ge "$deadline" ]; then break; fi
+            sleep 15
+          done
+          echo "waiting for:$missing"
+        executable: /bin/bash
+      register: caddy_cover_certcopy
+      changed_when: false
+      failed_when: false
+      when: caddy_cover_helper.stat.exists
+
+    - name: Find the certificates in {{ caddy_cover_cert_root }}
+      ansible.builtin.find:
+        paths: "{{ caddy_cover_cert_root }}"
+        patterns:
+          - fullchain.pem
+          - privkey.pem
+        recurse: true
+        depth: 2
+        size: "1"
+      register: caddy_cover_cert_files
+
+    # certs: name -> directory, with `*.example.com` for Caddy's
+    # `wildcard_.example.com`. A name is covered by its own certificate or by
+    # the wildcard one of its parent domain.
+    - name: Decide who answers each name of this host
+      ansible.builtin.set_fact:
+        caddy_cover_plan: >-
+          {%- set dirs = caddy_cover_cert_files.files | default([]) | map(attribute='path')
+                         | map('dirname') | map('basename') | list -%}
+          {%- set certs = {} -%}
+          {%- for dir in dirs | unique | sort -%}
+          {%-   set name = ('*' ~ dir[9:]) if dir is match('wildcard_[.]') else dir -%}
+          {%-   if dirs | select('equalto', dir) | list | length == 2
+                   and (name | regex_replace('^[*][.]', '')) is match(domains_base_domain_pattern) -%}
+          {%-     set _ = certs.update({name: dir}) -%}
+          {%-   endif -%}
+          {%- endfor -%}
+          {%- set covered = {} -%}
+          {%- for name in (caddy_cover_names + (domains | default([])) + caddy_cover_passthrough_names) | unique -%}
+          {%-   set wildcard = '*.' ~ (name | regex_replace('^[^.]+[.]', '')) -%}
+          {%-   if name in certs -%}
+          {%-     set _ = covered.update({name: certs[name]}) -%}
+          {%-   elif wildcard in certs -%}
+          {%-     set _ = covered.update({name: certs[wildcard]}) -%}
+          {%-   endif -%}
+          {%- endfor -%}
+          {%- set passthrough = (caddy_cover_passthrough_names
+                                 + ((caddy_cover_names + (domains | default([]))) | reject('in', covered) | list))
+                                | unique | list -%}
+          {%- set static = caddy_cover_names | select('in', covered) | reject('in', passthrough) | list -%}
+          {%- set managed = certs | list | reject('in', static) | reject('in', passthrough) | sort | list -%}
+          {{ {
+               'certs': certs | combine(covered),
+               'static': static,
+               'managed': managed,
+               'passthrough': passthrough | sort | list,
+               'default_cert': covered[static | first] if static | length > 0 else '',
+               'waiting': caddy_cover_names | reject('in', covered) | list,
+             } }}
+
+    - name: Create the configuration directory of the cover
+      ansible.builtin.file:
+        path: "{{ caddy_cover_conf_dir }}"
+        state: directory
+        mode: "0775"
+
+    # nginx checks the file, in a throwaway container without a network,
+    # before it replaces the one in use.
+    - name: Render and check the nginx configuration of the cover
+      ansible.builtin.template:
+        src: "{{ role_path }}/cover/nginx.conf.j2"
+        dest: "{{ caddy_cover_conf_dir }}/nginx.conf"
+        mode: "0644"
+        validate: >-
+          docker run --rm --network none --entrypoint nginx
+          -v %s:/etc/nginx/cover-check.conf:ro
+          {{ caddy_cover_image }} -t -q -c /etc/nginx/cover-check.conf
+      register: caddy_cover_conf

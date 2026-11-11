@@ -1,0 +1,22 @@
+---
+# Where the cover is not active (any more), its container goes before the
+# compose is brought up: Caddy publishes port 80 again, and carries the
+# caddy_cover_alias name itself.
+
+- name: Remove the cover where it is not active
+  when: not (caddy_cover_active | bool)
+  block:
+    - name: Look for a cover container left on this host
+      community.docker.docker_container_info:
+        name: "{{ caddy_cover_container_name }}"
+      register: caddy_cover_leftover
+
+    - name: Remove the cover container, Caddy publishes port 80 again
+      community.docker.docker_container:
+        name: "{{ caddy_cover_container_name }}"
+        state: absent
+      when:
+        - caddy_cover_leftover.exists
+        - >-
+          (caddy_cover_leftover.container.Config.Labels | default({}, true))['com.docker.compose.project']
+          | default('') == compose_project_name

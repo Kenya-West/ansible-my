@@ -1,0 +1,29 @@
+---
+# Re-reads Caddy's certificates into the cover of REALITY (the nginx container
+# of roles/install_vpn_caddy_caddy) once certcopy.yaml has copied them: on a
+# fresh node Caddy had none when caddy.yaml brought the cover up, and the
+# cover left every name to Caddy. Changes nothing on a host whose cover
+# already knows its certificates, or has none.
+- name: Refresh the cover of REALITY
+  hosts: vpn_caddy
+  become: false
+  become_user: "{{ standard_user }}"
+  strategy: ansible.builtin.host_pinned
+
+  tasks:
+    - name: Refresh the cover of REALITY
+      ansible.builtin.include_role:
+        name: install_vpn_caddy_caddy
+        tasks_from: cover_refresh
+        apply:
+          tags:
+            - update_config_hard
+            - update_config_soft
+            - caddy_cover
+      vars:
+        # Caddy may still be obtaining the certificates of a new node.
+        caddy_cover_wait_for_certs: 120
+      tags:
+        - update_config_hard
+        - update_config_soft
+        - caddy_cover

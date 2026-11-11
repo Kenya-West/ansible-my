@@ -107,6 +107,12 @@
         output file /var/log/caddy/common.access.log
     }
 
+    # No HTTP/3: no UDP port is published, and Caddy would still announce it
+    # in an Alt-Svc header pointing at a port nothing answers on.
+    servers {
+        protocols h1 h2
+    }
+
     metrics {
         per_host
     }

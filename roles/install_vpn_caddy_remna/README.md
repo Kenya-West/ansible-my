@@ -3,7 +3,8 @@ install_vpn_caddy_remna
 
 Deploys the Remnawave node (`remnawave/node`, container `remna`) of a
 `vpn_caddy` host as a Compose project:
-- It joins the `caddy` network, where Caddy is its REALITY target.
+- It joins the `caddy` network, where its REALITY target lives: Caddy, or the
+  nginx cover in front of it (`roles/install_vpn_caddy_caddy`, "Cover").
 - It joins the internal `warp` network, where MicroWARP answers as
   `microwarp-socks`.
 - It publishes 443 (unless Caddy owns it) and the control port, which UFW

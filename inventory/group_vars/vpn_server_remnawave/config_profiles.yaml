@@ -69,7 +69,13 @@ vpn_server_remnawave_config_profiles_sniffing:
 
 # Where REALITY forwards what is not a client: the Caddy of the node
 # (roles/install_vpn_caddy_caddy, container caddy).
-vpn_server_remnawave_config_profiles_reality_target: caddy:443
+#
+# `cover:443` (caddy_cover_alias, group_vars/caddy/cover.yaml) is the nginx
+# cover of the node where it has one and Caddy where it has none. Switch to it
+# only once playbooks/reverse_proxy/caddy.yaml has run on EVERY node of this
+# panel since the cover was introduced: a node that does not know the name yet
+# has no target, and REALITY stops accepting clients there.
+vpn_server_remnawave_config_profiles_reality_target: cover:443
 
 # The REALITY private key of every inbound tag: its entry in
 # vpn_server_remnawave_inbounds_private_keys.specific, else the entry of the

@@ -1,0 +1,15 @@
+---
+# Entry point of playbooks/reverse_proxy/cover.yaml: re-reads the certificates
+# into a cover that is already deployed, without touching Caddy or the compose.
+# Removing a cover no longer wanted is left to the role itself, which gives
+# port 80 back to Caddy in the same run.
+
+- name: Decide who answers each name again
+  ansible.builtin.include_tasks:
+    file: cover.yml
+  when: caddy_cover_active | bool
+
+- name: Apply it
+  ansible.builtin.include_tasks:
+    file: cover_reload.yml
+  when: caddy_cover_active | bool

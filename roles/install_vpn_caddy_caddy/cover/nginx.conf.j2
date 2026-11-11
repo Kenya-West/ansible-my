@@ -1,0 +1,167 @@
+{# The cover of REALITY, rendered by tasks/cover.yml from caddy_cover_plan:
+     static       names nginx answers with the fake site
+     managed      names nginx terminates and hands to Caddy
+     passthrough  names handed to Caddy as raw TLS
+     certs        name -> directory of caddy_cover_cert_root
+     default_cert the certificate of a handshake naming none of them
+   With no certificate of a cover name yet (default_cert empty) every
+   handshake goes to Caddy, as it did before the cover. #}
+{% set plan = caddy_cover_plan %}
+{% set caddy = caddy_cover_caddy_host %}
+{% set degraded = plan.default_cert | length == 0 %}
+{% macro to_caddy() %}
+            proxy_pass $cover_caddy;
+            proxy_ssl_server_name on;
+            proxy_ssl_name $host;
+            proxy_set_header Host $host;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $cover_connection;
+            proxy_buffering off;
+            proxy_request_buffering off;
+            proxy_read_timeout 1h;
+            proxy_send_timeout 1h;
+            client_max_body_size 0;
+{% endmacro %}
+# Managed by Ansible: roles/install_vpn_caddy_caddy/cover/nginx.conf.j2,
+# see the role's README. Changes made here are overwritten.
+
+user  nginx;
+worker_processes  2;
+
+error_log  /var/log/nginx/error.log warn;
+pid        /run/nginx.pid;
+
+events {
+    worker_connections  1024;
+}
+
+# What REALITY forwards arrives here. Nothing is decrypted at this level: the
+# ClientHello alone decides who answers.
+stream {
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    map_hash_bucket_size 128;
+
+    map $ssl_preread_server_name $cover_by_sni {
+        hostnames;
+        default  {{ caddy ~ ':443' if degraded else '127.0.0.1:8443' }};
+{% for name in plan.passthrough if not degraded %}
+        {{ name }}  {{ caddy }}:443;
+{% endfor %}
+    }
+
+    # ACME TLS-ALPN-01 validations are Caddy's.
+    map $ssl_preread_alpn_protocols $cover_backend {
+        ~\bacme-tls/1\b  {{ caddy }}:443;
+        default          $cover_by_sni;
+    }
+
+    server {
+        listen 443;
+        ssl_preread on;
+        proxy_connect_timeout 5s;
+        proxy_pass $cover_backend;
+    }
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$host"';
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile        on;
+    keepalive_timeout  65;
+
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    map_hash_bucket_size 128;
+    server_names_hash_bucket_size 128;
+
+    map $http_upgrade $cover_connection {
+        default  upgrade;
+        ''       close;
+    }
+
+    # Port 80, the way an nginx site answers it. ACME HTTP-01 stays Caddy's.
+    server {
+        listen 80 default_server;
+        server_name _;
+
+        location ^~ /.well-known/acme-challenge/ {
+            set $cover_caddy http://{{ caddy }}:80;
+            proxy_pass $cover_caddy;
+            proxy_set_header Host $host;
+        }
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+{% if not degraded %}
+
+    # The certificates are Caddy's, copied to {{ caddy_cover_cert_root }} by
+    # install_webfeatures_certcopy. A path with a variable is read at the
+    # handshake, so a renewed certificate needs no reload.
+    map $ssl_server_name $cover_cert {
+        hostnames;
+        default  {{ plan.default_cert }};
+{% for name, dir in plan.certs | dictsort %}
+        {{ name }}  {{ dir }};
+{% endfor %}
+    }
+
+    ssl_certificate        {{ caddy_cover_cert_root }}/$cover_cert/fullchain.pem;
+    ssl_certificate_key    {{ caddy_cover_cert_root }}/$cover_cert/privkey.pem;
+    ssl_certificate_cache  max=256 inactive=1d valid=1h;
+
+    # A handshake naming no site of this host.
+    server {
+        listen 127.0.0.1:8443 ssl default_server;
+        http2 on;
+        server_name _;
+{% if caddy_cover_unknown_sni == 'reject' %}
+        ssl_reject_handshake on;
+{% else %}
+
+        root   {{ caddy_cover_static_root }};
+        index  index.html index.htm;
+{% endif %}
+    }
+
+    # The fake site.
+    server {
+        listen 127.0.0.1:8443 ssl;
+        http2 on;
+        server_name {{ plan.static | join(' ') }};
+
+        root   {{ caddy_cover_static_root }};
+        index  index.html index.htm;
+{% if path_to_internal_services_base | default('') | length > 0 %}
+
+        # The internal services Caddy publishes under these names.
+        location ^~ /{{ path_to_internal_services_base }}/ {
+            set $cover_caddy https://{{ caddy }}:443;
+{{ to_caddy() }}        }
+{% endif %}
+    }
+{% if plan.managed | length > 0 %}
+
+    # The other sites of Caddy: terminated here, so that the TLS a client
+    # meets is nginx's under every name, then handed to Caddy as they are.
+    server {
+        listen 127.0.0.1:8443 ssl;
+        http2 on;
+        server_name {{ plan.managed | join(' ') }};
+
+        location / {
+            set $cover_caddy https://{{ caddy }}:443;
+{{ to_caddy() }}        }
+    }
+{% endif %}
+{% endif %}
+}

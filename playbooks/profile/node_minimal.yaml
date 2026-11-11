@@ -12,6 +12,7 @@
 - import_playbook: ../anti_censorship/node/remna.yaml
 - import_playbook: ../anti_censorship/node/zapret.yaml
 - import_playbook: ../reverse_proxy/certcopy.yaml
+- import_playbook: ../reverse_proxy/cover.yaml
 
 # Step 3: Install backup tools
 - import_playbook: ../backup/node/rclone.yaml
