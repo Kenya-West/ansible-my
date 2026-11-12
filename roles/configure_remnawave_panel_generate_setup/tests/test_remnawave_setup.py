@@ -1307,8 +1307,9 @@ class HopTests(unittest.TestCase):
             items.append(peer)
 
         def ipv6_forwarder(items, opts):
-            self.node_of(items, 'shared-exit')['hops'] = {'egress': {'interface': 'ens4',
-                                                                     'family': 'ipv6'}}
+            # Hidden behind an entry of Russian exits, it would have to dial them.
+            self.node_of(items, 'eu-tail')['hops']['egress'] = {'interface': 'ens4',
+                                                                'family': 'ipv6'}
 
         def typo(items, opts):
             self.node_of(items, 'eu-tail')['hops'] = {'form': ['shared-exit']}
@@ -1321,10 +1322,51 @@ class HopTests(unittest.TestCase):
                 (twice, 'names shared-exit twice'),
                 (no_chain_domain, r'eu-tail needs exactly one chain \(chain-location\) domain'),
                 (round_robin_disagrees, 'declare different hop relations'),
-                (ipv6_forwarder, 'family of shared-exit is ipv6'),
+                (ipv6_forwarder, 'family of eu-tail is ipv6, but it would forward to net-russia'),
                 (typo, 'unknown keys form')):
             with self.subTest(change=change.__name__):
                 self.refused(change, message)
+
+    def test_an_ipv6_egress_node_is_named_so_and_is_no_automatic_entry(self):
+        items, opts = hop_scenario()
+        items.append(hop_node('eu-v6', 'NL', 'global', 'net-europe-9',
+                              {'egress': {'interface': 'ens3', 'family': 'ipv6'}},
+                              extra=['chain-europe-9']))
+        opts['outbounds'].append({'address': 'net-europe-9.example.test', 'tag': 'out-chain-9'})
+        model = setup.remnawave_model(items, opts)
+        mine = [h for h in model['hosts'] if h['exit'] == 'net-europe-9.example.test']
+        self.assertEqual(sorted(h['remark'] for h in mine), [
+            '🇳🇱 EU-3 (IPv6)', '🇳🇱 EU-3 (IPv6) | by 🇷🇺 RU-1', '🇳🇱 EU-3 (IPv6) | by 🇷🇺 RU-2'])
+        self.assertFalse([h for h in model['hosts'] if h['entry'] == 'chain-europe-9.example.test'])
+        opts['remark_egress_suffix'] = {}
+        model = setup.remnawave_model(items, opts)
+        self.assertIn('🇳🇱 EU-3', [h['remark'] for h in model['hosts']])
+
+    def test_an_ipv6_node_may_enter_for_the_node_that_takes_traffic_from_it(self):
+        # IPv4 in, IPv6 out on eu-v6; eu-behind is reached through it only,
+        # and published under its own name alone.
+        items, opts = hop_scenario(visible=False)
+        items.append(hop_node('eu-v6', 'NL', 'global', 'net-europe-9',
+                              {'egress': {'interface': 'ens3', 'family': 'ipv6'}},
+                              protocol=XHTTP, extra=['chain-europe-9']))
+        items.append(hop_node('eu-behind', 'FR', 'global', 'net-europe-7',
+                              {'from': [{'host': 'eu-v6', 'hidden': False, 'show_entry': False}]}))
+        for label in ('net-europe-9', 'net-europe-7'):
+            opts['outbounds'].append({'address': label + '.example.test', 'tag': 'out-' + label})
+        model = setup.remnawave_model(items, opts)
+        behind = [h for h in model['hosts'] if h['exit'] == 'net-europe-7.example.test']
+        self.assertEqual([(h['remark'], h['address'], h['nodes'], h['config_profile'], short(h['paths']))
+                          for h in behind],
+                         [('🇫🇷 EU-2', 'chain-europe-9.example.test', ['eu-v6'], 'Default-xHTTP',
+                           ['chain-europe-9 > net-europe-7'])])
+        own = next(h for h in model['hosts'] if h['kind'] == 'direct'
+                   and h['exit'] == 'net-europe-9.example.test')
+        self.assertEqual((own['remark'], own['vless_route_id']), ('🇳🇱 EU-3 (IPv6)', 2))
+        self.assertEqual(verify_problems(model, panel_with_outbounds(model, opts))['problems'], [])
+        # show_entry as the node's default, and its usual form.
+        items[-1]['hops'] = {'from': ['eu-v6'], 'hidden': False}
+        model = setup.remnawave_model(items, opts)
+        self.assertIn('🇫🇷 EU-2 | by 🇳🇱 EU-2', [h['remark'] for h in model['hosts']])
 
     def test_an_auto_pair_whose_tails_meet_is_skipped_with_a_warning(self):
         items, opts = hop_scenario()

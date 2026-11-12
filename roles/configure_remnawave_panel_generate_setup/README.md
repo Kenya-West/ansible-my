@@ -345,7 +345,7 @@ clients: `remna_node_hops` in its host_vars
 remna_node_hops:
   from:                       # the Ansible hosts this node takes traffic from
     - play2go-de-7            # a hostname, or
-    - host: kimaro-de-11      # {host, hidden}
+    - host: kimaro-de-11      # {host, hidden, show_entry}
       hidden: false
   hidden: true                # what a relation without `hidden` is
   publish_direct: false       # keep this node's own hosts as well
@@ -366,7 +366,30 @@ balanced, see below.
 **Visible** (`hidden: false`): the relation publishes `D | by U`, entered
 through U's chain domain. D has no direct host of its own, and is no exit of
 automatic chains, unless it says `publish_direct: true`; U keeps exiting its
-own traffic.
+own traffic. With `show_entry: false` (per relation, or as the node's
+default) the host is published under D's name alone - `🇫🇷 EU-6` instead of
+`🇫🇷 EU-6 | by 🇳🇱 EU-4` - so the node dialed is not named; a node can have one
+such relation only, as remarks are unique.
+
+**IPv4 in, IPv6 out.** A node whose `egress.family` is `ipv6` exits its own
+traffic over IPv6 and is named so: `🇳🇱 EU-7 (IPv6)`
+(`vpn_server_remnawave_hosts_remark_egress_suffix`; a name from
+`vpn_server_remnawave_hosts_labels` stays as written). It is no automatic
+chain entry, but it may be the upstream of relations: its egress routes IPv4
+to the nodes naming it in `from`, and to nothing else. Together:
+
+```yaml
+# host_vars/netrum-nl-5/...            # host_vars/inet-fr-1/...
+remna_node_hops:                       remna_node_hops:
+  egress:                                from:
+    interface: ens3                        - host: netrum-nl-5
+    family: ipv6                             hidden: false
+                                             show_entry: false
+```
+
+publishes `🇳🇱 EU-7 (IPv6)` (in over IPv4, out over IPv6 at netrum-nl-5) and
+`🇫🇷 EU-6` (dialed at netrum-nl-5, out at inet-fr-1), and nothing dialing
+inet-fr-1 itself.
 
 Refused, with the hosts named: a cycle of relations (`play2go-de-7 →
 senko-de-5 → play2go-de-7`), a hidden relation across censorship geos (it
@@ -375,8 +398,9 @@ a hidden relation into an exclusive node from outside its profile (shared
 users would exit there), a host naming itself (a second address of the same
 machine is `egress`), a host that is no node of this panel, nodes behind one
 domain declaring different relations, a visible upstream without exactly one
-chain domain, and an `egress.family: ipv6` node that forwards to other nodes
-(their domains have IPv4 records only). An automatic pair whose two tails
+chain domain, and an `egress.family: ipv6` node that would forward to a node
+not naming it in `from` (node domains have IPv4 records only, and its IPv4
+is open to those nodes alone). An automatic pair whose two tails
 share a node is skipped with a warning.
 
 ### User types and local traffic

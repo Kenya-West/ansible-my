@@ -94,11 +94,16 @@
   failed_when: false
   when: not ansible_check_mode
 
-- name: The container must leave with another address than the host
+# The egress interface may be the one clients come in on, in the other family
+# (IPv4 in, IPv6 out on one NIC): the container then leaves with that
+# interface's own address, as the host does. So: never as ansible_host, and
+# either with an address of the interface or with another one than the host.
+- name: The container must leave through the egress interface, never as ansible_host
   ansible.builtin.assert:
     that:
       - remna_egress_container_ip | length > 0
-      - remna_egress_container_ip != remna_egress_host_ip
+      - remna_egress_container_ip != ansible_host
+      - remna_egress_container_ip in remna_egress_iface_addresses or remna_egress_container_ip != remna_egress_host_ip
     fail_msg: >-
       Over IPv{{ item.0.item }}, the remna container of {{ inventory_hostname }} leaves as
       {{ remna_egress_container_ip or 'nothing (the probe failed)' }} and the host as
@@ -119,4 +124,57 @@
       {{ ([remna_egress_iface.ipv4.address | default('')]
           + (remna_egress_iface.ipv4_secondaries | default([]) | map(attribute='address') | list)
           + (remna_egress_iface.ipv6 | default([]) | map(attribute='address') | list)) | select | list }}
+  when: not ansible_check_mode
+
+- name: Ask from inside the container in the family that must stay in
+  become: true
+  become_user: root
+  ansible.builtin.command:
+    argv: [nsenter, -t, "{{ remna_egress_pid.stdout }}", -n, curl, -s, -m, "8", "{{ remna_egress_probe[item] }}"]
+  loop: "{{ remna_egress_blocked_families }}"
+  register: remna_egress_seen_blocked
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: The container must not leave in the other family at all
+  ansible.builtin.assert:
+    that:
+      - item.stdout | default('') | regex_findall('(?m)^ip=') | length == 0
+    fail_msg: >-
+      The remna container of {{ inventory_hostname }} leaves over IPv{{ item.item }} as
+      {{ item.stdout | default('') | regex_findall('(?m)^ip=([0-9a-fA-F.:]+)') | first | default('?') }},
+      but remna_node_hops.egress.family is {{ remna_node_egress_family }}.
+    quiet: true
+  loop: "{{ remna_egress_seen_blocked.results | default([]) }}"
+  loop_control:
+    label: "IPv{{ item.item }}"
+  when: not ansible_check_mode
+
+# Docker's resolver asks an upstream that is not on the host's loopback from
+# inside the container's namespace, where one family is shut.
+- name: The container must still resolve names
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - "{{ remna_node_egress_container }}"
+      - node
+      - -e
+      - "require('dns').lookup('one.one.one.one',(e,a)=>{if(e){console.error(e.message);process.exit(1)}console.log(a)})"
+  register: remna_egress_dns
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Names must resolve inside the container
+  ansible.builtin.assert:
+    that:
+      - remna_egress_dns.rc == 0
+    fail_msg: >-
+      The remna container of {{ inventory_hostname }} cannot resolve names
+      ({{ remna_egress_dns.stderr | default('') | trim }}). With egress family
+      {{ remna_node_egress_family }}, the host's DNS servers must be reachable in that
+      family, or be a resolver on the host's loopback.
+    quiet: true
   when: not ansible_check_mode

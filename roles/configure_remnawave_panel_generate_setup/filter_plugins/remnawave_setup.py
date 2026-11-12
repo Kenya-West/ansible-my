@@ -747,8 +747,8 @@ def _uuid_route(uuid):
 
 # --- hops between nodes (remna_node_hops) -----------------------------------
 
-_HOPS_KEYS = ('from', 'hidden', 'publish_direct', 'egress')
-_HOPS_FROM_KEYS = ('host', 'hidden')
+_HOPS_KEYS = ('from', 'hidden', 'show_entry', 'publish_direct', 'egress')
+_HOPS_FROM_KEYS = ('host', 'hidden', 'show_entry')
 _EGRESS_KEYS = ('interface', 'family', 'gateway')
 _EGRESS_FAMILIES = ('ipv4', 'ipv6', 'dual')
 _FINAL = 0
@@ -775,6 +775,7 @@ def _hops_of(node):
         raise AnsibleFilterError('remna_node_hops of %s has unknown keys %s; it takes %s'
                                  % (name, ', '.join(unknown), ', '.join(_HOPS_KEYS)))
     hidden_default = _as_bool(raw.get('hidden', True))
+    show_default = _as_bool(raw.get('show_entry', True))
     items = raw.get('from') or []
     if isinstance(items, (str, dict)):
         items = [items]
@@ -800,8 +801,10 @@ def _hops_of(node):
             raise AnsibleFilterError('remna_node_hops.from of %s names %s twice' % (name, host))
         seen.add(host)
         hidden = item.get('hidden')
+        shown = item.get('show_entry')
         relations.append({'host': host,
-                          'hidden': hidden_default if hidden is None else _as_bool(hidden)})
+                          'hidden': hidden_default if hidden is None else _as_bool(hidden),
+                          'show_entry': show_default if shown is None else _as_bool(shown)})
     egress = raw.get('egress') or {}
     if not isinstance(egress, dict):
         raise AnsibleFilterError('remna_node_hops.egress of %s must be a mapping, got %r'
@@ -874,6 +877,9 @@ class _Hops(object):
                 self.entry_of.setdefault(host, []).append(slot)
         self.hidden_down = {}
         self.visible = []
+        # (upstream domain, downstream domain) of the visible relations
+        # published under the downstream's name alone (show_entry: false).
+        self.unnamed_entry = set()
         self.relations = []
         edges = {}
         for node in nodes:
@@ -887,6 +893,9 @@ class _Hops(object):
                 else:
                     self.visible.append((self.entry_of[relation['host']][0],
                                          self.exit_of[node['name']][0]))
+                    if not relation['show_entry']:
+                        self.unnamed_entry.add((self.entry_of[relation['host']][0]['domain'],
+                                                self.exit_of[node['name']][0]['domain']))
         cycle = _find_cycle(edges)
         if cycle:
             raise AnsibleFilterError(
@@ -962,6 +971,14 @@ class _Hops(object):
                 'Nodes behind one domain run the same routing, so give them the same '
                 'remna_node_hops.from and name all of them wherever one is named.'
                 % (slot['domain'], ', '.join(sorted(views))))
+
+    def egress_family(self, slot):
+        """The family a domain's nodes leave in through an egress interface of
+        their own (remna_node_hops.egress), when they all agree; else ''."""
+        families = set(self.node[h]['hop']['egress']['family']
+                       if self.node[h]['hop']['egress']['interface'] else ''
+                       for h in slot['hosts'])
+        return families.pop() if len(families) == 1 else ''
 
     def published(self, slot):
         """Whether a domain is published on its own: its nodes take traffic from
@@ -1053,6 +1070,9 @@ def remnawave_model(nodes, options):
     global_entries = _as_bool(options.get('entry_global_for_non_global', False))
     entries = [e for e in entries if e['country'] in entry_countries
                or (global_entries and e['scopes'][0]['kind'] == 'global')]
+    # A node leaving over IPv6 only cannot dial another node (their domains
+    # have IPv4 records only), so it is an exit and never an automatic entry.
+    entries = [e for e in entries if hops.egress_family(e) != 'ipv6']
     pairs = _chain_pairs(exits, entries, options)
     # A visible relation publishes its own "D | by U"; an automatic pair of the
     # same two domains would collide with it. A pair whose tails share a node
@@ -1180,6 +1200,15 @@ def remnawave_model(nodes, options):
                 for slot in members:
                     slot['display'] = exclusive_format.format(
                         name=slot['display'], profile=group)
+
+    # A node whose own traffic leaves in another family than clients reach it
+    # in says so in its name: "🇳🇱 EU-6 (IPv6)".
+    egress_suffix = options.get('remark_egress_suffix')
+    if egress_suffix is None:
+        egress_suffix = {'ipv6': ' (IPv6)'}
+    # Only as an exit: entered for another node, it hands over in IPv4.
+    for slot in named_exits:
+        slot['display'] += str((egress_suffix or {}).get(hops.egress_family(slot)) or '')
 
     # --- route ids: what each node does with the traffic it is handed -------
     # A route id is an action: where a node sends what arrives carrying it
@@ -1353,17 +1382,25 @@ def remnawave_model(nodes, options):
             'final_geos': sorted(set(geo_of_domain[d] for d in finals(key))),
         })
 
-    # A node that egresses over IPv6 only cannot dial other nodes: their
-    # domains carry A records only.
+    # A node that egresses over IPv6 only is kept from IPv4 altogether, but
+    # for the nodes that take traffic from it (remna_node_hops.from names it):
+    # its egress routes IPv4 to exactly those (roles/install_vpn_caddy_remna).
+    # Anything else it would have to dial has IPv4 records only.
     for route in routes:
         for domain in route['performed_by']:
-            slot = next(s for s in used if s['domain'] == domain)
+            slot = slot_by_domain[domain]
             for host in slot['hosts']:
-                if hops.node[host]['hop']['egress']['family'] == 'ipv6':
+                if hops.node[host]['hop']['egress']['family'] != 'ipv6':
+                    continue
+                for target in route['next']:
+                    takers = slot_by_domain[target['address']]['hosts']
+                    if all(host in [r['host'] for r in hops.node[t]['hop']['from']] for t in takers):
+                        continue
                     raise AnsibleFilterError(
-                        'remna_node_hops.egress.family of %s is ipv6, but it forwards to %s, '
-                        'whose domains have IPv4 records only; use dual'
-                        % (host, ', '.join(n['address'] for n in route['next'])))
+                        'remna_node_hops.egress.family of %s is ipv6, but it would forward to '
+                        '%s, which does not take traffic from it (remna_node_hops.from) and has '
+                        'IPv4 records only; use dual, or keep %s out of that path'
+                        % (host, target['address'], host))
 
     # The rules snippet: local traffic first (a node's own decision, split
     # per censored geo), then one rule per action handing to one next hop.
@@ -1496,7 +1533,12 @@ def remnawave_model(nodes, options):
         return {
             'kind': 'chain',
             'via': kind,
-            'remark': _remark(exit_slot, labels) + separator + _remark(entry, labels),
+            # A relation saying show_entry: false is published under its
+            # exit's name alone: the node dialed stays unnamed.
+            'remark': _remark(exit_slot, labels) + (
+                '' if kind == 'relation'
+                and (entry['domain'], exit_slot['domain']) in hops.unnamed_entry
+                else separator + _remark(entry, labels)),
             'address': entry['domain'],
             'sni': '',
             'vless_route_id': ids[key],

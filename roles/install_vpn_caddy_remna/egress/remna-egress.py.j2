@@ -41,7 +41,16 @@ MARK = {{ remna_node_egress_mark | int }}
 TABLE = {{ remna_node_egress_table | int }}
 PRIORITY = {{ remna_node_egress_rule_priority | int }}
 
+HOP_DOMAINS = {{ remna_node_egress_hop_domains | default([]) | list | to_json }}
+CACHE = '/var/lib/remna-egress/hops.json'
+
 FAMILIES = {'ipv4': (4,), 'ipv6': (6,), 'dual': (4, 6)}[FAMILY]
+# An IPv6-only egress still hands traffic to the nodes that take it from this
+# one (HOP_DOMAINS), whose names have IPv4 addresses only: the IPv4 table then
+# holds a route to each of those addresses and nothing else, so IPv4 reaches
+# them and stays shut for everything else.
+HOPS_ONLY = (4,) if FAMILY == 'ipv6' and HOP_DOMAINS else ()
+ROUTED = FAMILIES + HOPS_ONLY
 NFT_TABLE = 'remna_egress'
 
 
@@ -112,6 +121,14 @@ def nft_ruleset(others):
         if addresses:
             guard += ('    %s saddr { %s } ct direction original oifname != "br-*" '
                       'oifname != "docker0" drop\n' % (field, ', '.join(addresses)))
+    # Clients arriving on the egress interface answer through it too - but
+    # only in a family that leaves through it. The interface may also be the
+    # one clients come in on in the other family (IPv4 in, IPv6 out on one
+    # NIC): those connections stay unmarked and answer by the main table,
+    # instead of meeting the unreachable rule of a family that is kept in.
+    inbound = ''.join(
+        '    meta nfproto %s iifname "%s" ct state new ct mark set %d\n'
+        % ({4: 'ipv4', 6: 'ipv6'}[family], IFACE, MARK) for family in FAMILIES)
     return (
         'table inet %(t)s {}\n'
         'delete table inet %(t)s\n'
@@ -123,11 +140,11 @@ def nft_ruleset(others):
         '  }\n'
         '  chain forward {\n'
         '    type filter hook forward priority -10; policy accept;\n'
-        '    iifname "%(i)s" ct state new ct mark set %(m)d\n'
+        '%(n)s'
         '    iifname "%(b)s" ct direction original oifname != { "%(i)s", "%(b)s" } drop\n'
         '%(g)s'
         '  }\n'
-        '}\n' % {'t': NFT_TABLE, 'b': BRIDGE, 'i': IFACE, 'm': MARK, 'g': guard})
+        '}\n' % {'t': NFT_TABLE, 'b': BRIDGE, 'i': IFACE, 'm': MARK, 'g': guard, 'n': inbound})
 
 
 def nft_present():
@@ -144,13 +161,13 @@ def rules(family):
 def ensure_rules(family):
     have = rules(family)
     wanted = [(PRIORITY + 1, ['unreachable'])]
-    if family in FAMILIES:
+    if family in ROUTED:
         wanted.insert(0, (PRIORITY, ['lookup', str(TABLE)]))
     for priority, action in wanted:
         if any(r.get('priority') == priority for r in have):
             continue
         run(['ip', '-%d' % family, 'rule', 'add', 'fwmark', str(MARK), 'priority', str(priority)] + action)
-    if family not in FAMILIES:
+    if family not in ROUTED:
         for r in have:
             if r.get('priority') == PRIORITY:
                 run(['ip', '-%d' % family, 'rule', 'del', 'priority', str(PRIORITY)], check=False)
@@ -216,6 +233,56 @@ def ensure_table(family):
     return False
 
 
+def hop_addresses():
+    """{domain: [IPv4 addresses]} of the nodes taking traffic from this one,
+    resolved now; a name that does not resolve keeps its last known addresses,
+    so a resolver not up yet at boot does not cut the hop."""
+    import socket
+    try:
+        with open(CACHE) as cached:
+            known = json.load(cached)
+    except (OSError, ValueError):
+        known = {}
+    found = {}
+    for domain in HOP_DOMAINS:
+        try:
+            found[domain] = sorted(set(info[4][0] for info in socket.getaddrinfo(
+                domain, None, socket.AF_INET, socket.SOCK_STREAM)))
+        except OSError:
+            found[domain] = known.get(domain) or []
+    if found != known:
+        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+        with open(CACHE + '.new', 'w') as target:
+            json.dump(found, target)
+        os.replace(CACHE + '.new', CACHE)
+    return found
+
+
+def hop_routes(family):
+    return sorted(r['dst'] for r in ip_json(family, 'route', 'show', 'table', str(TABLE))
+                  if r.get('dst') not in (None, 'default') and '/' not in str(r['dst']))
+
+
+def ensure_hop_table(family):
+    """The table of a family open to the next hops only: one host route each."""
+    wanted = sorted(set(a for addresses in hop_addresses().values() for a in addresses))
+    via = gateway(family)
+    for address in wanted:
+        onlink = any(ipaddress.ip_address(address) in ipaddress.ip_network(p, strict=False)
+                     for p in connected(family))
+        if onlink:
+            run(['ip', '-%d' % family, 'route', 'replace', address, 'dev', IFACE, 'table', str(TABLE)])
+        elif via:
+            run(['ip', '-%d' % family, 'route', 'replace', address, 'via', via, 'dev', IFACE,
+                 'table', str(TABLE)])
+        else:
+            say('no IPv%d gateway found for %s: the next hop %s stays out of reach; set '
+                'remna_node_hops.egress.gateway' % (family, IFACE, address))
+    for route in ip_json(family, 'route', 'show', 'table', str(TABLE)):
+        if route.get('dst') is not None and route['dst'] not in wanted:
+            run(['ip', '-%d' % family, 'route', 'del', route['dst'], 'table', str(TABLE)], check=False)
+
+
 def table_default(family):
     return [r for r in ip_json(family, 'route', 'show', 'table', str(TABLE)) if r.get('dst') == 'default']
 
@@ -265,6 +332,8 @@ def apply(with_container=True):
     if os.path.exists('/sys/class/net/%s' % IFACE):
         for family in FAMILIES:
             ensure_table(family)
+        for family in HOPS_ONLY:
+            ensure_hop_table(family)
     else:
         say('interface %s is missing: the container\'s traffic stays blocked' % IFACE)
     sysctls()
@@ -282,11 +351,20 @@ def check(found=None, with_container=True):
         problems.append('nft table inet %s is missing' % NFT_TABLE)
     for family in (4, 6):
         priorities = set(r.get('priority') for r in rules(family))
-        wanted = {PRIORITY, PRIORITY + 1} if family in FAMILIES else {PRIORITY + 1}
+        wanted = {PRIORITY, PRIORITY + 1} if family in ROUTED else {PRIORITY + 1}
         if not wanted <= priorities:
             problems.append('IPv%d rules %s are missing' % (family, sorted(wanted - priorities)))
         if family in FAMILIES and not table_default(family):
             problems.append('IPv%d table %d has no default route' % (family, TABLE))
+        if family in HOPS_ONLY:
+            if table_default(family):
+                problems.append('IPv%d table %d has a default route, but only the next hops '
+                                'may be reached in IPv%d' % (family, TABLE, family))
+            routed = hop_routes(family)
+            for domain, addresses in sorted(hop_addresses().items()):
+                if not addresses or not set(addresses) <= set(routed):
+                    problems.append('no IPv%d route to the next hop %s (%s)' % (
+                        family, domain, ', '.join(addresses) or 'its name does not resolve'))
     found = found if found is not None or not with_container else container()
     if found and with_container:
         ok, why = container_default_ok(found[0])
@@ -301,7 +379,9 @@ def check(found=None, with_container=True):
     for problem in problems:
         say(problem)
     if not problems:
-        say('ok: %s leaves through %s (%s)' % (CONTAINER, IFACE, FAMILY))
+        say('ok: %s leaves through %s (%s%s)' % (
+            CONTAINER, IFACE, FAMILY,
+            ', IPv4 to %s only' % ', '.join(HOP_DOMAINS) if HOPS_ONLY else ''))
     return 1 if problems else 0
 
 

@@ -117,6 +117,10 @@ vpn_server_remnawave_hosts_labels: {}
 vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
 # The remark of an exit of an exclusive profile, numbered within that profile.
 vpn_server_remnawave_hosts_remark_exclusive_format: '{name} · {profile}'
+# Appended to the generated name of a node whose own traffic leaves through an
+# egress interface in this family (remna_node_hops.egress.family).
+vpn_server_remnawave_hosts_remark_egress_suffix:
+  ipv6: ' (IPv6)'
 
 # What to do with hosts carrying the primary tags that the inventory no longer
 # produces. It can be: ignore, disable, delete.

@@ -45,6 +45,7 @@ remna_node_panel_exclusive_profile: ''
 #       - play2go-de-7         # a hostname, or
 #       - host: kimaro-de-11   # {host, hidden}
 #         hidden: false        # publishes "<this node> | by kimaro-de-11"
+#         show_entry: false    # ... under this node's name alone
 #     hidden: true             # what a relation without `hidden` is
 #     publish_direct: false    # keep this node's own hosts too
 #     egress:                  # a second address of this same machine
@@ -61,6 +62,7 @@ remna_node_panel_exclusive_profile: ''
 # hops of their own.
 remna_node_hops_defaults:
   hidden: true
+  show_entry: true
   publish_direct: false
   egress:
     family: ipv4

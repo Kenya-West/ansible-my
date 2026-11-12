@@ -155,9 +155,38 @@ sudo nsenter -t "$(docker inspect -f '{{.State.Pid}}' remna)" -n curl -s https:/
   off everywhere else, and `apply` re-asserts it.
 - `accept_ra` is raised from 1 to 2 where it is 1, so a host still learning
   its route from router advertisements keeps it once forwarding is on.
-- `ipv6` alone suits only an exit. The panel refuses it on a node forwarding
-  to other nodes, whose domains have IPv4 records only.
-- IPv6 was not part of the lab.
+- **`ipv6` and next hops.** Node domains have IPv4 records only, so an
+  `ipv6` node could not hand traffic to another node. For the nodes that
+  name it in their `remna_node_hops.from` (`remna_node_egress_hop_domains`,
+  derived from the inventory) the IPv4 table gets one host route per address
+  their direct domains resolve to, and no default route: IPv4 reaches those
+  nodes, from the interface's IPv4 address, and nothing else. The names are
+  resolved on the node on every heal, and the last answer is kept
+  (`/var/lib/remna-egress/hops.json`) for when the resolver is not up. The
+  panel refuses an `ipv6` node on any other forwarding path.
+- **One interface, IPv4 in and IPv6 out.** The egress interface may be the
+  one `ansible_host` is on:
+
+  ```yaml
+  remna_node_hops:
+    egress: {interface: ens3, family: ipv6}
+  ```
+
+  Clients keep connecting over IPv4, and everything the node opens leaves
+  with the interface's IPv6 address. The node's own IPv4 is blocked, so a
+  site without an IPv6 address is unreachable through it. Inbound
+  connections on the egress interface are marked only in the family that
+  leaves through it, so the IPv4 clients answer by the main table. After
+  deploying, the role checks that the container leaves over IPv6 with an
+  address of the interface, cannot leave over IPv4, and still resolves names.
+  Docker asks DNS servers that are not on the host's loopback from inside
+  the container, so they must be reachable over IPv6.
+- This single-interface case was tested in a lab (one NIC with both
+  families, docker-ce 29): IPv6 out, IPv4 blocked, IPv4 and IPv6 clients
+  served, and a deleted route blocked then healed; IPv4 reaching the next
+  hop only, following its name to a new address, surviving a name that
+  stopped resolving, and `check` reporting a deleted hop route. `dual` and
+  IPv6 on a second interface were not.
 
 Variables
 ---------
@@ -170,6 +199,7 @@ Variables
 | `remna_node_egress_network` / `_bridge` | `remna-egress` / `br-remna-eg` | Docker network and bridge name |
 | `remna_node_egress_subnet_ipv4` / `_ipv6` | `10.247.241.0/29` / `fd52:656d:6e61:2401::/64` | Its subnets; must overlap nothing the host routes |
 | `remna_node_egress_mark` / `_table` / `_rule_priority` | `9217` (0x2401) / `2401` / `2401` | Firewall mark, routing table, ip rule priorities (and the next one) |
+| `remna_node_egress_hop_domains` | from the inventory | Direct domains of the nodes taking traffic from this one; the only IPv4 destinations of an `ipv6` egress |
 | `remna_node_egress_heal_interval` | `60s` | How often everything is put back and checked |
 | `remna_node_egress_probe_url_ipv4` / `_ipv6` | Cloudflare trace by IP | Asked after deploying to see the addresses |
 

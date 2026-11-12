@@ -92,6 +92,26 @@ remna_node_egress: >-
 remna_node_egress_interface: "{{ remna_node_egress.interface | default('', true) }}"
 remna_node_egress_family: "{{ remna_node_egress.family | default('ipv4', true) }}"
 remna_node_egress_gateway: "{{ remna_node_egress.gateway | default('auto', true) }}"
+# The direct domains of the nodes that take traffic from this one (their
+# remna_node_hops.from names it). With an IPv6-only egress they are the only
+# IPv4 destinations the container may reach: their names have IPv4 addresses
+# only, resolved on the node itself and re-read on every heal.
+remna_node_egress_hop_domains: >-
+  {%- set out = [] -%}
+  {%- for host in groups[remna_node_egress_node_group] | default([]) if host != inventory_hostname -%}
+  {%-   set names = [] -%}
+  {%-   for item in [(hostvars[host].remna_node_hops | default({}, true))['from'] | default([], true)] | flatten -%}
+  {%-     set _ = names.append(item.host if item is mapping else item) -%}
+  {%-   endfor -%}
+  {%-   if inventory_hostname in names -%}
+  {%-     for entry in (hostvars[host].domains_keys | default({}, true)).remna_node | default([], true)
+                       if entry.type == vpn_deployment_domain_prefix.net_location.type -%}
+  {%-       set _ = out.append(entry.domain) -%}
+  {%-     endfor -%}
+  {%-   endif -%}
+  {%- endfor -%}
+  {{ out | unique | sort }}
+remna_node_egress_node_group: vpn_caddy
 remna_node_egress_enabled: "{{ remna_node_egress_interface | length > 0 }}"
 remna_node_egress_container: remna
 remna_node_egress_tool: /usr/local/sbin/remna-egress
@@ -111,3 +131,5 @@ remna_egress_probe:
   4: "{{ remna_node_egress_probe_url_ipv4 }}"
   6: "{{ remna_node_egress_probe_url_ipv6 }}"
 remna_egress_probe_families: "{{ {'ipv4': [4], 'ipv6': [6], 'dual': [4, 6]}[remna_node_egress_family] }}"
+# The family that must not leave at all (ipv4 for an ipv6 egress and back).
+remna_egress_blocked_families: "{{ {'ipv4': [6], 'ipv6': [4], 'dual': []}[remna_node_egress_family] }}"

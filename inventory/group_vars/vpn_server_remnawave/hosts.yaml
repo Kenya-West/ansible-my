@@ -85,6 +85,13 @@ vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
 # unique panel-wide, and an exclusive squad sees only its own exits.
 vpn_server_remnawave_hosts_remark_exclusive_format: '{name} · {profile}'
 
+# Appended to the generated name of a node whose own traffic leaves through an
+# egress interface (remna_node_hops.egress) in this family, while clients
+# reach it over IPv4: "🇳🇱 EU-6 (IPv6)". A name from
+# vpn_server_remnawave_hosts_labels is left as written.
+vpn_server_remnawave_hosts_remark_egress_suffix:
+  ipv6: ' (IPv6)'
+
 # ---------------------------------------------------------------------------
 # Chains
 # ---------------------------------------------------------------------------
