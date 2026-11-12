@@ -55,7 +55,9 @@ vpn_server_remnawave_hosts_prune: delete
 
 # A direct host takes its exit's profile. A chain host takes its exit's access
 # scope (global, location or exclusive), using the entry's transport.
-# The entry node still activates its own scope's profile for server routing.
+# The entry node still activates its own scope's profile for server routing,
+# so the squads shown a chain are also granted the entry's inbounds (squads
+# stage), and hosts are allow_only the squads granted their exit's scope.
 
 vpn_server_remnawave_hosts_port: 443
 vpn_server_remnawave_hosts_fingerprint: firefox

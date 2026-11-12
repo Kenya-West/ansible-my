@@ -294,6 +294,23 @@ and hold the users, so it only adds: no inbound is taken out of a squad, a
 squad missing from the panel is reported and not created, and tags are left
 alone.
 
+A chain host is attached to its exit's scope, but the client dials the
+**entry**, which runs its own profile and carries only the users of the squads
+holding one of *its* inbounds. So the model also grants every squad the
+inbounds of the entries its chains go through (`transit_profiles` in
+`squad_grants`): Default-Squad gets `Reverse-RU`'s for `🇩🇪 EU-1 | by 🇷🇺 RU-1`,
+Reverse-proxy gets `Default-Profile`'s for `🇷🇺 RU-1 | by 🇩🇪 EU-1`, an exclusive
+squad gets the entries of its exit's chains. Without it a client is shown the
+chain, completes the REALITY handshake at the entry and is refused there
+(`invalid request user id` in the node's access log; Xray clients show `n/a`);
+`verify` reports a squad shown a chain host that its entry node does not let in.
+
+Transit must not widen what a squad is shown, so hosts name their audience -
+the squads granted a profile of the exit's scope - with
+`internal_squads: allow_only`: every chain and relation host, and the direct
+hosts of location and exclusive exits. Only the direct hosts of global exits
+are shown to every holder of their inbound.
+
 The direct hosts of an exclusive exit are on its own inbound, which only its
 squads hold. Its chain hosts use the exclusive variant matching the entry's
 transport, and are shown only to squads granted the exit's primary profile

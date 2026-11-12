@@ -87,7 +87,10 @@ vpn_server_remnawave_config_profiles_protected:
 
 # --- internal squads ---------------------------------------------------------
 # The squads granted the inbounds of the profiles a selector picks, as
-# {squad, profiles}. Only ever adds inbounds; squads are never created.
+# {squad, profiles}: the audience of those profiles' exits. The role also
+# grants each squad the inbounds of the entry nodes its chains go through, as
+# an entry carries only the users of its own inbounds.
+# Only ever adds inbounds; squads are never created.
 vpn_server_remnawave_internal_squads_inbounds: []
 
 # --- nodes ------------------------------------------------------------------

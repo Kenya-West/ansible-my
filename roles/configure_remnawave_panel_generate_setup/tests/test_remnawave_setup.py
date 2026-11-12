@@ -349,6 +349,49 @@ class GenerationTests(unittest.TestCase):
         ])
         self.assertEqual(self.model['node_profiles']['ru-tcp']['config_profile'], 'Reverse-RU')
 
+    def test_chain_audience_is_let_in_at_the_entry(self):
+        # The entry runs its own profile and carries only the users of its own
+        # inbounds: the squads shown a chain are granted those too, or they
+        # are refused after the handshake (clients show n/a).
+        chains = [h for h in self.model['hosts'] if h['kind'] == 'chain'
+                  and h['exit'] == 'net-europe-1.example.test']
+        for host in chains:
+            self.assertEqual(host['internal_squads'], {'mode': 'allow_only', 'squads': ['Default-Squad']})
+        grant = next(g for g in self.model['squad_grants'] if g['squad'] == 'Default-Squad')
+        self.assertEqual(grant['profiles'], ['Default-Profile', 'Default-xHTTP'])
+        self.assertEqual(grant['transit_profiles'], ['Reverse-RU', 'Reverse-RU-xHTTP'])
+        self.assertEqual(grant['inbounds'], ['VLESS_TCP_REALITY', 'VLESS_REALITY_XHTTP',
+                                             'VLESS_TCP_REALITY_REVERSE_RU',
+                                             'VLESS_REALITY_XHTTP_REVERSE_RU'])
+        xenus = next(g for g in self.model['squad_grants'] if g['squad'] == 'Xenus-team')
+        self.assertIn('VLESS_TCP_REALITY_REVERSE_RU', xenus['inbounds'])
+
+    def test_transit_does_not_widen_who_sees_a_scope(self):
+        # A transit grant is not an audience: profiles keep their squads, and
+        # non-global direct hosts name theirs; global ones stay open.
+        reverse = next(p for p in self.model['profiles'] if p['name'] == 'Reverse-RU')
+        self.assertEqual(reverse['squads'], ['Reverse-proxy'])
+        direct = dict((h['exit'], h['internal_squads']) for h in self.model['hosts']
+                      if h['kind'] == 'direct')
+        self.assertEqual(direct, {
+            'net-europe-1.example.test': {'mode': 'exclude', 'squads': []},
+            'net-europe-2.example.test': {'mode': 'allow_only', 'squads': ['Xenus-team']},
+        })
+        model = setup.remnawave_model(*reverse_scenario())
+        for host in model['hosts']:
+            if host['kind'] == 'direct' and host['exit'].startswith('net-russia'):
+                self.assertEqual(host['internal_squads'],
+                                 {'mode': 'allow_only', 'squads': ['Reverse-proxy']})
+
+    def test_verify_rejects_a_chain_audience_not_let_in_at_the_entry(self):
+        panel = panel_for(self.model)
+        self.assertEqual(self.verify(panel), [])
+        squad = next(s for s in panel['internal_squads'] if s['name'] == 'Default-Squad')
+        squad['inbounds'] = [i for i in squad['inbounds'] if 'REVERSE_RU' not in i['tag']]
+        problems = self.verify(panel)
+        self.assertTrue(any('Default-Squad' in p and 'ru-tcp' in p and 'is not let in' in p
+                            for p in problems), problems)
+
     def test_exclusive_chain_gets_both_transports_and_keeps_restrictions(self):
         profiles = {p['name']: p for p in self.model['profiles']}
         self.assertIn('Xenus-team-xHTTP', profiles)
@@ -421,12 +464,15 @@ class GenerationTests(unittest.TestCase):
         ])
         self.assertEqual(len(self.model['hosts']), 6)
 
-    def verify(self, panel):
+    def verify_report(self, panel):
         return setup.remnawave_verify(panel, self.model, {
             'primary_tags': ['MANAGED_BY:ANSIBLE'], 'separator': ' | by ',
             'direct_route_id': 2, 'route_id_range': [400, 499],
             'rules_snippet': 'rules', 'outbounds_snippet': 'outbounds', 'fingerprint': 'firefox',
-        })['problems']
+        })
+
+    def verify(self, panel):
+        return self.verify_report(panel)['problems']
 
     def test_verify_accepts_compatible_chain_entry_profile(self):
         self.assertEqual(self.verify(panel_for(self.model)), [])
@@ -498,7 +544,11 @@ class ReverseChainTests(unittest.TestCase):
             self.assertEqual(host['nodes'], ['shared-exit'] if host['protocol'] == TCP else ['global-xhttp'])
             self.assertEqual(host['sni'], '')
             self.assertIs(host['override_sni_from_address'], True)
-            self.assertEqual(host['internal_squads'], {'mode': 'exclude', 'squads': []})
+            self.assertEqual(host['internal_squads'], {'mode': 'allow_only', 'squads': ['Reverse-proxy']})
+        # Entered at the global nodes, which carry only their own inbounds' users.
+        grant = next(g for g in model['squad_grants'] if g['squad'] == 'Reverse-proxy')
+        self.assertEqual(sorted(grant['transit_profiles']), ['Default-Profile', 'Default-xHTTP'])
+        self.assertIn('VLESS_TCP_REALITY', grant['inbounds'])
         forward = [h for h in model['hosts'] if h['kind'] == 'chain' and h['exit'].startswith('net-europe')]
         self.assertEqual(len(forward), 4)
         self.assertEqual([h['config_profile'] for h in forward],
@@ -1397,7 +1447,11 @@ class HopTests(unittest.TestCase):
         user = {'username': 'svc', 'vlessUuid': SERVICE,
                 'activeInternalSquads': [{'name': 'Default-Squad'}]}
         problems = verify_problems(model, panel, service_user=user)['problems']
-        self.assertTrue(any('Service user svc cannot connect to node ru-tail' in p for p in problems))
+        # Default-Squad is let in at the RU nodes its chains enter, not at the
+        # exclusive exit.
+        self.assertTrue(any('Service user svc cannot connect to node exclusive-exit' in p
+                            for p in problems), problems)
+        self.assertFalse(any('cannot connect to node ru-tail' in p for p in problems))
         user['activeInternalSquads'] += [{'name': 'Reverse-proxy'}, {'name': 'Xenus-team'}]
         self.assertFalse([p for p in verify_problems(model, panel, service_user=user)['problems']
                           if 'Service user' in p])

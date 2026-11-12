@@ -565,7 +565,9 @@ def _squad_grants(profiles, grants):
             raise AnsibleFilterError('Every vpn_server_remnawave_internal_squads_inbounds '
                                      'item needs a squad, got %r' % (item,))
         if squad not in out:
-            out[squad] = {'squad': squad, 'inbounds': [], 'profiles': []}
+            # transit_profiles: profiles granted only to let the squad in at a
+            # chain's entry (remnawave_model), not to show it their hosts.
+            out[squad] = {'squad': squad, 'inbounds': [], 'profiles': [], 'transit_profiles': []}
             order.append(squad)
         for profile in profiles:
             if not _matches(item.get('profiles', {}), profile):
@@ -1491,6 +1493,14 @@ def remnawave_model(nodes, options):
     # --- the hosts ----------------------------------------------------------
     # A direct host uses its exit's profile. A chain host uses the exit's
     # access scope and the entry's transport, in either chaining direction.
+    #
+    # The entry node, though, runs its own profile and carries only the users
+    # of the squads holding one of its own inbounds: a user shown a chain but
+    # unknown to its entry completes the REALITY handshake and is refused
+    # there. So the audience of every chain - the squads granted its exit's
+    # scope - is granted the entry's inbounds as well (squad grants,
+    # "transit"). Holding those shows a squad the hosts attached to them, so
+    # every host but the direct ones of global exits names its audience.
     bind = options.get('chain_bind_nodes', 'entry')
     separator = options['remark_chain_separator']
     direct_route_id = options.get('direct_route_id')
@@ -1502,15 +1512,31 @@ def remnawave_model(nodes, options):
         key_of[(journey[0], journey[1]['domain'], journey[3]['domain'])] = key
 
     def restriction_of(exit_slot, what):
-        # Visibility follows the exit's access scope, never the entry's.
-        if exit_slot['scope_kind'] != 'exclusive':
-            return dict(unrestricted)
-        allowed = sorted(profile_by_name[exit_slot['profile']]['squads'])
+        # Visibility follows the exit's access scope, never the entry's: the
+        # squads granted a profile of that scope, whatever its transport.
+        allowed = sorted(set(
+            squad for p in profiles
+            if (p['kind'], p['scope']) == (exit_slot['scope_kind'], exit_slot['scope'])
+            for squad in p['squads']))
         if not allowed:
-            warnings.append('%s of exclusive exit %s are shown to no one: no internal squad '
-                            'is granted config profile %s'
-                            % (what, exit_slot['domain'], exit_slot['profile']))
+            warnings.append('%s of %s exit %s are shown to no one: no internal squad is granted '
+                            'a config profile of scope %s'
+                            % (what, exit_slot['scope_kind'], exit_slot['domain'],
+                               exit_slot['scope']))
         return {'mode': 'allow_only', 'squads': allowed}
+
+    grant_of = dict((g['squad'], g) for g in squad_grants)
+
+    def let_in(squads, entry):
+        """Grant ``squads`` the inbounds of the profile ``entry`` activates."""
+        profile = profile_by_name[entry['profile']]
+        for squad in squads:
+            grant = grant_of[squad]
+            if profile['name'] not in grant['profiles'] + grant['transit_profiles']:
+                grant['transit_profiles'].append(profile['name'])
+            for tag in profile['inbound_tags']:
+                if tag not in grant['inbounds']:
+                    grant['inbounds'].append(tag)
 
     def bound_to(exit_slot, entry):
         if bind in ('exit', 'both'):
@@ -1530,6 +1556,7 @@ def remnawave_model(nodes, options):
         client_profile = profile_by_key[(exit_slot['scope_kind'], exit_slot['scope'],
                                          entry['protocol'])]
         key = key_of[(kind, entry['domain'], exit_slot['domain'])]
+        let_in(restriction['squads'], entry)
         return {
             'kind': 'chain',
             'via': kind,
@@ -1546,7 +1573,7 @@ def remnawave_model(nodes, options):
             'protocol': entry['protocol'],
             'config_profile': client_profile['name'],
             'inbound': client_profile['inbound_tags'][0],
-            'internal_squads': restriction,
+            'internal_squads': dict(restriction, squads=list(restriction['squads'])),
             'exit': exit_slot['domain'],
             'entry': entry['domain'],
             'paths': path_list(entry, (exit_slot, None)),
@@ -1567,7 +1594,8 @@ def remnawave_model(nodes, options):
             'protocol': exit_slot['protocol'],
             'config_profile': exit_slot['profile'],
             'inbound': exit_slot['inbound'],
-            'internal_squads': dict(unrestricted),
+            'internal_squads': (dict(unrestricted) if exit_slot['scope_kind'] == 'global'
+                                else restriction_of(exit_slot, 'Direct hosts')),
             'exit': exit_slot['domain'],
             'entry': None,
             'paths': path_list(exit_slot, None),
@@ -2108,6 +2136,18 @@ def remnawave_verify(panel, model, options):
                                 % (describe(have), node.get('name')))
                 continue
             active = node.get('configProfile') or {}
+            if want['kind'] == 'chain' and want_restriction[0] == 'allow_only':
+                # The entry carries only the users of its own inbounds: a
+                # squad shown the chain but holding none of them is refused
+                # there after the handshake.
+                served = set(i.get('tag') for i in active.get('activeInbounds') or [])
+                for name in want_restriction[1]:
+                    if name in squad_tags and not served & squad_tags[name]:
+                        problems.append(
+                            'Squad %s is shown chain host %s but is not let in at its entry '
+                            'node %s: it holds none of the inbounds the node activates (%s)'
+                            % (name, describe(have), node.get('name'),
+                               ', '.join(sorted(served)) or '-'))
             if want['kind'] == 'chain' and active.get('activeConfigProfileUuid') != profile_uuid:
                 # A chain's advertised profile controls subscription access;
                 # the entry still runs its own profile and routing. Verify
