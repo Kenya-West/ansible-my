@@ -51,6 +51,8 @@ vpn_server_remnawave_hosts_adopt_untagged: false
 #             hand in the panel comes back on; retired hosts stay disabled
 vpn_server_remnawave_hosts_publish_state: enabled
 
+vpn_server_remnawave_hosts_prune: delete
+
 # A direct host takes its exit's profile. A chain host takes its exit's access
 # scope (global, location or exclusive), using the entry's transport.
 # The entry node still activates its own scope's profile for server routing.

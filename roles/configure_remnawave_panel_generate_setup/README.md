@@ -708,7 +708,7 @@ Node side, in `group_vars/vpn_caddy/remna.yaml` or a node's host_vars:
 | `..._domain_types_specific_filter` | `[chain-location]` | Domain types a chain host is entered through |
 | `vpn_server_remnawave_hosts_publish_state` | `present` | `present`, `disabled` or `enabled`, see [New hosts are disabled](#new-hosts-are-disabled) |
 | `vpn_server_remnawave_hosts_adopt_untagged` | `false` | Whether a generated host may take over a host of its remark without the primary tags |
-| `vpn_server_remnawave_hosts_prune` | `disable` | What to do with primary-tagged hosts the inventory no longer produces: `ignore`, `disable`, `delete` |
+| `vpn_server_remnawave_hosts_prune` | `delete` | What to do with primary-tagged hosts the inventory no longer produces: `ignore`, `disable`, `delete` |
 | `vpn_server_remnawave_hosts_port` | `443` | Port advertised to clients |
 | `vpn_server_remnawave_hosts_fingerprint` | `firefox` | uTLS fingerprint |
 | `vpn_server_remnawave_hosts_labels` | `{}` | Display names keyed by domain label, overriding the generated ones |
