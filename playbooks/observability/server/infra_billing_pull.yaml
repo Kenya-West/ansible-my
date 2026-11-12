@@ -1,0 +1,15 @@
+---
+# Half-duplex PULL: infra-billing -> existing host_vars files. Never writes to
+# infra-billing, never creates/removes files, skips hosts without a file or a
+# matching service (with a warning). Always preview first:
+#   ansible-playbook -i inventory/production.ini \
+#     playbooks/observability/server/infra_billing_pull.yaml --check --diff
+- name: Pull infra-billing service data into host_vars
+  hosts: analytics_server
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Pull billing data
+      ansible.builtin.include_role:
+        name: configure_infra_billing
+        tasks_from: pull

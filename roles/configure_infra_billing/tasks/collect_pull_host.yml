@@ -1,0 +1,19 @@
+---
+# Like collect_host.yml but without runtime-only requirements (country code).
+- name: Resolve the host's billing relation
+  ansible.builtin.include_role:
+    name: kwtoolset/resolve_host_relations
+  vars:
+    resolve_host_relations_source: "{{ hostvars[cib_node].host_relations | default({}) }}"
+    resolve_host_relations_group: analytics_server
+    resolve_host_relations_component: infra_billing
+  when: hostvars[cib_node].infrastructure is defined
+
+- name: Keep nodes whose primary billing server is this one
+  ansible.builtin.set_fact:
+    cib_pull_hosts: >-
+      {{ cib_pull_hosts + [{'name': cib_node,
+         'file': infra_billing_pull_host_file_template | replace('HOST', cib_node)}] }}
+  when:
+    - hostvars[cib_node].infrastructure is defined
+    - resolve_host_relations_host == inventory_hostname
