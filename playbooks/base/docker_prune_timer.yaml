@@ -1,0 +1,8 @@
+---
+- name: Install weekly Docker prune systemd timer
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  roles:
+    - install_docker_prune_timer
