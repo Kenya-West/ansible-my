@@ -12,6 +12,7 @@
   proxy_url = ""
   system = ""
   target = "{{ eget_temp_dir.path }}/binaries"
+  batch_concurrency = {{ eget_batch_concurrency | int }}
 
 [packages]
 {% for pkg in packages_binary_list %}
@@ -40,7 +41,8 @@
   file = "{{ pkg.file }}"
 {%   endif %}
 {%   if pkg.assets is defined %}
-  asset_filters = [{% for a in pkg.assets %}"{{ a }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{%     set asset_filters = pkg.assets | map('split', ',') | flatten | map('trim') | reject('equalto', '') | list %}
+  asset_filters = [{% for a in asset_filters %}"{{ a }}"{% if not loop.last %}, {% endif %}{% endfor %}]
 {%   endif %}
 {#   Without tag_policy, `eget update` ignores the tag and goes for the latest release. #}
 {%   if pkg.tag is defined %}

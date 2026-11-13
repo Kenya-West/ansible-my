@@ -21,3 +21,15 @@ eget_sync_retry_delay: 10
 # Packages declaring a different dest_loc are moved out of it afterwards by
 # tasks/place_binaries.yml.
 eget_host_bin_dir: /usr/local/bin
+
+# Concurrent package tasks for "eget install --all" (eget's
+# global.batch_concurrency): 0 = eget's auto (up to 6), 1 = serial.
+# eget names its download cache file after the asset + version + URL hash, not
+# the package, so two packages pulling the same release asset (e.g. fastfetch
+# and flashfetch from one tarball) race on the same ".part" file and one fails
+# with "rename ....part ...: no such file or directory". Serial is forced
+# whenever packages_binary_list repeats a repo; otherwise auto.
+eget_batch_concurrency: >-
+  {{ 1 if (packages_binary_list | map(attribute='repo') | list | length)
+          != (packages_binary_list | map(attribute='repo') | unique | list | length)
+     else 0 }}
