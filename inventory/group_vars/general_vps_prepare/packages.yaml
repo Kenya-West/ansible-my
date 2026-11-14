@@ -1,59 +1,66 @@
 ---
-packages_list:
+packages_list_required:
   uninstall:
     apt:
       - fzf
       - btop
+    snap: []
   install:
     apt:
-      # Base packages
       - bash
       - curl
       - wget
       - unzip
-      - ncdu
-      - tree
       - gpg
       - git
       - gettext-base
-      - snapd
       - locales
       - logrotate
       - rsync
       - openssh-server
-      - bc
-      - lsof
-      - net-tools
       - acl
       - conntrack
-      - parallel
       - nftables
       - ufw
+      - cron
+      - jq
+      - lsof
+      - net-tools
+      - perl
+      - parallel
+      # Service packages
+      - python3-debian # Needed for DEB mirrors
+      - python3-docker # Needed for Ansible Docker modules
+      - python3-passlib # Needed for Ansible htpasswd module
+      - python3-bcrypt # Needed for Ansible htpasswd module
+    snap: []
+    snap_classic: []
+
+packages_list_essentials:
+  uninstall: {}
+  install:
+    apt:
+      - ncdu
+      - tree
+      - snapd
+      - bc
       # TermSCP dependencies
       - libdbus-1-dev
       - pkg-config
       - libsmbclient
       # Extra packages
       - moreutils
-      - neofetch
       - bat # Ensure this is available or add a task to include its repository
       - fd-find # Use 'fd' for Ubuntu/Debian, might need a PPA
       - httpie
-      - cron
       - hstr
       - duf
-      - jq
       - whois
       - ripgrep
       - micro
       - sqlite3
       - nala
       - doas
-      # Service packages
-      - python3-debian # Needed for DEB mirrors
-      - python3-docker # Needed for Ansible Docker modules
-      - python3-passlib # Needed for Ansible htpasswd module
-      - python3-bcrypt # Needed for Ansible htpasswd module
     snap:
       - btop
       - procs
@@ -61,3 +68,5 @@ packages_list:
       - dust
     snap_classic:
       - astral-uv
+
+packages_list: "{{ packages_list_required | combine(packages_list_essentials, recursive=True, list_merge='append') }}"

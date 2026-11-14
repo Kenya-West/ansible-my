@@ -1,6 +1,7 @@
 ---
 packages_python_timeout: 30
-packages_python_list:
+packages_python_list_required: []
+packages_python_list_essentials:
   # full schema is:
   # - tool: "sot"                 # tool name on github
   - tool: "sot"
@@ -8,3 +9,4 @@ packages_python_list:
   - tool: "netshow"
   - tool: "dtop"
   - tool: "twg"
+packages_python_list: "{{ packages_python_list_required + packages_python_list_essentials }}"

@@ -1,5 +1,7 @@
 ---
 packages_deb_timeout: 30s
-packages_deb_list:
+packages_deb_list_required: []
+packages_deb_list_essentials:
   - powershell
   - zenith
+packages_deb_list: "{{ packages_deb_list_required + packages_deb_list_essentials }}"
