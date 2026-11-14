@@ -1,0 +1,27 @@
+---
+- import_playbook: ../base/gai_prefer_ipv4.yaml
+- import_playbook: ../base/packages.yaml
+  vars:
+    packages_list: "{{ packages_list_essentials }}"
+- import_playbook: ../maintenance/copy_binaries_to_hosts.yaml
+  vars:
+    packages_binary_list: "{{ packages_binary_list_essentials }}"
+- import_playbook: ../base/debget.yaml
+- import_playbook: ../base/packages_deb.yaml
+- import_playbook: ../base/python_mirrors.yaml
+- import_playbook: ../base/packages_python_concurrent.yaml
+- import_playbook: ../base/docker_prune_timer.yaml
+- import_playbook: ../base/ohmyposh.yaml
+- import_playbook: ../base/bash_default.yaml
+- import_playbook: ../base/bash.yaml
+- import_playbook: ../base/powershell_modules.yaml
+- import_playbook: ../base/powershell_profile.yaml
+- import_playbook: ../base/editor.yaml
+- import_playbook: ../base/doas.yaml
+- import_playbook: ../base/micro.yaml
+- import_playbook: ../base/broot.yaml
+- import_playbook: ../base/btop.yaml
+- import_playbook: ../base/journals.yaml
+- import_playbook: ../base/clear_cache.yaml
+- import_playbook: ../base/logs.yaml
+- import_playbook: ../scenarios/backup_show_keys.yaml

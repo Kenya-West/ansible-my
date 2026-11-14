@@ -1,4 +1,5 @@
 ---
+- import_playbook: ../base/gai_prefer_ipv4.yaml
 - import_playbook: ../base/packages.yaml
 - import_playbook: ../base/eget.yaml
 - import_playbook: ../maintenance/copy_binaries_to_hosts.yaml
