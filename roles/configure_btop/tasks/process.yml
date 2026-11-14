@@ -6,7 +6,7 @@
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
-  when: "{{ remove_home_config | default(configure_btop_remove_home_config) }}"
+  when: remove_home_config | default(configure_btop_remove_home_config)
 
 - name: Launch btop with PTY
   become: "{{ item.become | default(false) }}"
