@@ -1,0 +1,97 @@
+---
+# defaults file for roles/run_benchmarks_termshot
+
+# termshot is installed by install_packages_eget_inherelab
+benchmarks_termshot_package_repo: homeport/termshot
+# Separate eget config, so installing termshot never touches the main one
+benchmarks_termshot_eget_config: "/home/{{ standard_user }}/.config/eget-termshot/eget.toml"
+benchmarks_termshot_bin: /usr/local/bin/termshot
+# Install termshot again (latest release) even when it is already on the host
+benchmarks_termshot_update: false
+
+# Commands the scripts check for before they start. A missing one makes them
+# ask to install it, and a prompt cannot be answered here, so every command
+# that is not on the host is installed from its apt package first.
+benchmarks_termshot_dependencies:
+  - { command: curl, package: curl }
+  - { command: wget, package: wget }
+  - { command: jq, package: jq }
+  - { command: bc, package: bc }
+  - { command: nc, package: netcat-openbsd }
+  - { command: dig, package: dnsutils }
+  - { command: ip, package: iproute2 }
+  - { command: ping, package: iputils-ping }
+  - { command: openssl, package: openssl }
+  - { command: column, package: bsdextrautils }
+  - { command: iperf3, package: iperf3 }
+
+# Screenshots (and raw output logs) go to
+# <local_dir>/<run timestamp>/NN_<name>.png
+benchmarks_termshot_local_dir: "{{ inventory_dir }}/host_vars/{{ inventory_hostname }}/benchmarks"
+# Also save each benchmark's raw output (with ANSI colors) as NN_<name>.log
+benchmarks_termshot_save_logs: true
+
+# Terminal width the scripts see and the screenshot is wrapped at
+benchmarks_termshot_columns: 100
+# Seconds a benchmark may run before it is stopped; the screenshot then shows
+# the output up to that point. Override per entry with `timeout`.
+benchmarks_termshot_timeout: 900
+
+# Names from benchmarks_termshot_list to run; empty runs all of them
+benchmarks_termshot_select: []
+# Fail the host at the end when a benchmark produced no screenshot
+benchmarks_termshot_fail_on_error: true
+
+# Run in this order. `name` becomes the file name, `command` is run by bash.
+# Optional per entry: `timeout` (seconds), `columns`, `types` with list:
+# `perf`, `net`, `cens` (censorship). If not set, it will be executed by default.
+benchmarks_termshot_list:
+  # -y: install missing dependencies without asking
+  - name: sysbench
+    command: sysbench cpu run --threads=1
+    types: [perf]
+  - name: ip_check_place
+    command: bash <(curl -Ls https://IP.Check.Place) -l en -y
+    types: [net]
+  - name: openode_bench
+    command: wget -qO- bench.openode.xyz | bash
+    types: [perf, net]
+  # - name: artydev_speedtest
+  #   command: wget -qO- speedtest.artydev.ru | bash
+  #   timeout: 1800
+  #   types: [net]
+  - name: bench_sh
+    command: wget -qO- bench.sh | bash
+    types: [perf, net]
+  - name: check_unlock_media
+    command: bash <(curl -L -s check.unlock.media) -E en -R 0
+    types: [cens]
+  - name: iperf3_n_teslatel
+    command: wget -qO- bench.tlab.pw | bash
+    types: [net]
+  - name: iperf3_DigneZzZ
+    command: wget -qO- bench.gig.ovh | bash
+    types: [net]
+  - name: openode_checker
+    command: bash <(curl -L -s https://bench.openode.xyz/checker_inst.sh)
+    types: [cens]
+  - name: yabs
+    command: curl -sL yabs.sh | bash -s -- -4
+    types: [perf]
+    timeout: 1800
+  - name: vernette_ipregion
+    command: wget -qO- https://ipregion.mirror.vrnt.xyz | bash
+    types: [net, cens]
+  - name: vernette_censorcheck_dpi
+    command: wget -qO- https://ipregion.mirror.vrnt.xyz | bash -s -- --mode dpi
+    types: [cens]
+  - name: vernette_censorcheck_geoblock
+    command: wget -qO- https://ipregion.mirror.vrnt.xyz | bash -s -- --mode geoblock
+    types: [cens]
+  # - name: davoyan_ipregion
+  #   command: bash <(wget -qO- https://raw.githubusercontent.com/Davoyan/ipregion/main/ipregion.sh)
+  #   types: [cens]
+  - name: itdoginfo_russian_iperf3
+    command: bash <(wget -qO- https://github.com/itdoginfo/russian-iperf3-servers/raw/main/speedtest.sh)
+    timeout: 1200
+    types: [net]
