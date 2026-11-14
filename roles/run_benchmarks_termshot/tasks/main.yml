@@ -34,6 +34,30 @@
   delegate_to: localhost
   become: false
 
+# With Oh My Posh installed and set up in the user's .bashrc, screenshots use
+# that profile's prompt; otherwise termshot's plain prompt stays
+- name: Check whether Oh My Posh is installed
+  ansible.builtin.shell: command -v oh-my-posh
+  register: benchmarks_termshot_ohmyposh
+  changed_when: false
+  failed_when: false
+  when: benchmarks_termshot_use_ohmyposh | bool
+
+- name: Check for the Oh My Posh profile in the user's .bashrc
+  ansible.builtin.command: "grep -q oh-my-posh {{ benchmarks_termshot_bashrc | quote }}"
+  register: benchmarks_termshot_bashrc_check
+  changed_when: false
+  failed_when: false
+  when:
+    - benchmarks_termshot_use_ohmyposh | bool
+    - benchmarks_termshot_ohmyposh.rc == 0
+
+- name: Choose the profile for the screenshot prompt
+  ansible.builtin.set_fact:
+    benchmarks_termshot_prompt_bashrc: >-
+      {{ benchmarks_termshot_bashrc
+         if (benchmarks_termshot_bashrc_check.rc | default(1)) == 0 else '' }}
+
 - name: Run the benchmarks
   block:
     - name: Create a remote work directory

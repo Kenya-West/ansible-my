@@ -3,14 +3,14 @@
 # termshot-capture.sh — run one benchmark script under termshot and render
 # its terminal output into a PNG.
 #
-# Usage: termshot-capture.sh <termshot> <png> <columns> <timeout> <script>
+# Usage: termshot-capture.sh <termshot> <png> <columns> <timeout> <script> [bashrc]
 #
 # Exit code: termshot's own when it fails (no PNG then), otherwise the
 # benchmark's (pty-runner.sh writes it to <script without .sh>.rc).
 
 set -u
 
-termshot=$1 png=$2 columns=$3 limit=$4 script=$5
+termshot=$1 png=$2 columns=$3 limit=$4 script=$5 bashrc=${6:-}
 runner="$(dirname "$(readlink -f "$0")")/pty-runner.sh"
 rc_file="${script%.sh}.rc"
 
@@ -26,7 +26,7 @@ keeper=$!
 # Without a terminal on stdout, termshot sizes the PTY from --columns only
 # when CI=true; pty-runner.sh unsets CI again before starting the benchmark.
 CI=true "$termshot" --columns "$columns" --filename "$png" \
-  -- bash "$runner" "$limit" "$script" "$rc_file" <&3
+  -- bash "$runner" "$limit" "$script" "$rc_file" "$bashrc" <&3
 termshot_rc=$?
 
 exec 3<&-

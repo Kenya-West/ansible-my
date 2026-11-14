@@ -28,6 +28,10 @@ benchmarks_termshot_dependencies:
 # Screenshots (and raw output logs) go to
 # <local_dir>/<run timestamp>/NN_<name>.png
 benchmarks_termshot_local_dir: "{{ inventory_dir }}/host_vars/{{ inventory_hostname }}/benchmarks"
+# Show the Oh My Posh prompt from the user's .bashrc in screenshots when Oh My
+# Posh is installed; false (or no Oh My Posh) keeps termshot's plain prompt
+benchmarks_termshot_use_ohmyposh: true
+benchmarks_termshot_bashrc: "/home/{{ standard_user }}/.bashrc"
 # Also save each benchmark's raw output (with ANSI colors) as NN_<name>.log
 benchmarks_termshot_save_logs: true
 
@@ -83,10 +87,10 @@ benchmarks_termshot_list:
     command: wget -qO- https://ipregion.mirror.vrnt.xyz | bash
     types: [net, cens]
   - name: vernette_censorcheck_dpi
-    command: wget -qO- https://ipregion.mirror.vrnt.xyz | bash -s -- --mode dpi
+    command: wget -qO- https://github.com/vernette/censorcheck/raw/master/censorcheck.sh | bash -s -- --mode dpi
     types: [cens]
   - name: vernette_censorcheck_geoblock
-    command: wget -qO- https://ipregion.mirror.vrnt.xyz | bash -s -- --mode geoblock
+    command: wget -qO- https://github.com/vernette/censorcheck/raw/master/censorcheck.sh | bash -s -- --mode geoblock
     types: [cens]
   # - name: davoyan_ipregion
   #   command: bash <(wget -qO- https://raw.githubusercontent.com/Davoyan/ipregion/main/ipregion.sh)

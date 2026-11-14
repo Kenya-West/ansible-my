@@ -22,6 +22,7 @@
           - "{{ benchmark.columns | default(benchmarks_termshot_columns) }}"
           - "{{ benchmark_timeout }}"
           - "{{ benchmark_remote }}.sh"
+          - "{{ benchmarks_termshot_prompt_bashrc | default('') }}"
         chdir: "{{ benchmarks_termshot_workdir.path }}"
       environment:
         TERM: xterm-256color

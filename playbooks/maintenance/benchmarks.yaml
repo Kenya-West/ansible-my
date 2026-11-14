@@ -4,6 +4,8 @@
 - name: Run benchmarks and save their terminal screenshots
   hosts: general_vps_prepare
   become: true
+  vars:
+    benchmarks_termshot_use_ohmyposh: false
 
   environment:
     EGET_GITHUB_TOKEN: "{{ github_api_token_eget | default(omit) }}"
