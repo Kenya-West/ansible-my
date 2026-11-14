@@ -1,0 +1,46 @@
+---
+# defaults file for roles/configure_gai_ipv4
+# present: write the managed block; absent: remove it (and restore the lines
+# this role commented out, see gai_conf_restore_disabled).
+role_state: present
+
+gai_conf_path: /etc/gai.conf
+gai_conf_owner: root
+gai_conf_group: root
+# Keep a timestamped copy next to the file before every change.
+gai_conf_backup: true
+
+# Marker lines of the managed block ({mark} becomes BEGIN / END).
+gai_conf_marker: "# {mark} ANSIBLE MANAGED BLOCK: configure_gai_ipv4 (prefer IPv4)"
+
+# Precedence of IPv4-mapped destinations (::ffff:0:0/96). glibc default is 10;
+# it must be above 50 (::1/128) to win over every IPv6 class.
+gai_conf_ipv4_precedence: 100
+
+# Any active `precedence` line replaces glibc's whole built-in table, so the
+# full default table (glibc = RFC 3484 values) is restated here with only the
+# IPv4-mapped entry raised. Must contain ::ffff:0:0/96.
+gai_conf_precedence_table:
+  - { prefix: "::1/128", value: 50 }
+  - { prefix: "::/0", value: 40 }
+  - { prefix: "2002::/16", value: 30 }
+  - { prefix: "::/96", value: 20 }
+  - { prefix: "::ffff:0:0/96", value: "{{ gai_conf_ipv4_precedence }}" }
+
+# What to do with active `precedence` lines found outside the managed block
+# (they would merge into the same table and change its meaning):
+#   comment - prefix them with gai_conf_disabled_prefix (default)
+#   fail    - stop and leave the file untouched
+gai_conf_conflict_action: comment
+gai_conf_disabled_prefix: "# disabled by configure_gai_ipv4: "
+# role_state=absent: uncomment the lines carrying gai_conf_disabled_prefix.
+gai_conf_restore_disabled: true
+
+# Skip (with a warning) hosts that have no IPv4 default route: preferring IPv4
+# there would only add a failed attempt before every IPv6 connection.
+gai_conf_require_ipv4_route: true
+
+# After a change, resolve this dual-stack name with `getent ahosts` and fail
+# if an IPv6 address still sorts first while the name has an IPv4 address.
+# A failed lookup (no DNS yet) only warns. "" disables the check.
+gai_conf_verify_hostname: one.one.one.one
