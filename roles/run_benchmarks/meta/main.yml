@@ -1,0 +1,7 @@
+galaxy_info:
+  author: Kenya-West
+  description: Run benchmark scripts in a terminal on the host and save screenshots of their output on the controller
+  license: MIT
+  min_ansible_version: "2.15"
+
+dependencies: []

@@ -1,18 +1,32 @@
 ---
-# defaults file for roles/run_benchmarks_termshot
+# defaults file for roles/run_benchmarks
 
-# termshot is installed by install_packages_eget_inherelab
-benchmarks_termshot_package_repo: homeport/termshot
-# Separate eget config, so installing termshot never touches the main one
-benchmarks_termshot_eget_config: "/home/{{ standard_user }}/.config/eget-termshot/eget.toml"
-benchmarks_termshot_bin: /usr/local/bin/termshot
-# Install termshot again (latest release) even when it is already on the host
-benchmarks_termshot_update: false
+# freeze draws the screenshots on the host. It is installed by
+# install_packages_eget_inherelab from this entry of
+# packages_binary_list_essentials, with its own eget config so the main one
+# is not touched.
+benchmarks_freeze_package_repo: charmbracelet/freeze
+benchmarks_freeze_eget_config: "/home/{{ standard_user }}/.config/eget-benchmarks/eget.toml"
+benchmarks_freeze_bin: /usr/local/bin/freeze
+# Install freeze again (latest release) even when it is already on the host
+benchmarks_freeze_update: false
+# Fonts freeze can fall back to, installed with apt. The emoji font gives the
+# emoji shapes; they are drawn in the text color.
+benchmarks_font_packages:
+  - fontconfig
+  - fonts-dejavu-core
+  - fonts-noto-color-emoji
+# CSS font list; a glyph missing from one font is taken from the next, then
+# from any installed font. Nerd Font icons (Oh My Posh prompt) need a Nerd
+# Font on the host, which is not installed by this role.
+benchmarks_font_family: >-
+  'CaskaydiaCove Nerd Font Mono', 'JetBrainsMono Nerd Font Mono',
+  'Hack Nerd Font Mono', 'DejaVu Sans Mono', monospace
 
 # Commands the scripts check for before they start. A missing one makes them
 # ask to install it, and a prompt cannot be answered here, so every command
 # that is not on the host is installed from its apt package first.
-benchmarks_termshot_dependencies:
+benchmarks_dependencies:
   - { command: curl, package: curl }
   - { command: wget, package: wget }
   - { command: jq, package: jq }
@@ -24,38 +38,53 @@ benchmarks_termshot_dependencies:
   - { command: openssl, package: openssl }
   - { command: column, package: bsdextrautils }
   - { command: iperf3, package: iperf3 }
+  - { command: sysbench, package: sysbench }
+  # script(1) gives each benchmark its terminal
+  - { command: script, package: bsdutils }
+  # freeze makes the PNG with it; without it every emoji is a square
+  - { command: rsvg-convert, package: librsvg2-bin }
 
 # Screenshots (and raw output logs) go to
 # <local_dir>/<run timestamp>/NN_<name>.png
-benchmarks_termshot_local_dir: "{{ inventory_dir }}/host_vars/{{ inventory_hostname }}/benchmarks"
+benchmarks_local_dir: "{{ inventory_dir }}/host_vars/{{ inventory_hostname }}/benchmarks"
 # Show the Oh My Posh prompt from the user's .bashrc in screenshots when Oh My
-# Posh is installed; false (or no Oh My Posh) keeps termshot's plain prompt
-benchmarks_termshot_use_ohmyposh: true
-benchmarks_termshot_bashrc: "/home/{{ standard_user }}/.bashrc"
+# Posh is installed; false (or no Oh My Posh) keeps a plain `$` prompt
+benchmarks_use_ohmyposh: true
+benchmarks_bashrc: "/home/{{ standard_user }}/.bashrc"
 # Also save each benchmark's raw output (with ANSI colors) as NN_<name>.log
-benchmarks_termshot_save_logs: true
+benchmarks_save_logs: true
 
 # Terminal width the scripts see and the screenshot is wrapped at
-benchmarks_termshot_columns: 100
+benchmarks_columns: 100
 # Seconds a benchmark may run before it is stopped; the screenshot then shows
 # the output up to that point. Override per entry with `timeout`.
-benchmarks_termshot_timeout: 900
+benchmarks_timeout: 900
 
-# Names from benchmarks_termshot_list to run; empty runs all of them
-benchmarks_termshot_select: []
+# Switch TCP congestion control to BBR while the benchmarks run, then back to
+# what it was. Only the runtime value changes, a reboot also restores it.
+benchmarks_enable_bbr: true
+
+# Names from benchmarks_list to run; empty runs all of them
+benchmarks_select: []
 # Fail the host at the end when a benchmark produced no screenshot
-benchmarks_termshot_fail_on_error: true
+benchmarks_fail_on_error: true
 
 # Run in this order. `name` becomes the file name, `command` is run by bash.
-# Optional per entry: `timeout` (seconds), `columns`, `types` with list:
+# Optional per entry: `timeout` (seconds), `columns` (terminal width, wider
+# or narrower than benchmarks_columns), `start_at` (the screenshot skips the
+# script's output before the first line containing this text; the command
+# header stays; everything is kept when the text never shows up),
+# `types` with list:
 # `perf`, `net`, `cens` (censorship). If not set, it will be executed by default.
-benchmarks_termshot_list:
+benchmarks_list:
   # -y: install missing dependencies without asking
   - name: sysbench
     command: sysbench cpu run --threads=1
     types: [perf]
   - name: ip_check_place
     command: bash <(curl -Ls https://IP.Check.Place) -l en -y
+    # skip the sponsor banners before the report
+    start_at: "######################"
     types: [net]
   - name: openode_bench
     command: wget -qO- bench.openode.xyz | bash
@@ -70,9 +99,9 @@ benchmarks_termshot_list:
   - name: check_unlock_media
     command: bash <(curl -L -s check.unlock.media) -E en -R 0
     types: [cens]
-  - name: iperf3_n_teslatel
-    command: wget -qO- bench.tlab.pw | bash
-    types: [net]
+  # - name: iperf3_n_teslatel
+  #   command: wget -qO- bench.tlab.pw | bash
+  #   types: [net]
   - name: iperf3_DigneZzZ
     command: wget -qO- bench.gig.ovh | bash
     types: [net]
@@ -88,6 +117,7 @@ benchmarks_termshot_list:
     types: [net, cens]
   - name: vernette_censorcheck_dpi
     command: wget -qO- https://github.com/vernette/censorcheck/raw/master/censorcheck.sh | bash -s -- --mode dpi
+    columns: 120
     types: [cens]
   - name: vernette_censorcheck_geoblock
     command: wget -qO- https://github.com/vernette/censorcheck/raw/master/censorcheck.sh | bash -s -- --mode geoblock

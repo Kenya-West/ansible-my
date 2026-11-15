@@ -116,6 +116,8 @@ packages_binary_list_essentials:
       - '^polyfilled,tar.gz'
     file: "REG:/usr/bin/flashfetch$"
     bin_name: flashfetch
-  - repo: homeport/termshot
+  - repo: charmbracelet/freeze
+    assets:
+      - tar.gz
 
 packages_binary_list: "{{ packages_binary_list_required + packages_binary_list_essentials }}"

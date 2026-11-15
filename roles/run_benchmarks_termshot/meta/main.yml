@@ -1,7 +1,0 @@
-galaxy_info:
-  author: Kenya-West
-  description: Run benchmark scripts under termshot and fetch their screenshots to the controller
-  license: MIT
-  min_ansible_version: "2.15"
-
-dependencies: []

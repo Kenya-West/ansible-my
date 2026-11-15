@@ -61,6 +61,7 @@ packages_list_essentials:
       - sqlite3
       - nala
       - doas
+      - sysbench
     snap:
       - btop
       - procs
