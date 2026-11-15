@@ -105,9 +105,9 @@ benchmarks_list:
   - name: iperf3_DigneZzZ
     command: wget -qO- bench.gig.ovh | bash
     types: [net]
-  - name: openode_checker
-    command: bash <(curl -L -s https://bench.openode.xyz/checker_inst.sh)
-    types: [cens]
+  # - name: openode_checker
+  #   command: bash <(curl -L -s https://bench.openode.xyz/checker_inst.sh)
+  #   types: [cens]
   - name: yabs
     command: curl -sL yabs.sh | bash -s -- -4
     types: [perf]
