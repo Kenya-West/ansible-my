@@ -26,8 +26,9 @@ What it does
      produce a hostname that exists;
    - the IPv4 address, checked against the ones already in use;
    - the optional groups (`vpn_caddy`, `analytics_node`,
-     `backup_restic_node` by default); `general_vps_prepare` and
-     `domain_management` are always joined;
+     `backup_restic_node` by default); `general_vps_prepare` is always
+     joined, `domain_management` unless DNS is kept by hand (see
+     [A domain outside Cloudflare](#a-domain-outside-cloudflare));
    - the host the new one relates to by default (`host_relations.default`
      of `1_domains.yaml`): chosen from the `analytics_server` and
      `vpn_server_remnawave` hosts (deduplicated), or typed. This is asked
@@ -41,8 +42,11 @@ What it does
    - for a `vpn_caddy` host, the exit and entry (chain) location indexes
      (the `4` of `chain-russia-4.123987465.xyz`; the default is the next
      free index of the region, and an existing one joins that round-robin
-     domain), the primary protocol of the node and whether its
-     certificates use the Cloudflare DNS-01 challenge.
+     domain) and the primary protocol of the node;
+   - whether its DNS records are managed through Cloudflare
+     (`dns_managed`) and, for a `vpn_caddy` host, whether its certificates
+     use the Cloudflare DNS-01 challenge (`remna_use_dns01_cloudflare`,
+     defaulting to the previous answer).
 3. Renders `templates/host/0_all/` of `setup/common` and of this role and, for every group joined that has a
    directory of the same name in `templates/host/`, that directory into
    `host_vars/<hostname>/`.
@@ -84,6 +88,37 @@ Unattended:
       -e '{"setup_node_prompt_answers": {"local_hostname": "kw-laptop", "country_code": "ru",
            "ip_address": "192.168.1.50", "groups": ["local_devices"],
            "default_relation_host_choice": "play2go-nl-3"}}'
+
+A domain outside Cloudflare
+--------------------------
+
+DNS automation (`playbooks/dns/*`, the `domain_management` role) and the
+DNS-01 challenge of the Remnawave node speak to Cloudflare only. A domain
+hosted elsewhere still works, with two "no" answers:
+
+- `dns_managed: false` leaves the host out of `domain_management`. Nothing
+  creates, checks or deletes its records: add an A record to its address for
+  every name in its `domains`
+  (`ansible -i inventory/production.ini <hostname> -m debug -a var=domains`;
+  a node also has the shared `net-global-…`/`chain-global-…` names) at your
+  DNS provider before deploying it. Records without the `managed-by=ansible`
+  tag are never touched by the sync, so a hand-made record on a round-robin
+  `net-…`/`chain-…` name of a Cloudflare zone survives next to the managed
+  ones.
+- `remna_use_dns01_cloudflare: false` writes
+  `remna_node_use_dns01_cloudflare: false` to `vpn_caddy/remna.yaml`
+  (`group_vars/vpn_caddy` sets `true`). Caddy then gets the node's
+  certificates through HTTP-01 / TLS-ALPN-01: ports 80 and 443 of its names
+  must reach the host, and the cover passes both challenges on to Caddy.
+
+One domain can serve every purpose: register it as both `main` and `xray` in
+the panel's catalog (`vpn_server_remnawave_node_base_domains`). The node's own
+name, its exit (`net-<geo>-<protocol>`) and entry (`chain-<geo>-<protocol>`)
+names then all sit on it, with distinct prefixes.
+
+Unattended, for such a node:
+
+    -e '{"setup_node_prompt_answers": {..., "dns_managed": false, "remna_use_dns01_cloudflare": false}}'
 
 Domains of a `vpn_caddy` host
 -----------------------------

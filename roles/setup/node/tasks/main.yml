@@ -55,6 +55,12 @@
       - "Host {{ initial_configure_host_hostname }} ({{ initial_configure_host_ip_address }}) added."
       - "Deployment region: {{ setup_node_region }}."
       - "Groups: {{ setup_node_groups | join(', ') }}."
+      - >-
+        {{ 'DNS: not managed; create an A record to ' ~ initial_configure_host_ip_address
+           ~ ' for every domain of the host (ansible -i <inventory> '
+           ~ initial_configure_host_hostname ~ ' -m debug -a var=domains) before deploying it.'
+           if not setup_node_local | bool and 'domain_management' not in setup_node_groups
+           else 'DNS: ' ~ ('none (local host).' if setup_node_local | bool else 'managed through Cloudflare (domain_management).') }}
       - "host_vars: {{ setup_node_host_vars_dir }}/{{ initial_configure_host_hostname }}/"
       - "Inventory file(s): {{ setup_node_inventory_files | join(', ') }}."
       - >-

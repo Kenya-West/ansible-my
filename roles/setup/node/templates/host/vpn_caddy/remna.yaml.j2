@@ -11,3 +11,9 @@ remna_node_primary_protocol_type: "{{ o }} remna_protocol_types.{{ setup_node_re
 # inventory/group_vars/vpn_caddy/remna.yaml (remna_node_primary_protocol_type),
 # so nothing is set here.
 {% endif %}
+{% if not initial_configure_host_remna_use_dns01_cloudflare | default(true) | bool %}
+
+# Certificates through HTTP-01 / TLS-ALPN-01, not the Cloudflare DNS-01
+# challenge: the zones of this node's domains are not in Cloudflare.
+remna_node_use_dns01_cloudflare: false
+{% endif %}

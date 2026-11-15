@@ -18,8 +18,15 @@
 
 - name: Settle the groups of the host
   ansible.builtin.set_fact:
-    setup_node_groups: "{{ (setup_node_groups_required + setup_node_groups_chosen) | unique }}"
+    # No DNS management (answer dns_managed): the host stays out of
+    # domain_management, its records are kept by hand.
+    setup_node_groups: >-
+      {{ (setup_node_groups_required + setup_node_groups_chosen) | unique
+         | reject('in', __setup_node_groups_left_out) | list }}
     setup_node_remna_node_enabled: "{{ 'vpn_caddy' in setup_node_groups_chosen }}"
+  vars:
+    __setup_node_groups_left_out: >-
+      {{ [] if initial_configure_host_dns_managed | default(true) | bool else ['domain_management'] }}
 
 - name: Check the answers the templates rely on
   ansible.builtin.assert:

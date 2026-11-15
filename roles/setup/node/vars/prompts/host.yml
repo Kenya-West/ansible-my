@@ -278,8 +278,28 @@ prompts:
     default: "{{ setup_node_remna_protocol_type_default }}"
     when: "'vpn_caddy' in answers.groups | default([], true)"
 
-  - id: remna_use_dns01_cloudflare
-    prompt: Issue the certificates of the node through the Cloudflare DNS-01 challenge?
+  # A domain outside Cloudflare (or one whose records are kept by hand): the
+  # host stays out of domain_management, so playbooks/dns/* never see it.
+  - id: dns_managed
+    prompt: Manage the DNS records of {{ setup_node_hostname }} through Cloudflare?
+    help: >-
+      Yes joins domain_management: playbooks/dns/* create its A records in
+      the Cloudflare zones of its domains (cloudflare_api_token_dns). No
+      leaves it out: create an A record to {{ answers.ip_address }} for every
+      domain of the host at your DNS provider, before its certificates are
+      issued. Several hosts on one domain stay fine either way.
     type: bool
     default: true
+    when:
+      - not setup_node_local | bool
+      - "'domain_management' in setup_node_groups_required"
+
+  - id: remna_use_dns01_cloudflare
+    prompt: Issue the certificates of the node through the Cloudflare DNS-01 challenge?
+    help: >-
+      Needs the zones of the node's domains in Cloudflare. No issues them
+      through HTTP-01 / TLS-ALPN-01 instead: Caddy must be reachable on ports
+      80 and 443 of the domains (the cover passes the challenges on to it).
+    type: bool
+    default: "{{ answers.dns_managed | default(true) }}"
     when: "'vpn_caddy' in answers.groups | default([], true)"
