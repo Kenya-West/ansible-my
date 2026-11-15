@@ -3,8 +3,20 @@
   hosts: domain_management
   gather_facts: false
 
+  vars:
+    # No Cloudflare token for DNS: the records are kept by hand, skip the host
+    # instead of failing on Cloudflare's 400 for an empty Authorization header.
+    dns_cloudflare_configured: "{{ cloudflare_api_token_dns | default('', true) | string | trim | length > 0 }}"
+
+  pre_tasks:
+    - name: Report that the DNS records are left to be kept by hand
+      ansible.builtin.debug:
+        msg: cloudflare_api_token_dns is not set, skipping DNS records for {{ inventory_hostname }}.
+      when: not dns_cloudflare_configured | bool
+
   roles:
     - role: domain_management
+      when: dns_cloudflare_configured | bool
       vars:
         scenarios:
           - cloudflare_check_set_records_for_host
