@@ -121,6 +121,7 @@ benchmarks_list:
     types: [cens]
   - name: vernette_censorcheck_geoblock
     command: wget -qO- https://github.com/vernette/censorcheck/raw/master/censorcheck.sh | bash -s -- --mode geoblock
+    columns: 120
     types: [cens]
   # - name: davoyan_ipregion
   #   command: bash <(wget -qO- https://raw.githubusercontent.com/Davoyan/ipregion/main/ipregion.sh)
