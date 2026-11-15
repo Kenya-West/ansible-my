@@ -1,0 +1,8 @@
+---
+- name: Prefer IPv4 over IPv6 in getaddrinfo (/etc/gai.conf)
+  hosts: general_vps_prepare
+  become: true
+  become_user: root
+
+  roles:
+    - configure_gai_ipv4

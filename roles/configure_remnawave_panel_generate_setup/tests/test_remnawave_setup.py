@@ -2,13 +2,15 @@
 
 import copy
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 
 from jinja2 import Environment
-from jinja2.nativetypes import NativeEnvironment
+from jinja2.nativetypes import NativeEnvironment, NativeTemplate
 import yaml
 from ansible.errors import AnsibleFilterError
+from ansible.plugins.filter.core import FilterModule as AnsibleCoreFilters
 
 ROLE = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('remnawave_setup', ROLE / 'filter_plugins/remnawave_setup.py')
@@ -71,6 +73,52 @@ def nodes():
         node('ru-tcp', 'RU', 'russia', TCP, 'chain-russia-1', 'chain-location'),
         node('ru-xhttp', 'RU', 'russia', XHTTP, 'chain-russia-2', 'chain-location'),
     ]
+
+
+def reverse_scenario():
+    """Shared global entries, RU entries and RU exits: both chain directions."""
+    opts = options()
+    opts['entry_global_for_non_global'] = True
+    items = nodes()
+    items[0]['domains'].append({'domain': 'chain-europe-1.example.test', 'type': 'chain-location'})
+    global_xhttp = copy.deepcopy(items[0])
+    global_xhttp.update(name='global-xhttp', protocol=XHTTP)
+    global_xhttp['domains'] = [{'domain': 'chain-asia-1.example.test', 'type': 'chain-location'}]
+    items.append(global_xhttp)
+    items[1]['domains'].append({'domain': 'chain-europe-2.example.test', 'type': 'chain-location'})
+    for index, node in enumerate(items[2:4], 1):
+        domain = 'net-russia-%d.example.test' % index
+        node['domains'].append({'domain': domain, 'type': 'net-location'})
+        opts['outbounds'].append({'address': domain, 'tag': 'out-chain-ru-%d' % index})
+    return items, opts
+
+
+def legacy_scenarios():
+    """Inventories without remna_node_hops, whose hosts, route ids and tags
+    must stay what they were before hops existed (fixtures/legacy_snapshot.json)."""
+    exclusive_ru = reverse_scenario()
+    exclusive_ru[0][2].update(exclusive_member=True, exclusive_profile='Xenus-team')
+    exclusive_ru[0][1]['geo'] = 'russia'
+    return {
+        'forward': (nodes(), options()),
+        'reverse': reverse_scenario(),
+        'exclusive_reverse': exclusive_ru,
+    }
+
+
+def legacy_view(model):
+    """The parts of a model that existing panels and subscriptions depend on."""
+    keys = ('kind', 'remark', 'address', 'vless_route_id', 'nodes', 'config_profile',
+            'inbound', 'internal_squads', 'exit', 'entry', 'protocol')
+    return {
+        'hosts': [dict((k, h.get(k)) for k in keys) for h in model['hosts']],
+        'forward_rules': [r for r in model['rules']
+                          if not set(r) & {'domain', 'ip'} and 'outboundTag' in r],
+        'profiles': [(p['name'], p['kind'], p['scope'], p['protocol'], p['inbound_tags'], p['squads'])
+                     for p in model['profiles']],
+        'node_profiles': model['node_profiles'],
+        'squad_grants': model['squad_grants'],
+    }
 
 
 def panel_for(model):
@@ -301,6 +349,49 @@ class GenerationTests(unittest.TestCase):
         ])
         self.assertEqual(self.model['node_profiles']['ru-tcp']['config_profile'], 'Reverse-RU')
 
+    def test_chain_audience_is_let_in_at_the_entry(self):
+        # The entry runs its own profile and carries only the users of its own
+        # inbounds: the squads shown a chain are granted those too, or they
+        # are refused after the handshake (clients show n/a).
+        chains = [h for h in self.model['hosts'] if h['kind'] == 'chain'
+                  and h['exit'] == 'net-europe-1.example.test']
+        for host in chains:
+            self.assertEqual(host['internal_squads'], {'mode': 'allow_only', 'squads': ['Default-Squad']})
+        grant = next(g for g in self.model['squad_grants'] if g['squad'] == 'Default-Squad')
+        self.assertEqual(grant['profiles'], ['Default-Profile', 'Default-xHTTP'])
+        self.assertEqual(grant['transit_profiles'], ['Reverse-RU', 'Reverse-RU-xHTTP'])
+        self.assertEqual(grant['inbounds'], ['VLESS_TCP_REALITY', 'VLESS_REALITY_XHTTP',
+                                             'VLESS_TCP_REALITY_REVERSE_RU',
+                                             'VLESS_REALITY_XHTTP_REVERSE_RU'])
+        xenus = next(g for g in self.model['squad_grants'] if g['squad'] == 'Xenus-team')
+        self.assertIn('VLESS_TCP_REALITY_REVERSE_RU', xenus['inbounds'])
+
+    def test_transit_does_not_widen_who_sees_a_scope(self):
+        # A transit grant is not an audience: profiles keep their squads, and
+        # non-global direct hosts name theirs; global ones stay open.
+        reverse = next(p for p in self.model['profiles'] if p['name'] == 'Reverse-RU')
+        self.assertEqual(reverse['squads'], ['Reverse-proxy'])
+        direct = dict((h['exit'], h['internal_squads']) for h in self.model['hosts']
+                      if h['kind'] == 'direct')
+        self.assertEqual(direct, {
+            'net-europe-1.example.test': {'mode': 'exclude', 'squads': []},
+            'net-europe-2.example.test': {'mode': 'allow_only', 'squads': ['Xenus-team']},
+        })
+        model = setup.remnawave_model(*reverse_scenario())
+        for host in model['hosts']:
+            if host['kind'] == 'direct' and host['exit'].startswith('net-russia'):
+                self.assertEqual(host['internal_squads'],
+                                 {'mode': 'allow_only', 'squads': ['Reverse-proxy']})
+
+    def test_verify_rejects_a_chain_audience_not_let_in_at_the_entry(self):
+        panel = panel_for(self.model)
+        self.assertEqual(self.verify(panel), [])
+        squad = next(s for s in panel['internal_squads'] if s['name'] == 'Default-Squad')
+        squad['inbounds'] = [i for i in squad['inbounds'] if 'REVERSE_RU' not in i['tag']]
+        problems = self.verify(panel)
+        self.assertTrue(any('Default-Squad' in p and 'ru-tcp' in p and 'is not let in' in p
+                            for p in problems), problems)
+
     def test_exclusive_chain_gets_both_transports_and_keeps_restrictions(self):
         profiles = {p['name']: p for p in self.model['profiles']}
         self.assertIn('Xenus-team-xHTTP', profiles)
@@ -373,12 +464,15 @@ class GenerationTests(unittest.TestCase):
         ])
         self.assertEqual(len(self.model['hosts']), 6)
 
-    def verify(self, panel):
+    def verify_report(self, panel):
         return setup.remnawave_verify(panel, self.model, {
             'primary_tags': ['MANAGED_BY:ANSIBLE'], 'separator': ' | by ',
             'direct_route_id': 2, 'route_id_range': [400, 499],
             'rules_snippet': 'rules', 'outbounds_snippet': 'outbounds', 'fingerprint': 'firefox',
-        })['problems']
+        })
+
+    def verify(self, panel):
+        return self.verify_report(panel)['problems']
 
     def test_verify_accepts_compatible_chain_entry_profile(self):
         self.assertEqual(self.verify(panel_for(self.model)), [])
@@ -450,7 +544,11 @@ class ReverseChainTests(unittest.TestCase):
             self.assertEqual(host['nodes'], ['shared-exit'] if host['protocol'] == TCP else ['global-xhttp'])
             self.assertEqual(host['sni'], '')
             self.assertIs(host['override_sni_from_address'], True)
-            self.assertEqual(host['internal_squads'], {'mode': 'exclude', 'squads': []})
+            self.assertEqual(host['internal_squads'], {'mode': 'allow_only', 'squads': ['Reverse-proxy']})
+        # Entered at the global nodes, which carry only their own inbounds' users.
+        grant = next(g for g in model['squad_grants'] if g['squad'] == 'Reverse-proxy')
+        self.assertEqual(sorted(grant['transit_profiles']), ['Default-Profile', 'Default-xHTTP'])
+        self.assertIn('VLESS_TCP_REALITY', grant['inbounds'])
         forward = [h for h in model['hosts'] if h['kind'] == 'chain' and h['exit'].startswith('net-europe')]
         self.assertEqual(len(forward), 4)
         self.assertEqual([h['config_profile'] for h in forward],
@@ -590,31 +688,78 @@ class ReverseChainTests(unittest.TestCase):
             self.assertNotIn('402', rendered.split(','))
 
 
+INVENTORY = ROLE.parents[1] / 'inventory/group_vars/vpn_server_remnawave'
+
+
+def _ansible_concat(values):
+    """Template results the way ansible-core 2.21 has them: one expression
+    keeps its native value, a string stays a string ("0,2" is no tuple)."""
+    values = list(values)
+    if not values:
+        return None
+    if len(values) == 1:
+        return values[0]
+    return ''.join(str(v) for v in values)
+
+
+class AnsibleLikeEnvironment(NativeEnvironment):
+    concat = staticmethod(_ansible_concat)
+
+
+class AnsibleLikeTemplate(NativeTemplate):
+    environment_class = AnsibleLikeEnvironment
+
+
+AnsibleLikeEnvironment.template_class = AnsibleLikeTemplate
+
+
+def inventory_vars(snippets=None, direct_route_id=2):
+    """The panel's inventory variables this role reads, rendered the way
+    Ansible would: real routing_local.yaml, snippets_warp.yaml and
+    config_profiles.yaml, with mock snippet contents unless given."""
+    env = AnsibleLikeEnvironment()
+    env.filters.update(AnsibleCoreFilters().filters())
+    env.filters['remnawave_route_uuid'] = setup.remnawave_route_uuid
+    env.globals.update({
+        'vpn_server_remnawave_hosts_vless_route_id_direct': direct_route_id,
+        'vpn_server_remnawave_config_profiles_log': {'loglevel': 'warning'},
+        'vpn_server_remnawave_snippets_outbound_warp_tag': 'out-warp-socks',
+        'warp_socks5_host': 'microwarp-socks', 'warp_socks5_port': 1080,
+        'warp_socks5_user': 'socks5', 'warp_socks5_pass': 'mock-pass',
+        **{'vpn_server_remnawave_snippets_key_' + name: name + '_prod_1'
+           for name in ('outbounds_default', 'rules_default', 'outbounds_warp',
+                        'rules_warp', 'outbounds_all', 'rules_all', 'balancers_all')},
+        **{'vpn_server_remnawave_snippets_' + name: []
+           for name in ('outbounds_default', 'rules_default', 'outbounds_warp',
+                        'rules_warp', 'balancers_all')},
+    })
+
+    def render(value):
+        if isinstance(value, dict):
+            return {k: render(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [render(v) for v in value]
+        return env.from_string(value).render() if isinstance(value, str) else value
+
+    def load(name):
+        return yaml.safe_load((INVENTORY / name).read_text())
+
+    out = {}
+    for name in ('routing_local.yaml', 'snippets_warp.yaml'):
+        for key, value in load(name).items():
+            out[key] = render(value)
+            env.globals[key] = out[key]
+    for key, value in (snippets or {}).items():
+        env.globals['vpn_server_remnawave_snippets_' + key] = value
+    out['composition'] = render(load('config_profiles.yaml')['vpn_server_remnawave_config_profiles_composition'])
+    return out
+
+
 class CompositionTests(unittest.TestCase):
     def setUp(self):
-        inventory = yaml.safe_load((ROLE.parents[1] /
-                                   'inventory/group_vars/vpn_server_remnawave/config_profiles.yaml').read_text())
         # Render the actual inventory composition using mock snippet contents.
-        env = NativeEnvironment()
-        env.globals.update({
-            'vpn_server_remnawave_config_profiles_log': {'loglevel': 'warning'},
-            **{'vpn_server_remnawave_snippets_key_' + name: name + '_prod_1'
-               for name in ('outbounds_default', 'rules_default', 'outbounds_warp',
-                            'rules_warp', 'outbounds_all', 'rules_all', 'balancers_all')},
-            **{'vpn_server_remnawave_snippets_' + name: []
-               for name in ('outbounds_default', 'rules_default', 'outbounds_warp',
-                            'rules_warp', 'balancers_all')},
-        })
-
-        def render(value):
-            if isinstance(value, dict):
-                return {k: render(v) for k, v in value.items()}
-            if isinstance(value, list):
-                return [render(v) for v in value]
-            return env.from_string(value).render() if isinstance(value, str) else value
-
         self.options = options()
-        self.options['profile_composition'] = render(inventory['vpn_server_remnawave_config_profiles_composition'])
+        self.options['profile_composition'] = inventory_vars()['composition']
         self.nodes = nodes()
 
     def model(self):
@@ -628,14 +773,28 @@ class CompositionTests(unittest.TestCase):
             expected.append('rules_all_prod_1')
             self.assertEqual(setup._snippet_refs(profile['config']['routing']['rules']), expected)
             self.assertEqual(profile['composition'],
-                             ['defaults', 'warp', 'chains'] if profile['geo'] == 'global'
-                             else ['defaults', 'chains'])
+                             ['defaults', 'warp_outbound', 'warp', 'chains'] if profile['geo'] == 'global'
+                             else ['defaults', 'warp_outbound', 'chains'])
+
+    def test_no_profile_has_inline_rules_or_a_domain_strategy(self):
+        # Reverse profiles block nothing: their exit traffic falls to DIRECT.
+        for profile in self.model()['profiles']:
+            routing = profile['config']['routing']
+            self.assertEqual([r for r in routing['rules'] if 'snippet' not in r], [])
+            self.assertNotIn('domainStrategy', routing)
+
+    def test_empty_condition_lists_are_refused(self):
+        self.options['profile_composition'].append({
+            'name': 'oops', 'config': {'routing': {'rules': [
+                {'vlessRoute': '0', 'domain': [], 'outboundTag': 'out-warp-socks'}]}}})
+        with self.assertRaisesRegex(AnsibleFilterError, 'empty domain list'):
+            self.model()
 
     def test_outbounds_balancers_and_log_are_preserved(self):
         for profile in self.model()['profiles']:
-            expected = ['outbounds_default_prod_1']
-            if profile['geo'] == 'global':
-                expected.append('outbounds_warp_prod_1')
+            # Every profile can send local traffic to WARP: any node may be
+            # where a path leaves its censored geo.
+            expected = ['outbounds_default_prod_1', 'outbounds_warp_prod_1']
             expected.append('outbounds_all_prod_1')
             self.assertEqual(setup._snippet_refs(profile['config']['outbounds']), expected)
             self.assertEqual(profile['config']['routing']['balancers'],
@@ -644,7 +803,9 @@ class CompositionTests(unittest.TestCase):
 
     def test_fragment_order_controls_rule_precedence(self):
         fragments = self.options['profile_composition']
-        fragments[1], fragments[2] = fragments[2], fragments[1]
+        names = [f['name'] for f in fragments]
+        warp, chains = names.index('warp'), names.index('chains')
+        fragments[warp], fragments[chains] = fragments[chains], fragments[warp]
         profile = next(p for p in self.model()['profiles'] if p['name'] == 'Default-Profile')
         self.assertEqual(setup._snippet_refs(profile['config']['routing']['rules']),
                          ['rules_default_prod_1', 'rules_all_prod_1', 'rules_warp_prod_1'])
@@ -685,7 +846,8 @@ class CompositionTests(unittest.TestCase):
         self.assertEqual(self.options, original)
 
     def test_scoped_snippet_rule_is_rejected(self):
-        self.options['profile_composition'][1]['inbounds'] = ['VLESS_TCP_REALITY']
+        warp = next(f for f in self.options['profile_composition'] if f['name'] == 'warp')
+        warp['inbounds'] = ['VLESS_TCP_REALITY']
         with self.assertRaisesRegex(AnsibleFilterError, 'must be inline'):
             self.model()
 
@@ -791,7 +953,9 @@ class RoutingDependencyTests(unittest.TestCase):
             self.assertEqual(host['vless_route_id'], 2)
             profile = next(p for p in self.model['profiles'] if p['name'] == host['config_profile'])
             self.assertNotIn('rules_warp_prod_1', setup._snippet_refs(profile['config']['routing']['rules']))
-            self.assertNotIn('outbounds_warp_prod_1', setup._snippet_refs(profile['config']['outbounds']))
+            # The outbound is there: a node of a censored geo hands default
+            # users' local traffic to its WARP where their path leaves the geo.
+            self.assertIn('outbounds_warp_prod_1', setup._snippet_refs(profile['config']['outbounds']))
             self.assertEqual(setup._routing_dependencies(
                 profile['config'], {s['name']: s['snippet'] for s in self.panel['snippets']}), [])
 
@@ -801,16 +965,17 @@ class RoutingDependencyTests(unittest.TestCase):
             profile['config']['routing']['rules'].insert(1, {'snippet': 'rules_warp_prod_1'})
         problems = self.verify()
         for name in ('Reverse-RU', 'Reverse-RU-xHTTP'):
-            self.assertIn("Config profile '%s': routing rule targets outbound out-warp-socks, "
-                          "which is absent from this profile" % name, problems)
+            self.assertIn("Config profile '%s' embeds rules snippets rules_default_prod_1, "
+                          "rules_warp_prod_1, rules_all_prod_1, the inventory wants "
+                          "rules_default_prod_1, rules_all_prod_1" % name, problems)
 
     def test_inline_warp_rule_cannot_evade_snippet_reference_check(self):
         profile = next(p for p in self.panel['config_profiles'] if p['name'] == 'Reverse-RU')
         profile['config']['routing']['rules'].insert(1, {
             'domain': ['geosite:openai'], 'vlessRoute': '0,2', 'outboundTag': 'out-warp-socks',
         })
-        self.assertTrue(any("'Reverse-RU': routing rule targets outbound out-warp-socks" in p
-                            for p in self.verify()))
+        self.assertIn("Config profile 'Reverse-RU' holds inline rules that differ from the "
+                      "inventory", self.verify())
 
     def test_global_profile_missing_warp_outbound_is_rejected(self):
         profile = next(p for p in self.panel['config_profiles'] if p['name'] == 'Default-Profile')
@@ -827,12 +992,15 @@ class RoutingDependencyTests(unittest.TestCase):
             {'vlessRoute': '100', 'ip': ['geoip:ru'], 'balancerTag': 'bal-ru'},
             {'vlessRoute': '100', 'domain': ['geosite:category-ru'], 'balancerTag': 'bal-ru'},
         ]
-        self.assertFalse([p for p in self.verify() if 'twice' in p])
+        self.assertFalse([p for p in self.verify() if 'different rules' in p])
+        # Conditional rules only split traffic off (local traffic to WARP), so
+        # they may differ; two rules on the route alone may not.
         rules['snippet'][1]['outboundTag'] = 'out-chain-ru-2'
-        rules['snippet'][3] = {'vlessRoute': '100', 'outboundTag': 'out-chain-ru-2'}
-        self.assertEqual([p for p in self.verify() if 'twice' in p], [
-            'Rules snippet rules_all_prod_1 has route id 10 twice (out-chain-ru-1 and out-chain-ru-2)',
-            'Rules snippet rules_all_prod_1 has route id 100 twice (bal-ru and out-chain-ru-2)'])
+        self.assertFalse([p for p in self.verify() if 'different rules' in p])
+        rules['snippet'][2:4] = [{'vlessRoute': '100', 'balancerTag': 'bal-ru'},
+                                 {'vlessRoute': '99-101', 'outboundTag': 'out-chain-ru-2'}]
+        self.assertEqual([p for p in self.verify() if 'different rules' in p], [
+            'Route id 100 is sent to bal-ru and to out-chain-ru-2 by different rules'])
 
     def test_nested_snippet_rules_and_outbounds_are_resolved(self):
         snippets = {'rules': [{'snippet': 'nested-rules'}],
@@ -889,6 +1057,579 @@ class ServerNamesTests(unittest.TestCase):
         self.assertTrue(warnings)
         self.assertTrue(all('chain-russia-1.example.test' in w for w in warnings))
         self.assertTrue(any('Default-Profile' in w for w in warnings))
+
+
+SERVICE = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+
+
+def hop_node(name, country, geo, domain, hops=None, protocol=TCP, extra=()):
+    node = {'name': name, 'country': country, 'geo': geo, 'protocol': protocol,
+            'domains': [{'domain': domain + '.example.test', 'type': 'net-location'}]
+            + [{'domain': d + '.example.test', 'type': 'chain-location'} for d in extra],
+            'exclusive_member': False, 'exclusive_profile': ''}
+    if hops is not None:
+        node['hops'] = hops
+    return node
+
+
+def hop_scenario(fanout=False, visible=True):
+    """reverse_scenario plus hops: EU-1 (shared-exit) carried on by hidden
+    eu-tail (and eu-tail-2 with fanout), RU entry ru-tcp by hidden ru-tail -
+    the 4-hop RU-1 > RU-3 > EU-1 > EU-3 - and eu-visible published through
+    ru-tcp only."""
+    items, opts = reverse_scenario()
+    items += [hop_node('eu-tail', 'DE', 'global', 'net-europe-3', {'from': ['shared-exit']}),
+              hop_node('ru-tail', 'RU', 'russia', 'net-russia-3', {'from': ['ru-tcp']})]
+    if visible:
+        items.append(hop_node('eu-visible', 'SE', 'global', 'net-europe-5',
+                              {'from': [{'host': 'ru-tcp', 'hidden': False}]}))
+    if fanout:
+        items.append(hop_node('eu-tail-2', 'FI', 'global', 'net-europe-4', {'from': ['shared-exit']}))
+    for domain, tag in (('net-europe-3', 'out-chain-3'), ('net-europe-4', 'out-chain-4'),
+                        ('net-europe-5', 'out-chain-5'), ('net-russia-3', 'out-chain-ru-3')):
+        opts['outbounds'].append({'address': domain + '.example.test', 'tag': tag})
+    opts['local_traffic'] = {'russia': {'domain': ['geosite:category-ru'], 'ip': ['geoip:ru']}}
+    opts['observatory'] = {
+        'global': {'probeUrl': 'https://www.gstatic.com/generate_204', 'probeInterval': '1m'},
+        'russia': {'probeUrl': 'https://www.google.ru/generate_204', 'probeInterval': '1m'},
+    }
+    return items, opts
+
+
+def panel_with_outbounds(model, opts):
+    """panel_for with every outbound as the snippets stage writes it: the
+    planned ones handing over route 0, the hop ones their route, all as the
+    service user."""
+    panel = panel_for(model)
+    outbounds = [{'tag': o['tag'], 'settings': {'vnext': [{
+        'address': o['address'],
+        'users': [{'id': setup.remnawave_route_uuid(SERVICE, o.get('route', 0))}]}]}}
+        for o in opts['outbounds'] + model['hop_outbounds']]
+    # What the warp_outbound fragment gives every profile in the inventory.
+    outbounds.append({'tag': 'out-warp-socks', 'protocol': 'socks'})
+    panel['snippets'] = [s for s in panel['snippets'] if s['name'] != 'outbounds']
+    panel['snippets'].append({'name': 'outbounds', 'snippet': outbounds})
+    return panel
+
+
+def verify_problems(model, panel, **extra):
+    options_ = {'primary_tags': ['MANAGED_BY:ANSIBLE'], 'separator': ' | by ',
+                'direct_route_id': 2, 'route_id_range': [400, 999],
+                'rules_snippet': 'rules', 'outbounds_snippet': 'outbounds'}
+    options_.update(extra)
+    return setup.remnawave_verify(panel, model, options_)
+
+
+def short(paths):
+    return [' > '.join(d.split('.')[0] for d in path) for path in paths]
+
+
+class LegacySnapshotTests(unittest.TestCase):
+    """Without remna_node_hops nothing panels and subscriptions depend on moves."""
+
+    def test_models_without_hops_match_the_snapshot_taken_before_hops(self):
+        snapshot = json.loads((ROLE / 'tests/fixtures/legacy_snapshot.json').read_text())
+        for name, (items, opts) in legacy_scenarios().items():
+            with self.subTest(scenario=name):
+                view = json.loads(json.dumps(legacy_view(setup.remnawave_model(items, opts)),
+                                             sort_keys=True))
+                self.assertEqual(view, snapshot[name])
+
+    def test_local_traffic_adds_rules_but_keeps_every_id_and_tag(self):
+        items, opts = reverse_scenario()
+        before = setup.remnawave_model(copy.deepcopy(items), copy.deepcopy(opts))
+        opts['local_traffic'] = {'russia': {'domain': ['geosite:category-ru'], 'ip': ['geoip:ru']}}
+        after = setup.remnawave_model(items, opts)
+        self.assertEqual(legacy_view(after), legacy_view(before))
+        local = [r for r in after['rules'] if 'domain' in r or 'ip' in r]
+        # RU entries reaching global and exclusive exits leave the russia geo there.
+        self.assertEqual(local, [
+            {'vlessRoute': '400,401', 'domain': ['geosite:category-ru'], 'outboundTag': 'out-warp-socks'},
+            {'vlessRoute': '400,401', 'ip': ['geoip:ru'], 'outboundTag': 'out-warp-socks'},
+        ])
+        self.assertEqual(after['hop_outbounds'], [])
+
+
+class RouteUuidTests(unittest.TestCase):
+    def test_the_route_goes_into_the_third_group(self):
+        self.assertEqual(setup.remnawave_route_uuid(SERVICE, 405), 'aaaaaaaa-bbbb-0195-8ddd-eeeeeeeeeeee')
+        self.assertEqual(setup.remnawave_route_uuid(SERVICE.upper(), '0'), 'aaaaaaaa-bbbb-0000-8ddd-eeeeeeeeeeee')
+        self.assertEqual(setup._uuid_route(setup.remnawave_route_uuid(SERVICE, 65535)), 65535)
+
+    def test_what_is_no_uuid_or_no_route_is_refused(self):
+        for uuid, route in (('not-a-uuid', 1), (SERVICE, -1), (SERVICE, 65536), (SERVICE, 'x')):
+            with self.subTest(uuid=uuid, route=route):
+                with self.assertRaises(AnsibleFilterError):
+                    setup.remnawave_route_uuid(uuid, route)
+
+    def test_the_outbound_templates_hand_over_the_route(self):
+        env = AnsibleLikeEnvironment()
+        env.filters['remnawave_route_uuid'] = setup.remnawave_route_uuid
+        for name in ('snippet_vless_reality_tcp_001.yaml', 'snippet_vless_reality_xhttp_001.yaml'):
+            template = list(yaml.safe_load((INVENTORY / name).read_text()).values())[0]
+            user_id = template['settings']['vnext'][0]['users'][0]['id']
+            for route, expected in ((None, '0000'), (404, '0194')):
+                context = {'service_user_id': SERVICE}
+                if route is not None:
+                    context['node_route_id'] = route
+                with self.subTest(template=name, route=route):
+                    self.assertEqual(env.from_string(user_id).render(**context)[14:18], expected)
+
+
+class HopTests(unittest.TestCase):
+    def model(self, **kwargs):
+        items, opts = hop_scenario(**kwargs)
+        return setup.remnawave_model(items, opts), opts
+
+    def host(self, model, remark_start):
+        return next(h for h in model['hosts'] if h['remark'].startswith(remark_start))
+
+    def test_a_hidden_node_carries_on_for_its_upstream_and_is_not_published(self):
+        model, _ = self.model()
+        addresses = [h['address'] for h in model['hosts']]
+        self.assertNotIn('net-europe-3.example.test', addresses)
+        self.assertNotIn('net-russia-3.example.test', addresses)
+        direct = self.host(model, '🇳🇱 EU-1')
+        self.assertEqual(short(direct['paths']), ['net-europe-1 > net-europe-3'])
+        self.assertNotEqual(direct['vless_route_id'], 2)
+        self.assertEqual(short(self.host(model, '🇷🇺 RU-1')['paths']), ['net-russia-1 > net-russia-3'])
+        # A direct exit without a tail keeps the direct route id.
+        self.assertEqual(self.host(model, '🇷🇺 RU-2')['vless_route_id'], 2)
+
+    def test_the_tail_of_an_entry_and_of_an_exit_make_four_hops(self):
+        model, opts = self.model()
+        host = self.host(model, '🇳🇱 EU-1 | by 🇷🇺 RU-1')
+        self.assertEqual(short(host['paths']),
+                         ['chain-russia-1 > net-russia-3 > net-europe-1 > net-europe-3'])
+        routes = dict((r['id'], r) for r in model['routes'])
+        hops = []
+        route = host['vless_route_id']
+        while route:
+            step = routes[route]
+            hops.append((step['next'][0]['address'].split('.')[0], step['local']))
+            route = step['next'][0]['carried']
+        # Local traffic leaves the russia geo at RU-3, the last node inside it.
+        self.assertEqual(hops, [('net-russia-3', None), ('net-europe-1', 'russia'),
+                                ('net-europe-3', None)])
+        self.assertEqual(verify_problems(model, panel_with_outbounds(model, opts))['problems'], [])
+
+    def test_a_hidden_entry_tail_reaches_the_reverse_direction_too(self):
+        model, _ = self.model()
+        self.assertEqual(short(self.host(model, '🇷🇺 RU-1 | by 🇳🇱 EU-1')['paths']),
+                         ['chain-europe-1 > net-europe-3 > net-russia-1 > net-russia-3'])
+
+    def test_a_shared_node_may_be_hidden_behind_an_exclusive_one(self):
+        # Exclusive users exiting through a shared node give nobody access
+        # they lacked; the opposite direction is refused (test below).
+        items, opts = hop_scenario()
+        next(n for n in items if n['name'] == 'eu-tail')['hops']['from'].append('exclusive-exit')
+        model = setup.remnawave_model(items, opts)
+        host = next(h for h in model['hosts'] if h['remark'] == '🇨🇿 EU-1 · Xenus-team')
+        self.assertEqual(short(host['paths']), ['net-europe-2 > net-europe-3'])
+        self.assertEqual(host['config_profile'], 'Xenus-team')
+
+    def test_fan_in_shares_the_action_of_the_hidden_node(self):
+        items, opts = hop_scenario()
+        items.append(hop_node('ru-tcp-peer', 'RU', 'russia', 'net-russia-6',
+                              extra=['chain-russia-6']))
+        items[-1]['protocol'] = TCP
+        opts['outbounds'].append({'address': 'net-russia-6.example.test', 'tag': 'out-chain-ru-6'})
+        tail = next(n for n in items if n['name'] == 'ru-tail')
+        tail['hops']['from'].append('ru-tcp-peer')
+        model = setup.remnawave_model(items, opts)
+        via = [h for h in model['hosts'] if h['kind'] == 'chain'
+               and h['exit'] == 'net-europe-1.example.test' and h['entry'] in (
+                   'chain-russia-1.example.test', 'chain-russia-6.example.test')]
+        self.assertEqual(len(via), 2)
+        for host in via:
+            self.assertEqual(short(host['paths'])[0].split(' > ')[1:], ['net-russia-3', 'net-europe-1', 'net-europe-3'])
+        routes = dict((r['id'], r) for r in model['routes'])
+        # Both entries hand the same route to RU-3: one action, one id.
+        self.assertEqual(len(set(routes[h['vless_route_id']]['next'][0]['carried'] for h in via)), 1)
+
+    def test_fan_out_balances_inline_in_the_balancing_profile_only(self):
+        model, opts = self.model(fanout=True)
+        balanced = [r for r in model['routes'] if r['balancer']]
+        self.assertTrue(balanced)
+        self.assertTrue(all(r['profiles'] == ['Default-Profile'] for r in balanced))
+        self.assertFalse(any(r.get('balancerTag') for r in model['rules']))
+        self.assertFalse(set(str(r['id']) for r in balanced)
+                         & set(r['vlessRoute'] for r in model['rules']))
+        for profile in model['profiles']:
+            config = profile['config']
+            if profile['name'] != 'Default-Profile':
+                self.assertNotIn('observatory', config)
+                continue
+            tags = sorted(b['tag'] for b in config['routing']['balancers'] if 'tag' in b)
+            self.assertEqual(tags, sorted(r['balancer'] for r in balanced))
+            for balancer in config['routing']['balancers']:
+                self.assertEqual(balancer['strategy'], {'type': 'leastPing'})
+                self.assertEqual(balancer['fallbackTag'], balancer['selector'][0])
+            # The balanced reverse paths end in Russia: its probe is taken
+            # when one is set (this scenario sets one).
+            self.assertEqual(config['observatory']['probeUrl'], 'https://www.google.ru/generate_204')
+            self.assertEqual(config['observatory']['subjectSelector'],
+                             sorted(n['tag'] for r in balanced for n in r['next']))
+        self.assertEqual(sorted(short(self.host(model, '🇳🇱 EU-1')['paths'])),
+                         ['net-europe-1 > net-europe-3', 'net-europe-1 > net-europe-4'])
+        self.assertEqual(verify_problems(model, panel_with_outbounds(model, opts))['problems'], [])
+
+    def test_hop_tags_never_prefix_one_another(self):
+        model, _ = self.model(fanout=True)
+        tags = [o['tag'] for o in model['hop_outbounds']]
+        for tag in tags:
+            self.assertEqual([t for t in tags if t.startswith(tag)], [tag])
+
+    def test_a_visible_relation_publishes_only_d_by_u(self):
+        model, opts = self.model()
+        published = [h for h in model['hosts'] if h['exit'] == 'net-europe-5.example.test']
+        self.assertEqual([(h['remark'], h['via'], short(h['paths'])) for h in published], [
+            ('🇸🇪 EU-2 | by 🇷🇺 RU-1', 'relation', ['chain-russia-1 > net-russia-3 > net-europe-5'])])
+        self.assertEqual(published[0]['nodes'], ['ru-tcp'])
+        self.assertEqual(verify_problems(model, panel_with_outbounds(model, opts))['problems'], [])
+
+    def test_publish_direct_adds_the_own_host_and_auto_chains_without_a_collision(self):
+        items, opts = hop_scenario()
+        next(n for n in items if n['name'] == 'eu-visible')['hops']['publish_direct'] = True
+        model = setup.remnawave_model(items, opts)
+        published = sorted((h['remark'], h.get('via', h['kind']))
+                           for h in model['hosts'] if h['exit'] == 'net-europe-5.example.test')
+        self.assertEqual(published, [('🇸🇪 EU-2', 'direct'),
+                                     ('🇸🇪 EU-2 | by 🇷🇺 RU-1', 'relation'),
+                                     ('🇸🇪 EU-2 | by 🇷🇺 RU-2', 'chain')])
+
+    def test_a_visible_relation_into_a_location_node_gets_its_variant(self):
+        items, opts = hop_scenario(visible=False)
+        items.append(hop_node('ru-visible', 'RU', 'russia', 'net-russia-7',
+                              {'from': [{'host': 'global-xhttp', 'hidden': False}]}))
+        opts['outbounds'].append({'address': 'net-russia-7.example.test', 'tag': 'out-chain-ru-7'})
+        model = setup.remnawave_model(items, opts)
+        host = next(h for h in model['hosts'] if h['exit'] == 'net-russia-7.example.test')
+        self.assertEqual((host['config_profile'], host['protocol']), ('Reverse-RU-xHTTP', XHTTP))
+        self.assertEqual(host['nodes'], ['global-xhttp'])
+
+    def refused(self, change, message):
+        items, opts = hop_scenario()
+        change(items, opts)
+        with self.assertRaisesRegex(AnsibleFilterError, message):
+            setup.remnawave_model(items, opts)
+
+    def node_of(self, items, name):
+        return next(n for n in items if n['name'] == name)
+
+    def test_a_cycle_is_refused_with_the_whole_cycle_named(self):
+        def change(items, opts):
+            self.node_of(items, 'shared-exit')['hops'] = {'from': ['eu-tail']}
+        self.refused(change, r'hop relations form a cycle: eu-tail → shared-exit → eu-tail\. Each '
+                             r'arrow means the next host lists the previous one in '
+                             r'remna_node_hops\.from; remove one of these relations\.')
+
+    def test_a_longer_cycle_is_named_too(self):
+        def change(items, opts):
+            items.append(hop_node('eu-mid', 'AT', 'global', 'net-europe-8', {'from': ['eu-tail']}))
+            opts['outbounds'].append({'address': 'net-europe-8.example.test', 'tag': 'out-chain-8'})
+            self.node_of(items, 'shared-exit')['hops'] = {'from': ['eu-mid']}
+        self.refused(change, 'cycle: eu-mid → shared-exit → eu-tail → eu-mid')
+
+    def test_what_cannot_work_is_refused(self):
+        def hidden_across_geos(items, opts):
+            self.node_of(items, 'ru-tail')['hops'] = {'from': ['shared-exit']}
+
+        def hidden_into_exclusive(items, opts):
+            self.node_of(items, 'exclusive-exit')['hops'] = {'from': ['shared-exit']}
+
+        def self_relation(items, opts):
+            self.node_of(items, 'eu-tail')['hops'] = {'from': ['eu-tail']}
+
+        def unknown_host(items, opts):
+            self.node_of(items, 'eu-tail')['hops'] = {'from': ['nowhere']}
+
+        def twice(items, opts):
+            self.node_of(items, 'eu-tail')['hops'] = {'from': ['shared-exit', 'shared-exit']}
+
+        def no_chain_domain(items, opts):
+            self.node_of(items, 'eu-visible')['hops'] = {'from': [{'host': 'eu-tail', 'hidden': False}]}
+
+        def round_robin_disagrees(items, opts):
+            peer = copy.deepcopy(self.node_of(items, 'shared-exit'))
+            peer['name'] = 'shared-exit-peer'
+            peer['domains'] = peer['domains'][:1]
+            items.append(peer)
+
+        def ipv6_forwarder(items, opts):
+            # Hidden behind an entry of Russian exits, it would have to dial them.
+            self.node_of(items, 'eu-tail')['hops']['egress'] = {'interface': 'ens4',
+                                                                'family': 'ipv6'}
+
+        def typo(items, opts):
+            self.node_of(items, 'eu-tail')['hops'] = {'form': ['shared-exit']}
+
+        for change, message in (
+                (hidden_across_geos, 'crosses censorship geos'),
+                (hidden_into_exclusive, 'exclusive node exclusive-exit'),
+                (self_relation, 'names the host itself.*egress'),
+                (unknown_host, 'names nowhere, which is no node of this panel'),
+                (twice, 'names shared-exit twice'),
+                (no_chain_domain, r'eu-tail needs exactly one chain \(chain-location\) domain'),
+                (round_robin_disagrees, 'declare different hop relations'),
+                (ipv6_forwarder, 'family of eu-tail is ipv6, but it would forward to net-russia'),
+                (typo, 'unknown keys form')):
+            with self.subTest(change=change.__name__):
+                self.refused(change, message)
+
+    def test_an_ipv6_egress_node_is_named_so_and_is_no_automatic_entry(self):
+        items, opts = hop_scenario()
+        items.append(hop_node('eu-v6', 'NL', 'global', 'net-europe-9',
+                              {'egress': {'interface': 'ens3', 'family': 'ipv6'}},
+                              extra=['chain-europe-9']))
+        opts['outbounds'].append({'address': 'net-europe-9.example.test', 'tag': 'out-chain-9'})
+        model = setup.remnawave_model(items, opts)
+        mine = [h for h in model['hosts'] if h['exit'] == 'net-europe-9.example.test']
+        self.assertEqual(sorted(h['remark'] for h in mine), [
+            '🇳🇱 EU-3 (IPv6)', '🇳🇱 EU-3 (IPv6) | by 🇷🇺 RU-1', '🇳🇱 EU-3 (IPv6) | by 🇷🇺 RU-2'])
+        self.assertFalse([h for h in model['hosts'] if h['entry'] == 'chain-europe-9.example.test'])
+        opts['remark_egress_suffix'] = {}
+        model = setup.remnawave_model(items, opts)
+        self.assertIn('🇳🇱 EU-3', [h['remark'] for h in model['hosts']])
+
+    def test_an_ipv6_node_may_enter_for_the_node_that_takes_traffic_from_it(self):
+        # IPv4 in, IPv6 out on eu-v6; eu-behind is reached through it only,
+        # and published under its own name alone.
+        items, opts = hop_scenario(visible=False)
+        items.append(hop_node('eu-v6', 'NL', 'global', 'net-europe-9',
+                              {'egress': {'interface': 'ens3', 'family': 'ipv6'}},
+                              protocol=XHTTP, extra=['chain-europe-9']))
+        items.append(hop_node('eu-behind', 'FR', 'global', 'net-europe-7',
+                              {'from': [{'host': 'eu-v6', 'hidden': False, 'show_entry': False}]}))
+        for label in ('net-europe-9', 'net-europe-7'):
+            opts['outbounds'].append({'address': label + '.example.test', 'tag': 'out-' + label})
+        model = setup.remnawave_model(items, opts)
+        behind = [h for h in model['hosts'] if h['exit'] == 'net-europe-7.example.test']
+        self.assertEqual([(h['remark'], h['address'], h['nodes'], h['config_profile'], short(h['paths']))
+                          for h in behind],
+                         [('🇫🇷 EU-2', 'chain-europe-9.example.test', ['eu-v6'], 'Default-xHTTP',
+                           ['chain-europe-9 > net-europe-7'])])
+        own = next(h for h in model['hosts'] if h['kind'] == 'direct'
+                   and h['exit'] == 'net-europe-9.example.test')
+        self.assertEqual((own['remark'], own['vless_route_id']), ('🇳🇱 EU-3 (IPv6)', 2))
+        self.assertEqual(verify_problems(model, panel_with_outbounds(model, opts))['problems'], [])
+        # show_entry as the node's default, and its usual form.
+        items[-1]['hops'] = {'from': ['eu-v6'], 'hidden': False}
+        model = setup.remnawave_model(items, opts)
+        self.assertIn('🇫🇷 EU-2 | by 🇳🇱 EU-2', [h['remark'] for h in model['hosts']])
+
+    def test_an_auto_pair_whose_tails_meet_is_skipped_with_a_warning(self):
+        items, opts = hop_scenario()
+        opts['skip_same_country'] = False
+        self.node_of(items, 'ru-tail')['hops']['from'].append('ru-xhttp')
+        model = setup.remnawave_model(items, opts)
+        self.assertTrue(any('both reach ru-tail' in w for w in model['warnings']))
+        for host in model['hosts']:
+            for path in host['paths']:
+                hosts = [d for d in path]
+                self.assertEqual(len(hosts), len(set(hosts)))
+
+    def test_verify_names_a_broken_middle_hop(self):
+        model, opts = self.model()
+        panel = panel_with_outbounds(model, opts)
+        outbounds = next(s for s in panel['snippets'] if s['name'] == 'outbounds')['snippet']
+        middle = next(o for o in outbounds if o['tag'].startswith('out-hop-001'))
+        # The hop to RU-3 hands over route 0: RU-3 becomes the exit.
+        middle['settings']['vnext'][0]['users'][0]['id'] = setup.remnawave_route_uuid(SERVICE, 0)
+        problems = verify_problems(model, panel)['problems']
+        self.assertTrue(any("'🇳🇱 EU-1 | by 🇷🇺 RU-1' goes chain-russia-1.example.test > "
+                            "net-russia-3.example.test, the inventory wants" in p for p in problems),
+                        problems)
+
+    def test_verify_checks_the_service_user_reaches_every_dialed_node(self):
+        model, opts = self.model()
+        panel = panel_with_outbounds(model, opts)
+        user = {'username': 'svc', 'vlessUuid': SERVICE,
+                'activeInternalSquads': [{'name': 'Default-Squad'}]}
+        problems = verify_problems(model, panel, service_user=user)['problems']
+        # Default-Squad is let in at the RU nodes its chains enter, not at the
+        # exclusive exit.
+        self.assertTrue(any('Service user svc cannot connect to node exclusive-exit' in p
+                            for p in problems), problems)
+        self.assertFalse(any('cannot connect to node ru-tail' in p for p in problems))
+        user['activeInternalSquads'] += [{'name': 'Reverse-proxy'}, {'name': 'Xenus-team'}]
+        self.assertFalse([p for p in verify_problems(model, panel, service_user=user)['problems']
+                          if 'Service user' in p])
+        user['vlessUuid'] = '11111111-2222-4333-8444-555555555555'
+        self.assertTrue(any('is not the user the chain outbounds authenticate as' in p
+                            for p in verify_problems(model, panel, service_user=user)['problems']))
+        notes = verify_problems(model, panel)['notes']
+        self.assertTrue(any('vpn_server_remnawave_service_user_name' in n for n in notes))
+
+
+# --- Xray routing, evaluated -------------------------------------------------
+
+SITES = {  # domain -> geosite lists it is in
+    'yandex.ru': ['category-ru'], 'gosuslugi.ru': ['category-ru'],
+    'shop-in-moscow.com': [], 'google.com': [], 'gemini.google.com': ['google-gemini'],
+}
+RESOLVED = {'yandex.ru': '77.88.55.88', 'gosuslugi.ru': '213.59.254.7',
+            'shop-in-moscow.com': '95.213.0.9', 'google.com': '142.250.74.46',
+            'gemini.google.com': '142.250.74.47'}
+GEOIP = {'77.88.55.88': 'ru', '213.59.254.7': 'ru', '95.213.0.9': 'ru',
+         '142.250.74.46': 'us', '142.250.74.47': 'us', '10.1.2.3': 'private', '8.8.8.8': 'us'}
+
+
+class Xray(object):
+    """Enough of Xray's router for the rules this role writes: first match;
+    vlessRoute lists/ranges; inboundTag; geosite/plain domains; geoip and
+    CIDR /0; AsIs or IPIfNonMatch (resolve a domain nothing matched, then
+    match again); balancers; the first outbound by default."""
+
+    def __init__(self, config, snippets):
+        def expand(section):
+            out = []
+            for item in section or []:
+                out.extend(expand(snippets[item['snippet']]) if 'snippet' in item else [item])
+            return out
+        routing = config.get('routing') or {}
+        self.rules = expand(routing.get('rules'))
+        self.outbounds = [o['tag'] for o in expand(config.get('outbounds'))]
+        self.balancers = dict((b['tag'], b) for b in expand(routing.get('balancers')))
+        self.strategy = routing.get('domainStrategy', 'AsIs')
+        for rule in self.rules:
+            for target in ('outboundTag', 'balancerTag'):
+                if rule.get(target):
+                    known = self.outbounds if target == 'outboundTag' else self.balancers
+                    assert rule[target] in known, 'dangling %s %s' % (target, rule[target])
+
+    @staticmethod
+    def domain_matches(entries, domain):
+        for entry in entries:
+            if entry.startswith('geosite:'):
+                if entry[8:] in SITES.get(domain, []):
+                    return True
+            elif domain == entry or domain.endswith('.' + entry):
+                return True
+        return False
+
+    @staticmethod
+    def ip_matches(entries, ip):
+        for entry in entries:
+            if entry.startswith('geoip:') and GEOIP.get(ip) == entry[6:]:
+                return True
+            if entry in ('0.0.0.0/0', '::/0') and (':' in ip) == (entry == '::/0'):
+                return True
+        return False
+
+    def first(self, inbound, route, domain, ip):
+        for rule in self.rules:
+            if 'inboundTag' in rule and inbound not in rule['inboundTag']:
+                continue
+            if 'vlessRoute' in rule and route not in setup._route_numbers(rule['vlessRoute']):
+                continue
+            if 'domain' in rule and not (domain and self.domain_matches(rule['domain'], domain)):
+                continue
+            if 'ip' in rule and not (ip and self.ip_matches(rule['ip'], ip)):
+                continue
+            return rule.get('outboundTag') or 'balancer:' + rule['balancerTag']
+        return None
+
+    def route(self, inbound, route, target):
+        is_ip = target[0].isdigit()
+        found = self.first(inbound, route, None if is_ip else target, target if is_ip else None)
+        if found is None and not is_ip and self.strategy == 'IPIfNonMatch':
+            found = self.first(inbound, route, target, RESOLVED[target])
+        return found or self.outbounds[0]
+
+
+class RoutingSemanticsTests(unittest.TestCase):
+    """Default users' local traffic leaves through WARP where their path leaves
+    Russia, or at the global exit; reverse users get the whole internet
+    DIRECT at the Russian exit; nothing touches the node's own API."""
+
+    def setUp(self):
+        defaults = yaml.safe_load((INVENTORY / 'snippets.yaml').read_text())
+        rendered = inventory_vars()
+        items, self.opts = hop_scenario()
+        self.opts['profile_composition'] = rendered['composition']
+        self.opts['local_traffic'] = rendered['vpn_server_remnawave_routing_local_traffic']
+        self.model = setup.remnawave_model(items, self.opts)
+        outbounds = [{'tag': o['tag']} for o in self.opts['outbounds'] + self.model['hop_outbounds']]
+        self.snippets = {
+            'outbounds_default_prod_1': defaults['vpn_server_remnawave_snippets_outbounds_default'],
+            'rules_default_prod_1': defaults['vpn_server_remnawave_snippets_rules_default'],
+            'outbounds_warp_prod_1': rendered['vpn_server_remnawave_snippets_outbounds_warp'],
+            'rules_warp_prod_1': rendered['vpn_server_remnawave_snippets_rules_warp'],
+            'outbounds_all_prod_1': outbounds,
+            'rules_all_prod_1': self.model['rules'],
+            'balancers_all_prod_1': [],
+        }
+
+    def xray(self, profile):
+        return Xray(next(p for p in self.model['profiles'] if p['name'] == profile)['config'],
+                    self.snippets)
+
+    def inbound(self, profile):
+        return next(p for p in self.model['profiles'] if p['name'] == profile)['inbound_tags'][0]
+
+    def check(self, profile, route, expected):
+        xray = self.xray(profile)
+        for target, outcome in expected.items():
+            with self.subTest(profile=profile, route=route, target=target):
+                self.assertEqual(xray.route(self.inbound(profile), route, target), outcome)
+
+    def test_every_profile_resolves_every_rule(self):
+        for profile in self.model['profiles']:
+            self.xray(profile['name'])
+
+    def test_default_user_crossing_at_the_last_russian_node(self):
+        # EU-1 | by RU-2: RU-2 (xHTTP) is where the path leaves Russia.
+        host = next(h for h in self.model['hosts'] if h['remark'] == '🇳🇱 EU-1 | by 🇷🇺 RU-2')
+        forward = next(r for r in self.model['routes'] if r['id'] == host['vless_route_id'])
+        self.assertEqual(forward['local'], 'russia')
+        self.check('Reverse-RU-xHTTP', host['vless_route_id'], {
+            'yandex.ru': 'out-warp-socks', '77.88.55.88': 'out-warp-socks',
+            # geoip on a domain needs resolving, which the forward rule's
+            # match before it never asks for: only the list catches it.
+            'shop-in-moscow.com': forward['next'][0]['tag'],
+            'google.com': forward['next'][0]['tag'], 'gemini.google.com': forward['next'][0]['tag'],
+            '10.1.2.3': 'BLOCK',
+        })
+
+    def test_default_user_four_hops_crosses_only_at_the_tail(self):
+        host = next(h for h in self.model['hosts'] if h['remark'] == '🇳🇱 EU-1 | by 🇷🇺 RU-1')
+        entry = next(r for r in self.model['routes'] if r['id'] == host['vless_route_id'])
+        # RU-1 hands everything to RU-3, its hidden tail, local traffic too.
+        self.check('Reverse-RU', host['vless_route_id'],
+                   {'yandex.ru': entry['next'][0]['tag'], 'google.com': entry['next'][0]['tag']})
+        crossing = entry['next'][0]['carried']
+        self.check('Reverse-RU', crossing, {'yandex.ru': 'out-warp-socks', 'google.com': 'out-hop-005-net-europe-1'})
+
+    def test_default_user_at_a_global_exit(self):
+        # Route 0 from the hop before, 2 from a client of a direct host.
+        for route in (0, 2):
+            self.check('Default-Profile', route, {
+                'yandex.ru': 'out-warp-socks', '77.88.55.88': 'out-warp-socks',
+                'gemini.google.com': 'out-warp-socks', 'google.com': 'DIRECT', '10.1.2.3': 'BLOCK'})
+            self.check('Xenus-team', route, {'yandex.ru': 'out-warp-socks', 'google.com': 'DIRECT'})
+
+    def test_reverse_user_gets_the_whole_internet_direct(self):
+        # Route 0 from the hop before (chains), 2 from a direct host's client.
+        for profile in ('Reverse-RU', 'Reverse-RU-xHTTP'):
+            for route in (0, 2):
+                self.check(profile, route, {
+                    'yandex.ru': 'DIRECT', 'gosuslugi.ru': 'DIRECT', '77.88.55.88': 'DIRECT',
+                    'shop-in-moscow.com': 'DIRECT',
+                    'google.com': 'DIRECT', '8.8.8.8': 'DIRECT', 'gemini.google.com': 'DIRECT',
+                    'www.gstatic.com': 'DIRECT',   # client ping probes
+                    '10.1.2.3': 'BLOCK'})
+
+    def test_the_node_api_inbound_is_never_blocked(self):
+        xray = self.xray('Reverse-RU')
+        self.assertEqual(xray.route('REMNAWAVE_API_INBOUND', 0, 'google.com'), 'DIRECT')
+
+    def test_chain_routes_through_a_russian_node_are_untouched_by_reverse_rules(self):
+        # RU-1 | by EU-1 enters Russia; at RU-1 the route is the forward one.
+        host = next(h for h in self.model['hosts'] if h['remark'] == '🇷🇺 RU-1 | by 🇳🇱 EU-1')
+        first = next(r for r in self.model['routes'] if r['id'] == host['vless_route_id'])
+        self.check('Default-Profile', host['vless_route_id'],
+                   {'google.com': first['next'][0]['tag'], 'yandex.ru': first['next'][0]['tag']})
 
 
 if __name__ == '__main__':

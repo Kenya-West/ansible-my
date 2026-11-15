@@ -55,3 +55,49 @@ install_vpn_caddy_caddy_ufw_hairpin: true
 # Comment on the UFW rules that let Docker networks reach Caddy's published
 # ports; the role deletes marked rules whose port is no longer published.
 install_vpn_caddy_caddy_hairpin_ufw_comment: caddy-hairpin
+
+# --- the cover of REALITY (tasks/cover.yml, cover/nginx.conf.j2, README) ---
+# An nginx container that answers what REALITY forwards (port 443 behind the
+# Remnawave node) and port 80, so that a prober meets nginx/OpenSSL instead of
+# Caddy's Go TLS. Caddy keeps the certificates, the labels and the routing.
+# Normally set in group_vars/caddy/cover.yaml.
+caddy_cover_enabled: true
+# The cover only exists where REALITY sits in front of Caddy: not on a host
+# whose Caddy owns 443 itself, nor on a plain HTTP one.
+caddy_cover_active: >-
+  {{ caddy_cover_enabled | bool
+     and not (caddy_http_only | default(false) | bool)
+     and not (caddy_occupy_HTTPS | default(false) | bool) }}
+# The name REALITY's target resolves on the caddy network: an alias of the
+# cover container, or of Caddy itself where the cover is not active, so
+# `<alias>:443` is a valid target on every host.
+caddy_cover_alias: cover
+caddy_cover_container_name: cover
+caddy_cover_image: nginx:stable-alpine-slim
+# Caddy as the cover reaches it on the caddy network.
+caddy_cover_caddy_host: caddy
+# Where install_webfeatures_certcopy leaves Caddy's certificates
+# (<name>/fullchain.pem and privkey.pem), and its root-owned helper.
+caddy_cover_cert_root: "{{ cert_location_root_path | default('/etc/ssl/shared') }}"
+caddy_cover_certcopy_helper: /usr/local/libexec/ansible-certcopy/copy.sh
+# Seconds to wait for the certificates of caddy_cover_names to reach
+# caddy_cover_cert_root (playbooks/reverse_proxy/cover.yaml sets it for a
+# fresh node, where Caddy is still obtaining them).
+caddy_cover_wait_for_certs: 0
+# The names nginx answers with the fake site itself. Their paths under
+# path_to_internal_services_base still go to Caddy.
+caddy_cover_names: >-
+  {{ ([domains_keys.main | default('')]
+      + (domains_keys.main_extra | default([], true))
+      + (domains_keys.remna_node | default([], true) | map(attribute='domain') | list))
+     | select | unique | list }}
+# Names handed to Caddy as raw TLS whatever certificates exist, e.g. a gRPC
+# service nginx would break. The names of the host that have no certificate in
+# caddy_cover_cert_root yet are passed through as well.
+caddy_cover_passthrough_names: []
+# What a handshake naming no site of this host gets: `cert` answers with the
+# first cover name's certificate and the fake site, as a stock nginx does;
+# `reject` refuses the handshake (ssl_reject_handshake), as Caddy did.
+caddy_cover_unknown_sni: cert
+caddy_cover_static_root: /var/www/public/sni-templates/current
+caddy_cover_conf_dir: "{{ dest_path_full }}/cover"

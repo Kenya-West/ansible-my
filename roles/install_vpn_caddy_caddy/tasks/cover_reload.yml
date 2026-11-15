@@ -1,0 +1,56 @@
+---
+# Applies what cover.yml rendered, once the compose is up, and reports who
+# answers what behind REALITY.
+
+- name: Apply and check the cover
+  when: caddy_cover_active | bool
+  block:
+    - name: Read the state of the cover container
+      community.docker.docker_container_info:
+        name: "{{ caddy_cover_container_name }}"
+      register: caddy_cover_container
+
+    - name: Reload nginx with the new configuration
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - "{{ caddy_cover_container_name }}"
+          - nginx
+          - -c
+          - /etc/nginx/cover/nginx.conf
+          - -s
+          - reload
+      changed_when: true
+      when:
+        - caddy_cover_conf is changed
+        - caddy_cover_container.exists
+        - caddy_cover_container.container.State.Running
+
+    - name: The cover container must be running
+      ansible.builtin.assert:
+        that:
+          - caddy_cover_container.exists
+          - caddy_cover_container.container.State.Running
+        fail_msg: >-
+          The container {{ caddy_cover_container_name }} is not running on {{ inventory_hostname }}:
+          run playbooks/reverse_proxy/caddy.yaml without tags (or with update_config_hard) to bring
+          the compose up, and see `docker logs {{ caddy_cover_container_name }}`.
+        quiet: true
+      when: not ansible_check_mode
+
+    - name: Show who answers what behind REALITY
+      ansible.builtin.debug:
+        msg: "{{ caddy_cover_report | select | list }}"
+      vars:
+        caddy_cover_report:
+          - >-
+            {{ 'No cover name has a certificate in ' ~ caddy_cover_cert_root ~ ' yet: Caddy still answers everything. '
+               ~ 'playbooks/reverse_proxy/cover.yaml picks the certificates up once install_webfeatures_certcopy has copied them.'
+               if caddy_cover_plan.default_cert | length == 0 else '' }}
+          - "nginx itself: {{ caddy_cover_plan.static | join(', ') | default('-', true) }}"
+          - "nginx, then Caddy: {{ caddy_cover_plan.managed | join(', ') | default('-', true) }}"
+          - "Caddy as raw TLS: {{ caddy_cover_plan.passthrough | join(', ') | default('-', true) }}"
+          - >-
+            {{ 'Cover names still without a certificate: ' ~ caddy_cover_plan.waiting | join(', ')
+               if caddy_cover_plan.waiting | length > 0 else '' }}

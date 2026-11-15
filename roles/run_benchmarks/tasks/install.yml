@@ -1,0 +1,64 @@
+---
+- name: Check whether freeze is installed
+  ansible.builtin.stat:
+    path: "{{ benchmarks_freeze_bin }}"
+  register: benchmarks_freeze_bin_stat
+
+- name: Install freeze with eget
+  when: not benchmarks_freeze_bin_stat.stat.exists or benchmarks_freeze_update | bool
+  block:
+    - name: Pick the freeze entry out of the binary packages list
+      ansible.builtin.set_fact:
+        benchmarks_freeze_packages: >-
+          {{ packages_binary_list_essentials | default([])
+             | selectattr('repo', 'equalto', benchmarks_freeze_package_repo)
+             | list }}
+
+    - name: Assert the binary packages list has a freeze entry
+      ansible.builtin.assert:
+        that: benchmarks_freeze_packages | length > 0
+        fail_msg: >-
+          No entry with repo {{ benchmarks_freeze_package_repo }} in
+          packages_binary_list_essentials
+        quiet: true
+
+    - name: Check eget is installed, install or update it
+      ansible.builtin.include_role:
+        name: install_eget_inherelab
+
+    # Only freeze is installed: the role gets just that one entry and its own
+    # eget config, so the main eget.toml and the other packages stay untouched
+    - name: Install freeze with install_packages_eget_inherelab
+      ansible.builtin.include_role:
+        name: install_packages_eget_inherelab
+      vars:
+        packages_binary_list: "{{ benchmarks_freeze_packages }}"
+        eget_config_location: "{{ benchmarks_freeze_eget_config }}"
+
+- name: Check freeze runs
+  ansible.builtin.command: "{{ benchmarks_freeze_bin }} --version"
+  register: benchmarks_freeze_version
+  changed_when: false
+
+# Commands the benchmarks check for, plus what the screenshots need
+- name: Find which benchmark dependencies are missing
+  ansible.builtin.shell: "command -v {{ item.command | quote }}"
+  loop: "{{ benchmarks_dependencies }}"
+  loop_control:
+    label: "{{ item.command }}"
+  register: benchmarks_dependency_check
+  changed_when: false
+  failed_when: false
+
+- name: Install missing benchmark dependencies and the screenshot fonts
+  ansible.builtin.apt:
+    name: >-
+      {{ (benchmarks_dependency_check.results
+          | rejectattr('rc', 'equalto', 0)
+          | map(attribute='item.package')
+          | list
+          + benchmarks_font_packages)
+         | unique }}
+    state: present
+    update_cache: true
+    cache_valid_time: 3600

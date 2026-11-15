@@ -1,0 +1,48 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for roles/configure_remnawave_panel_sync_squads
+#
+# Every variable here is normally set in
+# inventory/group_vars/vpn_server_remnawave/. These are the fallbacks that
+# keep the role usable on its own.
+
+# --- panel ------------------------------------------------------------------
+# The same connection settings configure_remnawave_panel_generate_setup uses.
+vpn_server_remnawave_access_mode: api_token
+vpn_server_remnawave_panel_url: "https://{{ domains_keys.remnawave }}"
+vpn_server_remnawave_panel_validate_certs: true
+vpn_server_remnawave_panel_timeout: 30
+vpn_server_remnawave_service_user_name: ''
+
+# --- squad sync -------------------------------------------------------------
+# Which external squad the members of an internal squad are put in, as
+# {internal_squad, external_squad}, both by name. A user can be in several
+# internal squads but only one external squad, so the first rule matching any
+# of the user's internal squads wins. Several rules may name the same external
+# squad. An empty external_squad ('' or null) takes the members out of any
+# external squad.
+vpn_server_remnawave_squads_sync: []
+
+# What happens to a user in an external squad named by some rule when no rule
+# matches the user any more, for example after leaving the internal squad. It
+# can be: ignore (leave the user there), remove (take the user out of the
+# external squad).
+vpn_server_remnawave_squads_sync_prune: ignore
+
+# Usernames never touched. The service user sits in every internal squad.
+vpn_server_remnawave_squads_sync_exclude_users:
+  - "{{ vpn_server_remnawave_service_user_name }}"
+
+# Skip users in more than one internal squad (any squads, not only the ones
+# the rules name).
+vpn_server_remnawave_squads_sync_skip_multiple_internal_squads: false
+
+# Skip users in any of these internal squads, by name.
+vpn_server_remnawave_squads_sync_skip_internal_squads: []
+
+# Skip users whose tag is one of these. The panel gives a user one tag at
+# most (A-Z, 0-9, _).
+vpn_server_remnawave_squads_sync_skip_user_tags: []
+
+# How many users one bulk request changes; the panel accepts up to 500.
+vpn_server_remnawave_squads_sync_batch_size: 500

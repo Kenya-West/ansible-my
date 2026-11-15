@@ -17,5 +17,7 @@ infra_billing_rotate_credentials: false
 infra_billing_sync_all_accounts: false
 # Account-wide import only if an enabled connector service is missing.
 infra_billing_sync_missing_services: true
+# Pull mode: file each node's billing fields are read from/updated in (HOST is replaced).
+infra_billing_pull_host_file_template: "{{ inventory_dir }}/host_vars/HOST/0_all/3_infrastructure.yaml"
 infra_billing_validate_certs: true
 infra_billing_timeout: 30

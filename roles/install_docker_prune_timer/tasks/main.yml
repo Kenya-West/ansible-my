@@ -1,0 +1,66 @@
+---
+# tasks file for roles/install_docker_prune_timer
+- name: Install Docker prune script
+  become: true
+  become_user: root
+  ansible.builtin.template:
+    src: docker-prune.sh.j2
+    dest: "{{ docker_prune_script_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: role_state == 'present'
+
+- name: Reconcile Docker prune service and timer
+  ansible.builtin.include_role:
+    name: kwtoolset/systemd_timer
+  vars:
+    systemd_timer_state: "{{ role_state }}"
+    systemd_timer_units:
+      - name: "{{ docker_prune_unit_name }}"
+        type: service
+        scope: system
+        user: root
+        path: "{{ docker_prune_systemd_unit_path }}"
+        manage_state: false
+        enabled: false
+        Unit:
+          Description: "Prune unused Docker objects"
+          Documentation: "https://docs.docker.com/engine/manage-resources/pruning/"
+          After: docker.service
+          ConditionPathExists: /usr/bin/docker
+        Service:
+          Type: oneshot
+          SyslogIdentifier: "{{ docker_prune_unit_name }}"
+          ExecStart: "/usr/bin/bash {{ docker_prune_script_path | quote }}"
+          Environment:
+            - "HOME=/root"
+            - "PATH=/usr/local/bin:/usr/bin:/bin"
+          TimeoutStartSec: "{{ docker_prune_timeout }}"
+          Nice: "10"
+          IOSchedulingClass: idle
+      - name: "{{ docker_prune_unit_name }}"
+        type: timer
+        scope: system
+        user: root
+        path: "{{ docker_prune_systemd_unit_path }}"
+        enabled: "{{ docker_prune_enabled | bool }}"
+        state: "{{ 'started' if docker_prune_enabled | bool else 'stopped' }}"
+        Unit:
+          Description: "Schedule Docker prune"
+          Documentation: "https://docs.docker.com/engine/manage-resources/pruning/"
+        Timer:
+          Unit: "{{ docker_prune_unit_name }}.service"
+          OnCalendar: "{{ docker_prune_calendar }}"
+          RandomizedDelaySec: "{{ docker_prune_randomized_delay }}"
+          Persistent: "true"
+        Install:
+          WantedBy: timers.target
+
+- name: Remove Docker prune script
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: "{{ docker_prune_script_path }}"
+    state: absent
+  when: role_state == 'absent'

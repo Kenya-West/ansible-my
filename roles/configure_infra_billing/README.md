@@ -100,6 +100,33 @@ See [data model, examples, commands and safety limits](https://github.com/Kenya-
   regeneration readers and is unrelated to the retired field.
 - Supports `--check` (GET only); secrets are protected with `no_log`.
 
+## Pull mode (infra-billing → host_vars, half-duplex)
+
+`playbooks/observability/server/infra_billing_pull.yaml` (`tasks/pull.yml`) reads
+services with a GET and updates **existing** values in each related node's
+`host_vars/<host>/0_all/3_infrastructure.yaml`
+(override with `infra_billing_pull_host_file_template`). Nothing is written to
+infra-billing.
+
+```sh
+ansible-playbook -i inventory/production.ini \
+  playbooks/observability/server/infra_billing_pull.yaml --check --diff   # preview
+ansible-playbook -i inventory/production.ini \
+  playbooks/observability/server/infra_billing_pull.yaml                  # apply
+```
+
+- Pulled: `infrastructure.billing.{amount,currency,interval,next_due_at}`,
+  `infra_billing_service.{project_uuid,uuid}`.
+- Match order: `infra_billing_service.uuid` (no fallback if it is gone), then
+  `infrastructure.service_id` = billing externalId, then service name = host name.
+  Ambiguous or double-claimed matches are skipped.
+- Only keys already present are edited, as in-place text edits that keep comments,
+  quoting and layout. Equivalent values (`370` vs `370.00`, `…Z` vs `….000Z`) are
+  left alone. The result is re-parsed before writing.
+- Never creates or removes files or keys. Hosts with a missing, symlinked,
+  vault-encrypted or unparseable file, or with no matching service, are skipped
+  with a warning and a `SKIP` line. No backups are made.
+
 ## Tests
 
 ```sh

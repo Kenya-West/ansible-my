@@ -1,0 +1,25 @@
+# The cover of REALITY (roles/install_vpn_caddy_caddy, tasks/cover.yml and
+# the role's README): an nginx container next to Caddy that answers what the
+# Remnawave node forwards (port 443) and port 80, so a prober meets
+# nginx/OpenSSL rather than Caddy's Go TLS. Caddy keeps issuing the
+# certificates and serving every site; nginx reads the certificates from
+# cert_location_root_path, where install_webfeatures_certcopy copies them.
+#
+# It only exists where REALITY sits in front of Caddy: a host with
+# caddy_occupy_HTTPS or caddy_http_only never gets one.
+caddy_cover_enabled: true
+
+# The name REALITY's target resolves on the caddy network. The cover container
+# answers to it; where there is no cover, Caddy does, so `cover:443` is a valid
+# vpn_server_remnawave_config_profiles_reality_target on every host whose
+# caddy.yaml has run since the cover was introduced.
+caddy_cover_alias: cover
+
+# A handshake naming no site of the host: `cert` answers with the first cover
+# name's certificate and the fake site, as a stock nginx does; `reject`
+# refuses it, as Caddy did, and shows no name of the host to an IP scan.
+caddy_cover_unknown_sni: cert
+
+# Names handed to Caddy as raw TLS (Caddy's own handshake), for a service
+# nginx would break in between, e.g. gRPC.
+caddy_cover_passthrough_names: []

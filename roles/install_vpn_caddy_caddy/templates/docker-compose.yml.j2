@@ -7,7 +7,9 @@ services:
     cpus: 0.5
     mem_limit: 200m
     ports:
-{% for port in caddy_external_ports_allowlist %}
+{# Port 80 is the cover's where it is active (caddy_cover_*, tasks/cover.yml). #}
+{% for port in caddy_external_ports_allowlist
+   if not (caddy_cover_active | bool and (port | string) is match('^(0[.]0[.]0[.]0:)?80:80(/tcp)?$')) %}
       - "{{port}}"
 {% endfor %}
 {% if caddy_occupy_HTTPS is defined and caddy_occupy_HTTPS == true %}
@@ -23,7 +25,15 @@ services:
     env_file:
       - .env
     networks:
-      - {{ docker_vpn_network }}
+{% if caddy_cover_active | bool %}
+      {{ docker_vpn_network }}: {}
+{% else %}
+      # No cover container on this host: Caddy answers to the name REALITY's
+      # target may carry (caddy_cover_alias) itself.
+      {{ docker_vpn_network }}:
+        aliases:
+          - {{ caddy_cover_alias }}
+{% endif %}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config:/config
@@ -41,6 +51,40 @@ services:
       caddy.handle_path.metrics: ""
       UFW_MANAGED: "TRUE"
     restart: unless-stopped
+{% if caddy_cover_active | bool %}
+
+  # The cover of REALITY: nginx answers what the Remnawave node forwards to
+  # {{ caddy_cover_alias }}:443, and port 80, with its own (OpenSSL) TLS; see
+  # cover/nginx.conf, rendered by tasks/cover.yml.
+  cover:
+    image: {{ caddy_cover_image }}
+    container_name: {{ caddy_cover_container_name }}
+    cpus: 0.5
+    mem_limit: 96m
+    command: ["nginx", "-c", "/etc/nginx/cover/nginx.conf", "-g", "daemon off;"]
+    # Caddy lets go of port 80 before the cover takes it.
+    depends_on:
+      - caddy
+    ports:
+      - "80:80"
+    networks:
+      {{ docker_vpn_network }}:
+        aliases:
+          - {{ caddy_cover_alias }}
+    volumes:
+      - ./cover:/etc/nginx/cover:ro
+      - ./static:/var/www/public:ro
+      - {{ caddy_cover_cert_root }}:{{ caddy_cover_cert_root }}:ro
+      - /home/{{ standard_user }}/logs/nginx:/var/log/nginx
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      UFW_MANAGED: "TRUE"
+    restart: unless-stopped
+{% endif %}
 
 networks:
   {{ docker_vpn_network }}:

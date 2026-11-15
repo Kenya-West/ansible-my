@@ -144,3 +144,14 @@
       {%- endfor -%}
       {{ out }}
     crpgs_profiles_left_out: "{{ crpgs_profiles_plan | selectattr('left_out') | map(attribute='name') | list }}"
+
+# The rules snippet was written by the snippets stage without being pushed
+# into the profiles (tasks/snippets.yml): its rules may name the WARP outbound
+# or inline balancers that the profiles only hold from now on.
+- name: Push the rules snippet into the profiles, now that they hold what it names
+  kenyawest.remnawave.snippet:
+    name: "{{ vpn_server_remnawave_snippets_key_rules_all }}"
+    snippet: "{{ crpgs_model.rules }}"
+    sync: always
+  delegate_to: localhost
+  when: crpgs_rules_sync_pending | default(false) | bool

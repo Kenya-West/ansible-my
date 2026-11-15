@@ -1,3 +1,5 @@
+# node_address: the domain dialed; node_route_id: the route handed to it in
+# the service user's UUID (remnawave_route_uuid) - 0 when it is the exit.
 vless_reality_tcp_001:
   tag: "tag_id"
   protocol: vless
@@ -6,7 +8,7 @@ vless_reality_tcp_001:
     vnext:
       - port: 443
         users:
-          - id: "{{ service_user_id }}"
+          - id: "{{ service_user_id | remnawave_route_uuid(node_route_id | default(0)) }}"
             flow: xtls-rprx-vision
             level: 0
             encryption: none

@@ -1,0 +1,95 @@
+---
+# One benchmark: run it in a PTY on the host, render the screenshot there,
+# then fetch it (and the raw output)
+- name: "{{ benchmark.file }} | run, render and fetch the screenshot"
+  vars:
+    benchmark_remote: "{{ benchmarks_workdir.path }}/{{ benchmark.file }}"
+    benchmark_local: "{{ benchmarks_local_run_dir }}/{{ benchmark.file }}"
+    benchmark_timeout: "{{ benchmark.timeout | default(benchmarks_timeout) | int }}"
+    benchmark_columns: "{{ benchmark.columns | default(benchmarks_columns) }}"
+  block:
+    - name: "{{ benchmark.file }} | write the command to a script"
+      ansible.builtin.copy:
+        dest: "{{ benchmark_remote }}.sh"
+        content: "{{ benchmark.command }}\n"
+        mode: "0700"
+
+    - name: "{{ benchmark.file }} | run in a terminal (up to {{ benchmark_timeout }}s)"
+      ansible.builtin.command:
+        argv:
+          - bash
+          - "{{ benchmarks_workdir.path }}/pty-capture.sh"
+          - "{{ benchmark_remote }}.raw"
+          - "{{ benchmark_columns }}"
+          - "{{ benchmark_timeout }}"
+          - "{{ benchmark_remote }}.sh"
+          - "{{ benchmarks_prompt_bashrc | default('') }}"
+        chdir: "{{ benchmarks_workdir.path }}"
+      environment:
+        TERM: xterm-256color
+      # Ansible's own limit, past the script's timeout
+      async: "{{ benchmark_timeout | int + 300 }}"
+      poll: 10
+      register: benchmark_run
+      changed_when: true
+      failed_when: false
+
+    - name: "{{ benchmark.file }} | check there is output"
+      ansible.builtin.stat:
+        path: "{{ benchmark_remote }}.raw"
+      register: benchmark_raw
+
+    - name: "{{ benchmark.file }} | fail when there is no output"
+      ansible.builtin.fail:
+        msg: >-
+          the benchmark left no output (rc={{ benchmark_run.rc | default('n/a') }}):
+          {{ benchmark_run.stderr | default(benchmark_run.msg | default('')) | trim }}
+      when: not benchmark_raw.stat.exists or benchmark_raw.stat.size == 0
+
+    - name: "{{ benchmark.file }} | render the screenshot"
+      ansible.builtin.command:
+        argv:
+          - bash
+          - "{{ benchmarks_workdir.path }}/render-png.sh"
+          - "{{ benchmark_remote }}.raw"
+          - "{{ benchmark_remote }}.png"
+          - "{{ benchmark_columns }}"
+          - "{{ benchmarks_font_family }}"
+          - "{{ benchmarks_freeze_bin }}"
+          - "{{ benchmark.start_at | default('') }}"
+      changed_when: true
+
+    - name: "{{ benchmark.file }} | fetch the screenshot"
+      ansible.builtin.fetch:
+        src: "{{ benchmark_remote }}.png"
+        dest: "{{ benchmark_local }}.png"
+        flat: true
+
+    # Raw output with all escape codes, view with less -R
+    - name: "{{ benchmark.file }} | fetch the raw output"
+      ansible.builtin.fetch:
+        src: "{{ benchmark_remote }}.raw"
+        dest: "{{ benchmark_local }}.log"
+        flat: true
+      when: benchmarks_save_logs | bool
+
+    - name: "{{ benchmark.file }} | record the result"
+      ansible.builtin.set_fact:
+        benchmarks_results: >-
+          {{ benchmarks_results + [{
+               'name': benchmark.name,
+               'ok': true,
+               'status': 'ok' if benchmark_run.rc == 0
+                         else 'stopped by timeout' if benchmark_run.rc == 143
+                         else 'exit code ' ~ benchmark_run.rc,
+             }] }}
+
+  rescue:
+    - name: "{{ benchmark.file }} | record the failure"
+      ansible.builtin.set_fact:
+        benchmarks_results: >-
+          {{ benchmarks_results + [{
+               'name': benchmark.name,
+               'ok': false,
+               'status': 'no screenshot: ' ~ (ansible_failed_result.msg | default(ansible_failed_result.stderr | default('failed'))),
+             }] }}

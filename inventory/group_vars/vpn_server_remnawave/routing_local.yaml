@@ -1,0 +1,61 @@
+# Local traffic: what a censored geo's own sites are, and what happens to it.
+#
+# There are two kinds of users, told apart by where a host's path ends:
+#
+#   default  the path ends at a global (or exclusive) exit: users inside a
+#            censored country reaching the open internet. Their local
+#            traffic leaves through the WARP of the last node of the path
+#            still inside the censored geo - never through a VPS address -
+#            or, on a path without one, through the WARP of the exit. The
+#            rest goes on to the next hop.
+#   reverse  the path ends at a node of a censored geo (a Reverse-<CODE>
+#            profile): users abroad who want that country's address. All
+#            their traffic, local or not, leaves DIRECT at that last node,
+#            with its VPS address; these lists do not apply to them.
+#
+# Where these lists are used:
+#   - rules_all (the model, crossing actions): default users, at the node
+#     where their path leaves the geo;
+#   - rules_warp (snippets_warp.yaml): default users, at global exits.
+#
+# Each geo needs a domain list, an ip list, or both - never an empty list,
+# which Xray reads as "match everything" (the role refuses it). The names
+# must exist in the geosite.dat/geoip.dat the node image ships (Xray's
+# release: v2fly domain-list-community); an unknown name stops Xray on every
+# node of the profile. There is no geosite:ru; category-ru includes the whole
+# .ru, .su and .рф TLDs and the Russian services.
+#
+# A geoip condition only sees addresses: for default users it catches IP
+# literals, since their route already matches by domain.
+vpn_server_remnawave_routing_local_traffic:
+  russia:
+    domain:
+      - "geosite:category-ru"
+    ip:
+      - "geoip:ru"
+  # iran:
+  #   domain:
+  #     - "geosite:category-ir"
+  #   ip:
+  #     - "geoip:ir"
+
+# Every geo's lists at once, for the global exits, which do not know which
+# geo a default user comes from.
+vpn_server_remnawave_routing_local_domains: >-
+  {{ vpn_server_remnawave_routing_local_traffic.values() | map(attribute='domain', default=[])
+     | flatten | unique | list }}
+vpn_server_remnawave_routing_local_ips: >-
+  {{ vpn_server_remnawave_routing_local_traffic.values() | map(attribute='ip', default=[])
+     | flatten | unique | list }}
+
+# The route ids traffic reaches the node it exits at with: 0 from the hop
+# before it (chain outbounds hand route 0 over to their last node), the direct
+# route id from clients dialing it.
+vpn_server_remnawave_routing_final_route_ids: >-
+  {{ '0,' ~ (vpn_server_remnawave_hosts_vless_route_id_direct | string)
+     if vpn_server_remnawave_hosts_vless_route_id_direct not in [none, '', 0, '0']
+     else '0' }}
+
+# The outbound default users' local traffic leaves through. It has to be in
+# every profile: a node anywhere on a path may be where it leaves its geo.
+vpn_server_remnawave_routing_local_outbound: "{{ vpn_server_remnawave_snippets_outbound_warp_tag }}"

@@ -1,0 +1,20 @@
+# {{ ansible_managed | default('Managed by Ansible') }}
+# Routes what the Remnawave node container opens out of {{ remna_node_egress_interface }}
+# (roles/install_vpn_caddy_remna, tasks/egress.yml). Runs before Docker at
+# boot, so the container never starts unrouted; it never asks Docker
+# anything, which would wait for Docker, which waits for this.
+# {{ remna_node_egress_unit }}-heal.service, after Docker, does the rest.
+[Unit]
+Description=Remnawave node egress through {{ remna_node_egress_interface }}
+Documentation=file://{{ remna_node_egress_tool }}
+Wants=network-online.target
+After=network-online.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=60
+ExecStart=/usr/bin/python3 {{ remna_node_egress_tool }} prepare
+
+[Install]
+WantedBy=multi-user.target

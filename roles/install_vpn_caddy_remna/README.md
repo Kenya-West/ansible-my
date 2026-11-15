@@ -1,31 +1,211 @@
-Role Name
-=========
+install_vpn_caddy_remna
+=======================
 
-A brief description of the role goes here.
+Deploys the Remnawave node (`remnawave/node`, container `remna`) of a
+`vpn_caddy` host as a Compose project:
+- It joins the `caddy` network, where its REALITY target lives: Caddy, or the
+  nginx cover in front of it (`roles/install_vpn_caddy_caddy`, "Cover").
+- It joins the internal `warp` network, where MicroWARP answers as
+  `microwarp-socks`.
+- It publishes 443 (unless Caddy owns it) and the control port, which UFW
+  opens to the panel's IPs only.
+- It optionally gets an **egress interface**: a second address of the same
+  machine for everything the node sends out.
 
-Requirements
-------------
+`playbooks/anti_censorship/node/remna.yaml` runs it after
+`kwtoolset/resolve_host_relations`, which finds the panel the node registers
+with.
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
-
-Role Variables
---------------
-
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
-
-Dependencies
-------------
-
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
-
-Example Playbook
+Egress interface
 ----------------
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+A machine with two addresses on two interfaces counts as two hops. Clients and
+upstream nodes connect to `ansible_host` (the DNS records stay as they are),
+and whatever the node opens itself leaves through the other interface's
+address: the next hop, the sites of the exit, everything. Only the node
+container is routed that way; the host and every other container keep the
+main routing table. No address is written anywhere: an interface name, an
+address family and, rarely, a gateway.
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+```yaml
+# host_vars/<node>/vpn_caddy/remna.yaml
+remna_node_hops:
+  egress:
+    interface: ens4    # the interface of the second address
+    family: ipv4       # ipv4 | ipv6 | dual
+    gateway: auto      # auto, or that interface's gateway when nothing tells it
+```
+
+### How
+
+1. **Network.** The container gets a Docker network of its own, `remna-egress`
+   (bridge `br-remna-eg`, `10.247.241.0/29`, plus a ULA `/64` for
+   ipv6/dual). It is attached with `gw_priority: 1`, so it is the container's
+   default route; `caddy` and `warp` stay attached for what they reach.
+2. **Marks.** nft table `inet remna_egress`, prerouting:
+   - A connection the container opens through that bridge gets conntrack mark
+     `0x2401`.
+   - Packets of marked connections coming from any bridge get firewall mark
+     `0x2401`.
+3. **Routing.** `ip rule fwmark 0x2401 lookup 2401`, then
+   `fwmark 0x2401 unreachable`. Table 2401 holds only the interface's connected
+   prefixes and `default via <gateway> dev <interface>`. Docker's own
+   MASQUERADE gives the packets that interface's address.
+4. **Replies.** They come back on the interface, and the main table delivers
+   them to the container; reverse-path filtering is loose
+   (`rp_filter=2`) on that interface and on the bridge, since the main table
+   routes their sources elsewhere.
+5. **Inbound.** Clients connect to `ansible_host` as before: those connections
+   carry no mark and answer through the main table. A connection arriving
+   on the egress address (published ports listen on every address) is marked
+   in forward, so its replies leave through the same interface.
+
+The gateway is, in order:
+1. the explicit `gateway`;
+2. a default route of that interface in any table (a second NIC usually has
+   one with a higher metric);
+3. its systemd-networkd or dhclient lease;
+4. its IPv6 router advertisement;
+5. the link itself when it is point-to-point.
+
+### Failing closed
+
+The point is never to show the entry address, so every way it can go wrong
+blocks instead of leaking:
+
+- A mark finding no route (no gateway, interface down, routes flushed) hits
+  the `unreachable` rule; it never falls back to the main table.
+- A forward guard drops anything the container opens through its bridge
+  that would leave through another interface. A second guard drops
+  anything opened from the container's addresses on its other networks: that
+  covers a default route that moved off the egress network.
+- `remna-egress check` stops the container when its default route is not the
+  egress network, or it is not attached to it. Docker reconnects containers
+  *without* their `gw_priority` when a network is recreated.
+- At boot `remna-egress.service` runs before Docker (`prepare`, which never
+  asks Docker), so the container's first packet is already routed.
+- `remna-egress.timer` runs `remna-egress-heal.service` (`apply`, after
+  Docker) every 60 s. A `networkd-dispatcher` hook runs it at once when
+  systemd-networkd reconfigures a link, which removes rules it did not make.
+  The heal service puts everything back, refreshes the guard of the
+  container's other addresses, and checks.
+
+Everything above was tested on a lab node: Ubuntu 24.04 with systemd and
+docker-ce 29, two uplinks. The ways it was broken:
+- deleted routes;
+- flushed rules;
+- strict rp_filter;
+- a changed gateway;
+- the egress network reconnected without `gw_priority`;
+- a reboot.
+
+All of them blocked or healed without a packet leaving through the entry
+address.
+
+One gap remains: deleting only the `inet remna_egress` nft table lets the
+container leave through the main route until the next heal (60 s). A whole
+`nft flush ruleset` also removes Docker's NAT on iptables-nft hosts (Ubuntu's
+default), so nothing leaves with the host's address then.
+
+### Deploying
+
+`tasks/egress.yml` runs before the compose and asserts these preconditions:
+- Docker Engine 28+ and Compose 2.33+ (for `gw_priority`);
+- the interface exists with an address of the family;
+- the subnets overlap nothing the host routes;
+- the `caddy` network has no IPv6, or it would become the container's IPv6
+  way out.
+
+It then creates the network, recreating it only when its settings changed and
+with the compose down first. It installs:
+- `/usr/local/sbin/remna-egress`;
+- the units and the timer;
+- `/etc/sysctl.d/95-remna-egress.conf`;
+- the dispatcher hook.
+
+Finally it runs `remna-egress prepare`.
+
+`tasks/egress_verify.yml` runs after the compose:
+1. It recreates the container when the egress network is missing or not its
+   default route. `compose restart` never attaches a new network, and
+   `compose up` does not notice a lost `gw_priority`.
+2. It runs `remna-egress apply` and starts the timer.
+3. It asks Cloudflare's trace by IP literal, from inside the container's
+   network namespace and from the host. The two addresses must differ.
+   The success message names both, and says when the egress address sits
+   behind the provider's NAT.
+
+Unsetting `egress` removes all of it (`tasks/egress_remove.yml`) once the
+compose is up without the network.
+
+By hand on the node:
+
+```sh
+sudo remna-egress check    # what is missing; stops the container if it would leak
+sudo remna-egress apply    # put everything back
+sudo nsenter -t "$(docker inspect -f '{{.State.Pid}}' remna)" -n curl -s https://1.1.1.1/cdn-cgi/trace | grep ip=
+```
+
+### IPv6
+
+- With `family: ipv6` or `dual`, the network gets its ULA subnet, and IPv6
+  leaves through the interface the same way.
+- `group_vars/general_vps_prepare/secure.yaml` then turns
+  `net.ipv6.conf.all.forwarding` on for that host only. os_hardening keeps it
+  off everywhere else, and `apply` re-asserts it.
+- `accept_ra` is raised from 1 to 2 where it is 1, so a host still learning
+  its route from router advertisements keeps it once forwarding is on.
+- **`ipv6` and next hops.** Node domains have IPv4 records only, so an
+  `ipv6` node could not hand traffic to another node. For the nodes that
+  name it in their `remna_node_hops.from` (`remna_node_egress_hop_domains`,
+  derived from the inventory) the IPv4 table gets one host route per address
+  their direct domains resolve to, and no default route: IPv4 reaches those
+  nodes, from the interface's IPv4 address, and nothing else. The names are
+  resolved on the node on every heal, and the last answer is kept
+  (`/var/lib/remna-egress/hops.json`) for when the resolver is not up. The
+  panel refuses an `ipv6` node on any other forwarding path.
+- **One interface, IPv4 in and IPv6 out.** The egress interface may be the
+  one `ansible_host` is on:
+
+  ```yaml
+  remna_node_hops:
+    egress: {interface: ens3, family: ipv6}
+  ```
+
+  Clients keep connecting over IPv4, and everything the node opens leaves
+  with the interface's IPv6 address. The node's own IPv4 is blocked, so a
+  site without an IPv6 address is unreachable through it. Inbound
+  connections on the egress interface are marked only in the family that
+  leaves through it, so the IPv4 clients answer by the main table. After
+  deploying, the role checks that the container leaves over IPv6 with an
+  address of the interface, cannot leave over IPv4, and still resolves names.
+  Docker asks DNS servers that are not on the host's loopback from inside
+  the container, so they must be reachable over IPv6.
+- This single-interface case was tested in a lab (one NIC with both
+  families, docker-ce 29): IPv6 out, IPv4 blocked, IPv4 and IPv6 clients
+  served, and a deleted route blocked then healed; IPv4 reaching the next
+  hop only, following its name to a new address, surviving a name that
+  stopped resolving, and `check` reporting a deleted hop route. `dual` and
+  IPv6 on a second interface were not.
+
+Variables
+---------
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `remna_node_hops.egress.interface` | | The egress interface; unset, there is none |
+| `remna_node_hops.egress.family` | `ipv4` | `ipv4`, `ipv6` or `dual` |
+| `remna_node_hops.egress.gateway` | `auto` | Explicit gateway, when nothing on the host tells it |
+| `remna_node_egress_network` / `_bridge` | `remna-egress` / `br-remna-eg` | Docker network and bridge name |
+| `remna_node_egress_subnet_ipv4` / `_ipv6` | `10.247.241.0/29` / `fd52:656d:6e61:2401::/64` | Its subnets; must overlap nothing the host routes |
+| `remna_node_egress_mark` / `_table` / `_rule_priority` | `9217` (0x2401) / `2401` / `2401` | Firewall mark, routing table, ip rule priorities (and the next one) |
+| `remna_node_egress_hop_domains` | from the inventory | Direct domains of the nodes taking traffic from this one; the only IPv4 destinations of an `ipv6` egress |
+| `remna_node_egress_heal_interval` | `60s` | How often everything is put back and checked |
+| `remna_node_egress_probe_url_ipv4` / `_ipv6` | Cloudflare trace by IP | Asked after deploying to see the addresses |
+
+`remna_node_hops.from`, `hidden` and `publish_direct` are the panel's: see
+`roles/configure_remnawave_panel_generate_setup/README.md`, Hops between
+nodes.
 
 License
 -------
@@ -35,4 +215,4 @@ BSD
 Author Information
 ------------------
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+Kenya-West

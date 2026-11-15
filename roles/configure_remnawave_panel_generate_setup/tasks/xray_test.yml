@@ -1,0 +1,94 @@
+---
+# Run every generated config profile, with the snippets it embeds expanded as
+# the panel will expand them, through `xray run -test` of the node image on the
+# controller. Needs Docker there; reads crpgs_outbounds (render_outbounds.yml).
+# Every profile gets its inbounds' real REALITY keys, so the files live in a
+# private temporary directory removed afterwards.
+
+- name: Expand every generated profile with the snippets it embeds
+  ansible.builtin.set_fact:
+    crpgs_xray_test_configs: >-
+      {%- set catalog = {} -%}
+      {%- for item in crpgs_model.profile_snippets + vpn_server_remnawave_snippets_whole -%}
+      {%-   set _ = catalog.update({item.name: item.snippet}) -%}
+      {%- endfor -%}
+      {%- set _ = catalog.update({
+            vpn_server_remnawave_snippets_key_outbounds_all: crpgs_outbounds,
+            vpn_server_remnawave_snippets_key_rules_all: crpgs_model.rules,
+          }) -%}
+      {%- set out = [] -%}
+      {%- for profile in crpgs_model.profiles -%}
+      {#- The node's log files do not exist in the test container. -#}
+      {%-   set _ = out.append({'name': profile.name,
+                                'config': profile.config | remnawave_expand(catalog)
+                                          | combine({'log': {'loglevel': 'warning'}})}) -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: Test the profiles
+  delegate_to: localhost
+  block:
+    - name: Make a private directory for the profiles
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: -xray-test
+      register: crpgs_xray_test_dir
+      changed_when: false
+      check_mode: false
+
+    - name: Write every profile
+      ansible.builtin.copy:
+        content: "{{ item.config | to_nice_json }}"
+        dest: "{{ crpgs_xray_test_dir.path }}/{{ item.name }}.json"
+        mode: "0600"
+      changed_when: false
+      check_mode: false
+      loop: "{{ crpgs_xray_test_configs }}"
+      loop_control:
+        label: "{{ item.name }}"
+      no_log: true
+
+    - name: Run Xray's config test on every profile
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network=none
+          - -v
+          - "{{ crpgs_xray_test_dir.path }}:/profiles:ro"
+          - --entrypoint
+          - xray
+          - "{{ vpn_server_remnawave_xray_test_image }}"
+          - run
+          - -test
+          - -c
+          - "/profiles/{{ item.name }}.json"
+      loop: "{{ crpgs_xray_test_configs }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: crpgs_xray_tested
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Xray must accept every profile
+      ansible.builtin.assert:
+        that:
+          - crpgs_xray_failed | length == 0
+        fail_msg: >-
+          Xray of {{ vpn_server_remnawave_xray_test_image }} refuses
+          {% for result in crpgs_xray_failed %}{{ result.item.name }}
+          ({{ ((result.stdout | default('')) ~ ' ' ~ (result.stderr | default('')))[-400:] | trim }}){{ '; ' if not loop.last else '' }}{% endfor %}.
+          Nothing has been written to the panel.
+        quiet: true
+      vars:
+        crpgs_xray_failed: "{{ crpgs_xray_tested.results | selectattr('rc', 'ne', 0) | list }}"
+  always:
+    - name: Remove the profiles
+      ansible.builtin.file:
+        path: "{{ crpgs_xray_test_dir.path }}"
+        state: absent
+      when: crpgs_xray_test_dir.path is defined
+      changed_when: false
+      check_mode: false

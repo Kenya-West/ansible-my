@@ -1,0 +1,105 @@
+---
+- name: Read {{ _gai_conf_file }}
+  ansible.builtin.slurp:
+    src: "{{ _gai_conf_file }}"
+  register: _gai_slurp
+  when: _gai_conf_stat.exists
+
+# Active precedence lines outside the managed block merge into the same table.
+- name: Find precedence lines outside the managed block
+  ansible.builtin.set_fact:
+    _gai_foreign_lines: >-
+      {%- set ns = namespace(inside=false, found=[]) -%}
+      {%- for line in (_gai_slurp.content | default('') | b64decode).splitlines() -%}
+      {%-   if line == _gai_marker_begin -%}{%- set ns.inside = true -%}
+      {%-   elif line == _gai_marker_end -%}{%- set ns.inside = false -%}
+      {%-   elif not ns.inside and line is match('[ \t]*precedence([ \t]|$)') -%}
+      {%-     set ns.found = ns.found + [line] -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.found }}
+
+- name: Stop on conflicting precedence lines
+  ansible.builtin.fail:
+    msg: |-
+      {{ _gai_conf_file }} already sets precedence outside the managed block:
+      {{ _gai_foreign_lines | join('\n') }}
+      Remove them, or set gai_conf_conflict_action=comment.
+  when:
+    - _gai_foreign_lines | length > 0
+    - gai_conf_conflict_action == 'fail'
+
+# Matches an active precedence line unless the next marker after it is the
+# END marker, i.e. unless the line sits inside the managed block.
+- name: Comment out conflicting precedence lines
+  ansible.builtin.replace:
+    path: "{{ _gai_conf_file }}"
+    regexp: >-
+      ^(?P<line>[ \t]*precedence(?:[ \t].*)?)$(?!(?:(?!{{ _gai_marker_begin | regex_escape }})[\s\S])*{{ _gai_marker_end | regex_escape }})
+    replace: "{{ gai_conf_disabled_prefix }}\\g<line>"
+    backup: "{{ gai_conf_backup | bool }}"
+  register: _gai_commented
+  when:
+    - _gai_foreign_lines | length > 0
+    - gai_conf_conflict_action == 'comment'
+
+- name: Report commented lines
+  ansible.builtin.debug:
+    msg: "configure_gai_ipv4: commented out in {{ _gai_conf_file }}: {{ _gai_foreign_lines }}"
+  when: _gai_commented is changed
+
+- name: Write IPv4 preference block
+  ansible.builtin.blockinfile:
+    path: "{{ _gai_conf_file }}"
+    marker: "{{ gai_conf_marker }}"
+    insertafter: EOF
+    create: true
+    owner: "{{ gai_conf_owner }}"
+    group: "{{ gai_conf_group }}"
+    # Must stay world-readable: every process reads it through getaddrinfo(3).
+    mode: "0644"
+    backup: "{{ gai_conf_backup | bool }}"
+    block: |-
+      # Prefer IPv4 destinations in getaddrinfo(3) (RFC 3484 / RFC 6724 sorting).
+      # Any precedence line replaces glibc's whole built-in table, so the full
+      # default table is restated with only ::ffff:0:0/96 (IPv4) raised.
+      {% for entry in gai_conf_precedence_table %}
+      precedence {{ '%-16s' | format(entry.prefix) }} {{ entry.value | int }}
+      {% endfor %}
+  register: _gai_block
+
+- name: Verify that IPv4 sorts first
+  when:
+    - gai_conf_verify_hostname | length > 0
+    - _gai_block is changed or _gai_commented is changed
+    - not ansible_check_mode
+  block:
+    - name: Resolve {{ gai_conf_verify_hostname }}
+      ansible.builtin.command:
+        argv: [getent, ahosts, "{{ gai_conf_verify_hostname }}"]
+      register: _gai_verify
+      changed_when: false
+      failed_when: false
+
+    - name: Warn when the verification lookup fails
+      ansible.builtin.debug:
+        msg: >-
+          configure_gai_ipv4: could not resolve {{ gai_conf_verify_hostname }}
+          (rc={{ _gai_verify.rc }}); address order not verified.
+      when: _gai_verify.rc != 0 or _gai_verify.stdout | length == 0
+
+    - name: Check address order
+      vars:
+        _gai_addrs: "{{ _gai_verify.stdout_lines | map('split') | map('first') | unique | list }}"
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - "':' not in _gai_addrs[0] or _gai_addrs | reject('search', ':') | list | length == 0"
+        fail_msg: >-
+          {{ _gai_conf_file }} was written but {{ gai_conf_verify_hostname }}
+          still resolves IPv6 first: {{ _gai_addrs }}. Check the file for other
+          precedence/label lines and the C library in use.
+        success_msg: "IPv4 sorts first: {{ _gai_addrs }}"
+      when:
+        - _gai_verify.rc == 0
+        - _gai_verify.stdout | length > 0

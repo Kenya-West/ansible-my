@@ -3,7 +3,19 @@
 
 packages_binary_timeout: 60
 packages_binary_concurrent_batch_size: 25
-packages_binary_list:
+packages_binary_list_required:
+  - repo: mikefarah/yq
+    assets:
+      - yq_linux_amd64
+  - repo: cupcakearmy/autorestic
+  - repo: DNSCrypt/dnscrypt-proxy
+    assets:
+      - ^REG:minisig
+    dest_loc: /usr/sbin
+  - repo: https://raw.githubusercontent.com/chaifeng/ufw-docker/master/ufw-docker
+  - repo: kevinf100/ufw-docker-automated
+
+packages_binary_list_essentials:
   # full schema is:
   # - repo: tstack/lnav           # repo name on github
   #   assets:                     # Optional. Asset filter to download. ^REG: to negative filter.
@@ -26,9 +38,6 @@ packages_binary_list:
     assets:
       - lnav
   - repo: koenbollen/jl
-  - repo: mikefarah/yq
-    assets:
-      - yq_linux_amd64
   - repo: ducaale/xh
   - repo: orf/gping
     assets:
@@ -49,7 +58,6 @@ packages_binary_list:
   - repo: fioncat/otree
   - repo: ajeetdsouza/zoxide
   - repo: veeso/termscp
-  - repo: cupcakearmy/autorestic
   - repo: mr-karan/doggo
     assets:
       - ^REG:web
@@ -98,9 +106,18 @@ packages_binary_list:
   - repo: legostin/cull
     assets:
       - tar.gz
-  - repo: DNSCrypt/dnscrypt-proxy
+  - repo: fastfetch-cli/fastfetch
     assets:
-      - ^REG:minisig
-    dest_loc: /usr/sbin
-  - repo: https://raw.githubusercontent.com/chaifeng/ufw-docker/master/ufw-docker
-  - repo: kevinf100/ufw-docker-automated
+      - '^polyfilled,tar.gz'
+    file: "REG:/usr/bin/fastfetch$"
+    bin_name: fastfetch
+  - repo: fastfetch-cli/fastfetch
+    assets:
+      - '^polyfilled,tar.gz'
+    file: "REG:/usr/bin/flashfetch$"
+    bin_name: flashfetch
+  - repo: charmbracelet/freeze
+    assets:
+      - tar.gz
+
+packages_binary_list: "{{ packages_binary_list_required + packages_binary_list_essentials }}"

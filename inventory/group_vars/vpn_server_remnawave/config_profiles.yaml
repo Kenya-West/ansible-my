@@ -69,7 +69,13 @@ vpn_server_remnawave_config_profiles_sniffing:
 
 # Where REALITY forwards what is not a client: the Caddy of the node
 # (roles/install_vpn_caddy_caddy, container caddy).
-vpn_server_remnawave_config_profiles_reality_target: caddy:443
+#
+# `cover:443` (caddy_cover_alias, group_vars/caddy/cover.yaml) is the nginx
+# cover of the node where it has one and Caddy where it has none. Switch to it
+# only once playbooks/reverse_proxy/caddy.yaml has run on EVERY node of this
+# panel since the cover was introduced: a node that does not know the name yet
+# has no target, and REALITY stops accepting clients there.
+vpn_server_remnawave_config_profiles_reality_target: cover:443
 
 # The REALITY private key of every inbound tag: its entry in
 # vpn_server_remnawave_inbounds_private_keys.specific, else the entry of the
@@ -177,7 +183,7 @@ vpn_server_remnawave_config_profiles_exclusive_group: vps_exclusive
 # One ordered list assembles the config of every profile. Matching fragments
 # contribute normal Xray config mappings: nested mappings merge, lists append
 # in declaration order, scalar values are replaced by the last matching one.
-# Thus routing precedence is visible here: defaults -> WARP -> chain/geo rules.
+# Thus routing precedence is visible here: defaults -> WARP -> chains.
 # Per-protocol base.config overrides the result (its lists replace, not append);
 # the role then supplies the generated inbounds.
 #
@@ -201,25 +207,36 @@ vpn_server_remnawave_config_profiles_composition:
         rules:
           - snippet: "{{ vpn_server_remnawave_snippets_key_rules_default }}"
 
-  # The microwarp proxy beside global-geo nodes, including exclusive ones.
-  # WARP precedes chain/geo rules, but its rule matches only unmarked/direct
-  # traffic (snippets_warp.yaml); explicit chain routes still reach their exit.
-  # Rule and outbound are selected together: non-global profiles embed neither
-  # snippet. A host's direct route id (2) alone cannot activate the WARP rule.
+  # The microwarp proxy beside every node. Every profile can send to it: a
+  # node of a censored geo hands a default user's local traffic to its own
+  # WARP where the user's path leaves the geo (routing_local.yaml, rules_all).
+  - name: warp_outbound
+    snippets:
+      - name: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
+        snippet: "{{ vpn_server_remnawave_snippets_outbounds_warp }}"
+    config:
+      outbounds:
+        - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
+
+  # WARP rules of global-geo nodes, including exclusive ones: a few services
+  # and default users' local traffic. They precede the chain rules but match
+  # only traffic exiting here - route 0 from the hop before, or the direct
+  # route id (snippets_warp.yaml) - so chain routes still reach their exit.
   - name: warp
     profiles:
       geo: global
     snippets:
-      - name: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
-        snippet: "{{ vpn_server_remnawave_snippets_outbounds_warp }}"
       - name: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
         snippet: "{{ vpn_server_remnawave_snippets_rules_warp }}"
     config:
-      outbounds:
-        - snippet: "{{ vpn_server_remnawave_snippets_key_outbounds_warp }}"
       routing:
         rules:
           - snippet: "{{ vpn_server_remnawave_snippets_key_rules_warp }}"
+
+  # Location nodes (Reverse-<CODE>) need no rules of their own: traffic
+  # exiting there (route 0 from the hop before, the direct route id from
+  # clients) matches nothing and leaves through the first outbound, DIRECT,
+  # with the node's VPS address - the full internet, not only local sites.
 
   - name: chains
     # outbounds_all and rules_all are generated/merged by the snippets stage;
@@ -257,9 +274,3 @@ vpn_server_remnawave_internal_squads_inbounds:
     profiles:
       kind: location
       geo: russia
-  - squad: Calibrach-extranet
-    profiles:
-      scope: Calibrach-extranet
-  - squad: Xenus-team
-    profiles:
-      scope: Xenus-team

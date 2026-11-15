@@ -30,9 +30,9 @@
     - eget_help_verbose.rc is defined
     - eget_help_verbose.rc == 0
     - eget_installed.rc == 0
-    - "{{ 'Usage:' in eget_help_verbose.stdout }}"
-    - "{{ 'Global Options:' in eget_help_verbose.stdout }}"
-    - "{{ 'Available Commands:' in eget_help_verbose.stdout }}"
+    - "'Usage:' in eget_help_verbose.stdout"
+    - "'Global Options:' in eget_help_verbose.stdout"
+    - "'Available Commands:' in eget_help_verbose.stdout"
 
 - name: Register condition that this is not inherelab's fork of eget because it produced unexpected output
   ansible.builtin.set_fact:

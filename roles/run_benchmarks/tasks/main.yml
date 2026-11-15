@@ -1,0 +1,155 @@
+---
+# tasks file for roles/run_benchmarks
+
+- name: Assert every selected benchmark exists
+  ansible.builtin.assert:
+    that: benchmarks_select | difference(benchmarks_list | map(attribute='name')) | length == 0
+    fail_msg: >-
+      Unknown benchmarks in benchmarks_select:
+      {{ benchmarks_select | difference(benchmarks_list | map(attribute='name')) | join(', ') }}
+    quiet: true
+
+- name: Start with no results
+  ansible.builtin.set_fact:
+    benchmarks_results: []
+
+# One timestamp for every host, so a run's screenshots sit in same-named dirs
+- name: Pick the run timestamp
+  ansible.builtin.set_fact:
+    benchmarks_run_id: "{{ now(fmt='%Y-%m-%d_%H%M%S') }}"
+  run_once: true
+
+- name: Set the local directory for this host's screenshots
+  ansible.builtin.set_fact:
+    benchmarks_local_run_dir: "{{ benchmarks_local_dir }}/{{ benchmarks_run_id }}"
+
+- name: Install freeze and the benchmark dependencies
+  ansible.builtin.include_tasks: install.yml
+
+- name: Create the local screenshot directory
+  ansible.builtin.file:
+    path: "{{ benchmarks_local_run_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+
+# With Oh My Posh installed and set up in the user's .bashrc, screenshots use
+# that profile's prompt; otherwise a plain `$` prompt
+- name: Check whether Oh My Posh is installed
+  ansible.builtin.shell: command -v oh-my-posh
+  register: benchmarks_ohmyposh
+  changed_when: false
+  failed_when: false
+  when: benchmarks_use_ohmyposh | bool
+
+- name: Check for the Oh My Posh profile in the user's .bashrc
+  ansible.builtin.command: "grep -q oh-my-posh {{ benchmarks_bashrc | quote }}"
+  register: benchmarks_bashrc_check
+  changed_when: false
+  failed_when: false
+  when:
+    - benchmarks_use_ohmyposh | bool
+    - benchmarks_ohmyposh.rc == 0
+
+- name: Choose the profile for the screenshot prompt
+  ansible.builtin.set_fact:
+    benchmarks_prompt_bashrc: >-
+      {{ benchmarks_bashrc
+         if (benchmarks_bashrc_check.rc | default(1)) == 0 else '' }}
+
+- name: Run the benchmarks
+  block:
+    # BBR is switched on for the run only (runtime value, nothing written to
+    # sysctl files), and the previous algorithm is put back in `always`
+    - name: Read the current TCP congestion control
+      ansible.builtin.command: sysctl -n net.ipv4.tcp_congestion_control
+      register: benchmarks_tcp_cc_before
+      changed_when: false
+      when: benchmarks_enable_bbr | bool
+
+    - name: Switch TCP congestion control to BBR for the benchmarks
+      ansible.builtin.command: sysctl -w net.ipv4.tcp_congestion_control=bbr
+      register: benchmarks_bbr_set
+      changed_when: benchmarks_bbr_set.rc == 0
+      # A kernel without tcp_bbr refuses; the benchmarks then run as they are
+      failed_when: false
+      when:
+        - benchmarks_enable_bbr | bool
+        - benchmarks_tcp_cc_before.stdout | trim != 'bbr'
+
+    - name: Warn when BBR could not be enabled
+      ansible.builtin.debug:
+        msg: >-
+          BBR is not available on this kernel, the benchmarks run with
+          {{ benchmarks_tcp_cc_before.stdout | trim }}:
+          {{ benchmarks_bbr_set.stderr | default('') | trim }}
+      when:
+        - benchmarks_bbr_set is not skipped
+        - benchmarks_bbr_set.rc | default(0) != 0
+
+    - name: Create a remote work directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: .benchmarks
+      register: benchmarks_workdir
+
+    - name: Copy the capture scripts
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ benchmarks_workdir.path }}/{{ item }}"
+        mode: "0755"
+      loop:
+        - pty-capture.sh
+        - pty-runner.sh
+        - ansi-flatten.py
+        - render-png.sh
+
+    # Files are numbered by position in the full list, so a benchmark keeps
+    # its number when only some are selected
+    - name: Run each benchmark in turn
+      ansible.builtin.include_tasks: run_one.yml
+      loop: "{{ benchmarks_list }}"
+      loop_control:
+        loop_var: benchmark_item
+        index_var: benchmark_index
+        label: "{{ benchmark_item.name }}"
+      vars:
+        benchmark: "{{ benchmark_item | combine({'file': '%02d_%s' | format(benchmark_index + 1, benchmark_item.name)}) }}"
+      when: >-
+        benchmarks_select | length == 0
+        or benchmark_item.name in benchmarks_select
+
+  always:
+    - name: Switch TCP congestion control back to {{ benchmarks_tcp_cc_before.stdout | default('') | trim }}
+      ansible.builtin.command: "sysctl -w net.ipv4.tcp_congestion_control={{ benchmarks_tcp_cc_before.stdout | trim }}"
+      changed_when: true
+      when:
+        - benchmarks_bbr_set is defined
+        - benchmarks_bbr_set is not skipped
+        - benchmarks_bbr_set.rc | default(1) == 0
+
+    - name: Remove the remote work directory
+      ansible.builtin.file:
+        path: "{{ benchmarks_workdir.path }}"
+        state: absent
+      when: benchmarks_workdir.path is defined
+
+- name: Show the results
+  ansible.builtin.debug:
+    msg: >-
+      {{ benchmarks_results
+         | map(attribute='name')
+         | zip(benchmarks_results | map(attribute='status'))
+         | map('join', ': ')
+         | list
+         + ['Saved to ' ~ benchmarks_local_run_dir] }}
+
+- name: Fail when a benchmark produced no screenshot
+  ansible.builtin.fail:
+    msg: >-
+      No screenshot from:
+      {{ benchmarks_results | rejectattr('ok') | map(attribute='name') | join(', ') }}
+  when:
+    - benchmarks_fail_on_error | bool
+    - benchmarks_results | rejectattr('ok') | list | length > 0

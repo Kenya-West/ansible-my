@@ -30,3 +30,64 @@ remna_node_panel_inbounds: []
 # config profile, hosts and squads are then that profile's rather than the
 # ones of its location.
 remna_node_panel_exclusive_profile: ''
+
+# ---------------------------------------------------------------------------
+# Hops between nodes and the egress interface: remna_node_hops
+# ---------------------------------------------------------------------------
+
+# Set per node in host_vars/<node>/vpn_caddy/remna.yaml; nothing here turns
+# anything on. The panel (roles/configure_remnawave_panel_generate_setup)
+# reads `from`, `hidden` and `publish_direct`; the node's own remna role reads
+# `egress`.
+#
+#   remna_node_hops:
+#     from:                    # the Ansible hosts this node takes traffic from
+#       - play2go-de-7         # a hostname, or
+#       - host: kimaro-de-11   # {host, hidden}
+#         hidden: false        # publishes "<this node> | by kimaro-de-11"
+#         show_entry: false    # ... under this node's name alone
+#     hidden: true             # what a relation without `hidden` is
+#     publish_direct: false    # keep this node's own hosts too
+#     egress:                  # a second address of this same machine
+#       interface: ens4        # outgoing traffic leaves through its address
+#       family: ipv4           # ipv4 | ipv6 | dual
+#       gateway: auto          # auto, or the gateway of that interface
+#
+# A hidden node carries on whatever its upstream would send out itself:
+# EU-2 with `from: [EU-1]` makes the host "EU-1" exit at EU-2, and "EU-1 | by
+# RU-1" go RU-1 > EU-1 > EU-2. The cycle of relations, a hidden relation across
+# censorship geos and one into an exclusive node fail the panel run. Clients
+# and upstream nodes keep connecting to ansible_host; only what leaves the
+# node goes out through the egress interface, so its two addresses are two
+# hops of their own.
+remna_node_hops_defaults:
+  hidden: true
+  show_entry: true
+  publish_direct: false
+  egress:
+    family: ipv4
+    gateway: auto
+
+# The plumbing of the egress interface (roles/install_vpn_caddy_remna,
+# tasks/egress.yml): a Docker network of the remna container alone, whose
+# traffic is marked and routed out of the egress interface by a table of its
+# own; nothing else on the host changes route. The subnets must not overlap
+# anything the host routes (checked), the IPv4 one must stay private.
+remna_node_egress_network: remna-egress
+remna_node_egress_bridge: br-remna-eg
+remna_node_egress_subnet_ipv4: 10.247.241.0/29
+remna_node_egress_subnet_ipv6: fd52:656d:6e61:2401::/64
+# Firewall mark, routing table and the priority of its two ip rules (and
+# the one after it).
+remna_node_egress_mark: 9217        # 0x2401
+remna_node_egress_table: 2401
+remna_node_egress_rule_priority: 2401
+# How often the routes and marks are checked and put back, e.g. after
+# systemd-networkd reconfigured the interface.
+remna_node_egress_heal_interval: 60s
+# Asked from inside the remna container's network namespace after deploying,
+# and from the host, to see which address each leaves with. An IP literal, as
+# the host's resolver is not reachable from the container's namespace; the
+# answer carries an `ip=<address>` line (Cloudflare's trace).
+remna_node_egress_probe_url_ipv4: https://1.1.1.1/cdn-cgi/trace
+remna_node_egress_probe_url_ipv6: "https://[2606:4700:4700::1111]/cdn-cgi/trace"

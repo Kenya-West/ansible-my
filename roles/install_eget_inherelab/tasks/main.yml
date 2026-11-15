@@ -121,7 +121,7 @@
   become: true
   become_user: root
   ansible.builtin.shell:
-    cmd: "timeout {{ eget_inherelab_timeout_seconds }}s eget install inherelab/eget"
+    cmd: "timeout {{ eget_inherelab_timeout_seconds }}s eget install --to {{ eget_location_bin }} inherelab/eget"
     chdir: "/home/{{ standard_user }}"
   environment:
     NO_COLOR: "1"
@@ -176,4 +176,13 @@
   become_user: root
   ansible.builtin.file:
     path: "{{ eget_location_user_dir }}"
+    state: absent
+
+# An older run of `eget install` without --to put a copy in root's home, which
+# can shadow the one in {{ eget_location_bin }}
+- name: Remove stray eget binary from root's user directory
+  become: true
+  become_user: root
+  ansible.builtin.file:
+    path: /root/.local/bin/eget
     state: absent

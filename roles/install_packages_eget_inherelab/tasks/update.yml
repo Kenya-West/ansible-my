@@ -23,7 +23,7 @@
 - name: Execute files/check_packages.sh and collect results
   become: true
   become_user: "{{ standard_user }}"
-  ansible.builtin.script: files/check_packages.sh
+  ansible.builtin.script: "files/check_packages.sh {{ eget_config_location }} {{ eget_config_location | dirname }}/installed.toml"
   register: eget_config_entries_consistent_check
   failed_when: eget_config_entries_consistent_check.rc != 0
   when: eget_config_entries_matched

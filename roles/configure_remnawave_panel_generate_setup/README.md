@@ -294,6 +294,23 @@ and hold the users, so it only adds: no inbound is taken out of a squad, a
 squad missing from the panel is reported and not created, and tags are left
 alone.
 
+A chain host is attached to its exit's scope, but the client dials the
+**entry**, which runs its own profile and carries only the users of the squads
+holding one of *its* inbounds. So the model also grants every squad the
+inbounds of the entries its chains go through (`transit_profiles` in
+`squad_grants`): Default-Squad gets `Reverse-RU`'s for `🇩🇪 EU-1 | by 🇷🇺 RU-1`,
+Reverse-proxy gets `Default-Profile`'s for `🇷🇺 RU-1 | by 🇩🇪 EU-1`, an exclusive
+squad gets the entries of its exit's chains. Without it a client is shown the
+chain, completes the REALITY handshake at the entry and is refused there
+(`invalid request user id` in the node's access log; Xray clients show `n/a`);
+`verify` reports a squad shown a chain host that its entry node does not let in.
+
+Transit must not widen what a squad is shown, so hosts name their audience -
+the squads granted a profile of the exit's scope - with
+`internal_squads: allow_only`: every chain and relation host, and the direct
+hosts of location and exclusive exits. Only the direct hosts of global exits
+are shown to every holder of their inbound.
+
 The direct hosts of an exclusive exit are on its own inbound, which only its
 squads hold. Its chain hosts use the exclusive variant matching the entry's
 transport, and are shown only to squads granted the exit's primary profile
@@ -304,16 +321,163 @@ entry node's active profile is not necessarily the host's subscription profile.
 Route ids
 ---------
 
-A chained exit's route id is `vpn_server_remnawave_hosts_vless_route_id_base`
-plus its position among the chained exits in
-`vpn_server_remnawave_snippets_outbounds_plan` - the order of their outbound
-tags: region, protocol, domain index. Adding or removing a chained exit therefore
-renumbers the ones after it. The rules snippet is regenerated in the same
-run, so panel and rules stay in step; anything outside this repo that
-hardcodes a route id will not.
+A route id is an **action**: what the node receiving it does with the traffic
+- the next hop it hands it to (or the balanced next hops), the route it hands
+over with it, and whether it splits off local traffic first. The rules
+snippet is one catalog in every profile, so an id must mean the same on every
+node, which it does by being the action itself.
 
-Direct hosts all carry
-`vpn_server_remnawave_hosts_vless_route_id_direct` instead.
+The chained exits keep the ids they always had: the n-th chained exit of
+`vpn_server_remnawave_snippets_outbounds_plan` (region, protocol, domain
+index) is `vpn_server_remnawave_hosts_vless_route_id_base` + n, whenever an
+entry without a hop tail reaches it. Ids hops add follow, in the order hosts
+are generated. Adding, removing or hiding a node can therefore renumber them;
+the hosts stage reports every host whose id changes, since a client keeps the
+old id until its subscription refreshes. Anything outside this repo that
+hardcodes an id will not follow.
+
+Direct hosts of an exit without a hidden node behind it carry
+`vpn_server_remnawave_hosts_vless_route_id_direct`; one with a hidden node
+carries the id of its first action.
+
+Every chain outbound hands the route on in the service user's UUID: the
+panel writes a host's route id into its clients' UUIDs (bytes 6-7, the third
+group), Xray routes by those bytes (`vlessRoute`) and ignores them when it
+looks the user up. So an outbound authenticating as the service user with
+another third group still reaches the next node, telling it what to do next
+(`remnawave_route_uuid`). The last hop hands over route `0`: the node it
+reaches is the exit. Before hops the outbounds kept the service user's own
+UUID, a random v4 one, so traffic reaching an exit carried route `0x4xxx` and
+the WARP rule's `vlessRoute: "0,2"` never matched it; now it does.
+
+Hops between nodes
+------------------
+
+A node can take traffic from other nodes instead of, or besides, from
+clients: `remna_node_hops` in its host_vars
+(`host_vars/<node>/vpn_caddy/remna.yaml`), defaults in
+`group_vars/vpn_caddy/remna.yaml` (`remna_node_hops_defaults`).
+
+```yaml
+remna_node_hops:
+  from:                       # the Ansible hosts this node takes traffic from
+    - play2go-de-7            # a hostname, or
+    - host: kimaro-de-11      # {host, hidden, show_entry}
+      hidden: false
+  hidden: true                # what a relation without `hidden` is
+  publish_direct: false       # keep this node's own hosts as well
+  egress:                     # a second address of this machine, node side:
+    interface: ens4           # see roles/install_vpn_caddy_remna
+    family: ipv4
+```
+
+**Hidden** (the default): the node carries on whatever its upstream would
+send out itself, and is not published. `EU-2` with `from: [EU-1]` makes the
+host `EU-1` exit at EU-2; `EU-1 | by RU-1` goes RU-1 > EU-1 > EU-2; with
+`RU-2` hidden behind `RU-1` too, it goes RU-1 > RU-2 > EU-1 > EU-2. A hidden
+relation hangs off the Ansible host, so every domain of the upstream - its
+exit and its chain entry - continues into the hidden node. Several upstreams
+(fan-in) share it; several hidden nodes behind one upstream (fan-out) are
+balanced, see below.
+
+**Visible** (`hidden: false`): the relation publishes `D | by U`, entered
+through U's chain domain. D has no direct host of its own, and is no exit of
+automatic chains, unless it says `publish_direct: true`; U keeps exiting its
+own traffic. With `show_entry: false` (per relation, or as the node's
+default) the host is published under D's name alone - `🇫🇷 EU-6` instead of
+`🇫🇷 EU-6 | by 🇳🇱 EU-4` - so the node dialed is not named; a node can have one
+such relation only, as remarks are unique.
+
+**IPv4 in, IPv6 out.** A node whose `egress.family` is `ipv6` exits its own
+traffic over IPv6 and is named so: `🇳🇱 EU-7 (IPv6)`
+(`vpn_server_remnawave_hosts_remark_egress_suffix`; a name from
+`vpn_server_remnawave_hosts_labels` stays as written). It is no automatic
+chain entry, but it may be the upstream of relations: its egress routes IPv4
+to the nodes naming it in `from`, and to nothing else. Together:
+
+```yaml
+# host_vars/netrum-nl-5/...            # host_vars/inet-fr-1/...
+remna_node_hops:                       remna_node_hops:
+  egress:                                from:
+    interface: ens3                        - host: netrum-nl-5
+    family: ipv6                             hidden: false
+                                             show_entry: false
+```
+
+publishes `🇳🇱 EU-7 (IPv6)` (in over IPv4, out over IPv6 at netrum-nl-5) and
+`🇫🇷 EU-6` (dialed at netrum-nl-5, out at inet-fr-1), and nothing dialing
+inet-fr-1 itself.
+
+Refused, with the hosts named: a cycle of relations (`play2go-de-7 →
+senko-de-5 → play2go-de-7`), a hidden relation across censorship geos (it
+would change the user type mid-path; chain across geos with `hidden: false`),
+a hidden relation into an exclusive node from outside its profile (shared
+users would exit there), a host naming itself (a second address of the same
+machine is `egress`), a host that is no node of this panel, nodes behind one
+domain declaring different relations, a visible upstream without exactly one
+chain domain, and an `egress.family: ipv6` node that would forward to a node
+not naming it in `from` (node domains have IPv4 records only, and its IPv4
+is open to those nodes alone). An automatic pair whose two tails
+share a node is skipped with a warning.
+
+### User types and local traffic
+
+Who a host is for follows from where its path ends:
+
+| User type | Path ends at | Local traffic (`vpn_server_remnawave_routing_local_traffic`) | Other traffic |
+| --- | --- | --- | --- |
+| default | a global or exclusive node | WARP of the **last node of the path inside the censored geo**; on a path without one, WARP of the exit | the next hop, then DIRECT at the exit |
+| reverse | a node of a censored geo (`Reverse-<CODE>`) | DIRECT at that node, with its VPS address | DIRECT at that node too (full internet) |
+
+- The default users' rule sits in `rules_all` on the ids of the actions that
+  leave the geo (`local: russia` in the model's routes), so it fires only on
+  that node. The exit-side rule is in `rules_warp` (global profiles,
+  `vlessRoute` 0 and the direct id).
+- Reverse users need no rule: at the exit their traffic (`vlessRoute` 0 from
+  the hop before, the direct id from clients) matches nothing and leaves
+  through the first outbound, DIRECT, so chains and direct hosts ending in
+  Russia reach the whole internet - and pass client ping probes.
+- `geoip` in the default users' rule only sees IP literals: their route
+  matches by itself first, so Xray never resolves for it (which also keeps
+  their DNS off the Russian node).
+- The names must exist in the dat files of the node image (the Xray
+  release's v2fly lists): there is no `geosite:ru`; `geosite:category-ru`
+  covers the `.ru`, `.su` and `.рф` TLDs and Russian services.
+
+### Fan-out
+
+A node several hidden nodes take traffic from hands each action to a
+`leastPing` balancer over the outbounds to them, written **inline** into the
+profiles that node activates - rule, balancer and `observatory` together, so
+no profile ever names a balancer it lacks. Only that node receives the
+balancer's route id, but every node activating that profile probes. The
+probe follows the whole rest of each path; a profile balancing paths that end
+in a censored geo uses that geo's probe when one is set, else the global one
+(`vpn_server_remnawave_hosts_hops_observatory`).
+
+### Writing order
+
+`rules_all` is written by the snippets stage **without being synced** into the
+profiles, and synced after the config profiles stage: its rules may name the
+WARP outbound or inline balancers that the profiles only get then, and a
+profile taking a rule naming a balancer it lacks stops Xray on its nodes. A
+run without the config profiles stage checks every profile embedding the
+snippet first (`remnawave_dangling`) and refuses to sync when anything would
+dangle.
+
+With `vpn_server_remnawave_xray_test: true`, every generated profile, its
+snippets expanded, goes through `xray run -test` of
+`vpn_server_remnawave_xray_test_image` on the controller (Docker needed)
+before anything is written: an unknown geosite name or a dangling reference
+fails the run instead of every node of a profile.
+
+### Without hops
+
+An inventory without `remna_node_hops` gets the hosts, remarks, route ids,
+outbound tags, profiles and squad grants it had before hops existed
+(`tests/fixtures/legacy_snapshot.json`); only the routing above is new. The
+same 2-hop setups can also be written explicitly, as visible relations with
+`publish_direct: true`.
 
 Tags: what the role owns
 ------------------------
@@ -402,10 +566,18 @@ The `verify` stage (`remnawave_verify.yaml`, and the end of every
 `remnawave_generate_all.yaml` run) reads the panel back and follows what it
 holds the way a client is routed, writing nothing:
 
-- every managed host's route id leads, through the rule of that id in the
-  rules snippet and the outbound that rule names, to the exit domain the host
-  is named after (`🇰🇿 AS-1 | by 🇷🇺 RU-1` must reach `net-asia-2`); direct
-  hosts carry `vpn_server_remnawave_hosts_vless_route_id_direct`;
+- every managed host's route id leads, through the rule of that id (the
+  rules snippet or a balancing profile's inline rules), the outbound or the
+  balanced outbounds it names and the route each hands over in its UUID, hop
+  by hop to route 0, along exactly the paths of the model
+  (`🇰🇿 AS-1 | by 🇷🇺 RU-1` must reach `net-asia-2`); a host served by its
+  own node carries `vpn_server_remnawave_hosts_vless_route_id_direct`;
+- the rules snippet is the model's, the observatory and inline balancers and
+  rules of every profile are the model's, two rules matching on a route alone
+  never send it to different places, and every chain outbound authenticates
+  as one user - with `vpn_server_remnawave_service_user_name` set, the
+  service user, whose squads must hold an inbound of every node a chain
+  outbound dials;
 - every host is attached to the profile and inbound of the model, and shown to
   the squads of the model;
 - the nodes a host binds to exist and activate its inbound (direct) or a
@@ -481,7 +653,7 @@ In `group_vars/vpn_server_remnawave/config_profiles.yaml`:
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `vpn_server_remnawave_config_profiles_base` | the two below | One base profile per protocol, as `{protocol, name, variant_suffix, inbounds, config}` |
-| `vpn_server_remnawave_config_profiles_composition` | defaults, WARP, chains | Ordered named config fragments with profile selectors and whole snippet definitions |
+| `vpn_server_remnawave_config_profiles_composition` | defaults, warp_outbound, warp, chains | Ordered named config fragments with profile selectors and whole snippet definitions |
 | `vpn_server_remnawave_config_profiles_location` | `{name: Reverse-{code}, inbound_suffix: REVERSE_{code}}` | Naming of a location's variant |
 | `vpn_server_remnawave_config_profiles_exclusive` | `[]` | The panel's exclusive profiles, as `{name, inbound_suffix}` (its host_vars) |
 | `vpn_server_remnawave_config_profiles_exclusive_group` | `vps_exclusive` | Group whose nodes are published on an exclusive profile |
@@ -496,6 +668,27 @@ In `group_vars/vpn_server_remnawave/config_profiles.yaml`:
 | --- | --- | --- | --- | --- |
 | `Default-Profile` | `vless-reality-tcp` | `VLESS_TCP_REALITY` | raw | |
 | `Default-xHTTP` | `vless-reality-xhttp` | `VLESS_REALITY_XHTTP` | xhttp | `-xHTTP` |
+
+### Hops and local traffic
+
+In `group_vars/vpn_server_remnawave/routing_local.yaml` and `hosts.yaml`; see
+[Hops between nodes](#hops-between-nodes):
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `vpn_server_remnawave_routing_local_traffic` | russia: `geosite:category-ru`, `geoip:ru` (role: none) | Per censored geo, `{domain, ip}` lists of its own sites |
+| `vpn_server_remnawave_routing_local_outbound` | `out-warp-socks` | Where default users' local traffic leaves |
+| `vpn_server_remnawave_routing_final_route_ids` | `0,2` | Route ids traffic reaches its exit with |
+| `vpn_server_remnawave_hosts_hops_observatory` | global: gstatic | Per geo the balanced paths end in: `probeUrl`, `probeInterval`, `enableConcurrency` |
+| `vpn_server_remnawave_hosts_hops_outbound_tag_prefix` | `out-hop` | Tags of outbounds handing a route other than 0 on |
+| `vpn_server_remnawave_hosts_hops_balancer_tag_prefix` | `bal-hop` | Tags of fan-out balancers |
+| `vpn_server_remnawave_service_user_name` | `''` | Username of the chain outbounds' user, checked by verify when set |
+| `vpn_server_remnawave_xray_test` | `false` | Test every generated profile with the node image's Xray before writing |
+| `vpn_server_remnawave_xray_test_image` | `remnawave/node:latest` | The image whose Xray tests them |
+
+Node side, in a node's host_vars: `remna_node_hops` (`from`, `hidden`,
+`publish_direct`, `egress`), defaults `remna_node_hops_defaults` in
+`group_vars/vpn_caddy/remna.yaml`.
 
 ### Nodes
 
@@ -532,7 +725,7 @@ Node side, in `group_vars/vpn_caddy/remna.yaml` or a node's host_vars:
 | `..._domain_types_specific_filter` | `[chain-location]` | Domain types a chain host is entered through |
 | `vpn_server_remnawave_hosts_publish_state` | `present` | `present`, `disabled` or `enabled`, see [New hosts are disabled](#new-hosts-are-disabled) |
 | `vpn_server_remnawave_hosts_adopt_untagged` | `false` | Whether a generated host may take over a host of its remark without the primary tags |
-| `vpn_server_remnawave_hosts_prune` | `disable` | What to do with primary-tagged hosts the inventory no longer produces: `ignore`, `disable`, `delete` |
+| `vpn_server_remnawave_hosts_prune` | `delete` | What to do with primary-tagged hosts the inventory no longer produces: `ignore`, `disable`, `delete` |
 | `vpn_server_remnawave_hosts_port` | `443` | Port advertised to clients |
 | `vpn_server_remnawave_hosts_fingerprint` | `firefox` | uTLS fingerprint |
 | `vpn_server_remnawave_hosts_labels` | `{}` | Display names keyed by domain label, overriding the generated ones |

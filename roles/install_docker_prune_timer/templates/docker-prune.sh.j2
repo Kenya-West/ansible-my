@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+# Prunes unused Docker objects (rootful Docker). Run by {{ docker_prune_unit_name }}.timer.
+set -euo pipefail
+
+{% set until_arg = (' --filter until=' ~ (docker_prune_until | quote)) if docker_prune_until | length > 0 else '' %}
+{% if docker_prune_containers | bool %}
+docker container prune --force{{ until_arg }}
+{% endif %}
+{% if docker_prune_images | bool %}
+docker image prune --force{{ until_arg }}
+{% endif %}
+{% if docker_prune_networks | bool %}
+docker network prune --force{{ until_arg }}
+{% endif %}
+{% if docker_prune_volumes | bool %}
+docker volume prune --force
+{% endif %}
+{% if docker_prune_builder_cache | bool %}
+docker builder prune --force{{ until_arg }}
+{% endif %}

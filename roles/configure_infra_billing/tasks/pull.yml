@@ -1,0 +1,39 @@
+---
+# Pull-only: infra-billing -> existing host_vars files. No billing writes, no
+# file creation/removal. Preview with --check --diff before applying.
+- name: Start with no pull hosts
+  ansible.builtin.set_fact:
+    cib_pull_hosts: []
+
+- name: Resolve which inventory nodes belong to this billing server
+  ansible.builtin.include_tasks: collect_pull_host.yml
+  loop: "{{ groups[infra_billing_node_group] | default([]) }}"
+  loop_control:
+    loop_var: cib_node
+
+- name: Read infra-billing services (GET only)
+  infra_billing:
+    api_url: "{{ infra_billing_api_url }}"
+    token: "{{ infra_billing_api_token }}"
+    action: read
+    validate_certs: "{{ infra_billing_validate_certs }}"
+    timeout: "{{ infra_billing_timeout }}"
+  delegate_to: localhost
+  register: cib_pull_read
+  no_log: true
+
+- name: Pull billing data into existing host files
+  infra_billing_pull:
+    services: "{{ cib_pull_read.gathered.services }}"
+    hosts: "{{ cib_pull_hosts }}"
+  delegate_to: localhost
+  register: cib_pull_result
+
+- name: Report pull (one line per change, skip or warning)
+  ansible.builtin.debug:
+    msg: >-
+      {{ ['Billing server: ' ~ inventory_hostname ~ ' | ' ~ ('check mode, nothing written' if ansible_check_mode else 'apply')
+          ~ ' | hosts=' ~ cib_pull_result.counts.hosts ~ ' changed=' ~ cib_pull_result.counts.changed
+          ~ ' skipped=' ~ cib_pull_result.counts.skipped
+          ~ ' billing_services_without_host=' ~ cib_pull_result.counts.billing_services_without_host]
+         + (cib_pull_result.lines if cib_pull_result.lines | length > 0 else ['No changes.']) }}

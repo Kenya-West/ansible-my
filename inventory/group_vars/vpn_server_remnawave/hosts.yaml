@@ -51,9 +51,13 @@ vpn_server_remnawave_hosts_adopt_untagged: false
 #             hand in the panel comes back on; retired hosts stay disabled
 vpn_server_remnawave_hosts_publish_state: enabled
 
+vpn_server_remnawave_hosts_prune: delete
+
 # A direct host takes its exit's profile. A chain host takes its exit's access
 # scope (global, location or exclusive), using the entry's transport.
-# The entry node still activates its own scope's profile for server routing.
+# The entry node still activates its own scope's profile for server routing,
+# so the squads shown a chain are also granted the entry's inbounds (squads
+# stage), and hosts are allow_only the squads granted their exit's scope.
 
 vpn_server_remnawave_hosts_port: 443
 vpn_server_remnawave_hosts_fingerprint: firefox
@@ -84,6 +88,13 @@ vpn_server_remnawave_hosts_remark_chain_separator: ' | by '
 # {profile} the exclusive profile: "🇨🇿 EU-1 · Xenus-team". A remark has to be
 # unique panel-wide, and an exclusive squad sees only its own exits.
 vpn_server_remnawave_hosts_remark_exclusive_format: '{name} · {profile}'
+
+# Appended to the generated name of a node whose own traffic leaves through an
+# egress interface (remna_node_hops.egress) in this family, while clients
+# reach it over IPv4: "🇳🇱 EU-6 (IPv6)". A name from
+# vpn_server_remnawave_hosts_labels is left as written.
+vpn_server_remnawave_hosts_remark_egress_suffix:
+  ipv6: ' (IPv6)'
 
 # ---------------------------------------------------------------------------
 # Chains
@@ -138,3 +149,30 @@ vpn_server_remnawave_hosts_vless_route_id_base: 400
 # Route id put on every direct host. Leave empty to publish direct hosts
 # without a route id at all.
 vpn_server_remnawave_hosts_vless_route_id_direct: 2
+
+# ---------------------------------------------------------------------------
+# Hops between nodes (remna_node_hops, group_vars/vpn_caddy/remna.yaml)
+# ---------------------------------------------------------------------------
+
+# A node several hidden nodes take traffic from balances between them
+# (leastPing): its profile gets the balancer and an Xray observatory probing
+# every next hop through the whole rest of its path. Every node activating
+# that profile probes, not only the one balancing. Settings per geo the
+# balanced paths end in, falling back to the global ones; every exit reaches
+# the whole internet, so the global probe serves paths ending in Russia too.
+vpn_server_remnawave_hosts_hops_observatory:
+  global:
+    probeUrl: https://www.gstatic.com/generate_204
+    probeInterval: 1m
+    enableConcurrency: true
+
+# Tags of what the model adds for hops: outbounds handing a route other than 0
+# to the next node (<prefix>-<NNN>-<label>), and the balancers of nodes with
+# several hidden next hops (<prefix>-<route id>).
+vpn_server_remnawave_hosts_hops_outbound_tag_prefix: out-hop
+vpn_server_remnawave_hosts_hops_balancer_tag_prefix: bal-hop
+
+# The username of the user the chain outbounds authenticate as
+# (service_user_id is its VLESS UUID). When set, verify checks that its
+# internal squads hold an inbound of every node a chain outbound dials.
+vpn_server_remnawave_service_user_name: ''

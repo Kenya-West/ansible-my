@@ -1,0 +1,15 @@
+---
+- name: Remove IPv4 preference block
+  ansible.builtin.blockinfile:
+    path: "{{ _gai_conf_file }}"
+    marker: "{{ gai_conf_marker }}"
+    state: absent
+    backup: "{{ gai_conf_backup | bool }}"
+
+- name: Restore precedence lines commented out by this role
+  ansible.builtin.replace:
+    path: "{{ _gai_conf_file }}"
+    regexp: "^{{ gai_conf_disabled_prefix | regex_escape }}(?P<line>.*)$"
+    replace: "\\g<line>"
+    backup: "{{ gai_conf_backup | bool }}"
+  when: gai_conf_restore_disabled | bool

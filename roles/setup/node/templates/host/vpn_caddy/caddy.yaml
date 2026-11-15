@@ -2,3 +2,7 @@
 # server running the Remnawave panel. A plain Remnawave node leaves it unset:
 # the node takes 443 and Caddy sits behind it.
 # caddy_occupy_HTTPS: true
+
+# A Remnawave node gets an nginx cover in front of Caddy (group_vars/caddy/cover.yaml,
+# the README of roles/install_vpn_caddy_caddy). Uncomment to leave this host without one.
+# caddy_cover_enabled: false

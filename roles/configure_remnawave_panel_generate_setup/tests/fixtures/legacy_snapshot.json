@@ -1,0 +1,1073 @@
+{
+ "exclusive_reverse": {
+  "forward_rules": [
+   {
+    "outboundTag": "out-chain-1",
+    "vlessRoute": "400"
+   },
+   {
+    "outboundTag": "out-chain-2",
+    "vlessRoute": "401"
+   },
+   {
+    "outboundTag": "out-chain-ru-1",
+    "vlessRoute": "402"
+   },
+   {
+    "outboundTag": "out-chain-ru-2",
+    "vlessRoute": "403"
+   }
+  ],
+  "hosts": [
+   {
+    "address": "net-europe-1.example.test",
+    "config_profile": "Default-Profile",
+    "entry": null,
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_TCP_REALITY",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "shared-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇳🇱 EU-1",
+    "vless_route_id": 2
+   },
+   {
+    "address": "net-europe-2.example.test",
+    "config_profile": "Xenus-team",
+    "entry": null,
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "exclusive-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇨🇿 EU-1 · Xenus-team",
+    "vless_route_id": 2
+   },
+   {
+    "address": "net-russia-1.example.test",
+    "config_profile": "Xenus-team",
+    "entry": null,
+    "exit": "net-russia-1.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "ru-tcp"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇷🇺 RU-1 · Xenus-team",
+    "vless_route_id": 2
+   },
+   {
+    "address": "net-russia-2.example.test",
+    "config_profile": "Reverse-RU-xHTTP",
+    "entry": null,
+    "exit": "net-russia-2.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "ru-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇷🇺 RU-1",
+    "vless_route_id": 2
+   },
+   {
+    "address": "chain-russia-1.example.test",
+    "config_profile": "Default-Profile",
+    "entry": "chain-russia-1.example.test",
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_TCP_REALITY",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-tcp"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇳🇱 EU-1 | by 🇷🇺 RU-1 · Xenus-team",
+    "vless_route_id": 400
+   },
+   {
+    "address": "chain-russia-2.example.test",
+    "config_profile": "Default-xHTTP",
+    "entry": "chain-russia-2.example.test",
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_REALITY_XHTTP",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇳🇱 EU-1 | by 🇷🇺 RU-1",
+    "vless_route_id": 400
+   },
+   {
+    "address": "chain-asia-1.example.test",
+    "config_profile": "Xenus-team-xHTTP",
+    "entry": "chain-asia-1.example.test",
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "global-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇨🇿 EU-1 · Xenus-team | by 🇳🇱 ASIA-1",
+    "vless_route_id": 401
+   },
+   {
+    "address": "chain-europe-1.example.test",
+    "config_profile": "Xenus-team",
+    "entry": "chain-europe-1.example.test",
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "shared-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇨🇿 EU-1 · Xenus-team | by 🇳🇱 EU-1",
+    "vless_route_id": 401
+   },
+   {
+    "address": "chain-russia-1.example.test",
+    "config_profile": "Xenus-team",
+    "entry": "chain-russia-1.example.test",
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-tcp"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇨🇿 EU-1 · Xenus-team | by 🇷🇺 RU-1 · Xenus-team",
+    "vless_route_id": 401
+   },
+   {
+    "address": "chain-russia-2.example.test",
+    "config_profile": "Xenus-team-xHTTP",
+    "entry": "chain-russia-2.example.test",
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇨🇿 EU-1 · Xenus-team | by 🇷🇺 RU-1",
+    "vless_route_id": 401
+   },
+   {
+    "address": "chain-asia-1.example.test",
+    "config_profile": "Xenus-team-xHTTP",
+    "entry": "chain-asia-1.example.test",
+    "exit": "net-russia-1.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "global-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇷🇺 RU-1 · Xenus-team | by 🇳🇱 ASIA-1",
+    "vless_route_id": 402
+   },
+   {
+    "address": "chain-europe-1.example.test",
+    "config_profile": "Xenus-team",
+    "entry": "chain-europe-1.example.test",
+    "exit": "net-russia-1.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "shared-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇷🇺 RU-1 · Xenus-team | by 🇳🇱 EU-1",
+    "vless_route_id": 402
+   },
+   {
+    "address": "chain-asia-1.example.test",
+    "config_profile": "Reverse-RU-xHTTP",
+    "entry": "chain-asia-1.example.test",
+    "exit": "net-russia-2.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "global-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇷🇺 RU-1 | by 🇳🇱 ASIA-1",
+    "vless_route_id": 403
+   },
+   {
+    "address": "chain-europe-1.example.test",
+    "config_profile": "Reverse-RU",
+    "entry": "chain-europe-1.example.test",
+    "exit": "net-russia-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "shared-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇷🇺 RU-1 | by 🇳🇱 EU-1",
+    "vless_route_id": 403
+   }
+  ],
+  "node_profiles": {
+   "exclusive-exit": {
+    "config_profile": "Xenus-team",
+    "inbounds": [
+     "VLESS_TCP_REALITY_XENUS"
+    ]
+   },
+   "global-xhttp": {
+    "config_profile": "Default-xHTTP",
+    "inbounds": [
+     "VLESS_REALITY_XHTTP"
+    ]
+   },
+   "ru-tcp": {
+    "config_profile": "Xenus-team",
+    "inbounds": [
+     "VLESS_TCP_REALITY_XENUS"
+    ]
+   },
+   "ru-xhttp": {
+    "config_profile": "Reverse-RU-xHTTP",
+    "inbounds": [
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ]
+   },
+   "shared-exit": {
+    "config_profile": "Default-Profile",
+    "inbounds": [
+     "VLESS_TCP_REALITY"
+    ]
+   }
+  },
+  "profiles": [
+   [
+    "Default-Profile",
+    "global",
+    "global",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY"
+    ],
+    [
+     "Default-Squad"
+    ]
+   ],
+   [
+    "Default-xHTTP",
+    "global",
+    "global",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP"
+    ],
+    [
+     "Default-Squad"
+    ]
+   ],
+   [
+    "Reverse-RU",
+    "location",
+    "RU",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY_REVERSE_RU"
+    ],
+    [
+     "Reverse-proxy"
+    ]
+   ],
+   [
+    "Reverse-RU-xHTTP",
+    "location",
+    "RU",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ],
+    [
+     "Reverse-proxy"
+    ]
+   ],
+   [
+    "Xenus-team",
+    "exclusive",
+    "Xenus-team",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY_XENUS"
+    ],
+    [
+     "Xenus-team"
+    ]
+   ],
+   [
+    "Xenus-team-xHTTP",
+    "exclusive",
+    "Xenus-team",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP_XENUS"
+    ],
+    [
+     "Xenus-team"
+    ]
+   ]
+  ],
+  "squad_grants": [
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY",
+     "VLESS_REALITY_XHTTP"
+    ],
+    "profiles": [
+     "Default-Profile",
+     "Default-xHTTP"
+    ],
+    "squad": "Default-Squad"
+   },
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY_REVERSE_RU",
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ],
+    "profiles": [
+     "Reverse-RU",
+     "Reverse-RU-xHTTP"
+    ],
+    "squad": "Reverse-proxy"
+   },
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY_XENUS",
+     "VLESS_REALITY_XHTTP_XENUS"
+    ],
+    "profiles": [
+     "Xenus-team",
+     "Xenus-team-xHTTP"
+    ],
+    "squad": "Xenus-team"
+   }
+  ]
+ },
+ "forward": {
+  "forward_rules": [
+   {
+    "outboundTag": "out-chain-1",
+    "vlessRoute": "400"
+   },
+   {
+    "outboundTag": "out-chain-2",
+    "vlessRoute": "401"
+   }
+  ],
+  "hosts": [
+   {
+    "address": "net-europe-1.example.test",
+    "config_profile": "Default-Profile",
+    "entry": null,
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_TCP_REALITY",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "shared-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇳🇱 EU-1",
+    "vless_route_id": 2
+   },
+   {
+    "address": "net-europe-2.example.test",
+    "config_profile": "Xenus-team",
+    "entry": null,
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "exclusive-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇨🇿 EU-1 · Xenus-team",
+    "vless_route_id": 2
+   },
+   {
+    "address": "chain-russia-1.example.test",
+    "config_profile": "Default-Profile",
+    "entry": "chain-russia-1.example.test",
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_TCP_REALITY",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-tcp"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇳🇱 EU-1 | by 🇷🇺 RU-1",
+    "vless_route_id": 400
+   },
+   {
+    "address": "chain-russia-2.example.test",
+    "config_profile": "Default-xHTTP",
+    "entry": "chain-russia-2.example.test",
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_REALITY_XHTTP",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇳🇱 EU-1 | by 🇷🇺 RU-2",
+    "vless_route_id": 400
+   },
+   {
+    "address": "chain-russia-1.example.test",
+    "config_profile": "Xenus-team",
+    "entry": "chain-russia-1.example.test",
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-tcp"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇨🇿 EU-1 · Xenus-team | by 🇷🇺 RU-1",
+    "vless_route_id": 401
+   },
+   {
+    "address": "chain-russia-2.example.test",
+    "config_profile": "Xenus-team-xHTTP",
+    "entry": "chain-russia-2.example.test",
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇨🇿 EU-1 · Xenus-team | by 🇷🇺 RU-2",
+    "vless_route_id": 401
+   }
+  ],
+  "node_profiles": {
+   "exclusive-exit": {
+    "config_profile": "Xenus-team",
+    "inbounds": [
+     "VLESS_TCP_REALITY_XENUS"
+    ]
+   },
+   "ru-tcp": {
+    "config_profile": "Reverse-RU",
+    "inbounds": [
+     "VLESS_TCP_REALITY_REVERSE_RU"
+    ]
+   },
+   "ru-xhttp": {
+    "config_profile": "Reverse-RU-xHTTP",
+    "inbounds": [
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ]
+   },
+   "shared-exit": {
+    "config_profile": "Default-Profile",
+    "inbounds": [
+     "VLESS_TCP_REALITY"
+    ]
+   }
+  },
+  "profiles": [
+   [
+    "Default-Profile",
+    "global",
+    "global",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY"
+    ],
+    [
+     "Default-Squad"
+    ]
+   ],
+   [
+    "Default-xHTTP",
+    "global",
+    "global",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP"
+    ],
+    [
+     "Default-Squad"
+    ]
+   ],
+   [
+    "Reverse-RU",
+    "location",
+    "RU",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY_REVERSE_RU"
+    ],
+    [
+     "Reverse-proxy"
+    ]
+   ],
+   [
+    "Reverse-RU-xHTTP",
+    "location",
+    "RU",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ],
+    [
+     "Reverse-proxy"
+    ]
+   ],
+   [
+    "Xenus-team",
+    "exclusive",
+    "Xenus-team",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY_XENUS"
+    ],
+    [
+     "Xenus-team"
+    ]
+   ],
+   [
+    "Xenus-team-xHTTP",
+    "exclusive",
+    "Xenus-team",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP_XENUS"
+    ],
+    [
+     "Xenus-team"
+    ]
+   ]
+  ],
+  "squad_grants": [
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY",
+     "VLESS_REALITY_XHTTP"
+    ],
+    "profiles": [
+     "Default-Profile",
+     "Default-xHTTP"
+    ],
+    "squad": "Default-Squad"
+   },
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY_REVERSE_RU",
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ],
+    "profiles": [
+     "Reverse-RU",
+     "Reverse-RU-xHTTP"
+    ],
+    "squad": "Reverse-proxy"
+   },
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY_XENUS",
+     "VLESS_REALITY_XHTTP_XENUS"
+    ],
+    "profiles": [
+     "Xenus-team",
+     "Xenus-team-xHTTP"
+    ],
+    "squad": "Xenus-team"
+   }
+  ]
+ },
+ "reverse": {
+  "forward_rules": [
+   {
+    "outboundTag": "out-chain-1",
+    "vlessRoute": "400"
+   },
+   {
+    "outboundTag": "out-chain-2",
+    "vlessRoute": "401"
+   },
+   {
+    "outboundTag": "out-chain-ru-1",
+    "vlessRoute": "402"
+   },
+   {
+    "outboundTag": "out-chain-ru-2",
+    "vlessRoute": "403"
+   }
+  ],
+  "hosts": [
+   {
+    "address": "net-europe-1.example.test",
+    "config_profile": "Default-Profile",
+    "entry": null,
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_TCP_REALITY",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "shared-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇳🇱 EU-1",
+    "vless_route_id": 2
+   },
+   {
+    "address": "net-europe-2.example.test",
+    "config_profile": "Xenus-team",
+    "entry": null,
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "exclusive-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇨🇿 EU-1 · Xenus-team",
+    "vless_route_id": 2
+   },
+   {
+    "address": "net-russia-1.example.test",
+    "config_profile": "Reverse-RU",
+    "entry": null,
+    "exit": "net-russia-1.example.test",
+    "inbound": "VLESS_TCP_REALITY_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "ru-tcp"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇷🇺 RU-1",
+    "vless_route_id": 2
+   },
+   {
+    "address": "net-russia-2.example.test",
+    "config_profile": "Reverse-RU-xHTTP",
+    "entry": null,
+    "exit": "net-russia-2.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "direct",
+    "nodes": [
+     "ru-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇷🇺 RU-2",
+    "vless_route_id": 2
+   },
+   {
+    "address": "chain-russia-1.example.test",
+    "config_profile": "Default-Profile",
+    "entry": "chain-russia-1.example.test",
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_TCP_REALITY",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-tcp"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇳🇱 EU-1 | by 🇷🇺 RU-1",
+    "vless_route_id": 400
+   },
+   {
+    "address": "chain-russia-2.example.test",
+    "config_profile": "Default-xHTTP",
+    "entry": "chain-russia-2.example.test",
+    "exit": "net-europe-1.example.test",
+    "inbound": "VLESS_REALITY_XHTTP",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇳🇱 EU-1 | by 🇷🇺 RU-2",
+    "vless_route_id": 400
+   },
+   {
+    "address": "chain-russia-1.example.test",
+    "config_profile": "Xenus-team",
+    "entry": "chain-russia-1.example.test",
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-tcp"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇨🇿 EU-1 · Xenus-team | by 🇷🇺 RU-1",
+    "vless_route_id": 401
+   },
+   {
+    "address": "chain-russia-2.example.test",
+    "config_profile": "Xenus-team-xHTTP",
+    "entry": "chain-russia-2.example.test",
+    "exit": "net-europe-2.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_XENUS",
+    "internal_squads": {
+     "mode": "allow_only",
+     "squads": [
+      "Xenus-team"
+     ]
+    },
+    "kind": "chain",
+    "nodes": [
+     "ru-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇨🇿 EU-1 · Xenus-team | by 🇷🇺 RU-2",
+    "vless_route_id": 401
+   },
+   {
+    "address": "chain-asia-1.example.test",
+    "config_profile": "Reverse-RU-xHTTP",
+    "entry": "chain-asia-1.example.test",
+    "exit": "net-russia-1.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "global-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇷🇺 RU-1 | by 🇳🇱 ASIA-1",
+    "vless_route_id": 402
+   },
+   {
+    "address": "chain-europe-1.example.test",
+    "config_profile": "Reverse-RU",
+    "entry": "chain-europe-1.example.test",
+    "exit": "net-russia-1.example.test",
+    "inbound": "VLESS_TCP_REALITY_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "shared-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇷🇺 RU-1 | by 🇳🇱 EU-1",
+    "vless_route_id": 402
+   },
+   {
+    "address": "chain-asia-1.example.test",
+    "config_profile": "Reverse-RU-xHTTP",
+    "entry": "chain-asia-1.example.test",
+    "exit": "net-russia-2.example.test",
+    "inbound": "VLESS_REALITY_XHTTP_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "global-xhttp"
+    ],
+    "protocol": "vless-reality-xhttp",
+    "remark": "🇷🇺 RU-2 | by 🇳🇱 ASIA-1",
+    "vless_route_id": 403
+   },
+   {
+    "address": "chain-europe-1.example.test",
+    "config_profile": "Reverse-RU",
+    "entry": "chain-europe-1.example.test",
+    "exit": "net-russia-2.example.test",
+    "inbound": "VLESS_TCP_REALITY_REVERSE_RU",
+    "internal_squads": {
+     "mode": "exclude",
+     "squads": []
+    },
+    "kind": "chain",
+    "nodes": [
+     "shared-exit"
+    ],
+    "protocol": "vless-reality-tcp",
+    "remark": "🇷🇺 RU-2 | by 🇳🇱 EU-1",
+    "vless_route_id": 403
+   }
+  ],
+  "node_profiles": {
+   "exclusive-exit": {
+    "config_profile": "Xenus-team",
+    "inbounds": [
+     "VLESS_TCP_REALITY_XENUS"
+    ]
+   },
+   "global-xhttp": {
+    "config_profile": "Default-xHTTP",
+    "inbounds": [
+     "VLESS_REALITY_XHTTP"
+    ]
+   },
+   "ru-tcp": {
+    "config_profile": "Reverse-RU",
+    "inbounds": [
+     "VLESS_TCP_REALITY_REVERSE_RU"
+    ]
+   },
+   "ru-xhttp": {
+    "config_profile": "Reverse-RU-xHTTP",
+    "inbounds": [
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ]
+   },
+   "shared-exit": {
+    "config_profile": "Default-Profile",
+    "inbounds": [
+     "VLESS_TCP_REALITY"
+    ]
+   }
+  },
+  "profiles": [
+   [
+    "Default-Profile",
+    "global",
+    "global",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY"
+    ],
+    [
+     "Default-Squad"
+    ]
+   ],
+   [
+    "Default-xHTTP",
+    "global",
+    "global",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP"
+    ],
+    [
+     "Default-Squad"
+    ]
+   ],
+   [
+    "Reverse-RU",
+    "location",
+    "RU",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY_REVERSE_RU"
+    ],
+    [
+     "Reverse-proxy"
+    ]
+   ],
+   [
+    "Reverse-RU-xHTTP",
+    "location",
+    "RU",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ],
+    [
+     "Reverse-proxy"
+    ]
+   ],
+   [
+    "Xenus-team",
+    "exclusive",
+    "Xenus-team",
+    "vless-reality-tcp",
+    [
+     "VLESS_TCP_REALITY_XENUS"
+    ],
+    [
+     "Xenus-team"
+    ]
+   ],
+   [
+    "Xenus-team-xHTTP",
+    "exclusive",
+    "Xenus-team",
+    "vless-reality-xhttp",
+    [
+     "VLESS_REALITY_XHTTP_XENUS"
+    ],
+    [
+     "Xenus-team"
+    ]
+   ]
+  ],
+  "squad_grants": [
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY",
+     "VLESS_REALITY_XHTTP"
+    ],
+    "profiles": [
+     "Default-Profile",
+     "Default-xHTTP"
+    ],
+    "squad": "Default-Squad"
+   },
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY_REVERSE_RU",
+     "VLESS_REALITY_XHTTP_REVERSE_RU"
+    ],
+    "profiles": [
+     "Reverse-RU",
+     "Reverse-RU-xHTTP"
+    ],
+    "squad": "Reverse-proxy"
+   },
+   {
+    "inbounds": [
+     "VLESS_TCP_REALITY_XENUS",
+     "VLESS_REALITY_XHTTP_XENUS"
+    ],
+    "profiles": [
+     "Xenus-team",
+     "Xenus-team-xHTTP"
+    ],
+    "squad": "Xenus-team"
+   }
+  ]
+ }
+}

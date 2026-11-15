@@ -1,12 +1,14 @@
 # Routing through the microwarp SOCKS5 proxy (roles/install_vpn_caddy_microwarp)
-# that runs beside every node: one outbound and the rule sending some domains
-# to it. Each is a snippet of its own, written as it is and embedded only in
-# the profiles of the global geo by the warp composition fragment
-# (vpn_server_remnawave_config_profiles_composition, config_profiles.yaml).
+# that runs beside every node: one outbound and the rules sending some domains
+# to it. Each is a snippet of its own, written as it is. The outbound is in
+# every profile (warp_outbound fragment): any node may be where a default
+# user's local traffic leaves its censored geo through WARP (routing_local.yaml,
+# rules_all). The rules are embedded only in the profiles of the global geo
+# (warp fragment, config_profiles.yaml).
 #
 # The snippet catalog is not a global routing table. Non-global profiles do
-# not embed this rule or its outbound; their direct route id 2 stays local to
-# those profiles and does not activate WARP.
+# not embed these rules; their direct route id 2 stays local to those profiles
+# and does not activate them.
 #
 # The proxy's values come from group_vars/vpn_caddy/warp.yaml, which the role
 # uses as well - the panel hosts are vpn_caddy hosts too. The node's xray reaches
@@ -38,4 +40,14 @@ vpn_server_remnawave_snippets_rules_warp:
       - "geosite:google-gemini"
       - "geosite:spotify"
       - "whatismyipaddress.com"
+    outboundTag: "{{ vpn_server_remnawave_snippets_outbound_warp_tag }}"
+  # Default users' local traffic of every censored geo (routing_local.yaml) at
+  # the global exit it reaches: a path that never passed a node of that geo,
+  # or whose node there left it to the exit. Never through the exit's VPS
+  # address. Chain outbounds hand route 0 to the exit, so this sees them too.
+  - vlessRoute: "{{ vpn_server_remnawave_routing_final_route_ids }}"
+    domain: "{{ vpn_server_remnawave_routing_local_domains }}"
+    outboundTag: "{{ vpn_server_remnawave_snippets_outbound_warp_tag }}"
+  - vlessRoute: "{{ vpn_server_remnawave_routing_final_route_ids }}"
+    ip: "{{ vpn_server_remnawave_routing_local_ips }}"
     outboundTag: "{{ vpn_server_remnawave_snippets_outbound_warp_tag }}"

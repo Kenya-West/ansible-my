@@ -8,6 +8,7 @@
 - import_playbook: ../base/powershell_modules.yaml
 - import_playbook: ../base/docker.yaml
 - import_playbook: ../base/docker_mirrors.yaml
+- import_playbook: ../base/docker_prune_timer.yaml
 - import_playbook: ../base/ohmyposh.yaml
 - import_playbook: ../base/bash_default.yaml
 - import_playbook: ../base/bash.yaml

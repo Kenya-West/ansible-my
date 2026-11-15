@@ -1,0 +1,226 @@
+---
+# The egress interface of the Remnawave node (remna_node_hops.egress): what the
+# container opens itself leaves through remna_node_egress_interface's address,
+# while clients and upstream nodes keep connecting to ansible_host. Before the
+# compose is brought up: the network the container attaches to, and the
+# routing, marks and guards it needs (egress/remna-egress.py.j2). After it,
+# egress_verify.yml checks the container really leaves that way.
+#
+# Nothing else on the host changes route: only connections the container
+# opens through its own Docker network carry the mark the routing table keys
+# on. See the README's "Egress interface".
+
+- name: Read the versions of Docker Engine and Compose
+  ansible.builtin.command:
+    argv: [docker, version, --format, "{{ '{{' }}.Server.Version{{ '}}' }}"]
+  register: remna_egress_engine
+  changed_when: false
+  check_mode: false
+
+- name: Read the version of Docker Compose
+  ansible.builtin.command:
+    argv: [docker, compose, version, --short]
+  register: remna_egress_compose
+  changed_when: false
+  check_mode: false
+
+- name: Docker must be able to pick the container's default gateway network
+  ansible.builtin.assert:
+    that:
+      - remna_egress_engine.stdout is version('28.0', '>=')
+      - remna_egress_compose.stdout | regex_replace('^v', '') is version('2.33', '>=')
+    fail_msg: >-
+      The egress interface needs Docker Engine 28.0+ and Compose 2.33+ for
+      gw_priority, which makes {{ remna_node_egress_network }} the container's default
+      route; {{ inventory_hostname }} runs Engine {{ remna_egress_engine.stdout }} and
+      Compose {{ remna_egress_compose.stdout }}.
+    quiet: true
+
+- name: The egress interface must exist and carry an address of its family
+  ansible.builtin.assert:
+    that:
+      - remna_node_egress_interface in ansible_facts.interfaces
+      - remna_node_egress_family not in ['ipv4', 'dual'] or remna_egress_iface.ipv4 is defined
+      - >-
+        remna_node_egress_family not in ['ipv6', 'dual']
+        or (remna_egress_iface.ipv6 | default([]) | selectattr('scope', 'equalto', 'global') | list | length > 0)
+    fail_msg: >-
+      remna_node_hops.egress of {{ inventory_hostname }} names interface
+      {{ remna_node_egress_interface }} ({{ remna_node_egress_family }}), but the host has
+      {{ ansible_facts.interfaces | join(', ') }}{{ '' if remna_node_egress_interface not in ansible_facts.interfaces
+      else ', and it has no ' ~ remna_node_egress_family ~ ' address' }}.
+    quiet: true
+  vars:
+    remna_egress_iface: "{{ ansible_facts[remna_node_egress_interface | replace('-', '_')] | default({}) }}"
+
+- name: Read the host's routes and Docker networks
+  ansible.builtin.command:
+    argv: [ip, -j, "-{{ item }}", route, show, table, all]
+  loop: [4, 6]
+  register: remna_egress_routes
+  changed_when: false
+  check_mode: false
+
+- name: The egress subnets must overlap nothing the host routes
+  ansible.builtin.assert:
+    that:
+      - remna_egress_overlaps | length == 0
+    fail_msg: >-
+      remna_node_egress_subnet_ipv4/ipv6 ({{ remna_node_egress_subnet_ipv4 }},
+      {{ remna_node_egress_subnet_ipv6 }}) overlap what {{ inventory_hostname }} already
+      routes: {{ remna_egress_overlaps | join(', ') }}. Pick other subnets in its host_vars.
+    quiet: true
+  vars:
+    remna_egress_overlaps: >-
+      {%- set out = [] -%}
+      {%- for result in remna_egress_routes.results -%}
+      {%-   for route in result.stdout | from_json -%}
+      {%-     set subnet = remna_node_egress_subnet_ipv4 if result.item == 4 else remna_node_egress_subnet_ipv6 -%}
+      {%-     if route.dst is defined and route.dst not in ['default', 'multicast']
+                 and route.dev | default('') != remna_node_egress_bridge
+                 and (route.table | default('main') | string) != (remna_node_egress_table | string)
+                 and route.type | default('unicast') in ['unicast', 'local']
+                 and (route.dst | ansible.utils.ipaddr('net') or route.dst | ansible.utils.ipaddr('address'))
+                 and ((route.dst if '/' in route.dst else route.dst ~ ('/32' if result.item == 4 else '/128'))
+                      | ansible.utils.network_in_network(subnet)
+                      or subnet | ansible.utils.network_in_network(route.dst if '/' in route.dst
+                         else route.dst ~ ('/32' if result.item == 4 else '/128'))) -%}
+      {%-       set _ = out.append(route.dst ~ ' (' ~ route.dev | default('?') ~ ')') -%}
+      {%-     endif -%}
+      {%-   endfor -%}
+      {%- endfor -%}
+      {{ out | unique }}
+
+# A dual-stack network beside it would hand the container an IPv6 default
+# route of its own, leaving through the host's address.
+- name: Read the other networks the container is on
+  community.docker.docker_network_info:
+    name: "{{ docker_vpn_network }}"
+  register: remna_egress_vpn_network
+
+- name: No other network may give the container an IPv6 route out
+  ansible.builtin.assert:
+    that:
+      - not (remna_egress_vpn_network.network.EnableIPv6 | default(false))
+    fail_msg: >-
+      Docker network {{ docker_vpn_network }} has IPv6 enabled, so the remna container
+      would get an IPv6 default route through it, out of the host's own address.
+      Disable IPv6 on it.
+    quiet: true
+  when: remna_egress_vpn_network.exists
+
+- name: Read the egress network as it is
+  community.docker.docker_network_info:
+    name: "{{ remna_node_egress_network }}"
+  register: remna_egress_network_info
+
+# Recreating a network reconnects its containers without their gw_priority,
+# which would hand the default route back to the host's address: the
+# compose project goes down first, and comes up again later in the role.
+- name: Tell whether the egress network has to be recreated
+  ansible.builtin.set_fact:
+    remna_egress_network_differs: >-
+      {{
+        remna_egress_network_info.exists
+        and (
+          (remna_egress_network_info.network.Options | default({}, true)).get('com.docker.network.bridge.name') != remna_node_egress_bridge
+          or (remna_egress_network_info.network.EnableIPv6 | default(false)) != (remna_node_egress_family != 'ipv4')
+          or (remna_egress_network_info.network.IPAM.Config | default([], true) | map(attribute='Subnet') | sort)
+             != ([remna_node_egress_subnet_ipv4]
+                 + ([remna_node_egress_subnet_ipv6] if remna_node_egress_family != 'ipv4' else [])) | sort
+        )
+      }}
+
+- name: Take the compose project down before its network is recreated
+  ansible.builtin.include_role:
+    name: kwtoolset/compose_down
+  vars:
+    project_paths:
+      - "{{ dest_path_full }}"
+  when: remna_egress_network_differs | bool
+
+# appends: the module would otherwise disconnect every container it is not
+# told about - the remna container itself - on every run; force: recreate
+# only what changed, once the compose is down (above).
+- name: Create the egress network of the container
+  community.docker.docker_network:
+    name: "{{ remna_node_egress_network }}"
+    driver: bridge
+    driver_options:
+      com.docker.network.bridge.name: "{{ remna_node_egress_bridge }}"
+    enable_ipv6: "{{ remna_node_egress_family != 'ipv4' }}"
+    ipam_config: >-
+      {{ [{'subnet': remna_node_egress_subnet_ipv4}]
+         + ([{'subnet': remna_node_egress_subnet_ipv6}] if remna_node_egress_family != 'ipv4' else []) }}
+    appends: true
+    force: "{{ remna_egress_network_differs | bool }}"
+    state: present
+  register: remna_egress_network
+
+- name: Install the egress tool and its units
+  become: true
+  become_user: root
+  block:
+    - name: Install the egress tool
+      ansible.builtin.template:
+        src: "{{ this_role_path }}/egress/remna-egress.py.j2"
+        dest: "{{ remna_node_egress_tool }}"
+        owner: root
+        group: root
+        mode: "0755"
+      register: remna_egress_tool
+
+    - name: Install the egress service and timer
+      ansible.builtin.template:
+        src: "{{ this_role_path }}/egress/{{ item.src }}"
+        dest: "/etc/systemd/system/{{ item.name | default(remna_node_egress_unit) }}.{{ item.ext }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop:
+        - {src: remna-egress.service.j2, ext: service}
+        - {src: remna-egress-heal.service.j2, ext: service, name: "{{ remna_node_egress_unit }}-heal"}
+        - {src: remna-egress.timer.j2, ext: timer}
+      register: remna_egress_units
+
+    - name: Keep reverse-path checks loose on the egress interface across reboots
+      ansible.builtin.template:
+        src: "{{ this_role_path }}/egress/sysctl.conf.j2"
+        dest: /etc/sysctl.d/95-remna-egress.conf
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Find networkd-dispatcher
+      ansible.builtin.stat:
+        path: /etc/networkd-dispatcher/routable.d
+      register: remna_egress_dispatcher
+
+    - name: Re-apply the egress as soon as systemd-networkd reconfigures a link
+      ansible.builtin.template:
+        src: "{{ this_role_path }}/egress/networkd-dispatcher.sh.j2"
+        dest: /etc/networkd-dispatcher/routable.d/50-remna-egress
+        owner: root
+        group: root
+        mode: "0755"
+      when: remna_egress_dispatcher.stat.isdir | default(false)
+
+    - name: Enable the egress service, which runs before Docker at boot
+      ansible.builtin.systemd_service:
+        name: "{{ remna_node_egress_unit }}.service"
+        enabled: true
+        daemon_reload: "{{ remna_egress_units is changed }}"
+
+    # Routes, rules, marks and guards, before the container is (re)created:
+    # its first packet already leaves through the egress interface.
+    - name: Route the egress network out of {{ remna_node_egress_interface }}
+      ansible.builtin.command:
+        argv: [python3, "{{ remna_node_egress_tool }}", prepare]
+      register: remna_egress_prepared
+      changed_when: false
+      failed_when: remna_egress_prepared.rc not in [0, 1]
+      when: not ansible_check_mode
+
+- name: Remember whether the container has to come up again on its networks
+  ansible.builtin.set_fact:
+    remna_egress_changed: "{{ remna_egress_network is changed }}"

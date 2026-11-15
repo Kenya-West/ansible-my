@@ -7,6 +7,7 @@
 - import_playbook: ../bootstrap/fail2ban.yaml
 
 # Step 2: System maintenance
+- import_playbook: ../base/gai_prefer_ipv4.yaml
 - import_playbook: ../base/deb_mirrors.yaml
 - import_playbook: ../maintenance/update.yaml
 - import_playbook: ../maintenance/reboot.yaml
@@ -29,6 +30,7 @@
 - import_playbook: ../base/packages_python_concurrent.yaml
 - import_playbook: ../base/docker.yaml
 - import_playbook: ../base/docker_mirrors.yaml
+- import_playbook: ../base/docker_prune_timer.yaml
 - import_playbook: ../base/ohmyposh.yaml
 - import_playbook: ../base/bash_default.yaml
 - import_playbook: ../base/bash.yaml

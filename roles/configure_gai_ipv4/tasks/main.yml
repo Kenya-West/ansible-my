@@ -1,0 +1,109 @@
+---
+# tasks file for roles/configure_gai_ipv4
+- name: Validate configure_gai_ipv4 variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - role_state in ['present', 'absent']
+      - gai_conf_conflict_action in ['comment', 'fail']
+      - gai_conf_path is match('^/')
+      - gai_conf_ipv4_precedence | string is match('^[0-9]+$')
+      - gai_conf_ipv4_precedence | int > 50
+      - gai_conf_marker is search('{mark}')
+      - gai_conf_disabled_prefix is match('^#')
+      - gai_conf_precedence_table | map(attribute='prefix') | select('equalto', '::ffff:0:0/96') | list | length == 1
+      - gai_conf_precedence_table | map(attribute='value') | map('string') | reject('match', '^[0-9]+$') | list | length == 0
+    fail_msg: >-
+      configure_gai_ipv4: invalid settings. Need role_state present|absent,
+      gai_conf_conflict_action comment|fail, an absolute gai_conf_path,
+      an integer gai_conf_ipv4_precedence > 50 (got {{ gai_conf_ipv4_precedence }}),
+      a gai_conf_marker containing {mark}, a gai_conf_disabled_prefix starting with #,
+      and a gai_conf_precedence_table of integer values with exactly one ::ffff:0:0/96 entry.
+
+- name: Set managed block markers
+  ansible.builtin.set_fact:
+    _gai_marker_begin: "{{ gai_conf_marker | replace('{mark}', 'BEGIN') }}"
+    _gai_marker_end: "{{ gai_conf_marker | replace('{mark}', 'END') }}"
+
+# gai.conf is read by glibc only; musl (Alpine) and others ignore it.
+- name: Check that the C library is glibc
+  ansible.builtin.command: getconf GNU_LIBC_VERSION
+  register: _gai_glibc
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Inspect {{ gai_conf_path }}
+  ansible.builtin.stat:
+    path: "{{ gai_conf_path }}"
+    follow: false
+    get_checksum: false
+  register: _gai_stat_link
+
+# Edit the real file behind a symlink instead of replacing the link.
+- name: Inspect symlink target of {{ gai_conf_path }}
+  ansible.builtin.stat:
+    path: "{{ gai_conf_path }}"
+    follow: true
+    get_checksum: false
+  register: _gai_stat_target
+  when: _gai_stat_link.stat.islnk | default(false)
+
+- name: Resolve the file to edit
+  ansible.builtin.set_fact:
+    _gai_conf_file: >-
+      {{ _gai_stat_link.stat.lnk_source
+         if _gai_stat_link.stat.islnk | default(false) else gai_conf_path }}
+    _gai_conf_stat: >-
+      {{ _gai_stat_target.stat
+         if _gai_stat_link.stat.islnk | default(false) else _gai_stat_link.stat }}
+
+- name: Refuse to edit something that is not a regular file
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - not _gai_conf_stat.exists or _gai_conf_stat.isreg
+    fail_msg: >-
+      {{ _gai_conf_file }} exists but is not a regular file
+      ({{ 'dangling symlink' if _gai_stat_link.stat.islnk | default(false) and not _gai_conf_stat.exists
+          else 'directory or special file' }}); fix it by hand.
+
+- name: Gather network facts for the IPv4 route check
+  ansible.builtin.setup:
+    gather_subset:
+      - "!all"
+      - "!min"
+      - network
+  when:
+    - role_state == 'present'
+    - gai_conf_require_ipv4_route | bool
+    - ansible_facts.default_ipv4 is not defined
+
+- name: Decide whether this host gets the IPv4 preference
+  ansible.builtin.set_fact:
+    _gai_skip_reason: >-
+      {{ 'the C library is not glibc, so ' ~ gai_conf_path ~ ' is ignored'
+         if _gai_glibc.rc != 0 else
+         'no IPv4 default route (IPv6-only host)'
+         if role_state == 'present'
+            and gai_conf_require_ipv4_route | bool
+            and (ansible_facts.default_ipv4 | default({})).gateway | default('') | length == 0
+         else '' }}
+
+- name: Report skipped host
+  ansible.builtin.debug:
+    msg: "configure_gai_ipv4: skipping {{ inventory_hostname }}: {{ _gai_skip_reason }}"
+  when: _gai_skip_reason | length > 0
+
+- name: Prefer IPv4 in {{ gai_conf_path }}
+  ansible.builtin.include_tasks: present.yml
+  when:
+    - role_state == 'present'
+    - _gai_skip_reason | length == 0
+
+- name: Remove IPv4 preference from {{ gai_conf_path }}
+  ansible.builtin.include_tasks: absent.yml
+  when:
+    - role_state == 'absent'
+    - _gai_skip_reason | length == 0
+    - _gai_conf_stat.exists

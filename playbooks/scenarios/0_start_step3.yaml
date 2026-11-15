@@ -1,4 +1,5 @@
 ---
+- import_playbook: ../base/gai_prefer_ipv4.yaml
 - import_playbook: ../base/packages.yaml
 - import_playbook: ../base/eget.yaml
 - import_playbook: ../maintenance/copy_binaries_to_hosts.yaml
@@ -8,6 +9,7 @@
 - import_playbook: ../base/packages_python_concurrent.yaml
 - import_playbook: ../base/docker.yaml
 - import_playbook: ../base/docker_mirrors.yaml
+- import_playbook: ../base/docker_prune_timer.yaml
 - import_playbook: ../base/ohmyposh.yaml
 - import_playbook: ../base/bash_default.yaml
 - import_playbook: ../base/bash.yaml

@@ -1,0 +1,25 @@
+---
+# defaults file for roles/install_docker_prune_timer
+role_state: present
+
+docker_prune_unit_name: docker-prune
+docker_prune_systemd_unit_path: /etc/systemd/system
+docker_prune_script_path: /usr/local/sbin/docker-prune.sh
+docker_prune_calendar: "Sun *-*-* 04:00:00"
+docker_prune_randomized_delay: "1h"
+docker_prune_timeout: "30min"
+
+# Same settings as playbooks/maintenance/docker_prune.yaml.
+# Without filters, `images` removes dangling images only and `builder_cache`
+# removes only dangling build cache, matching community.docker.docker_prune.
+docker_prune_containers: true
+docker_prune_images: true
+docker_prune_networks: true
+docker_prune_volumes: false
+docker_prune_builder_cache: true
+
+# Only prune objects older than this (e.g. "24h", "168h"); "" disables the
+# filter. Not applied to volumes (docker volume prune has no `until` filter).
+docker_prune_until: ""
+# Install and enable the timer; false installs the units but keeps the timer stopped.
+docker_prune_enabled: true
