@@ -52,13 +52,13 @@
   ansible.builtin.file:
     path: "{{ path.dest }}"
     state: directory
-    mode: "{{ (path.default_mode_directory | default(path.default_mode | default(755) | int)) }}"
+    mode: "{{ (path.default_mode_directory | default(path.default_mode | default('0755'))) }}"
 
 - name: Build rsync_opts list
   ansible.builtin.set_fact:
     copy_files_templating_rsync_opts:
-      - "--chmod=F{{ (path.default_mode_file | default(path.default_mode | default(755) | int)) }}"
-      - "--chmod=D{{ (path.default_mode_directory | default(path.default_mode | default(755) | int)) }}"
+      - "--chmod=F{{ (path.default_mode_file | default(path.default_mode | default('0755'))) }}"
+      - "--chmod=D{{ (path.default_mode_directory | default(path.default_mode | default('0755'))) }}"
 
 - name: Add exclusions to rsync_opts list
   ansible.builtin.set_fact:
