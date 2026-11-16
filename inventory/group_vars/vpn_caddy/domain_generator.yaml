@@ -91,7 +91,12 @@ domains_node_base_domains: >-
   {{ out }}
   {%- endif -%}
 
-domains_keys:
+# A node that is also a server (setup/server on an existing host) adds the
+# service domains of its server groups in domains_keys_services
+# (0_all/4_server_domains.yaml); they are merged into the generated keys.
+domains_keys: "{{ domains_keys_generated | combine(domains_keys_services | default({}, true)) }}"
+
+domains_keys_generated:
   main: "{{ inventory_hostname }}.{{ domains_node_base_domains.main | first }}"
   main_extra: >-
     {{ domains_node_base_domains.main[1:]

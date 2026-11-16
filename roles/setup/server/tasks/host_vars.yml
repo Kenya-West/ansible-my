@@ -1,8 +1,21 @@
 ---
+- name: Settle which host is the server
+  ansible.builtin.set_fact:
+    setup_server_existing_host: >-
+      {{ '' if initial_configure_server_existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
+         else initial_configure_server_existing_host }}
+
 - name: Settle the facts the server templates use
   ansible.builtin.set_fact:
     initial_configure_server_hostname: >-
-      {{ initial_configure_server_provider }}-{{ initial_configure_server_country_code }}-{{ initial_configure_server_index }}
+      {{ setup_server_existing_host if setup_server_existing_host | length > 0
+         else initial_configure_server_provider ~ '-' ~ initial_configure_server_country_code ~ '-' ~ initial_configure_server_index }}
+    setup_server_address: >-
+      {{ hostvars[setup_server_existing_host].ansible_host | default(setup_server_existing_host)
+         if setup_server_existing_host | length > 0 else initial_configure_server_ip_address }}
+    setup_server_groups_to_add: >-
+      {{ (initial_configure_server_groups | default([], true)) if setup_server_existing_host | length > 0
+         else ((setup_server_groups_required + (initial_configure_server_groups | default([], true))) | unique) }}
     initial_configure_server_base_domain_name: >-
       {{ initial_configure_server_base_domain_name_custom
          | default(initial_configure_server_base_domain_name_choice | default('', true), true) }}
@@ -10,6 +23,7 @@
       {{ initial_configure_server_default_relation_host_custom
          | default(initial_configure_server_default_relation_host_choice | default('', true), true) }}
     setup_server_groups: "{{ (setup_server_groups_required + (initial_configure_server_groups | default([], true))) | unique }}"
+    setup_server_remnawave_self_relation: "{{ initial_configure_server_remnawave_node_self_relation | default(false) | bool }}"
     # The e-mail addresses the templates read, taken from the inventory the
     # way setup/secrets does it for a group.
     initial_configure_user_input_user_email:
@@ -90,7 +104,85 @@
 - name: Stop when host_vars/{{ initial_configure_server_hostname }} exists
   ansible.builtin.fail:
     msg: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }} already exists. Nothing was written."
-  when: __setup_server_host_dir_stat.stat.exists
+  when:
+    - __setup_server_host_dir_stat.stat.exists
+    - setup_server_existing_host | length == 0
+
+- name: Check that the existing host can be made a server
+  ansible.builtin.assert:
+    that:
+      - __setup_server_host_dir_stat.stat.exists
+      - setup_server_groups_to_add | length > 0
+      - setup_server_groups_to_add | select('in', hostvars[setup_server_existing_host].group_names) | list | length == 0
+    quiet: true
+    fail_msg: >-
+      {{ setup_server_existing_host }} needs a host_vars directory and at least one
+      server group it does not serve yet.
+  when: setup_server_existing_host | length > 0
+
+# An existing host already has its domains in 0_all/1_domains.yaml. They are
+# read and checked before anything is written; the service domains of the
+# groups it joins are added to them afterwards.
+- name: Read the domains of the existing host
+  ansible.builtin.slurp:
+    src: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/0_all/1_domains.yaml"
+  register: __setup_server_existing_domains
+  when: setup_server_existing_host | length > 0
+
+- name: Settle the service domains to add to the existing host
+  ansible.builtin.set_fact:
+    __setup_server_domain_data: "{{ __setup_server_existing_domains.content | b64decode | from_yaml | default({}, true) }}"
+    __setup_server_domain_additions: >-
+      {%- set out = {} -%}
+      {%- for group in setup_server_groups_to_add if group in setup_server_service_domains -%}
+      {%-   for key, label in setup_server_service_domains[group].items() -%}
+      {%-     set _ = out.update({key: label ~ '.' ~ setup_server_service_base_domains[group]}) -%}
+      {%-   endfor -%}
+      {%- endfor -%}
+      {{ out }}
+  when: setup_server_existing_host | length > 0
+
+- name: Check that the domains of the existing host can take the service domains
+  ansible.builtin.assert:
+    that: >-
+      __setup_server_domain_data.domains_node is defined
+      or __setup_server_domain_data.domains_keys is mapping
+    quiet: true
+    fail_msg: >-
+      0_all/1_domains.yaml of {{ initial_configure_server_hostname }} has neither domains_node
+      nor a domains_keys mapping; add its domains first (setup/node writes them).
+  when: setup_server_existing_host | length > 0
+
+- name: Check what a panel on the existing host needs from its domains
+  ansible.builtin.assert:
+    that:
+      - __setup_server_domain_data.vpn_server_remnawave_node_base_domains is not defined
+      - >-
+        not setup_server_remnawave_self_relation
+        or (__setup_server_domain_data.host_relations | default({}, true)).vpn_server_remnawave is not defined
+      - >-
+        not setup_server_remnawave_self_relation
+        or __setup_server_selection.main | default([]) | difference(setup_server_node_base_domains.main) | length == 0
+      - >-
+        not setup_server_remnawave_self_relation
+        or __setup_server_selection.xray | default([]) | difference(setup_server_node_base_domains.xray) | length == 0
+    quiet: true
+    fail_msg: >-
+      0_all/1_domains.yaml of {{ initial_configure_server_hostname }} must not declare
+      vpn_server_remnawave_node_base_domains yet; when its node relates to the new panel, it must
+      not have a host_relations.vpn_server_remnawave already, and its domains_node.base_domains
+      must be in the panel's catalog (main {{ setup_server_node_base_domains.main }},
+      xray {{ setup_server_node_base_domains.xray }}). Nothing was written.
+  vars:
+    __setup_server_selection: >-
+      {%- set out = {} -%}
+      {%- for key, value in ((__setup_server_domain_data.domains_node | default({}, true)).base_domains | default({}, true)).items() -%}
+      {%-   set _ = out.update({key: [value] if value is string else value}) -%}
+      {%- endfor -%}
+      {{ out }}
+  when:
+    - setup_server_existing_host | length > 0
+    - "'vpn_server_remnawave' in setup_server_groups_to_add"
 
 - name: Generate the passwords of the server
   ansible.builtin.include_role:
@@ -116,6 +208,7 @@
   register: __setup_server_template_dirs
 
 - name: Render the files every host gets into host_vars/{{ initial_configure_server_hostname }}/0_all
+  when: setup_server_existing_host | length == 0
   ansible.builtin.include_role:
     name: setup/common
     tasks_from: render_tree
@@ -130,9 +223,78 @@
   vars:
     setup_render_tree_src: "{{ setup_server_role_path }}/templates/host/{{ setup_server_template_dir }}"
     setup_render_tree_dest: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/{{ setup_server_template_dir }}"
+    # An existing host keeps every file it already has.
+    setup_render_tree_force: "{{ setup_server_existing_host | length == 0 }}"
   loop: >-
-    {{ (setup_server_templates_always + setup_server_groups
-        + (['infrastructure'] if 'analytics_server' in setup_server_groups else [])) | unique
+    {{ ((setup_server_templates_always if setup_server_existing_host | length == 0 else [])
+        + setup_server_groups_to_add
+        + (['infrastructure'] if 'analytics_server' in setup_server_groups_to_add else [])) | unique
        | select('in', __setup_server_template_dirs.files | map(attribute='path') | map('basename') | list) | list }}
   loop_control:
     loop_var: setup_server_template_dir
+
+# The service domains of the groups the existing host joins: generated
+# domains_keys (a remna node, domains_node) get them through
+# domains_keys_services, which the vpn_caddy generator merges; a literal
+# domains_keys gets them inserted.
+- name: Read the service domains the generated domains already have
+  ansible.builtin.slurp:
+    src: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/0_all/4_server_domains.yaml"
+  register: __setup_server_services_file
+  failed_when: false
+  when:
+    - setup_server_existing_host | length > 0
+    - __setup_server_domain_data.domains_node is defined
+
+- name: Write the service domains of a host with generated domains_keys
+  ansible.builtin.copy:
+    dest: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/0_all/4_server_domains.yaml"
+    mode: "0664"
+    content: "# Service domains of the server groups of this host, merged into the\n# domains_keys that group_vars/vpn_caddy/domain_generator.yaml builds.\n{{ {'domains_keys_services': ((__setup_server_services_file.content | default('e30=') | b64decode | from_yaml | default({}, true)).domains_keys_services | default({}, true)) | combine(__setup_server_domain_additions)} | to_nice_yaml }}"
+  when:
+    - setup_server_existing_host | length > 0
+    - __setup_server_domain_data.domains_node is defined
+
+- name: Add the service domains to a host with a literal domains_keys
+  ansible.builtin.lineinfile:
+    path: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/0_all/1_domains.yaml"
+    regexp: "^  {{ item.key }}:"
+    insertafter: '^domains_keys:'
+    line: "  {{ item.key }}: {{ item.value }}"
+    backup: true
+  loop: "{{ __setup_server_domain_additions | dict2items | rejectattr('key', 'in', __setup_server_domain_data.domains_keys) | list }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when:
+    - setup_server_existing_host | length > 0
+    - __setup_server_domain_data.domains_node is not defined
+
+# A panel's catalog of node base domains lives in its 0_all/1_domains.yaml,
+# where the scan and the vpn_caddy generator of its nodes read it.
+- name: Add the panel's node domain catalog to the existing host
+  ansible.builtin.blockinfile:
+    path: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/0_all/1_domains.yaml"
+    marker: "# {mark} setup/server: Remnawave panel catalog"
+    insertbefore: BOF
+    backup: true
+    block: |
+      # Base domains of the nodes whose host_relations resolve to this panel
+      # (group_vars/vpn_caddy/domain_generator.yaml builds their domains_keys from them).
+      vpn_server_remnawave_node_base_domains:
+        main: {{ setup_server_node_base_domains.main | to_json }}
+        xray: {{ setup_server_node_base_domains.xray | to_json }}
+  when:
+    - setup_server_existing_host | length > 0
+    - "'vpn_server_remnawave' in setup_server_groups_to_add"
+
+- name: Relate the node of the existing host to its own panel
+  ansible.builtin.blockinfile:
+    path: "{{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/0_all/1_domains.yaml"
+    marker: "  # {mark} setup/server: the node relates to its own panel"
+    insertafter: "{{ '^host_relations:' if __setup_server_domain_data.host_relations is defined else 'EOF' }}"
+    backup: true
+    block: "{{ ('' if __setup_server_domain_data.host_relations is defined else 'host_relations:\n') ~ '  vpn_server_remnawave:\n    hosts:\n      - host: ' ~ initial_configure_server_hostname }}"
+  when:
+    - setup_server_existing_host | length > 0
+    - "'vpn_server_remnawave' in setup_server_groups_to_add"
+    - setup_server_remnawave_self_relation

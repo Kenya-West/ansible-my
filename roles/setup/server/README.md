@@ -52,7 +52,7 @@ What it does
    (tokens of external services, the node `SECRET_KEY` the Remnawave panel
    shows once it runs, ...).
 
-Nothing is written when `host_vars/<hostname>/` already exists.
+Nothing is written for a new server when `host_vars/<hostname>/` already exists.
 
 Panel catalogs are written as lists. `node_xray_base_domain_name` accepts a
 list or comma-separated input (legacy single-string presets still work),
@@ -73,8 +73,50 @@ domains_keys:
 Panel service URLs remain single hostnames independent of the node catalog.
 
 A server that is also a node, like `play2go-nl-3` (`vpn_caddy`,
-`analytics_node`, `backup_restic_node`), gets the node groups and their
-`host_vars/` by hand: `setup/node` refuses a host whose `host_vars/` exists.
+`analytics_node`, `backup_restic_node`): create the node first with
+`setup/node`, then run this playbook and pick it at the first prompt
+(*Make a new server, or turn an existing host into one?*; hosts of the
+inventory with a `host_vars/` directory are offered). Unattended, preset
+`existing_host`.
+
+An existing host:
+
+- is not asked for provider, country, index, address, billing or relation
+  host; it keeps its `host_vars/`, its `ansible_host` and its
+  `host_relations`;
+- is offered only the server groups it does not serve yet
+  (`setup_server_groups_existing_unsupported` removes more);
+- gets the files of the groups it joins (and `infrastructure/` for
+  `analytics_server`) written without overwriting any file it has;
+- gets the service domains of the new groups added to its domains: a node
+  with `domains_node` gets `0_all/4_server_domains.yaml`
+  (`domains_keys_services`, merged by `group_vars/vpn_caddy/domain_generator.yaml`),
+  a host with a literal `domains_keys` gets the keys inserted into
+  `0_all/1_domains.yaml` (a `.~` backup is kept);
+- is added only to the sections of the new groups.
+
+When an existing host becomes a Remnawave panel (`vpn_server_remnawave`):
+
+- its node domain catalog, `vpn_server_remnawave_node_base_domains`, is
+  inserted at the top of `0_all/1_domains.yaml`. A remna node's catalog
+  prompts default to the base domains it uses now (from the panel it relates
+  to), so its own domains stay valid;
+- a remna node (`vpn_caddy` with `domains_node`) is asked whether its node
+  should relate to the new panel (`remnawave_node_self_relation`, no by
+  default). Yes adds `host_relations.vpn_server_remnawave` pointing at the host
+  itself: the node then registers with its own panel and takes its domains
+  from that panel's catalog. No keeps the node on the panel it relates to now;
+- the run refuses, before writing anything, a host that already declares a
+  catalog. With yes, it also refuses a host that already has
+  `host_relations.vpn_server_remnawave`, or whose
+  `domains_node.base_domains` fall outside the new catalog.
+
+The service domains (`rw.`, `sub.` ...) default to the server's base domain,
+as for a new server: when another panel already uses them, type another
+base domain.
+
+For a node to read its own metrics, `host_relations` of the host must resolve
+`analytics_server` to the host itself: this playbook does not change them.
 
 Run it
 ------

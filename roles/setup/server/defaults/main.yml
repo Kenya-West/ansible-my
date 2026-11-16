@@ -92,3 +92,9 @@ setup_server_generated_passwords:
 # Preset answers for the prompts, by prompt id (see vars/prompts/host.yml),
 # for unattended runs together with prompting_engine_interactive=false.
 setup_server_prompt_answers: {}
+
+# An existing host of the inventory (a node, say) can be made a server too. The
+# choice that stands for "a new server" at the first prompt, and the server
+# groups never offered to an existing host.
+setup_server_new_choice: __new__
+setup_server_groups_existing_unsupported: []

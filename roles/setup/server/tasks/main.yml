@@ -41,6 +41,33 @@
   tags:
     - always
 
+# Hosts already in the inventory and in host_vars/ can become servers too.
+- name: Find the existing host_vars directories
+  ansible.builtin.find:
+    paths: "{{ setup_server_host_vars_dir }}"
+    file_type: directory
+    recurse: false
+  register: __setup_server_host_dirs
+  tags:
+    - always
+
+- name: Settle the existing hosts that can also be a server
+  ansible.builtin.set_fact:
+    setup_server_existing_candidates: >-
+      {{ groups['all'] | default([]) | reject('equalto', 'localhost')
+         | select('in', __setup_server_host_dirs.files | map(attribute='path') | map('basename') | list)
+         | sort | list }}
+  tags:
+    - always
+
+- name: Offer the existing hosts at the first prompt
+  ansible.builtin.set_fact:
+    setup_server_existing_choices: >-
+      {{ {setup_server_new_choice: 'A new server'}
+         | combine(dict(setup_server_existing_candidates | zip(setup_server_existing_candidates))) }}
+  tags:
+    - always
+
 - name: Ask about the new server
   ansible.builtin.include_tasks: prompt.yml
   tags:
@@ -58,8 +85,8 @@
   vars:
     setup_inventory_add_host_files: "{{ setup_server_inventory_files }}"
     setup_inventory_add_host_name: "{{ initial_configure_server_hostname }}"
-    setup_inventory_add_host_address: "{{ initial_configure_server_ip_address }}"
-    setup_inventory_add_host_groups: "{{ setup_server_groups }}"
+    setup_inventory_add_host_address: "{{ setup_server_address }}"
+    setup_inventory_add_host_groups: "{{ setup_server_groups_to_add }}"
   tags:
     - always
 
@@ -75,8 +102,11 @@
 - name: Report
   ansible.builtin.debug:
     msg:
-      - "Server {{ initial_configure_server_hostname }} ({{ initial_configure_server_ip_address }}) added."
-      - "Groups: {{ setup_server_groups | join(', ') }}."
+      - >-
+        {{ 'Host ' ~ initial_configure_server_hostname ~ ' (' ~ setup_server_address ~ ') is a server too now.'
+           if setup_server_existing_host | length > 0
+           else 'Server ' ~ initial_configure_server_hostname ~ ' (' ~ setup_server_address ~ ') added.' }}
+      - "Groups: {{ setup_server_groups_to_add | join(', ') }}."
       - "host_vars, with the secrets of the server: {{ setup_server_host_vars_dir }}/{{ initial_configure_server_hostname }}/"
       - "Inventory file(s): {{ setup_server_inventory_files | join(', ') }}."
       - >-
@@ -84,6 +114,9 @@
         {{ __setup_server_placeholders.files | map(attribute='path')
            | map('relpath', setup_server_host_vars_dir ~ '/' ~ initial_configure_server_hostname)
            | sort | join(', ') | default('none', true) }}.
-      - "Review the files, then prepare the server with the 0_start_* playbooks."
+      - >-
+        {{ 'Files that already existed were kept, and the domains of the new groups were added to the host. Check host_relations of the host: a node that should read its own metrics must resolve analytics_server to itself.'
+           if setup_server_existing_host | length > 0
+           else 'Review the files, then prepare the server with the 0_start_* playbooks.' }}
   tags:
     - always

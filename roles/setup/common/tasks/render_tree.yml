@@ -15,6 +15,9 @@
 #   setup_render_tree_dir_mode   mode of the created directories (0775)
 #   setup_render_tree_skip       paths (relative to the source, as kept in
 #                                it, .j2 included) not written; none by default
+#   setup_render_tree_force      false keeps the files that already exist in
+#                                the destination, writing only the missing
+#                                ones (true by default: they are overwritten)
 
 - name: Collect the entries of {{ setup_render_tree_src }}
   ansible.builtin.set_fact:
@@ -36,6 +39,7 @@
     src: "{{ item.src }}"
     dest: "{{ setup_render_tree_dest }}/{{ item.path | regex_replace('\\.j2$', '') }}"
     mode: "{{ setup_render_tree_file_mode | default('0664') }}"
+    force: "{{ setup_render_tree_force | default(true) }}"
   loop: "{{ __setup_render_tree_entries | selectattr('state', 'equalto', 'file') | selectattr('path', 'search', '\\.j2$') | list }}"
   loop_control:
     label: "{{ item.path }}"
@@ -45,6 +49,7 @@
     src: "{{ item.src }}"
     dest: "{{ setup_render_tree_dest }}/{{ item.path }}"
     mode: "{{ setup_render_tree_file_mode | default('0664') }}"
+    force: "{{ setup_render_tree_force | default(true) }}"
   loop: "{{ __setup_render_tree_entries | selectattr('state', 'equalto', 'file') | rejectattr('path', 'search', '\\.j2$') | list }}"
   loop_control:
     label: "{{ item.path }}"

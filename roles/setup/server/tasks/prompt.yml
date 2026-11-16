@@ -6,7 +6,22 @@
     prompting_engine_spec_file: "{{ setup_server_role_path }}/vars/prompts/host.yml"
     prompting_engine_answers: "{{ setup_server_prompt_answers }}"
     # Derived from the answers as they come in; the prompts refer to them.
-    setup_server_hostname: "{{ initial_configure_server_provider }}-{{ initial_configure_server_country_code }}-{{ initial_configure_server_index }}"
+    setup_server_existing_host: >-
+      {{ '' if initial_configure_server_existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
+         else initial_configure_server_existing_host }}
+    setup_server_hostname: >-
+      {{ setup_server_existing_host
+         if setup_server_existing_host | length > 0
+         else initial_configure_server_provider ~ '-' ~ initial_configure_server_country_code ~ '-' ~ initial_configure_server_index }}
+    # Groups an existing host does not serve yet.
+    setup_server_groups_offered: >-
+      {{ setup_server_groups_optional
+         if setup_server_existing_host | length == 0
+         else setup_server_groups_optional
+              | dict2items | rejectattr('key', 'in', hostvars[setup_server_existing_host].group_names)
+              | rejectattr('key', 'in', setup_server_groups_existing_unsupported) | list | items2dict }}
+    setup_server_groups_offered_default: >-
+      {{ setup_server_groups_optional_default | select('in', setup_server_groups_offered) | list }}
     setup_server_country_hostnames: >-
       {{ setup_node_scan_existing_hostnames
          | select('match', '^[a-z0-9]+-' ~ initial_configure_server_country_code ~ '-[0-9]+$') | list }}
@@ -19,3 +34,14 @@
       {{ dict(setup_node_scan_relation_hosts | zip(setup_node_scan_relation_hosts))
          | combine({setup_server_hostname: setup_server_hostname ~ ' (this server)'})
          | combine({setup_server_other_choice: 'Another host (typed next)'}) }}
+    # The node base domains an existing remna node has now (from the catalog
+    # of the panel it relates to): the defaults of the catalog of a panel
+    # added to it, so that its own domains stay valid if it relates to itself.
+    setup_server_existing_node_base_domains: >-
+      {{ hostvars[setup_server_existing_host].domains_node_base_domains
+         if setup_server_existing_host | length > 0 and hostvars[setup_server_existing_host].domains_node is defined
+         else {} }}
+    setup_server_existing_is_remna_node: >-
+      {{ setup_server_existing_host | length > 0
+         and 'vpn_caddy' in hostvars[setup_server_existing_host].group_names
+         and hostvars[setup_server_existing_host].domains_node is defined }}

@@ -10,14 +10,28 @@
 settings:
   var_prefix: initial_configure_server_
   intro: |-
-    New server of the inventory, with secrets of its own written into its
-    host_vars. Its name is <provider>-<country>-<index>, like play2go-nl-3.
+    New server of the inventory, or an existing host that becomes a server
+    too, with secrets of its own written into its host_vars. A new server is
+    named <provider>-<country>-<index>, like play2go-nl-3.
     Press Enter to accept a default; Ctrl+C, then A, aborts.
   review: true
 
 prompts:
+  - id: existing_host
+    prompt: Make a new server, or turn an existing host into one?
+    help: >-
+      A host already in the inventory (a node, say) can also be a server: it
+      keeps its host_vars, gets the server groups you choose next and the
+      files of those groups, and is added to their sections. Hosts offered:
+      {{ setup_server_existing_candidates | join(', ') }}.
+    type: choice
+    choices: "{{ setup_server_existing_choices }}"
+    default: "{{ setup_server_new_choice }}"
+    when: setup_server_existing_candidates | length > 0
+
   - id: provider
     prompt: Hosting provider
+    when: answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
     help: >-
       Lowercase letters and digits, no dashes: the first part of the hostname.
       Providers already in the inventory:
@@ -27,6 +41,7 @@ prompts:
         msg: "'{{ answer }}' is not valid: lowercase letters and digits only."
 
   - id: infrastructure_provider
+    when: answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
     prompt: Stable provider key in infra_providers
     help: Independent of the hostname prefix; create this key in the private provider catalog.
     default: "{{ answers.provider }}"
@@ -34,12 +49,14 @@ prompts:
       - pattern: '^[a-z0-9][a-z0-9_-]*$'
 
   - id: infrastructure_account
+    when: answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
     prompt: Account key at this provider
     default: main
     validate:
       - pattern: '^[a-z0-9][a-z0-9_-]*$'
 
   - id: infrastructure_billing_known
+    when: answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
     prompt: Enter verified billing amount and interval now?
     help: Unknown prices are omitted, never exported as zero. Export remains disabled until configured.
     type: bool
@@ -47,14 +64,14 @@ prompts:
 
   - id: infrastructure_amount
     prompt: Amount per billing interval
-    when: answers.infrastructure_billing_known
+    when: answers.infrastructure_billing_known | default(false)
     validate:
       - pattern: '^[0-9]+(\.[0-9]{1,2})?$'
 
   - id: infrastructure_currency
     prompt: Billing currency
     default: USD
-    when: answers.infrastructure_billing_known
+    when: answers.infrastructure_billing_known | default(false)
     validate:
       - pattern: '^[A-Z]{3,4}$'
 
@@ -62,7 +79,7 @@ prompts:
     prompt: Number of units between payments
     type: int
     default: 1
-    when: answers.infrastructure_billing_known
+    when: answers.infrastructure_billing_known | default(false)
     validate:
       - that: answer in [1, 3]
         msg: Use 1 for a standard period or 3 for quarterly (months only).
@@ -72,9 +89,10 @@ prompts:
     type: choice
     choices: "{{ ['month'] if answers.infrastructure_every | int == 3 else ['hour', 'day', 'month', 'year', 'once'] }}"
     default: month
-    when: answers.infrastructure_billing_known
+    when: answers.infrastructure_billing_known | default(false)
 
   - id: country_code
+    when: answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
     prompt: Country of the server
     help: >-
       Two lowercase letters (ISO 3166-1 alpha-2): the second part of the
@@ -84,6 +102,7 @@ prompts:
         msg: "'{{ answer }}' is not a two-letter lowercase country code."
 
   - id: index
+    when: answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
     prompt: "Index of the server: {{ answers.provider }}-{{ answers.country_code }}-<index>"
     help: >-
       Hosts in {{ answers.country_code }} so far:
@@ -96,6 +115,7 @@ prompts:
         msg: "{{ answers.provider }}-{{ answers.country_code }}-{{ answer }} already exists, in host_vars/ or in the inventory."
 
   - id: ip_address
+    when: answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
     prompt: "IPv4 address of {{ setup_server_hostname }}"
     help: Written as ansible_host in the inventory file(s).
     validate:
@@ -111,8 +131,8 @@ prompts:
       Choose at least one (numbers separated by commas); every group gets its
       secrets generated into host_vars/{{ setup_server_hostname }}/<group>/.
     type: multichoice
-    choices: "{{ setup_server_groups_optional }}"
-    default: "{{ setup_server_groups_optional_default }}"
+    choices: "{{ setup_server_groups_offered }}"
+    default: "{{ setup_server_groups_offered_default }}"
     validate:
       - min_length: 1
 
@@ -121,7 +141,10 @@ prompts:
     help: The base domains the hosts of this inventory already use.
     type: choice
     choices: "{{ setup_node_scan_base_domain_choices }}"
-    default: "{{ setup_node_scan_base_domain_default }}"
+    default: >-
+      {{ setup_server_existing_node_base_domains.main | first
+         if (setup_server_existing_node_base_domains.main | default([]) | first | default('')) in setup_node_scan_base_domain_choices
+         else setup_node_scan_base_domain_default }}
     when: setup_node_scan_base_domains | length > 0
 
   - id: base_domain_name_custom
@@ -157,7 +180,7 @@ prompts:
     prompt: Additional base domains for this panel's node hostnames (comma-separated)
     help: The server's own base domain is always the first main catalog entry.
     type: list
-    default: []
+    default: "{{ (setup_server_existing_node_base_domains.main | default([]))[1:] }}"
     required: false
     when: "'vpn_server_remnawave' in answers.groups | default([], true)"
     validate:
@@ -171,11 +194,26 @@ prompts:
       vpn_server_remnawave_node_base_domains.xray of 0_all/1_domains.yaml. The
       nodes relating to this panel get net-<region>-<index>.<base domain> and
       the like; their own domain is <hostname>.{{ setup_server_base_domain }}.
-    default: "{{ setup_node_scan_xray_base_domain_default | default(setup_server_base_domain, true) }}"
+    default: >-
+      {{ setup_server_existing_node_base_domains.xray
+         | default(setup_node_scan_xray_base_domain_default | default(setup_server_base_domain, true), true) }}
     when: "'vpn_server_remnawave' in answers.groups | default([], true)"
     validate:
       - that: answer | length > 0 and answer | reject('match', '^([a-z0-9-]+\\.)+[a-z]{2,}$') | list | length == 0
         msg: Enter one or more base domains.
+
+  - id: remnawave_node_self_relation
+    prompt: "Make the Remnawave node of {{ setup_server_hostname }} relate to its own new panel?"
+    help: >-
+      Adds host_relations.vpn_server_remnawave pointing at {{ setup_server_hostname }}
+      itself: the node then registers with this panel and takes its domains from
+      this panel's catalog. No keeps the panel it relates to now
+      ({{ hostvars[setup_server_hostname].domains_node_panel | default('none') }}).
+    type: bool
+    default: false
+    when:
+      - "'vpn_server_remnawave' in answers.groups | default([], true)"
+      - setup_server_existing_is_remna_node
 
   - id: matrix_base_domain_name
     prompt: Base domain of the Matrix server
@@ -211,6 +249,7 @@ prompts:
         msg: That does not look like a Telegram bot token (123456789:ABC...).
 
   - id: default_relation_host_choice
+    when: answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
     prompt: "Host {{ setup_server_hostname }} relates to by default"
     help: >-
       host_relations.default of 0_all/1_domains.yaml: the upstream a node
@@ -230,7 +269,9 @@ prompts:
     help: >-
       host_relations.default of 0_all/1_domains.yaml, an inventory_hostname
       like play2go-nl-3.
-    when: answers.default_relation_host_choice | default(setup_server_other_choice, true) == setup_server_other_choice
+    when:
+      - answers.existing_host | default(setup_server_new_choice, true) == setup_server_new_choice
+      - answers.default_relation_host_choice | default(setup_server_other_choice, true) == setup_server_other_choice
     validate:
       - pattern: '^[a-z0-9][a-z0-9._-]*$'
         msg: "'{{ answer }}' does not look like an inventory hostname."
