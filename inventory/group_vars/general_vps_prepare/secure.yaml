@@ -3,6 +3,10 @@ ssh_permit_root_login: "without-password"
 ssh_client_password_login: false
 sshd_authenticationmethods: "publickey"
 ssh_server_password_login: false
+# Relaxed so clients offering several keys (ssh-agent) don't exhaust auth attempts and trip Fail2Ban.
+ssh_max_auth_retries: 8
+ssh_login_grace_time: 60s
+ssh_max_startups: "30:30:100"
 ssh_allow_users: "{{ (users_to_set | map(attribute='name') + [standard_user, ansible_user, 'root']) | unique | join(' ') }}"
 
 # devsec.hardening.os_hardening
