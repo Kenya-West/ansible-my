@@ -4,7 +4,7 @@
   become_user: root
   ansible.builtin.synchronize:
     mode: push
-    src: "{{ hostvars[eget_primary_host].eget_temp_dir.path }}/binaries/"
+    src: "{{ eget_cache_dir }}/binaries/"
     dest: "{{ eget_host_bin_dir }}/"
     ssh_connection_multiplexing: true
     rsync_opts:

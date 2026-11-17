@@ -2,105 +2,165 @@
 ---
 # tasks file for roles/copy_eget_binaries_from_controller
 
-# Downloading/building binaries is identical for every host in the play, so it
-# runs once (delegated to localhost) instead of once per host. Facts registered
-# under run_once only exist on the host that ran the task, so later per-host
-# tasks read them back via hostvars[eget_primary_host] instead of directly.
+# Downloading binaries is identical for every host in the play, so it runs once
+# (delegated to localhost) instead of once per host. Results registered under
+# run_once reach every host in the play, and a failing run_once task ends the
+# play for all of them.
+#
+# The binaries are kept on the controller in a cache folder per package list
+# ({{ eget_cache_root }}/<hash of packages_binary_list>) and reused for
+# eget_cache_max_age_days. Only a miss (no cache, expired cache, or
+# eget_cache_refresh=true) installs eget and downloads; a hit goes straight to
+# the sync.
 - name: Set primary host for shared eget download
   ansible.builtin.set_fact:
     eget_primary_host: "{{ ansible_play_hosts_all[0] }}"
 
-- name: Create temporary directory
+# Directory mtime is when it was (re)filled: a refresh recreates binaries/ and
+# the marker inside it. Removing expired folders here also drops the caches of
+# package lists that are no longer used.
+- name: Find expired eget caches
   become: false
-  ansible.builtin.tempfile:
-    state: directory
-  register: eget_temp_dir
+  ansible.builtin.find:
+    paths: "{{ eget_cache_root }}"
+    file_type: directory
+    age: "{{ eget_cache_max_age_days }}d"
+  register: eget_cache_expired
   delegate_to: localhost
   run_once: true
 
-- name: Display temporary directory path
-  become: false
-  ansible.builtin.debug:
-    msg: "Temporary directory created at: {{ eget_temp_dir.path }}"
-  delegate_to: localhost
-  run_once: true
-
-- name: Ensure eget_temp_dir has binaries directory
+- name: Remove expired eget caches
   become: false
   ansible.builtin.file:
-    path: "{{ eget_temp_dir.path }}/binaries"
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ eget_cache_expired.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: Ensure eget cache directory exists
+  become: false
+  ansible.builtin.file:
+    path: "{{ eget_cache_root }}/{{ (packages_binary_list | to_json | hash('sha1'))[:16] }}"
     state: directory
-  delegate_to: localhost
-  run_once: true
-
-- name: Copy eget installation script to /tmp/
-  become: false
-  ansible.builtin.copy:
-    src: files/install.sh
-    dest: "{{ eget_temp_dir.path }}/eget.sh"
     mode: "0755"
+  register: eget_cache_dir_result
   delegate_to: localhost
   run_once: true
 
-- name: Run eget.sh to install eget
+# Written only after a download that succeeded and produced binaries, so an
+# interrupted or failed run never leaves a cache that counts as a hit.
+- name: Check eget cache marker
   become: false
-  ansible.builtin.shell:
-    cmd: "timeout 30s {{ eget_temp_dir.path }}/eget.sh"
-  environment:
-    NO_COLOR: "1"
-    EGET_INSTALL_DIR: "{{ eget_temp_dir.path }}"
-  register: eget_install_script_result
-  until: eget_install_script_result.rc == 0
-  retries: "{{ eget_install_retries }}"
-  delay: "{{ eget_install_retry_delay }}"
-  failed_when: false
+  ansible.builtin.stat:
+    path: "{{ eget_cache_dir_result.path }}/.complete"
+  register: eget_cache_marker
   delegate_to: localhost
   run_once: true
 
-- name: Fail if eget.sh install did not succeed after retries
+- name: Decide whether the eget cache can be used
+  ansible.builtin.set_fact:
+    eget_cache_dir: "{{ eget_cache_dir_result.path }}"
+    eget_cache_hit: >-
+      {{ not (eget_cache_refresh | bool)
+         and eget_cache_marker.stat.exists
+         and (now().timestamp() - eget_cache_marker.stat.mtime)
+             < (eget_cache_max_age_days | int) * 86400 }}
+
+- name: Report eget cache state
   become: false
-  ansible.builtin.fail:
+  ansible.builtin.debug:
     msg: >-
-      eget.sh install failed after {{ eget_install_retries }} attempt(s).
-      rc={{ eget_install_script_result.rc }}
-      stderr={{ eget_install_script_result.stderr }}
-  when: eget_install_script_result.rc != 0
+      {{ 'Using cached binaries' if eget_cache_hit else 'Downloading binaries into' }}
+      {{ eget_cache_dir }}/binaries
   delegate_to: localhost
   run_once: true
 
-- name: Template eget config
+- name: Download binaries with eget (cache miss)
+  when: not eget_cache_hit
   become: false
-  ansible.builtin.template:
-    src: templates/eget.toml.j2
-    dest: "{{ eget_temp_dir.path }}/eget.toml"
-    mode: "0755"
   delegate_to: localhost
   run_once: true
+  block:
+    # Starting from empty: binaries of packages removed from the list, or of an
+    # older release, must not be synced.
+    - name: Clear the cached binaries and marker
+      ansible.builtin.file:
+        path: "{{ eget_cache_dir }}/{{ item }}"
+        state: absent
+      loop:
+        - .complete
+        - binaries
 
-- name: Ensure that EGET_GITHUB_TOKEN is set
-  become: false
-  ansible.builtin.command: "echo $EGET_GITHUB_TOKEN"
-  register: eget_github_token_check
-  failed_when: eget_github_token_check.rc != 0 or eget_github_token_check.stdout == ""
-  delegate_to: localhost
-  run_once: true
+    - name: Ensure the cache has a binaries directory
+      ansible.builtin.file:
+        path: "{{ eget_cache_dir }}/binaries"
+        state: directory
+        mode: "0755"
 
-# Started in the background (poll: 0): the download only needs the controller,
-# so the hosts get their directory ownership fixed meanwhile, and the play
-# waits for eget only right before the binaries are needed.
-- name: Start eget install in the background
-  become: false
-  environment:
-    EGET_CONFIG: "{{ eget_temp_dir.path }}/eget.toml"
-    EGET_GITHUB_TOKEN: "{{ eget_github_token_check.stdout }}"
-    NO_COLOR: "1"
-  ansible.builtin.shell:
-    cmd: "{{ eget_temp_dir.path }}/eget install --all --retries {{ eget_install_retries }}"
-  async: "{{ eget_install_async_timeout }}"
-  poll: 0
-  register: eget_install_job
-  delegate_to: localhost
-  run_once: true
+    # eget itself, its config and its download cache: thrown away at the end.
+    - name: Create temporary directory
+      ansible.builtin.tempfile:
+        state: directory
+      register: eget_temp_dir
+
+    - name: Display temporary directory path
+      ansible.builtin.debug:
+        msg: "Temporary directory created at: {{ eget_temp_dir.path }}"
+
+    - name: Copy eget installation script to the temporary directory
+      ansible.builtin.copy:
+        src: files/install.sh
+        dest: "{{ eget_temp_dir.path }}/eget.sh"
+        mode: "0755"
+
+    - name: Run eget.sh to install eget
+      ansible.builtin.shell:
+        cmd: "timeout 30s {{ eget_temp_dir.path }}/eget.sh"
+      environment:
+        NO_COLOR: "1"
+        EGET_INSTALL_DIR: "{{ eget_temp_dir.path }}"
+      register: eget_install_script_result
+      until: eget_install_script_result.rc == 0
+      retries: "{{ eget_install_retries }}"
+      delay: "{{ eget_install_retry_delay }}"
+      failed_when: false
+
+    - name: Fail if eget.sh install did not succeed after retries
+      ansible.builtin.fail:
+        msg: >-
+          eget.sh install failed after {{ eget_install_retries }} attempt(s).
+          rc={{ eget_install_script_result.rc }}
+          stderr={{ eget_install_script_result.stderr }}
+      when: eget_install_script_result.rc != 0
+
+    - name: Template eget config
+      ansible.builtin.template:
+        src: templates/eget.toml.j2
+        dest: "{{ eget_temp_dir.path }}/eget.toml"
+        mode: "0755"
+
+    - name: Ensure that EGET_GITHUB_TOKEN is set
+      ansible.builtin.command: "echo $EGET_GITHUB_TOKEN"
+      register: eget_github_token_check
+      changed_when: false
+      failed_when: eget_github_token_check.rc != 0 or eget_github_token_check.stdout == ""
+
+    # Started in the background (poll: 0): the download only needs the
+    # controller, so the hosts get their directory ownership fixed meanwhile,
+    # and the play waits for eget only right before the binaries are needed.
+    - name: Start eget install in the background
+      environment:
+        EGET_CONFIG: "{{ eget_temp_dir.path }}/eget.toml"
+        EGET_GITHUB_TOKEN: "{{ eget_github_token_check.stdout }}"
+        NO_COLOR: "1"
+      ansible.builtin.shell:
+        cmd: "{{ eget_temp_dir.path }}/eget install --all --retries {{ eget_install_retries }}"
+      async: "{{ eget_install_async_timeout }}"
+      poll: 0
+      register: eget_install_job
 
 # Before the sync, which needs the directory to be the SSH user's. Everything
 # the sync writes is that user's already, so nothing is left to fix after it.
@@ -113,57 +173,57 @@
   tags:
     - eget_ownership
 
-# run_once results reach every host in the play, so the per-host tasks below
-# can keep reading hostvars[eget_primary_host].eget_install_result.
-- name: Wait for eget install to finish
+- name: Wait for the eget download (cache miss)
+  when: not eget_cache_hit
   become: false
-  ansible.builtin.async_status:
-    jid: "{{ eget_install_job.ansible_job_id }}"
-  register: eget_install_result
-  until: eget_install_result.finished
-  retries: "{{ (eget_install_async_timeout | int) // (eget_install_async_poll | int) + 1 }}"
-  delay: "{{ eget_install_async_poll }}"
-  failed_when: false
   delegate_to: localhost
   run_once: true
+  block:
+    - name: Wait for eget install to finish
+      ansible.builtin.async_status:
+        jid: "{{ eget_install_job.ansible_job_id }}"
+      register: eget_install_result
+      until: eget_install_result.finished
+      retries: "{{ (eget_install_async_timeout | int) // (eget_install_async_poll | int) + 1 }}"
+      delay: "{{ eget_install_async_poll }}"
+      failed_when: false
 
-- name: Clean up eget install job status
-  become: false
-  ansible.builtin.async_status:
-    jid: "{{ eget_install_job.ansible_job_id }}"
-    mode: cleanup
-  delegate_to: localhost
-  run_once: true
+    - name: Clean up eget install job status
+      ansible.builtin.async_status:
+        jid: "{{ eget_install_job.ansible_job_id }}"
+        mode: cleanup
 
-- name: Get number of binaries installed
+    - name: Remove temporary directory
+      ansible.builtin.file:
+        path: "{{ eget_temp_dir.path }}"
+        state: absent
+
+    - name: Fail if eget install did not succeed after retries
+      ansible.builtin.fail:
+        msg: >-
+          eget install failed after {{ eget_install_retries }} attempt(s).
+          rc={{ eget_install_result.rc | default('none') }}
+          msg={{ eget_install_result.msg | default('') }}
+          stderr={{ eget_install_result.stderr | default('') }}
+      # No rc means the job never finished: it hit eget_install_async_timeout.
+      when: (eget_install_result.rc | default(1)) != 0
+
+- name: Get number of binaries available
   become: false
   ansible.builtin.find:
-    paths: "{{ eget_temp_dir.path }}/binaries"
+    paths: "{{ eget_cache_dir }}/binaries"
     file_type: file
   register: binaries_found
   delegate_to: localhost
   run_once: true
 
-- name: Debug number of binaries installed
+- name: Debug number of binaries available
   become: false
   ansible.builtin.debug:
     msg: >-
-      eget has downloaded {{ binaries_found.matched }} binaries after
-      {{ eget_install_retries }} retries with exit code:
-      {{ eget_install_result.rc | default('none') }}
-  delegate_to: localhost
-  run_once: true
-
-- name: Fail if eget install did not succeed after retries
-  become: false
-  ansible.builtin.fail:
-    msg: >-
-      eget install failed after {{ eget_install_retries }} attempt(s).
-      rc={{ eget_install_result.rc | default('none') }}
-      msg={{ eget_install_result.msg | default('') }}
-      stderr={{ eget_install_result.stderr | default('') }}
-  # No rc means the job never finished: it hit eget_install_async_timeout.
-  when: (eget_install_result.rc | default(1)) != 0
+      {{ binaries_found.matched }} binaries in {{ eget_cache_dir }}/binaries
+      {{ '(cached)' if eget_cache_hit else
+         '(eget exit code: ' ~ (eget_install_result.rc | default('none')) ~ ')' }}
   delegate_to: localhost
   run_once: true
 
@@ -171,20 +231,31 @@
 # (wc's exit code, not ls's), so a directory that eget failed to populate
 # looked like "0 binaries" instead of failing here -- surfacing only later,
 # opaquely, when "Copy binaries to host" can't find the (still-missing) dir.
-- name: Fail if eget produced no binaries
+- name: Fail if there are no binaries
   become: false
   ansible.builtin.fail:
     msg: >-
-      eget install reported success (rc=0) but {{ eget_temp_dir.path }}/binaries
-      contains no files. eget stdout: {{ eget_install_result.stdout }}
+      {{ eget_cache_dir }}/binaries contains no files.
+      {{ 'Rerun with -e eget_cache_refresh=true.' if eget_cache_hit else
+         'eget stdout: ' ~ (eget_install_result.stdout | default('')) }}
   when: binaries_found.matched == 0
   delegate_to: localhost
   run_once: true
 
-- name: Ensure controller staging directory is readable
+- name: Mark the eget cache complete
+  become: false
+  ansible.builtin.copy:
+    content: "{{ packages_binary_list | to_nice_json }}\n"
+    dest: "{{ eget_cache_dir }}/.complete"
+    mode: "0644"
+  when: not eget_cache_hit
+  delegate_to: localhost
+  run_once: true
+
+- name: Ensure controller cache directory is readable
   become: false
   ansible.builtin.file:
-    path: "{{ eget_temp_dir.path }}"
+    path: "{{ eget_cache_dir }}"
     mode: "u=rwX,go=rX"
     recurse: true
     state: directory
@@ -193,11 +264,9 @@
 
 - name: Synchronize binaries to host (with retries)
   ansible.builtin.include_tasks: sync_retry.yml
-  when: hostvars[eget_primary_host].eget_install_result.rc == 0
 
 - name: Move binaries declaring a dest_loc to their final location on the host
   ansible.builtin.include_tasks: place_binaries.yml
-  when: hostvars[eget_primary_host].eget_install_result.rc == 0
 
 - name: Grant user rx on directory and existing contents
   become: true
@@ -208,7 +277,6 @@
     permissions: rx
     state: present
     recursive: true
-  when: hostvars[eget_primary_host].eget_install_result.rc == 0
 
 - name: Grant user rx as default ACL for future files
   become: true
@@ -219,7 +287,6 @@
     permissions: rx
     state: present
     default: true
-  when: hostvars[eget_primary_host].eget_install_result.rc == 0
 
 - name: Ensure ACL mask allows rx
   become: true
@@ -229,11 +296,3 @@
     permissions: rx
     state: present
     recursive: true
-  when: hostvars[eget_primary_host].eget_install_result.rc == 0
-
-- name: Remove temporary directory
-  ansible.builtin.file:
-    path: "{{ eget_temp_dir.path }}"
-    state: absent
-  delegate_to: localhost
-  run_once: true

@@ -11,7 +11,7 @@
   cache_dir = "{{ eget_temp_dir.path }}/.cache/eget"
   proxy_url = ""
   system = ""
-  target = "{{ eget_temp_dir.path }}/binaries"
+  target = "{{ eget_cache_dir }}/binaries"
   batch_concurrency = {{ eget_batch_concurrency | int }}
 
 [packages]
