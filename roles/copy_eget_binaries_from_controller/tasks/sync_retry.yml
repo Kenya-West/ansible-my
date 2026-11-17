@@ -9,6 +9,8 @@
     ssh_connection_multiplexing: true
     rsync_opts:
       - "--chmod=F0755"
+      # --archive would otherwise set the mtime of {{ eget_host_bin_dir }} itself.
+      - "--omit-dir-times"
   delegate_to: localhost
   register: eget_sync_result
   ignore_errors: "{{ (eget_sync_attempt | default(1) | int) < (eget_sync_retries | int) }}"

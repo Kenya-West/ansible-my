@@ -1,0 +1,32 @@
+---
+# One owner and one group for {{ eget_host_bin_dir }} and everything in it:
+# {{ standard_user }}, as on the established hosts.
+#
+# The binaries are rsynced as the SSH user (become never reaches the host rsync
+# writes on), so the directory must be that user's: a fresh host has it
+# root:root, where rsync fails with "mkstemp ... Permission denied". The group
+# matters too: --archive chgrps the directory, which a non-root user cannot do
+# to a group it is not in. Files installed earlier by other means (as root)
+# are taken over as well, so the user can replace them.
+#
+# Runs alone, without downloading or copying anything, with
+#   --tags eget_ownership
+
+- name: Make {{ standard_user }} own {{ eget_host_bin_dir }}
+  become: true
+  ansible.builtin.file:
+    path: "{{ eget_host_bin_dir }}"
+    state: directory
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    mode: "0755"
+
+# Owner and group only: the files keep their own modes.
+- name: Make {{ standard_user }} own everything in {{ eget_host_bin_dir }}
+  become: true
+  ansible.builtin.file:
+    path: "{{ eget_host_bin_dir }}"
+    state: directory
+    owner: "{{ standard_user }}"
+    group: "{{ standard_user }}"
+    recurse: true

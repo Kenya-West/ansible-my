@@ -149,6 +149,17 @@
   delegate_to: localhost
   run_once: true
 
+# Before the sync, which needs the directory to be the SSH user's. Everything
+# the sync writes is that user's already, so nothing is left to fix after it.
+- name: Fix the owner and group of the binaries directory
+  ansible.builtin.include_tasks:
+    file: ownership.yml
+    apply:
+      tags:
+        - eget_ownership
+  tags:
+    - eget_ownership
+
 - name: Synchronize binaries to host (with retries)
   ansible.builtin.include_tasks: sync_retry.yml
   when: hostvars[eget_primary_host].eget_install_result.rc == 0
