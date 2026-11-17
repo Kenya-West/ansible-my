@@ -9,6 +9,12 @@ eget_install_retries: 5
 # Seconds to wait between retries of "eget install --all".
 eget_install_retry_delay: 5
 
+# "eget install --all" runs in the background (async) while the hosts are
+# prepared. Seconds it may take in total before it is killed and the role
+# fails, and seconds between checks on it.
+eget_install_async_timeout: 480
+eget_install_async_poll: 5
+
 # Number of times to retry synchronizing binaries to each host on transient
 # rsync/ssh failures before giving up.
 eget_sync_retries: 3

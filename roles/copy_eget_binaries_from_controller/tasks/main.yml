@@ -85,7 +85,10 @@
   delegate_to: localhost
   run_once: true
 
-- name: Execute eget install
+# Started in the background (poll: 0): the download only needs the controller,
+# so the hosts get their directory ownership fixed meanwhile, and the play
+# waits for eget only right before the binaries are needed.
+- name: Start eget install in the background
   become: false
   environment:
     EGET_CONFIG: "{{ eget_temp_dir.path }}/eget.toml"
@@ -93,8 +96,42 @@
     NO_COLOR: "1"
   ansible.builtin.shell:
     cmd: "{{ eget_temp_dir.path }}/eget install --all --retries {{ eget_install_retries }}"
+  async: "{{ eget_install_async_timeout }}"
+  poll: 0
+  register: eget_install_job
+  delegate_to: localhost
+  run_once: true
+
+# Before the sync, which needs the directory to be the SSH user's. Everything
+# the sync writes is that user's already, so nothing is left to fix after it.
+- name: Fix the owner and group of the binaries directory
+  ansible.builtin.include_tasks:
+    file: ownership.yml
+    apply:
+      tags:
+        - eget_ownership
+  tags:
+    - eget_ownership
+
+# run_once results reach every host in the play, so the per-host tasks below
+# can keep reading hostvars[eget_primary_host].eget_install_result.
+- name: Wait for eget install to finish
+  become: false
+  ansible.builtin.async_status:
+    jid: "{{ eget_install_job.ansible_job_id }}"
   register: eget_install_result
+  until: eget_install_result.finished
+  retries: "{{ (eget_install_async_timeout | int) // (eget_install_async_poll | int) + 1 }}"
+  delay: "{{ eget_install_async_poll }}"
   failed_when: false
+  delegate_to: localhost
+  run_once: true
+
+- name: Clean up eget install job status
+  become: false
+  ansible.builtin.async_status:
+    jid: "{{ eget_install_job.ansible_job_id }}"
+    mode: cleanup
   delegate_to: localhost
   run_once: true
 
@@ -110,7 +147,10 @@
 - name: Debug number of binaries installed
   become: false
   ansible.builtin.debug:
-    msg: "eget has downloaded {{ binaries_found.matched }} binaries after {{ eget_install_retries }} retries with exit code: {{ eget_install_result.rc }}"
+    msg: >-
+      eget has downloaded {{ binaries_found.matched }} binaries after
+      {{ eget_install_retries }} retries with exit code:
+      {{ eget_install_result.rc | default('none') }}
   delegate_to: localhost
   run_once: true
 
@@ -119,9 +159,11 @@
   ansible.builtin.fail:
     msg: >-
       eget install failed after {{ eget_install_retries }} attempt(s).
-      rc={{ eget_install_result.rc }}
-      stderr={{ eget_install_result.stderr }}
-  when: eget_install_result.rc != 0
+      rc={{ eget_install_result.rc | default('none') }}
+      msg={{ eget_install_result.msg | default('') }}
+      stderr={{ eget_install_result.stderr | default('') }}
+  # No rc means the job never finished: it hit eget_install_async_timeout.
+  when: (eget_install_result.rc | default(1)) != 0
   delegate_to: localhost
   run_once: true
 
@@ -148,17 +190,6 @@
     state: directory
   delegate_to: localhost
   run_once: true
-
-# Before the sync, which needs the directory to be the SSH user's. Everything
-# the sync writes is that user's already, so nothing is left to fix after it.
-- name: Fix the owner and group of the binaries directory
-  ansible.builtin.include_tasks:
-    file: ownership.yml
-    apply:
-      tags:
-        - eget_ownership
-  tags:
-    - eget_ownership
 
 - name: Synchronize binaries to host (with retries)
   ansible.builtin.include_tasks: sync_retry.yml
