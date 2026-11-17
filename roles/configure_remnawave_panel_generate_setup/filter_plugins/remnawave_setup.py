@@ -448,6 +448,23 @@ def _prepare_composition(options):
                 raise AnsibleFilterError('Conflicting definitions of composition snippet %s'
                                          % snippet['name'])
             snippets[snippet['name']] = snippet
+    # The panel refuses an empty snippet (A166), and an inventory may legitimately
+    # produce one: balancers_all with no node publishing an "all" exit. Such a
+    # snippet is not written, and the profiles stop referencing it.
+    empty = set(name for name, snippet in snippets.items() if not snippet['snippet'])
+    if empty:
+        for fragment in composition:
+            config = fragment.get('config')
+            if not isinstance(config, dict):
+                continue
+            routing = config.get('routing')
+            for container, key in ((config, 'outbounds'),
+                                   (routing if isinstance(routing, dict) else {}, 'rules'),
+                                   (routing if isinstance(routing, dict) else {}, 'balancers')):
+                if isinstance(container.get(key), list):
+                    container[key] = [item for item in container[key]
+                                      if item.get('snippet') not in empty or len(item) > 1]
+        snippets = dict((name, snippet) for name, snippet in snippets.items() if name not in empty)
     return composition, list(snippets.values())
 
 

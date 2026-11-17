@@ -729,7 +729,8 @@ def inventory_vars(snippets=None, direct_route_id=2):
         **{'vpn_server_remnawave_snippets_key_' + name: name + '_prod_1'
            for name in ('outbounds_default', 'rules_default', 'outbounds_warp',
                         'rules_warp', 'outbounds_all', 'rules_all', 'balancers_all')},
-        **{'vpn_server_remnawave_snippets_' + name: []
+        # Non-empty: an empty composition snippet is dropped, with its references.
+        **{'vpn_server_remnawave_snippets_' + name: [{'tag': 'mock'}]
            for name in ('outbounds_default', 'rules_default', 'outbounds_warp',
                         'rules_warp', 'balancers_all')},
     })
@@ -800,6 +801,21 @@ class CompositionTests(unittest.TestCase):
             self.assertEqual(profile['config']['routing']['balancers'],
                              [{'snippet': 'balancers_all_prod_1'}])
             self.assertEqual(profile['config']['log'], {'loglevel': 'warning'})
+
+    def test_empty_snippet_is_not_written_nor_referenced(self):
+        # No node publishes an "all" exit: balancers_all is [], which the panel
+        # refuses to store (A166), so it is dropped along with its references.
+        for fragment in self.options['profile_composition']:
+            for snippet in fragment.get('snippets') or []:
+                if snippet['name'] == 'balancers_all_prod_1':
+                    snippet['snippet'] = []
+        model = self.model()
+        self.assertNotIn('balancers_all_prod_1', [s['name'] for s in model['profile_snippets']])
+        self.assertEqual(len(model['profile_snippets']), 4)
+        for profile in model['profiles']:
+            self.assertNotIn('balancers', profile['config']['routing'])
+            self.assertNotIn('balancers_all_prod_1', str(profile['config']))
+            self.assertIn('outbounds_all_prod_1', setup._snippet_refs(profile['config']['outbounds']))
 
     def test_fragment_order_controls_rule_precedence(self):
         fragments = self.options['profile_composition']
