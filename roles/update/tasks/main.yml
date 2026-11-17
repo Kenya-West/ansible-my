@@ -1,5 +1,9 @@
 ---
 # tasks file for roles/update
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Ensure apt list dir exists
   ansible.builtin.file:
     path: /var/lib/apt/lists/

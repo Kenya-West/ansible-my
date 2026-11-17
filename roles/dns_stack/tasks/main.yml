@@ -33,6 +33,10 @@
       notify: reload systemd
 
     # tasks file for roles/dns_stack
+    - name: Wait for APT/dpkg to be free
+      ansible.builtin.include_role:
+        name: kwtoolset/wait_for_apt
+
     - name: Ensure base packages are installed
       ansible.builtin.apt:
         name:

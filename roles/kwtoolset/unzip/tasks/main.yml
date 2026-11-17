@@ -29,6 +29,10 @@
     msg: "Unsupported file extension: {{ unzip_file_extension }}. Supported extensions are: {{ supported_file_extensions | join(', ') }}"
   when: unzip_file_extension not in supported_file_extensions
 
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Ensure tar is installed
   become: true
   become_user: root

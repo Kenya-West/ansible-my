@@ -1,0 +1,17 @@
+---
+# defaults file for roles/kwtoolset/wait_for_apt
+
+# Longest wait for unattended-upgrades/cloud-init on a fresh VPS (seconds)
+wait_for_apt_timeout: 1800
+# APT must stay idle this long after it was seen busy (bridges update→upgrade gaps)
+wait_for_apt_settle: 15
+# Seconds between checks on the host
+wait_for_apt_interval: 5
+# Seconds between async status polls from the controller
+wait_for_apt_poll: 15
+# Fail the host when APT is still busy at the timeout
+wait_for_apt_fail_on_timeout: true
+# Treat running cloud-init config/final stages as busy
+wait_for_apt_cloud_init: true
+# Run `dpkg --configure -a` when an earlier dpkg run was interrupted
+wait_for_apt_repair: true

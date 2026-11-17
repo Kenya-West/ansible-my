@@ -1,5 +1,9 @@
 ---
 # tasks file for roles/clear_cache
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Clear Apt cache
   ansible.builtin.apt:
     clean: true

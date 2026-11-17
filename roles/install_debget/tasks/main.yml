@@ -1,5 +1,9 @@
 ---
 # tasks file for roles/install_debget
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Install deb-get
   shell: curl -sL https://raw.githubusercontent.com/wimpysworld/deb-get/main/deb-get | sudo -E bash -s install deb-get
   become: true

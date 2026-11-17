@@ -75,6 +75,15 @@
     - update_config_hard
     - update_sync_configs
 
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+    apply:
+      tags:
+        - always
+  tags:
+    - always
+
 - name: Ensure git is installed
   become: true
   become_user: root

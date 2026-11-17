@@ -1,0 +1,33 @@
+---
+# tasks file for roles/kwtoolset/wait_for_apt
+# Fast path: one synchronous check, ok right away when APT is idle
+- name: Check whether APT/dpkg is busy
+  become: true
+  become_user: root
+  wait_for_apt_lock:
+    timeout: 0
+    fail_on_timeout: false
+    cloud_init: "{{ wait_for_apt_cloud_init }}"
+    repair: "{{ wait_for_apt_repair }}"
+  register: wait_for_apt_probe
+
+# Slow path: poll in the background so a long wait holds no SSH session open
+- name: Wait for APT/dpkg to be released
+  when: wait_for_apt_probe.busy
+  block:
+    - name: Show what is holding APT/dpkg
+      ansible.builtin.debug:
+        msg: "Waiting up to {{ wait_for_apt_timeout }}s: {{ wait_for_apt_probe.reasons | join('; ') }}"
+
+    - name: Wait until APT/dpkg is free
+      become: true
+      become_user: root
+      wait_for_apt_lock:
+        timeout: "{{ wait_for_apt_timeout }}"
+        settle: "{{ wait_for_apt_settle }}"
+        interval: "{{ wait_for_apt_interval }}"
+        fail_on_timeout: "{{ wait_for_apt_fail_on_timeout }}"
+        cloud_init: "{{ wait_for_apt_cloud_init }}"
+        repair: "{{ wait_for_apt_repair }}"
+      async: "{{ wait_for_apt_timeout | int + wait_for_apt_settle | int + 300 }}"
+      poll: "{{ wait_for_apt_poll }}"

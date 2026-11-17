@@ -35,6 +35,10 @@
     - country_code_upper in docker_mirrors_country_code_allowlist
     - docker_repo_url is defined
 
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Run geerlingguy.docker role to install Docker
   ansible.builtin.include_role:
     name: geerlingguy.docker

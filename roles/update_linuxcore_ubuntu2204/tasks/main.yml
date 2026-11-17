@@ -18,6 +18,10 @@
     msg: "Current kernel version is {{ update_linuxcore_ubuntu2204_current_kernel.stdout }}. No update needed."
   when: update_linuxcore_ubuntu2204_current_kernel.stdout is version('6.0', '>=')
 
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Install required packages for kernel update
   ansible.builtin.apt:
     name:

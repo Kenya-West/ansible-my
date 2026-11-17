@@ -8,6 +8,10 @@
   register: debget_installed
   ignore_errors: true
 
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Run command deb-get install
   ansible.builtin.command: deb-get install {{ packages_deb_list | join(' ') }}
   when:

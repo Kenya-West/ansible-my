@@ -50,6 +50,10 @@
   changed_when: false
   failed_when: false
 
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Install missing benchmark dependencies and the screenshot fonts
   ansible.builtin.apt:
     name: >-

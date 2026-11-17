@@ -13,6 +13,10 @@
       inventory hostname "{{ inventory_hostname }}".
       Expected exactly two lowercase letters.
 
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Ensure python3-debian is installed
   ansible.builtin.apt:
     name: python3-debian

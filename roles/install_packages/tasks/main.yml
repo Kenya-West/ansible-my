@@ -1,5 +1,9 @@
 ---
 # tasks file for roles/install_packages
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+
 - name: Uninstall Apt packages
   ansible.builtin.apt:
     name: "{{ item }}"

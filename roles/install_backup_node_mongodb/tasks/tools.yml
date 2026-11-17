@@ -1,4 +1,11 @@
 ---
+- name: Wait for APT/dpkg to be free
+  ansible.builtin.include_role:
+    name: kwtoolset/wait_for_apt
+  when:
+    - mongodump_install_tools | bool
+    - mongodump_targets | selectattr('execution.driver', 'equalto', 'direct') | list | length > 0
+
 - name: Install host MongoDB Database Tools when explicitly requested
   become: true
   become_user: root

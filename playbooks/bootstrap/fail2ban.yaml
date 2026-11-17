@@ -4,5 +4,10 @@
   become: true
   become_user: root
 
+  pre_tasks:
+    - name: Wait for APT/dpkg to be free
+      ansible.builtin.include_role:
+        name: kwtoolset/wait_for_apt
+
   roles:
     - name: oefenweb.fail2ban
