@@ -1936,7 +1936,12 @@ def remnawave_verify(panel, model, options):
 
     rules_name = options['rules_snippet']
     outbounds_name = options['outbounds_snippet']
+    # A balancers snippet the inventory no longer produces (no node publishes an
+    # "all" exit, so it is empty and never written) may linger in the panel from an
+    # earlier run; no profile embeds it, so its selectors are not checked.
     balancers_name = options.get('balancers_snippet')
+    if balancers_name not in set(d.get('name') for d in model.get('profile_snippets') or []):
+        balancers_name = None
     for name in (rules_name, outbounds_name):
         if name not in snippets:
             problems.append('Snippet %s is not in the panel' % name)
