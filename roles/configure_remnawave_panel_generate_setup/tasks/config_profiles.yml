@@ -51,6 +51,9 @@
     crpgs_gather:
       config_profiles: {}
 
+# A protected profile (Default-Profile) is adopted even untagged: the panel seeds
+# it on a fresh install, cannot create it again, and nobody made it by hand to
+# be spared.
 # Each desired profile is matched to the panel's profile holding its inbound,
 # else the one of its name. It is written addressed by its inbound when that
 # already identifies it (or nothing does yet), and by its name otherwise - the
@@ -75,7 +78,8 @@
       {%-   set current = (holder + named) | first if (holder + named) else {} -%}
       {%-   if not current -%}
       {%-     set left_out = '' -%}
-      {%-   elif current.uuid not in managed and not vpn_server_remnawave_config_profiles_adopt_untagged | bool -%}
+      {%-   elif current.uuid not in managed and not vpn_server_remnawave_config_profiles_adopt_untagged | bool
+                    and current.name not in vpn_server_remnawave_config_profiles_protected -%}
       {%-     set left_out = 'untagged' -%}
       {%-   elif holder and named and holder[0].uuid != named[0].uuid -%}
       {%-     set left_out = 'name_taken' -%}
