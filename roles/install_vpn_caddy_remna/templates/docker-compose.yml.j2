@@ -18,8 +18,10 @@ services:
       - /home/{{ standard_user }}/logs/remnanode:/var/log/remnanode
     cap_add:
       - NET_ADMIN
-{% set sd = domains_keys.remna_node | map(attribute='domain') | list | default([]) %}
-{% if sd | length > 0 %}
+{% set sd_all = domains_keys.remna_node | map(attribute='domain') | list | default([]) %}
+{# Same filter as .env.j2: the main domain is served by the host's own Caddy, SERVICE_DOMAINS only holds the extra ones #}
+{% set sd = domains_keys.remna_node | rejectattr('domain', 'in', [domains_keys.main] + (domains_keys.main_extra | default([]))) | map(attribute='domain') | unique | list | default([]) %}
+{% if sd_all | length > 0 %}
     ports:
 {% if caddy_occupy_HTTPS is not defined or caddy_occupy_HTTPS == false %}
       - "443:443"
@@ -31,6 +33,7 @@ services:
 {% endfor %}
 {% endif %}
     labels:
+{% if sd | length > 0 %}
       caddy: "${SERVICE_DOMAINS}"
 {% if remna_node_use_dns01_cloudflare is defined and remna_node_use_dns01_cloudflare == true %}
       caddy.tls.dns: "cloudflare ${CLOUDFLARE_API_TOKEN}"
@@ -39,6 +42,7 @@ services:
       caddy.@not_internal: "not path /{$$INTERNAL_PATH_BASE}*"
       caddy.root: "@not_internal /var/www/public/sni-templates/current"
       caddy.file_server: "@not_internal"
+{% endif %}
       UFW_MANAGED: "TRUE"
       UFW_ALLOW_FROM: "${UFW_ALLOW_FROM}"
 {% endif %}
