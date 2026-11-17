@@ -12,8 +12,17 @@ eget_install_retry_delay: 5
 # "eget install --all" runs in the background (async) while the hosts are
 # prepared. Seconds it may take in total before it is killed and the role
 # fails, and seconds between checks on it.
-eget_install_async_timeout: 480
+eget_install_async_timeout: 600
 eget_install_async_poll: 5
+
+# eget has no read timeout: a download whose connection goes silent hangs
+# forever, and --retries only counts errors. So each run of "eget install --all"
+# is killed after eget_install_attempt_timeout seconds and started again, up to
+# eget_install_attempts times. Retries are cheap: eget reuses what it already
+# downloaded (its pkg-cache in the temporary directory). A normal run takes
+# about a minute; keep attempts * timeout within eget_install_async_timeout.
+eget_install_attempts: 3
+eget_install_attempt_timeout: 180
 
 # Controller-side cache of downloaded binaries, one folder per distinct
 # packages_binary_list. A folder is reused for eget_cache_max_age_days, then

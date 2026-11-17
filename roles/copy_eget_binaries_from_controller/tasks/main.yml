@@ -157,7 +157,14 @@
         EGET_GITHUB_TOKEN: "{{ eget_github_token_check.stdout }}"
         NO_COLOR: "1"
       ansible.builtin.shell:
-        cmd: "{{ eget_temp_dir.path }}/eget install --all --retries {{ eget_install_retries }}"
+        cmd: |
+          attempt=1
+          while [ "$attempt" -le {{ eget_install_attempts | int }} ]; do
+            timeout -k 10 {{ eget_install_attempt_timeout | int }} {{ eget_temp_dir.path }}/eget install --all --retries {{ eget_install_retries }} && exit 0
+            echo "eget attempt $attempt/{{ eget_install_attempts | int }} failed or timed out (rc=$?)" >&2
+            attempt=$((attempt + 1))
+          done
+          exit 1
       async: "{{ eget_install_async_timeout }}"
       poll: 0
       register: eget_install_job
