@@ -99,6 +99,11 @@
       # Naming: a domain is published as "<flag> <REGION CODE>-<n>", built from
       # the region maps of group_vars/all/0_defaults/regions.yaml.
       region_codes: "{{ vpn_deployments_region_codes }}"
+      # The region of a domain whose label is not net-<region>-<n>: the one of
+      # its nodes' country.
+      country_regions: >-
+        {{ vpn_deployments_country_to_regions_matcher
+           | combine(vpn_deployments_country_to_censorship_region_matcher) }}
       flag_symbols: "{{ vpn_deployments_regional_indicator_symbols }}"
       outbounds: "{{ crpgs_outbounds_plan }}"
       route_id_base: "{{ vpn_server_remnawave_hosts_vless_route_id_base }}"

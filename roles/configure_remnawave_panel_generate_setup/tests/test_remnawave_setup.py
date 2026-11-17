@@ -604,6 +604,16 @@ class ReverseChainTests(unittest.TestCase):
         self.options['entry_country_codes'] = []
         self.assertFalse(any(h['kind'] == 'chain' for h in self.model()['hosts']))
 
+    def test_unconventional_labels_are_named_by_the_country_region(self):
+        self.options['country_regions'] = {'nl': 'europe', 'ru': 'russia'}
+        self.nodes[0]['domains'][0]['domain'] = 'germany-01.example.test'
+        self.nodes[2]['domains'][0]['domain'] = 'moscow-02.example.test'
+        names = {h['remark'] for h in self.model()['hosts']}
+        self.assertIn('\U0001F1F3\U0001F1F1 EU-1', names)
+        self.assertTrue(any(n.startswith('\U0001F1F7\U0001F1FA RU-') or ' | by \U0001F1F7\U0001F1FA RU-' in n
+                            for n in names), names)
+        self.assertFalse(any('01-1' in n or '02-1' in n for n in names), names)
+
     def test_new_direction_is_geography_based_not_russia_specific(self):
         self.options['region_codes']['iran'] = 'IR'
         for node in self.nodes[2:4]:

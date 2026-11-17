@@ -51,11 +51,20 @@ def _label(domain):
     return str(domain).split('.')[0]
 
 
-def _region(label):
-    """The region out of a net-<region>-<n> / chain-<region>-<n> label."""
+def _region(label, country='', country_regions=None):
+    """The region of a domain.
+
+    Out of a net-<region>-<n> / chain-<region>-<n> label when it is one. Any
+    other label (germany-01) says nothing about a region, so the region is the
+    one of the country the domain's nodes are in (country_regions: country code
+    -> region name); without a match the label's last part is used as before.
+    """
     parts = label.split('-')
     if len(parts) >= 3:
         return parts[1]
+    mapped = (country_regions or {}).get(str(country or '').lower())
+    if mapped:
+        return str(mapped)
     return parts[-1] if parts else ''
 
 
@@ -178,7 +187,7 @@ def _collect(nodes, wanted_types):
     return found
 
 
-def _settle(slot, default_protocol, warnings, kind):
+def _settle(slot, default_protocol, warnings, kind, country_regions=None):
     """Reduce a domain's nodes to the one country and protocol it publishes.
 
     A domain served by nodes that disagree is a configuration mistake rather
@@ -197,7 +206,7 @@ def _settle(slot, default_protocol, warnings, kind):
             'using %s' % (kind, slot['domain'], ', '.join(protocols), protocols[0]))
     slot['country'] = countries[0] if countries else ''
     slot['protocol'] = protocols[0] if protocols else default_protocol
-    slot['region'] = _region(slot['label'])
+    slot['region'] = _region(slot['label'], slot['country'], country_regions)
     # A host is attached to one inbound, so every node behind a domain has to
     # activate the same profile; nodes split across profiles cannot be served
     # by one host and are refused rather than half published.
@@ -1070,12 +1079,13 @@ def remnawave_model(nodes, options):
     # Plan chains before rendering profiles: their client-facing transport is
     # the entry's, but access is granted by the exit's scope. Location and
     # exclusive exits need a profile variant for each usable entry protocol.
+    country_regions = options.get('country_regions') or {}
     all_exits = [
-        _settle(slot, default_protocol, warnings, 'Direct domain')
+        _settle(slot, default_protocol, warnings, 'Direct domain', country_regions)
         for _, slot in sorted(_collect(nodes, set(options['direct_domain_types'])).items())
     ]
     all_entries = [
-        _settle(slot, default_protocol, warnings, 'Chain domain')
+        _settle(slot, default_protocol, warnings, 'Chain domain', country_regions)
         for _, slot in sorted(_collect(nodes, set(options['entry_domain_types'])).items())
     ]
     # Hop relations (remna_node_hops): a node taking traffic from another is
@@ -1184,7 +1194,7 @@ def remnawave_model(nodes, options):
     # the scope agrees but its primary transports do not.
     for slot in used:
         slot['profiles'] = sorted(set(node_profiles[n]['config_profile'] for n in slot['nodes']))
-        _settle(slot, default_protocol, [], 'Domain')
+        _settle(slot, default_protocol, [], 'Domain', country_regions)
 
     # Short names are per collection: an entry outside both eligible pools is
     # gone by now, so it takes no number with it.
