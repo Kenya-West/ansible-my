@@ -70,6 +70,24 @@ def _overlay(existing, declared):
     return out
 
 
+def _identities(catalog):
+    """Known infra-billing identity of every catalog account.
+
+    Mirrors the reconcile model: an account-level infra_billing.provider replaces
+    the provider-level default; name defaults to the catalog name, label to the key.
+    """
+    rows = []
+    for key, provider in catalog.items():
+        for aid, account in provider.get('accounts', {}).items():
+            own = account.get('infra_billing') or {}
+            ident = own['provider'] if 'provider' in own else provider.get('infra_billing') or {}
+            rows.append({'key': key, 'aid': aid, 'provider_uuid': ident.get('uuid'),
+                         'provider_name': ident.get('name', provider['name']),
+                         'uuid': own.get('uuid'), 'label': own.get('label', aid),
+                         'declared': bool(account.get('infra_billing') or provider.get('infra_billing'))})
+    return rows
+
+
 def regenerate_catalog(document, entries):
     if not isinstance(document, dict):
         raise AnsibleFilterError('Existing provider file must be a YAML mapping, not an encrypted vault or scalar')
@@ -86,6 +104,11 @@ def regenerate_catalog(document, entries):
             _check_catalog(entry['data'])
             declared = _merge_declared(declared, entry['data'])
     identities = {}
+    # Catalog infra_billing identities decide which stable key/account an API
+    # provider belongs to (e.g. two API providers split across one vendor key).
+    known = _overlay(existing, declared)
+    _check_catalog(known)
+    known_rows = _identities(known)
     # API-account sources precede account-less panels regardless of host order.
     api_entries = sorted((e for e in entries if e['kind'] != 'host_vars'),
                          key=lambda e: e['kind'] == 'remnawave')
@@ -94,19 +117,18 @@ def regenerate_catalog(document, entries):
         data = entry['data']
         if not isinstance(data, list):
             raise AnsibleFilterError('Provider API must return a list')
-        bindings = entry.get('bindings', [])
         key_map = entry.get('provider_keys', {})
         account_map = entry.get('account_keys', {})
         for p in data:
             uuid, name = p['uuid'], p['name']
-            matching = [b for b in bindings if b.get('uuid') == uuid or (not b.get('uuid') and b.get('name') == name)] if kind == 'infra_billing' else []
-            if len(matching) > 1:
-                raise AnsibleFilterError('Ambiguous provider binding during import')
-            binding = matching[0] if matching else {}
-            key = _check_key(key_map.get(uuid, key_map.get(name, binding.get('provider') or _key(name))))
+            rows = [r for r in known_rows if r['provider_uuid'] == uuid
+                    or (not r['provider_uuid'] and r['provider_name'] == name)] if kind == 'infra_billing' else []
+            if len({r['key'] for r in rows}) > 1:
+                raise AnsibleFilterError('Ambiguous catalog infra_billing identity during import; give the providers distinct infra_billing names/UUIDs')
+            key = _check_key(key_map.get(uuid, key_map.get(name, rows[0]['key'] if rows else _key(name))))
             # Names which sanitize to the same key must not be conflated. An
-            # explicit key map/binding authorizes multi-account vendor grouping.
-            explicit = uuid in key_map or name in key_map or 'provider' in binding
+            # explicit key map/catalog identity authorizes multi-account grouping.
+            explicit = uuid in key_map or name in key_map or bool(rows)
             identity = (kind, entry['host'], key)
             if identity in identities and not explicit:
                 raise AnsibleFilterError('Provider names collide after key normalization; supply provider_keys')
@@ -116,6 +138,8 @@ def regenerate_catalog(document, entries):
             provider = {'name': name, 'accounts': {}}
             if p.get('loginUrl'):
                 provider['login_url'] = p['loginUrl']
+            if p.get('faviconLink'):
+                provider['favicon_link'] = p['faviconLink']
             if kind == 'remnawave':
                 # Remnawave has no accounts or API connector information. Do
                 # not invent an account beside already-known real accounts.
@@ -123,9 +147,10 @@ def regenerate_catalog(document, entries):
                 provider['accounts'] = {} if known else {'main': {'connection': {'type': 'manual'}}}
             elif kind == 'infra_billing':
                 for a in p['accounts']:
-                    matches = [aid for aid, ab in binding.get('accounts', {}).items() if ab.get('uuid') == a['uuid'] or (not ab.get('uuid') and ab.get('label', aid) == a['label'])]
+                    matches = [r['aid'] for r in rows if r['key'] == key and (
+                        r['uuid'] == a['uuid'] or (not r['uuid'] and r['label'] == a['label']))]
                     if len(matches) > 1:
-                        raise AnsibleFilterError('Ambiguous account binding during import')
+                        raise AnsibleFilterError('Ambiguous catalog account identity during import')
                     aid = _check_key(account_map.get(a['uuid'], matches[0] if matches else _key(a['label'] or 'main')))
                     connection = {'type': 'manual' if p['kind'] == 'manual' else 'api'}
                     if p['kind'] != 'manual':
@@ -135,6 +160,11 @@ def regenerate_catalog(document, entries):
                     account = {'connection': connection}
                     if 'isPostpaid' in a:
                         account['postpaid'] = a['isPostpaid']
+                    # Record the live identity only where the catalog declares
+                    # none; declared names/UUIDs always win over the API.
+                    if not any(r['declared'] for r in known_rows if (r['key'], r['aid']) == (key, aid)):
+                        account['infra_billing'] = {'provider': {'uuid': uuid, 'name': name},
+                                                    'uuid': a['uuid'], 'label': a['label']}
                     accounts = provider['accounts']
                     if aid in accounts:
                         raise AnsibleFilterError('Imported account keys collide; supply account_keys')

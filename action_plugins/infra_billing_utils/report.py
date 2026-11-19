@@ -32,7 +32,7 @@ def build_report(projected, entries, before, after, operations, check_mode, reso
     resolved = resolved or {}
     sync_failures = sync_failures or {}
     providers, accounts, services = {}, {}, {}
-    # Full refresh includes live accounts not represented by inventory bindings.
+    # Full refresh includes live accounts not represented in the inventory catalog.
     # Report their public provider name/label, never credential hints or bodies.
     for provider in before['providers'] + after['providers']:
         providers[provider['uuid']] = provider['name']

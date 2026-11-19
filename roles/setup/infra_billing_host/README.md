@@ -37,9 +37,11 @@ Requirements:
   `host_vars/<server>/infrastructure/providers.yaml`. Declare
   `accounts.<key>.connection: {type: api, driver: billmgr, api_url: ...}` plus
   credentials in Vault for first creation. Existing secrets remain in billing.
-  Explicit `infra_billing_provider_bindings` are optional when no override is
-  needed; otherwise declare the intended provider/account UUIDs or names.
+  Optional `infra_billing` identity blocks in the same catalog declare adoption
+  UUIDs, display names and labels when defaults do not match (see
+  [configure_infra_billing](../../configure_infra_billing/README.md#provider-identities)).
   Do not copy environment-specific UUIDs to a fresh billing database.
+  Only this host's provider account is reconciled.
 - Default local file `host_vars/<host>/0_all/3_infrastructure.yaml` exists and
   contains `infrastructure`. Override `setup_infra_billing_host_file` if needed.
   Fully vaulted files/symlinks and duplicate service definitions are refused.
@@ -96,7 +98,7 @@ infra_billing_service:
 ```
 
 Run `add_host_to_billing.yaml -e setup_infra_billing_host=waicore-de-8` and choose
-an existing project by name. No `infra_billing_provider_bindings` is required for
+an existing project by name. No `infra_billing` identity block is required for
 this simple declaration. HSHP/DeepHost use their own driver/endpoints/credentials
 and provider service IDs in exactly the same way.
 

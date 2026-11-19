@@ -7,7 +7,6 @@
     token: "{{ hostvars[sibh_server].infra_billing_api_token | default(lookup('ansible.builtin.env', 'INFRA_BILLING_API_TOKEN')) }}"
     action: reconcile
     catalog: "{{ hostvars[sibh_server].infra_providers | default({}) }}"
-    bindings: "{{ sibh_selected_bindings }}"
     hosts:
       - name: "{{ setup_infra_billing_host }}"
         country_code: "{{ hostvars[setup_infra_billing_host].country_code_upper }}"

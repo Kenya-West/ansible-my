@@ -1,7 +1,8 @@
 """Consumer-independent infrastructure data validation and infra-billing projection.
 
 No network access here. Money uses Decimal; arbitrary calendar intervals are never
-silently treated as 30-day months. API-specific settings live in bindings only.
+silently treated as 30-day months. infra-billing API identities (provider/account
+UUIDs, names, labels) live in the catalog's optional `infra_billing` blocks.
 """
 import json
 import re
@@ -48,12 +49,29 @@ def api_uuid(value):
     return value
 
 
+def identity_block(value, allowed, label):
+    """Validate an optional infra-billing identity mapping without guessing fields."""
+    require(isinstance(value, dict), label + ' must be a mapping')
+    require(not set(value) - set(allowed), label + ' supports only: ' + ', '.join(sorted(allowed)))
+    if value.get('uuid') is not None:
+        api_uuid(value['uuid'])
+    if 'name' in value:
+        require(isinstance(value['name'], str) and value['name'], label + '.name must be a nonempty string')
+    if 'label' in value:
+        require(value['label'] is None or isinstance(value['label'], str) and 0 < len(value['label']) <= 64,
+                label + '.label must be null or 1..64 characters')
+    if 'provider' in value:
+        identity_block(value['provider'], ('uuid', 'name'), label + '.provider')
+
+
 def validate_catalog(catalog):
     require(isinstance(catalog, dict), 'infra_providers must be a mapping')
     for key, provider in catalog.items():
         identifier(key, 'provider key')
         require(isinstance(provider, dict) and provider.get('name'), key + ' needs a name')
-        for field in ('website', 'login_url'):
+        if 'infra_billing' in provider:
+            identity_block(provider['infra_billing'], ('uuid', 'name'), key + '.infra_billing')
+        for field in ('website', 'login_url', 'favicon_link'):
             if provider.get(field):
                 url(provider[field], key + '.' + field)
         require('todo' not in provider.get('sources', {}),
@@ -63,6 +81,9 @@ def validate_catalog(catalog):
         for aid, account in accounts.items():
             identifier(aid, 'account key')
             require(isinstance(account, dict), 'account must be a mapping')
+            if 'infra_billing' in account:
+                identity_block(account['infra_billing'], ('provider', 'uuid', 'label'),
+                               key + '.accounts.' + aid + '.infra_billing')
             connection = account.get('connection', {'type': 'manual'})
             require(connection.get('type') in ('api', 'manual', 'bot', 'web'),
                     'connection.type must be api, manual, bot or web')
@@ -108,11 +129,11 @@ def billing_projection(billing):
     return out
 
 
-def account_payload(account, binding):
+def account_payload(account, identity):
     connection = account.get('connection', {})
     out = {}
-    if 'label' in binding:
-        out['label'] = binding['label']
+    if 'label' in identity:
+        out['label'] = identity['label']
         require(out['label'] is None or isinstance(out['label'], str) and 0 < len(out['label']) <= 64,
                 'account label must be null or 1..64 characters')
     if 'postpaid' in account:
@@ -142,44 +163,64 @@ def require_create_credentials(kind, body, context='new API account'):
             + '; supply them in the private provider catalog (existing secrets are never revealed)')
 
 
-def effective_bindings(catalog, bindings, hosts):
-    """Explicit API identities win; derive missing bindings from declared drivers.
+def api_identity(provider, aid):
+    """infra-billing provider (uuid, name) of one catalog account.
 
-    Never infer BILLmanager from a URL, a provider name, or a prior API record.
-    Limit automatic bindings to accounts actually referenced by this run's hosts.
+    An account-level `infra_billing.provider` replaces (never merges with) the
+    provider-level `infra_billing` default, so split accounts cannot inherit
+    another API provider's UUID. Name defaults to the catalog provider name.
+    """
+    account = provider['accounts'][aid].get('infra_billing', {})
+    identity = account['provider'] if 'provider' in account else provider.get('infra_billing', {})
+    return identity.get('uuid'), identity.get('name', provider['name'])
+
+
+def account_kind(catalog, key, aid, context):
+    """Connector kind comes only from the declared driver, never from URLs or API state."""
+    connection = catalog[key]['accounts'][aid].get('connection', {'type': 'manual'})
+    if connection.get('type') != 'api':
+        return 'manual'
+    require(connection.get('driver'), f"{context} references API account '{key}/{aid}' without a driver: "
+            'declare accounts.<account>.connection.driver in the billing server provider catalog (for example billmgr)')
+    return connection['driver']
+
+
+def api_providers(catalog, hosts, include_unused=False):
+    """Group catalog accounts into infra-billing providers.
+
+    Scoped runs (one host, domains only) reconcile only accounts used by their
+    enabled exports, never unrelated providers. A full run sets include_unused
+    to reconcile every catalog account. Accounts sharing an API identity form
+    one provider and must share one connector driver.
     """
     validate_catalog(catalog)
-    require(isinstance(bindings, list), 'provider bindings must be a list')
-    result = list(bindings)
-    missing = {}
+    groups, used = {}, []
     for host in hosts:
         infra = host['infrastructure']
         key, aid = infra.get('provider'), infra.get('account')
         require(key in catalog and aid in catalog[key]['accounts'],
                 host['name'] + ' refers to an unknown infrastructure provider/account')
-        if not host.get('binding', {}).get('enabled', False):
+        if host.get('binding', {}).get('enabled', False):
+            used.append((key, aid, f"Host '{host['name']}'"))
+    if include_unused:
+        used += [(key, aid, 'Catalog') for key, p in catalog.items() for aid in p['accounts']]
+    for key, aid, context in used:
+        if any(aid in g['accounts'] for g in groups.values() if g['provider'] == key):
             continue
-        matches = [b for b in result if b['provider'] == key and aid in b.get('accounts', {})]
-        require(len(matches) <= 1, 'account bound to multiple API providers')
-        if matches:
-            continue
-        connection = catalog[key]['accounts'][aid].get('connection', {'type': 'manual'})
-        driver = connection.get('driver')
-        if connection.get('type') == 'api':
-            require(driver, f"Host '{host['name']}' references unbound API account '{key}/{aid}': "
-                    'declare accounts.<account>.connection.driver in the billing server provider catalog '
-                    '(for example billmgr), or set kind in its explicit provider binding')
-        else:
-            driver = 'manual'
-        group = (key, driver)
-        if group not in missing:
-            # Connector kind is immutable. Avoid splitting an existing explicit
-            # identity implicitly: user must declare that account's binding.
-            require(not any(b['provider'] == key for b in bindings),
-                    'Provider has explicit bindings; add this account to the intended binding')
-            missing[group] = {'provider': key, 'kind': driver, 'accounts': {}}
-            result.append(missing[group])
-        missing[group]['accounts'][aid] = {'label': aid}
+        uuid, name = api_identity(catalog[key], aid)
+        kind = account_kind(catalog, key, aid, context)
+        group = groups.setdefault((key, uuid, name), {'provider': key, 'uuid': uuid, 'name': name,
+                                                      'kind': kind, 'accounts': {}})
+        require(group['kind'] == kind, 'Provider/account ' + key + '/' + aid + ': infra-billing provider '
+                + name + ' already uses driver ' + group['kind'] + '; accounts of one API provider must share '
+                'one connection.driver, or give this account its own infra_billing.provider')
+        ib = catalog[key]['accounts'][aid].get('infra_billing', {})
+        group['accounts'][aid] = {k: ib[k] for k in ('uuid', 'label') if k in ib}
+    result = list(groups.values())
+    for field in ('uuid', 'name'):
+        values = [g[field] for g in result if g[field]]
+        require(len(values) == len(set(values)), 'infra-billing provider ' + field + ' is used by more than one '
+                'catalog provider/identity; give split accounts distinct infra_billing.provider names and UUIDs')
     return result
 
 
@@ -200,46 +241,19 @@ def domain_entries(domains, bindings):
     return entries
 
 
-def project_model(catalog, bindings, hosts):
-    bindings = effective_bindings(catalog, bindings, hosts)
-    providers, account_refs, identities = [], {}, set()
-    for binding in bindings:
-        key = binding['provider']
-        require(key in catalog, 'binding refers to unknown provider ' + key)
+def project_model(catalog, hosts, include_unused=False):
+    providers, account_refs = [], {}
+    for group in api_providers(catalog, hosts, include_unused):
+        key, kind = group['provider'], group['kind']
         p = catalog[key]
-        name = binding.get('name', p['name'])
-        kind = binding.get('kind')
-        if kind is None:
-            drivers = set()
-            for aid in binding.get('accounts', {}):
-                require(aid in p['accounts'], 'binding refers to unknown account ' + aid)
-                connection = p['accounts'][aid].get('connection', {'type': 'manual'})
-                driver = connection.get('driver') if connection.get('type') == 'api' else 'manual'
-                require(driver, 'API provider binding needs kind or declared connection.driver')
-                drivers.add(driver)
-            require(len(drivers) == 1, 'Binding accounts must share one connector driver')
-            kind = next(iter(drivers))
         require(kind in KINDS, 'unsupported infra-billing connector kind')
-        if binding.get('uuid'):
-            api_uuid(binding['uuid'])
-        identity = binding.get('uuid') or name
-        require(identity not in identities, 'duplicate provider binding')
-        identities.add(identity)
-        body = {'name': name}
+        body = {'name': group['name']}
         if p.get('login_url'):
             body['loginUrl'] = p['login_url']
         entries = []
-        require(isinstance(binding.get('accounts'), dict) and binding['accounts'], 'binding needs accounts')
         labels = set()
-        for aid, ab in binding['accounts'].items():
-            require(aid in p['accounts'], 'binding refers to unknown account ' + aid)
-            connection = p['accounts'][aid].get('connection', {})
-            require(not connection.get('driver') or connection['driver'] == kind,
-                    'Provider/account ' + key + '/' + aid + ': binding kind ' + kind
-                    + ' conflicts with declared connection.driver ' + str(connection.get('driver'))
-                    + '; for a manual migration set connection.type: manual and remove connection.driver')
+        for aid, ab in group['accounts'].items():
             ref = (key, aid)
-            require(ref not in account_refs, 'account bound to multiple API providers')
             payload = account_payload(p['accounts'][aid], ab)
             label = payload.get('label', aid)
             canonical = label.casefold() if label else None
@@ -248,12 +262,10 @@ def project_model(catalog, bindings, hosts):
             payload['label'] = label
             if kind == 'manual':
                 payload = {k: v for k, v in payload.items() if k in ('label', 'isPostpaid')}
-            if ab.get('uuid'):
-                api_uuid(ab['uuid'])
             entry = {'key': ref, 'uuid': ab.get('uuid'), 'body': payload}
             entries.append(entry)
             account_refs[ref] = entry
-        providers.append({'key': key, 'uuid': binding.get('uuid'), 'kind': kind, 'body': body, 'accounts': entries})
+        providers.append({'key': key, 'uuid': group['uuid'], 'kind': kind, 'body': body, 'accounts': entries})
     services = []
     for host in hosts:
         infra = host['infrastructure']
@@ -265,7 +277,7 @@ def project_model(catalog, bindings, hosts):
         export = host.get('binding', {})
         if not export.get('enabled', False):
             continue
-        require(ref in account_refs, 'exported host account has no provider binding')
+        require(ref in account_refs, 'exported host account has no infra-billing provider')
         require(export.get('project_uuid'), 'exported host needs project_uuid')
         api_uuid(export['project_uuid'])
         if export.get('uuid'):

@@ -1,4 +1,14 @@
 ---
+- name: Refuse the retired provider bindings variable
+  ansible.builtin.assert:
+    that: infra_billing_provider_bindings | default([]) | length == 0
+    fail_msg: >-
+      infra_billing_provider_bindings was merged into infra_providers. Move each binding's
+      provider uuid/name to infra_providers.<provider>.infra_billing (or
+      accounts.<account>.infra_billing.provider for split accounts), its account uuid/label to
+      accounts.<account>.infra_billing, its kind to connection.driver, then remove the variable.
+    quiet: true
+
 - name: Start with no billing hosts
   ansible.builtin.set_fact:
     cib_hosts: []
@@ -17,7 +27,7 @@
     token: "{{ infra_billing_api_token }}"
     action: "{{ infra_billing_action }}"
     catalog: "{{ infra_providers }}"
-    bindings: "{{ infra_billing_provider_bindings }}"
+    include_unused_accounts: "{{ infra_billing_include_unused_accounts }}"
     hosts: "{{ cib_hosts }}"
     domains: "{{ infrastructure_domains }}"
     domain_bindings: "{{ infra_billing_domain_bindings }}"

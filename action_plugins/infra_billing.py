@@ -18,7 +18,6 @@ _model_spec.loader.exec_module(model)
 SECRET_FLAGS = model.SECRET_FLAGS
 delta = model.delta
 project_model = model.project_model
-effective_bindings = model.effective_bindings
 require = model.require
 require_create_credentials = model.require_create_credentials
 unique_match = model.unique_match
@@ -46,17 +45,20 @@ options:
   action:
     description: Read entities or reconcile explicitly declared data.
     type: str
-    choices: [read, reconcile, resolve_bindings]
+    choices: [read, reconcile]
     default: read
   catalog:
-    description: Consumer-independent private provider catalog.
+    description:
+      - Consumer-independent private provider catalog, including optional infra_billing
+        API identities (provider/account UUIDs, names, labels).
     type: dict
     default: {}
-  bindings:
-    description: API provider and account bindings.
-    type: list
-    elements: dict
-    default: []
+  include_unused_accounts:
+    description:
+      - Also reconcile catalog accounts no enabled host/domain of this run uses (full sync).
+      - When false, only accounts referenced by enabled hosts/domains are reconciled.
+    type: bool
+    default: false
   hosts:
     description: Related hosts and their service export settings.
     type: list
@@ -127,9 +129,9 @@ def plan(model, providers, services, projects, rotate=False, allow_sync=False, a
         current = unique_match(providers, entry['uuid'], name=entry['body']['name'])
         require(not current or current['kind'] == entry['kind'],
                 'Provider ' + entry['key'] + ': live kind ' + str(current['kind'] if current else '')
-                + ' differs from binding kind ' + entry['kind']
-                + '; kind cannot be changed by reconciliation. Update the binding/adoption UUIDs '
-                  'to the intended live provider; do not reuse deleted connector UUIDs')
+                + ' differs from declared kind ' + entry['kind']
+                + '; kind cannot be changed by reconciliation. Point the catalog infra_billing provider '
+                  'uuid/name at the intended live provider; do not reuse deleted connector UUIDs')
         pref = '@provider:' + str(index)
         if current:
             pref = current['uuid']
@@ -249,14 +251,12 @@ def public_failure(prefix, exc):
 
 
 def reconcile(p, check_mode=False):
-    if p['action'] == 'resolve_bindings':
-        return dict(changed=False, bindings=effective_bindings(p['catalog'], p['bindings'], p['hosts']))
     try:
         base = url(p['api_url'].rstrip('/'), 'api_url')
         require(base.startswith('https://') or p['allow_http'], 'HTTPS required (allow_http is only for local tests)')
         require(p['token'], 'token must not be empty')
         entries = p['hosts'] + model.domain_entries(p.get('domains', {}), p.get('domain_bindings', {}))
-        projected = project_model(p['catalog'], p['bindings'], entries) if p['action'] == 'reconcile' else None
+        projected = project_model(p['catalog'], entries, p['include_unused_accounts']) if p['action'] == 'reconcile' else None
     except (ValueError, KeyError, TypeError) as exc:
         # Exception messages never include credentials or request bodies.
         raise public_failure('Invalid infrastructure data: ', exc) from None
@@ -376,15 +376,12 @@ def reconcile(p, check_mode=False):
                           + ' account(s); remaining accounts were attempted. Check failed accounts in the UI.')
         return output
     if p.get('return_records'):
-        accounts, resolved_bindings = {}, []
+        accounts = {}
         for entry in projected['providers']:
             current = unique_match(providers, entry['uuid'], name=entry['body']['name'])
-            binding = {'uuid': current['uuid'] if current else None, 'accounts': {}}
             for account in entry['accounts']:
                 acurrent = unique_match(current['accounts'], account['uuid'], label=account['body']['label']) if current else None
                 accounts[tuple(account['key'])] = acurrent['uuid'] if acurrent else None
-                binding['accounts'][account['key'][1]] = acurrent['uuid'] if acurrent else None
-            resolved_bindings.append(binding)
         records = []
         for entry in projected['services']:
             account = accounts[tuple(entry['account'])]
@@ -394,7 +391,7 @@ def reconcile(p, check_mode=False):
             require(check_mode or current is not None, 'Service was not found after reconciliation; local settings were not saved')
             records.append({'host': entry['host'], 'uuid': current['uuid'] if current else None,
                             'project_uuid': entry['body']['projectUuid']})
-        output.update(records=records, resolved_bindings=resolved_bindings)
+        output.update(records=records)
     return output
 
 
@@ -414,9 +411,9 @@ class ActionModule(ActionBase):
             _, params = self.validate_argument_spec(argument_spec={
                 'api_url': {'type': 'str', 'required': True},
                 'token': {'type': 'str', 'required': True, 'no_log': True},
-                'action': {'choices': ['read', 'reconcile', 'resolve_bindings'], 'default': 'read'},
+                'action': {'choices': ['read', 'reconcile'], 'default': 'read'},
                 'catalog': {'type': 'dict', 'default': {}, 'no_log': True},
-                'bindings': {'type': 'list', 'elements': 'dict', 'default': []},
+                'include_unused_accounts': {'type': 'bool', 'default': False},
                 'hosts': {'type': 'list', 'elements': 'dict', 'default': []},
                 'domains': {'type': 'dict', 'default': {}},
                 'domain_bindings': {'type': 'dict', 'default': {}},

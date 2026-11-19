@@ -17,7 +17,10 @@ Defaults: [defaults/main.yml](defaults/main.yml). Catalog owner is
 `setup_infra_providers_server` (default first analytics server); pass it explicitly
 when multiple servers exist. Only that server receives the catalog, not global
 `group_vars`. Controller onboarding reads `hostvars[resolved_server].infra_providers`.
-Providers describe identity/connections only; `sources.todo` is rejected.
+Providers describe identity/connections only (`name`, `website`, `login_url`,
+`favicon_link`, `accounts`, optional `infra_billing` identities), independent of
+any one consumer; `sources.todo` is rejected. Remnawave reads fill missing
+`login_url`/`favicon_link`; existing values win.
 Legacy host/domain `sources` seed metadata is no longer stored. The explicit
 `infrastructure_provider_sources` configuration below is different: it controls
 live readers during catalog regeneration and remains supported.
@@ -32,6 +35,11 @@ Sources on each host:
 No source is inferred from the hostname, inherited `infra_providers`, or
 `domains_keys`. `infrastructure: {provider: ..., account: ...}` alone is a
 reference, not enough information to rebuild a provider definition.
+
+Billing API providers map to catalog keys/accounts through the catalog's own
+`infra_billing` identities (UUID, else name/label), then `provider_keys`/
+`account_keys`, then a key derived from the name. Imported accounts without a
+declared identity get the live provider/account UUID, name and label recorded.
 
 Reports used/skipped hostnames and source status. API failures and conflicting
 explicit declarations abort before file writes. Existing values win over API

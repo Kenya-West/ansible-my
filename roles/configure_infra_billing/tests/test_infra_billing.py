@@ -34,7 +34,7 @@ def provider(uuid=PROVIDER, kind='billmgr', accounts=None):
 def params(**overrides):
     result = {
         'api_url': 'https://billing.example', 'token': 'PRIVATE-TOKEN',
-        'action': 'reconcile', 'catalog': {}, 'bindings': [], 'hosts': [],
+        'action': 'reconcile', 'catalog': {}, 'include_unused_accounts': True, 'hosts': [],
         'domains': {}, 'domain_bindings': {}, 'rotate_credentials': False,
         'sync_missing_services': True, 'sync_all_accounts': True,
         'allow_http': False, 'validate_certs': True, 'timeout': 30,
@@ -48,13 +48,12 @@ def declared_service(has_billing=False):
         'type': 'api', 'driver': 'billmgr', 'api_url': 'https://vendor.example',
         'credentials': {'username': 'user', 'password': 'PRIVATE-PASSWORD'},
     }}}}}
-    bindings = [{'provider': 'vendor', 'kind': 'billmgr', 'accounts': {'main': {'label': 'main'}}}]
     infra = {'provider': 'vendor', 'account': 'main', 'service_id': '42'}
     if has_billing:
         infra['billing'] = {'amount': '10.00', 'currency': 'USD', 'interval': {'every': 1, 'unit': 'month'}}
     hosts = [{'name': 'vendor-de-1', 'infrastructure': infra,
               'binding': {'enabled': True, 'project_uuid': PROJECT}}]
-    return {'catalog': catalog, 'bindings': bindings, 'hosts': hosts}
+    return {'catalog': catalog, 'hosts': hosts}
 
 
 def managed_service(**overrides):
@@ -240,7 +239,6 @@ class BillingSyncTests(unittest.TestCase):
     def test_manual_exports_still_reconcile_without_connector_sync(self):
         data = declared_service(has_billing=True)
         data['catalog']['vendor']['accounts']['main']['connection'] = {'type': 'manual'}
-        data['bindings'][0]['kind'] = 'manual'
         api = FakeAPI(providers=[provider(kind='manual')])
         result = self.run_action(params(**data), api)
         self.assertEqual(result['counts'], {'creates': 1, 'updates': 0, 'syncs': 0})
@@ -286,7 +284,6 @@ class BillingSyncTests(unittest.TestCase):
     def test_failed_account_does_not_block_healthy_service_annotation(self):
         data = declared_service(has_billing=True)
         data['catalog']['vendor']['accounts']['healthy'] = copy.deepcopy(data['catalog']['vendor']['accounts']['main'])
-        data['bindings'][0]['accounts']['healthy'] = {'label': 'healthy'}
         healthy_host = copy.deepcopy(data['hosts'][0])
         healthy_host['name'] = 'healthy-de-1'
         healthy_host['infrastructure']['account'] = 'healthy'
@@ -348,7 +345,6 @@ class BillingSyncTests(unittest.TestCase):
     def test_deleted_connector_uuid_names_host_and_manual_migration_fix(self):
         data = declared_service()
         data['catalog']['vendor']['accounts']['main']['connection'] = {'type': 'manual'}
-        data['bindings'][0]['kind'] = 'manual'
         data['hosts'][0]['binding']['uuid'] = SERVICE
         api = FakeAPI()
         with self.assertRaises(AnsibleActionFail) as exc:
@@ -363,7 +359,6 @@ class BillingSyncTests(unittest.TestCase):
     def test_manual_migration_without_billing_explains_required_fields(self):
         data = declared_service()
         data['catalog']['vendor']['accounts']['main']['connection'] = {'type': 'manual'}
-        data['bindings'][0]['kind'] = 'manual'
         api = FakeAPI()
         with self.assertRaises(AnsibleActionFail) as exc:
             self.run_action(params(**data), api, check=True)
@@ -375,7 +370,6 @@ class BillingSyncTests(unittest.TestCase):
     def test_manual_account_requires_verified_billing_even_with_old_managed_record(self):
         data = declared_service()
         data['catalog']['vendor']['accounts']['main']['connection'] = {'type': 'manual'}
-        data['bindings'][0]['kind'] = 'manual'
         api = FakeAPI(providers=[provider(kind='manual')], services=[managed_service()])
         with self.assertRaises(AnsibleActionFail) as exc:
             self.run_action(params(**data), api, check=True)
@@ -385,7 +379,6 @@ class BillingSyncTests(unittest.TestCase):
     def test_manual_migration_with_verified_billing_creates_without_sync(self):
         data = declared_service(has_billing=True)
         data['catalog']['vendor']['accounts']['main']['connection'] = {'type': 'manual'}
-        data['bindings'][0]['kind'] = 'manual'
         api = FakeAPI()
         result = self.run_action(params(**data), api, check=True)
         self.assertEqual(result['counts'], {'creates': 2, 'updates': 0, 'syncs': 0})
@@ -394,21 +387,29 @@ class BillingSyncTests(unittest.TestCase):
         self.assertEqual(result['counts'], {'creates': 2, 'updates': 0, 'syncs': 0})
         self.assertEqual([path for _, path, _ in api.writes()], ['/providers', '/services'])
 
-    def test_kind_and_driver_conflicts_name_provider_and_do_not_write(self):
+    def test_driver_conflict_within_one_api_provider_names_account_and_does_not_write(self):
         data = declared_service(has_billing=True)
-        data['bindings'][0]['kind'] = 'manual'
+        data['catalog']['vendor']['accounts']['second'] = {'connection': {'type': 'manual'}}
         api = FakeAPI()
         with self.assertRaises(AnsibleActionFail) as exc:
             self.run_action(params(**data), api, check=True)
-        self.assertIn('Provider/account vendor/main', exc.exception.result['public_error'])
-        self.assertIn('remove connection.driver', exc.exception.result['public_error'])
+        self.assertIn('Provider/account vendor/second', exc.exception.result['public_error'])
+        self.assertIn('share one connection.driver', exc.exception.result['public_error'])
         self.assertEqual(api.writes(), [])
+
+    def test_api_account_without_driver_names_account(self):
+        data = declared_service(has_billing=True)
+        del data['catalog']['vendor']['accounts']['main']['connection']['driver']
+        with self.assertRaises(AnsibleActionFail) as exc:
+            self.run_action(params(**data), FakeAPI(), check=True)
+        self.assertIn("'vendor/main' without a driver", exc.exception.result['public_error'])
+
 
     def test_live_kind_mismatch_has_safe_public_diagnostic(self):
         api = FakeAPI(providers=[provider(kind='manual')])
         with self.assertRaises(AnsibleActionFail) as exc:
             self.run_action(params(**declared_service(has_billing=True)), api, check=True)
-        self.assertIn('Provider vendor: live kind manual differs from binding kind billmgr',
+        self.assertIn('Provider vendor: live kind manual differs from declared kind billmgr',
                       exc.exception.result['public_error'])
         self.assertEqual(api.writes(), [])
 
@@ -426,6 +427,69 @@ class BillingSyncTests(unittest.TestCase):
             result = self.run_action(params(), api)
             self.assertFalse(result['changed'])
             self.assertEqual(api.writes(), [])
+
+
+class CatalogIdentityTests(unittest.TestCase):
+    """infra-billing identities declared inside the infra_providers catalog."""
+
+    def catalog(self):
+        return {'vendor': {'name': 'Vendor', 'accounts': {
+            'a': {'connection': {'type': 'api', 'driver': 'porkbun'}},
+            'b': {'connection': {'type': 'api', 'driver': 'porkbun'}},
+        }}, 'other': {'name': 'Other', 'accounts': {'main': {}}}}
+
+    def host(self, account, provider='vendor', enabled=True):
+        return {'name': provider + '-' + account, 'infrastructure': {'provider': provider, 'account': account},
+                'binding': {'enabled': enabled, 'project_uuid': PROJECT}}
+
+    def test_defaults_group_accounts_under_catalog_name_with_key_labels(self):
+        model = billing.model.project_model(self.catalog(), [self.host('a'), self.host('b')])
+        self.assertEqual([(p['key'], p['kind'], p['body']['name'], p['uuid']) for p in model['providers']],
+                         [('vendor', 'porkbun', 'Vendor', None)])
+        self.assertEqual([a['body']['label'] for a in model['providers'][0]['accounts']], ['a', 'b'])
+
+    def test_provider_level_identity_applies_to_all_accounts(self):
+        catalog = self.catalog()
+        catalog['vendor']['infra_billing'] = {'uuid': PROVIDER, 'name': 'Vendor: Live'}
+        catalog['vendor']['accounts']['a']['infra_billing'] = {'uuid': ACCOUNT, 'label': None}
+        model = billing.model.project_model(catalog, [self.host('a'), self.host('b')])
+        self.assertEqual(len(model['providers']), 1)
+        provider_ = model['providers'][0]
+        self.assertEqual((provider_['uuid'], provider_['body']['name']), (PROVIDER, 'Vendor: Live'))
+        self.assertEqual([(a['uuid'], a['body']['label']) for a in provider_['accounts']],
+                         [(ACCOUNT, None), (None, 'b')])
+
+    def test_account_level_provider_splits_and_replaces_provider_default(self):
+        catalog = self.catalog()
+        catalog['vendor']['infra_billing'] = {'uuid': PROVIDER, 'name': 'Vendor: A'}
+        catalog['vendor']['accounts']['b']['infra_billing'] = {'provider': {'name': 'Vendor: B'}}
+        model = billing.model.project_model(catalog, [self.host('a'), self.host('b')])
+        self.assertEqual(sorted((p['body']['name'], p['uuid']) for p in model['providers']),
+                         [('Vendor: A', PROVIDER), ('Vendor: B', None)])
+
+    def test_one_api_identity_cannot_span_catalog_providers(self):
+        catalog = self.catalog()
+        catalog['other']['infra_billing'] = {'name': 'Vendor'}
+        catalog['other']['accounts']['main']['connection'] = {'type': 'api', 'driver': 'porkbun'}
+        with self.assertRaisesRegex(ValueError, 'provider name is used by more than one'):
+            billing.model.project_model(catalog, [self.host('a'), self.host('main', 'other')])
+
+    def test_scoped_runs_only_reconcile_used_accounts_and_full_runs_all(self):
+        hosts = [self.host('a'), self.host('b', enabled=False)]
+        scoped = billing.model.project_model(self.catalog(), hosts)
+        self.assertEqual([a['key'] for p in scoped['providers'] for a in p['accounts']], [('vendor', 'a')])
+        full = billing.model.project_model(self.catalog(), hosts, include_unused=True)
+        self.assertEqual(sorted(a['key'] for p in full['providers'] for a in p['accounts']),
+                         [('other', 'main'), ('vendor', 'a'), ('vendor', 'b')])
+
+    def test_identity_blocks_reject_unknown_keys_and_bad_uuids(self):
+        for block, where in (({'kind': 'billmgr'}, 'provider'), ({'uuid': 'nope'}, 'account'),
+                             ({'provider': {'label': 'x'}}, 'account')):
+            catalog = self.catalog()
+            target = catalog['vendor'] if where == 'provider' else catalog['vendor']['accounts']['a']
+            target['infra_billing'] = block
+            with self.assertRaises(ValueError):
+                billing.model.validate_catalog(catalog)
 
 
 if __name__ == '__main__':

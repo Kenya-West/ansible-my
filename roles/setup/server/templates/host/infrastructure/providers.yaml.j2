@@ -8,6 +8,7 @@ infra_providers: {}
 #     name: Vendor
 #     website: https://vendor.example
 #     login_url: https://panel.vendor.example
+#     favicon_link: https://vendor.example/favicon.ico
 #     accounts:
 #       main:
 #         connection:
@@ -17,4 +18,25 @@ infra_providers: {}
 #           credentials:
 #             username: "{{ vault_vendor_login }}"
 #             password: "{{ vault_vendor_password }}"
+#         # Optional infra-billing identity of this account (all keys optional):
+#         infra_billing:
+#           uuid: ...      # adopt an existing account and retain its credentials
+#           label: null    # API label; default is the account key
+#     # Optional infra-billing provider identity shared by all accounts above:
+#     infra_billing:
+#       uuid: ...          # adopt a provider whose live display name differs
+#       name: "Vendor: me" # API display name; default is name above
+#
+#   # One vendor split into several infra-billing providers (one per account):
+#   registrar:
+#     name: Registrar
+#     accounts:
+#       personal:
+#         connection: {type: api, driver: porkbun}
+#         infra_billing:
+#           provider: {name: "Registrar: personal"}  # replaces provider-level identity
+#       business:
+#         connection: {type: api, driver: porkbun}
+#         infra_billing:
+#           provider: {name: "Registrar: business"}
 {% endraw %}

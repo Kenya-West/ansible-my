@@ -1,15 +1,18 @@
 ---
 # Catalog belongs to this billing server; controller workflows use hostvars[server].
 # No VPS due dates/reminders here; use each node's infrastructure instead.
+# API identities (UUIDs, names, labels) live in its optional infra_billing blocks.
 infra_providers: {}
 infra_billing_api_url: "https://{{ domains_keys.infra_billing }}"
 infra_billing_api_token: "{{ lookup('ansible.builtin.env', 'INFRA_BILLING_API_TOKEN') }}"
 infra_billing_action: read
-infra_billing_provider_bindings: []
 # Standalone registrar services owned by this billing server, never node hosts.
 infrastructure_domains: {}
 infra_billing_domain_bindings: {}
 infra_billing_manage_hosts: true
+# Reconcile every catalog provider account, even ones no enabled host/domain uses.
+# Scoped workflows (domains only) disable it to avoid unrelated provider writes.
+infra_billing_include_unused_accounts: true
 infra_billing_node_group: general_vps_prepare
 infra_billing_rotate_credentials: false
 # Full sync playbook refreshes all enabled non-manual accounts, even unbound ones.

@@ -45,12 +45,21 @@
       changed_when: false
       no_log: true
 
-    - name: Collect independent data and existing stable key bindings
+    - name: Refuse the retired provider bindings variable
+      ansible.builtin.assert:
+        that: hostvars[sip_host].infra_billing_provider_bindings | default([]) | length == 0
+        fail_msg: >-
+          {{ sip_host }}: infra_billing_provider_bindings was merged into infra_providers
+          (provider/account infra_billing blocks); move its identities there, then remove it.
+        quiet: true
+
+    # Stable keys for known API providers come from the existing catalog's
+    # infra_billing identities (matched inside the regenerate filter).
+    - name: Collect independent billing provider data
       ansible.builtin.set_fact:
         sip_entries: >-
           {{ sip_entries + [{'kind': 'infra_billing', 'host': sip_host,
              'data': sip_billing_read.json,
-             'bindings': hostvars[sip_host].infra_billing_provider_bindings | default([]),
              'provider_keys': sip_billing.provider_keys | default({}),
              'account_keys': sip_billing.account_keys | default({})}] }}
         sip_used: true

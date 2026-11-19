@@ -20,14 +20,14 @@ projected at the API boundary. Missing manual domains require verified billing;
 connector-managed domains retain their API price/due date.
 
 ```sh
-# Domains only: avoids unrelated enabled hosts and provider bindings.
+# Domains only: avoids unrelated enabled hosts and provider accounts.
 ansible-playbook -i inventory/production.ini \
   playbooks/observability/server/infra_billing_domains.yaml --limit=<server> --check
 ```
 
 Full `infra_billing_sync.yaml` includes enabled domains too. It also refreshes
 **every enabled non-manual account already in infra-billing**, even without a
-catalog binding or an enabled inventory export. All connector-discovered entities
+catalog entry or an enabled inventory export. All connector-discovered entities
 (services, domains, balances and supported payment history) are refreshed; manual
 records still use additive inventory reconciliation. Disabled connector accounts
 are skipped, never silently enabled. Projects are read/validated, not created.
@@ -55,9 +55,13 @@ See [data model, examples, commands and safety limits](https://github.com/Kenya-
   structured report of projects, services, provider/account UUIDs and inventory
   matches. It excludes credentials and is read-only.
 - `connection.driver: billmgr` (or another supported driver) declares connector
-  kind independently of API state. Missing bindings for referenced accounts are
-  derived from this declaration; explicit `infra_billing_provider_bindings` still
-  provide names, kind overrides and adoption UUIDs. Conflicting kinds fail.
+  kind independently of API state; non-API connections are `manual`. API
+  identities live in the same catalog, in optional `infra_billing` blocks (see
+  [Provider identities](#provider-identities)). The former
+  `infra_billing_provider_bindings` variable is refused when non-empty.
+- Full sync reconciles every catalog provider account
+  (`infra_billing_include_unused_accounts: true`); the domains-only playbook and
+  host onboarding reconcile only the accounts their enabled records use.
 - `infra_billing_sync_all_accounts` defaults to false in the role and is enabled
   by `infra_billing_sync.yaml`. Each enabled connector account receives exactly
   one `SYNC` per run, after provider/account creation or credential updates.
@@ -138,11 +142,36 @@ prevention, connector-owned fields, manual reconciliation, isolated account
 failures and safe reports. Isolated Ansible CLI tests verify the partial report
 is printed before failing and that validation failures remain private/fatal.
 
+## Provider identities
+
+`infra_providers` is the single source for both connections and infra-billing API
+identities. Every catalog account maps to one infra-billing provider/account:
+
+| Field | Where | Default |
+|---|---|---|
+| provider display name | `<provider>.infra_billing.name` | catalog `name` |
+| provider adoption UUID | `<provider>.infra_billing.uuid` | match by name |
+| account adoption UUID | `accounts.<a>.infra_billing.uuid` | match by label |
+| account label | `accounts.<a>.infra_billing.label` (may be `null`) | account key |
+| connector kind | `accounts.<a>.connection.driver` | `manual` unless `type: api` |
+
+Accounts with the same provider identity form one infra-billing provider and must
+share one driver. To split one vendor key into several API providers (e.g. one per
+registrar login), give each account its own `accounts.<a>.infra_billing.provider:
+{uuid, name}`; it replaces, never merges with, the provider-level block. One API
+identity cannot span two catalog providers. Examples:
+[server providers template](../setup/server/templates/host/infrastructure/providers.yaml.j2).
+
+`setup/infra_providers` regeneration maps live API providers back to catalog keys
+through these identities and records the live identity for accounts that declare
+none. Declared identities always win over API data.
+
 ## Switching a retired connector to manual billing
 
 If a provider retires its API, set the catalog account's `connection.type` to
-`manual`, remove `connection.driver`, and set its binding `kind: manual`. Use the
-intended manual provider/account UUIDs, or omit them when creating new records.
+`manual` and remove `connection.driver`. Point its `infra_billing` identity at the
+intended manual provider/account UUIDs, or remove those UUIDs (and use a new
+`infra_billing.name` if the old connector provider keeps its name) to create new records.
 Reconciliation does not convert a live provider's kind in place or adopt deleted
 UUIDs. Remove a deleted service's `infra_billing_service.uuid` (or replace it with
 an existing manual service UUID); keep the intended `project_uuid`.
@@ -157,10 +186,9 @@ invent zero-cost records. Once the UUIDs and billing are updated, preview with
 ## Configuration errors
 
 A driver error identifies the host and provider/account: API connections need an
-explicit `connection.driver` (such as `billmgr`) unless the API binding supplies
-`kind`. An enabled but absent connector account also needs creation credentials
-in the private catalog; a missing stored account cannot reuse secrets from a
-deleted binding. Enabled manual services need verified `infrastructure.billing`
+explicit `connection.driver` (such as `billmgr`). An enabled but absent connector
+account also needs creation credentials in the private catalog; a missing stored
+account cannot reuse secrets from a deleted account UUID. Enabled manual services need verified `infrastructure.billing`
 (amount, currency and supported interval). Historical To Do reminder dates are
 not sufficient. Reconciliation fails before writes rather than guessing costs,
 silently changing API accounts to manual, or skipping enabled exports.
