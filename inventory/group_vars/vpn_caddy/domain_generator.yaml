@@ -55,7 +55,7 @@ domains_node_panel: >-
   {%-   set _ = entries.append({'host': entry.host, 'priority': entry.priority | default(100) | int}) -%}
   {%- endfor -%}
   {%- set panel = entries | sort(attribute='priority') | map(attribute='host') | first | default('', true) -%}
-  {{ panel if panel else (undef('domains_node_panel: host_relations of ' ~ inventory_hostname ~ ' resolve to no panel') | mandatory) }}
+  {{ panel if panel else (undef() | mandatory('domains_node_panel: host_relations of ' ~ inventory_hostname ~ ' resolve to no panel')) }}
 
 # Read from the panel's 0_all/1_domains.yaml, not through hostvars: hostvars is
 # missing when another host templates this node's variables
