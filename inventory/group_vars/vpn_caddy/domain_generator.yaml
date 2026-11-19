@@ -43,7 +43,12 @@ domains_node_remna_node_spec:
 # host_relations.vpn_server_remnawave, then host_relations.default, by priority
 # - the resolution of kwtoolset/resolve_host_relations, which playbooks run
 # and inventory variables cannot.
+# Empty for a host without host_relations at all (not set up as a node yet,
+# e.g. the placeholder localhost): it gets no generated domains_keys. Relations
+# that exist but resolve to no panel are an error.
 domains_node_panel: >-
+  {%- if host_relations is not defined -%}
+  {%- else -%}
   {%- set rel = host_relations | default({}, true) -%}
   {%- set grp = rel.vpn_server_remnawave | default({}, true) -%}
   {%- set chain = [
@@ -56,6 +61,7 @@ domains_node_panel: >-
   {%- endfor -%}
   {%- set panel = entries | sort(attribute='priority') | map(attribute='host') | first | default('', true) -%}
   {{ panel if panel else (undef() | mandatory('domains_node_panel: host_relations of ' ~ inventory_hostname ~ ' resolve to no panel')) }}
+  {%- endif -%}
 
 # Read from the panel's 0_all/1_domains.yaml, not through hostvars: hostvars is
 # missing when another host templates this node's variables
@@ -94,7 +100,10 @@ domains_node_base_domains: >-
 # A node that is also a server (setup/server on an existing host) adds the
 # service domains of its server groups in domains_keys_services
 # (0_all/4_server_domains.yaml); they are merged into the generated keys.
-domains_keys: "{{ domains_keys_generated | combine(domains_keys_services | default({}, true)) }}"
+# A host without a panel (see domains_node_panel) generates nothing.
+domains_keys: >-
+  {{ (domains_keys_generated if domains_node_panel else {})
+     | combine(domains_keys_services | default({}, true)) }}
 
 domains_keys_generated:
   main: "{{ inventory_hostname }}.{{ domains_node_base_domains.main | first }}"

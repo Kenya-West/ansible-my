@@ -2,9 +2,7 @@
 {%- for host in groups['analytics_node'] -%}
   {%- set hv = hostvars[host] -%}
 
-  {%- set has_domains = host not in groups['vpn_caddy'] | default([]) or hv.host_relations is defined -%}
-
-  {%- if has_domains and (hv.domains_keys|default({})).main is defined -%}
+  {%- if (hv.domains_keys|default({})).main is defined -%}
 
     {# Skip adding the host if domains_keys.main contains example.tld #}
     {%- set skip_host = False -%}
